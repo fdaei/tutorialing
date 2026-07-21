@@ -1,0 +1,66 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-lingospeak}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-lingospeak}
+      POSTGRES_DB: ${POSTGRES_DB:-lingospeak}
+    ports: ["5432:5432"]
+    volumes: [postgres_data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [lingospeak]
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [lingospeak]
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address :9001
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-minio}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-change-me}
+      MINIO_API_CORS_ALLOW_ORIGIN: "${WEB_URL:-http://localhost:3000},http://127.0.0.1:3000"
+    ports: ["9000:9000", "9001:9001"]
+    volumes: [minio_data:/data]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks:
+      lingospeak:
+        aliases: [minio]
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        attempts=0;
+        until mc alias set local http://minio:9000 ${S3_ACCESS_KEY:-minio} ${S3_SECRET_KEY:-change-me}; do
+          attempts=$$((attempts + 1));
+          if [ "$$attempts" -ge 15 ]; then
+            echo "Blocking: minio-init could not resolve or connect to the MinIO service on the Compose network." >&2;
+            exit 1;
+          fi;
+          sleep 2;
+        done;
+        mc mb --ignore-existing local/${S3_BUCKET:-lingospeak};
+        mc anonymous set none local/${S3_BUCKET:-lingospeak}
+    restart: "no"
+    networks: [lingospeak]
+volumes: { postgres_data: {}, minio_data: {} }
+networks:
+  lingospeak:
+    driver: bridge

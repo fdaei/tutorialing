@@ -1,0 +1,23 @@
+'use client';
+import Link from 'next/link';
+import {Headphones,Menu,MessageCircle,X} from 'lucide-react';
+import {useState} from 'react';
+import {useQuery} from '@tanstack/react-query';
+import {api} from '@/lib/api';
+import {LanguageSwitcher} from './language-switcher';
+import {useTranslations} from './locale-provider';
+import {localePath} from '@/lib/i18n';
+
+export function Brand(){return <span className="flex items-center gap-2"><span className="brand-gradient grid size-10 place-items-center rounded-full text-lg font-black text-white shadow-lg"><MessageCircle size={23}/></span><strong className="latin text-xl font-bold text-navy">LingoSpeak</strong></span>}
+
+export function Header(){
+ const{locale,t}=useTranslations(),p=(x:string)=>localePath(x,locale),[open,setOpen]=useState(false);
+ const me=useQuery({queryKey:['header-me'],queryFn:()=>api<{roles:string[]}>('/users/me'),retry:false});
+ const links:[string,string][]=[[p('/teachers'),t('teachers')],[p('/placement'),t('placement')],[p('/matching'),t('matching')],[p('/about'),locale==='fa'?'درباره ما':'About us']];
+ return <header className="sticky top-0 z-40 border-b border-transparent bg-white/92 backdrop-blur-xl"><div className="mx-auto flex h-[76px] max-w-[1380px] items-center justify-between px-5 lg:px-8"><Link href={p('/')}><Brand/></Link><nav aria-label={t('mainNavigation')} className="hidden items-center gap-9 text-sm font-bold lg:flex">{links.map(([href,label])=><Link key={href} href={href} className="hover:text-blue">{label}</Link>)}</nav><div className="flex items-center gap-2.5"><LanguageSwitcher className="hidden sm:inline-flex"/><Link href={p(me.data?'/panel':'/auth')} className="rounded-xl border border-[#cfd5e5] bg-white px-5 py-2.5 text-sm font-bold hover:border-purple">{me.data?t('dashboard'):t('signIn')}</Link><Link href={p('/matching')} className="brand-gradient brand-glow hidden rounded-xl px-5 py-2.5 text-sm font-bold text-white sm:block">{t('findTeacher')}</Link><button className="grid size-10 place-items-center lg:hidden" onClick={()=>setOpen(x=>!x)} aria-label={t('openMenu')}>{open?<X/>:<Menu/>}</button></div></div>{open&&<nav className="grid gap-2 border-t hairline bg-white p-5 lg:hidden">{links.map(([href,label])=><Link key={href} onClick={()=>setOpen(false)} href={href} className="rounded-xl px-4 py-3 font-bold hover:bg-lavender">{label}</Link>)}</nav>}</header>
+}
+
+export function Footer(){const{locale,t}=useTranslations(),p=(x:string)=>localePath(x,locale);return <footer className="border-t hairline bg-white"><div className="mx-auto grid max-w-[1380px] gap-10 px-6 py-14 md:grid-cols-4"><div className="md:col-span-1"><Brand/><p className="mt-5 text-sm leading-7 text-muted">{locale==='fa'?'پلتفرم هوشمند تطبیق مدرس آیلتس؛ از سنجش سطح تا برنامه یادگیری شخصی.':'Smart IELTS teacher matching, from assessment to a personal learning plan.'}</p></div><div><p className="font-black">{locale==='fa'?'دسترسی سریع':'Explore'}</p><div className="mt-4 grid gap-3 text-sm text-muted"><Link href={p('/teachers')}>{t('teachers')}</Link><Link href={p('/placement')}>{t('placement')}</Link><Link href={p('/matching')}>{t('matching')}</Link><Link href={p('/about')}>{locale==='fa'?'درباره ما':'About us'}</Link></div></div><div><p className="font-black">{locale==='fa'?'پشتیبانی':'Support'}</p><div className="mt-4 grid gap-3 text-sm text-muted"><Link href={p('/faq')}>{locale==='fa'?'سؤالات متداول':'FAQ'}</Link><Link href={p('/contact')}>{locale==='fa'?'تماس با ما':'Contact'}</Link><Link href={p('/terms')}>{locale==='fa'?'قوانین':'Terms'}</Link><Link href={p('/privacy')}>{locale==='fa'?'حریم خصوصی':'Privacy'}</Link></div></div><div><p className="font-black">{locale==='fa'?'تماس با ما':'Contact'}</p><p className="latin mt-4 text-lg" dir="ltr">021 9109 4200</p><p className="latin mt-2 text-sm text-muted">support@lingospeak.ir</p><p className="mt-2 text-sm text-muted">{locale==='fa'?'شنبه تا پنج‌شنبه، ۹ تا ۲۰':'Saturday–Thursday, 9:00–20:00'}</p></div></div><div className="border-t hairline py-5 text-center text-xs text-muted">© ۱۴۰۵ LingoSpeak — {locale==='fa'?'تمام حقوق محفوظ است.':'All rights reserved.'}</div></footer>}
+
+export function Eyebrow({children}:{children:React.ReactNode}){return <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-violet/20 bg-lavender/70 px-4 py-2 text-xs font-bold text-purple"><span className="size-2 rounded-full bg-purple ring-4 ring-violet/15"/>{children}</div>}
+export function Empty({title,body}:{title:string;body:string}){return <div className="rounded-3xl border border-dashed hairline p-12 text-center"><Headphones className="mx-auto mb-4 text-muted"/><h3 className="font-bold">{title}</h3><p className="mt-2 text-sm text-muted">{body}</p></div>}

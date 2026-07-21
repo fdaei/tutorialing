@@ -1,0 +1,1 @@
+import{Module}from'@nestjs/common';import{SupportController,NotificationsController}from'./support.controller';import{SupportService}from'./support.service';@Module({controllers:[SupportController,NotificationsController],providers:[SupportService]})export class SupportModule{}
