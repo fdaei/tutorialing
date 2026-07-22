@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma, TeacherStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
+import { TeachersRepository } from './teachers.repository';
 import { AuditService } from '../../common/audit.service';
 import { badRequest, notFound } from '../../common/errors';
 

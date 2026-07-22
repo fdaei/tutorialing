@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
+import { BookingsRepository } from './bookings.repository';
 import { badRequest, conflict, forbidden, notFound } from '../../common/errors';
 import { QueueService } from '../queue/queue.service';
 import { AvailabilityService } from './availability.service';
@@ -9,7 +10,7 @@ import { RedisService } from './redis.service';
 @Injectable()
 export class BookingsService {
   constructor(
-    private db: PrismaService,
+    private db: PrismaService, private repo: BookingsRepository,
     private redis: RedisService,
     private queue: QueueService,
     private availability: AvailabilityService,
@@ -84,29 +85,11 @@ export class BookingsService {
   }
 
   list(userId:string,role:'student'|'teacher') {
-    return this.db.booking.findMany({
-      where: role === 'student' ? { studentId: userId } : { teacher: { userId } },
-      include: {
-        teacher: { select: { nameFa: true, nameEn: true, slug: true, languageLinks: { where: { active: true }, include: { language: true } } } },
-        student: { select: { name: true, phone: true, email: true } },
-        classRecord: true,
-        payment: { select: { id: true, status: true, amount: true } },
-        review: { select: { id: true, rating: true, moderationStatus: true } },
-      },
-      orderBy: { startsAt: 'asc' },
-    });
+    return role === 'student' ? this.repo.findStudentBookings(userId) : this.repo.findTeacherBookings(userId);
   }
 
   students(userId:string) {
-    return this.db.user.findMany({
-      where: { bookings: { some: { teacher: { userId }, status: { in: ['CONFIRMED', 'COMPLETED'] } } } },
-      select: {
-        id: true, name: true, phone: true, email: true, locale: true,
-        bookings: { where: { teacher: { userId } }, select: { id: true, status: true, startsAt: true, endsAt: true }, orderBy: { startsAt: 'desc' }, take: 5 },
-        learningPlans: { where: { teacher: { userId } }, select: { id: true, title: true, targetBand: true, createdAt: true }, orderBy: { createdAt: 'desc' }, take: 3 },
-      },
-      orderBy: { updatedAt: 'desc' }, take: 200,
-    });
+    return this.repo.findTeacherStudents(userId);
   }
 
   async cancel(userId:string,id:string,reason:string) {
