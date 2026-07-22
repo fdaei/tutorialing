@@ -1,19 +1,9 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
-import { IsIn, IsInt, IsOptional, IsString, Min } from 'class-validator';
 import { PriceStatus } from '@prisma/client';
 import { CurrentUser, Permissions, Roles, type AuthUser } from '../../common/auth';
 import { PricingService } from './pricing.service';
-
-class ProposalDto {
-  @IsInt() @Min(10000) proposedTrialPrice!: number;
-  @IsInt() @Min(10000) proposedRegularPrice!: number;
-}
-class PriceReviewDto {
-  @IsIn(['start_review', 'counter', 'reject', 'recommend_approval', 'approve']) action!: 'start_review' | 'counter' | 'reject' | 'recommend_approval' | 'approve';
-  @IsOptional() @IsInt() @Min(10000) counterTrialPrice?: number;
-  @IsOptional() @IsInt() @Min(10000) counterRegularPrice?: number;
-  @IsOptional() @IsString() note?: string;
-}
+import { ProposalDto } from './dto/request/proposal.dto';
+import { PriceReviewDto } from './dto/request/price-review.dto';
 
 @Roles('TEACHER')
 @Controller('teacher/pricing')

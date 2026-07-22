@@ -1,12 +1,9 @@
 import { Body, Controller, Param, Post, Put } from '@nestjs/common';
-import { IsIn, IsOptional, IsString } from 'class-validator';
-import { DocumentStatus } from '@prisma/client';
 import { CurrentUser, Permissions, Roles, type AuthUser } from '../../common/auth';
 import { VerificationService } from './verification.service';
-
-class DocumentDto { @IsIn(['identity', 'certificate', 'experience', 'demo-lesson']) kind!: string; @IsString() fileId!: string; }
-class ReviewDto { @IsIn(['UNDER_REVIEW', 'APPROVED', 'REJECTED', 'NEEDS_REVISION']) status!: DocumentStatus; @IsOptional() @IsString() note?: string; }
-class ResubmitDto { @IsString() fileId!: string; }
+import { DocumentDto } from './dto/request/document.dto';
+import { ResubmitDto } from './dto/request/resubmit.dto';
+import { ReviewDto } from './dto/request/review.dto';
 
 @Controller()
 export class VerificationController {
