@@ -1,19 +1,10 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
-import { IsIn, IsInt, IsOptional, IsString, Length, Max, Min } from 'class-validator';
 import { ReviewStatus } from '@prisma/client';
 import { CurrentUser, Permissions, Roles, type AuthUser } from '../../common/auth';
 import { ReviewsService } from './reviews.service';
-
-class CreateReviewDto {
-  @IsString() bookingId!: string;
-  @IsInt() @Min(1) @Max(5) rating!: number;
-  @IsOptional() @IsString() @Length(2, 3000) comment?: string;
-}
-class ModerateReviewDto {
-  @IsIn(['APPROVED', 'REJECTED', 'NEEDS_REVISION']) status!: 'APPROVED' | 'REJECTED' | 'NEEDS_REVISION';
-  @IsOptional() @IsString() note?: string;
-}
-class ReplyReviewDto { @IsString() @Length(2, 2000) response!: string; }
+import { CreateReviewDto } from './dto/request/create-review.dto';
+import { ModerateReviewDto } from './dto/request/moderate-review.dto';
+import { ReplyReviewDto } from './dto/request/reply-review.dto';
 
 @Controller('reviews')
 export class ReviewsController {
