@@ -1,10 +1,11 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, Role, UserStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
+import { AdminRepository } from './admin.repository';
 
 @Injectable()
 export class AdminService {
-  constructor(private db: PrismaService) {}
+  constructor(private db: PrismaService, private repo: AdminRepository) {}
 
   async dashboard() {
     const [users, teachers, pendingTeachers, attempts, pendingReviews, bookings, payments, payouts, tickets, revenue, credits, debits, recentActivity] = await this.db.$transaction([
@@ -27,7 +28,7 @@ export class AdminService {
 
   async users(page = 1, search = '', status = '') {
     const take=30,where:Prisma.UserWhereInput={...(search&&{OR:[{name:{contains:search,mode:'insensitive'}},{phone:{contains:search}},{email:{contains:search,mode:'insensitive'}}]}),...(['ACTIVE','SUSPENDED','DELETED'].includes(status)&&{status:status as UserStatus})};
-    const [data,total]=await this.db.$transaction([this.db.user.findMany({where,skip:(Math.max(1,page)-1)*take,take,include:{roles:true},orderBy:{createdAt:'desc'}}),this.db.user.count({where})]);
+    const [data,total]=await this.repo.getUsers(where, (Math.max(1,page)-1)*take, take);
     return{data,total,page:Math.max(1,page),totalPages:Math.ceil(total/take)};
   }
 
@@ -76,23 +77,23 @@ export class AdminService {
   }
 
   applications() {
-    return this.db.teacher.findMany({ where: { status: { notIn: ['DRAFT', 'APPROVED'] } }, include: { user: { select: { phone: true, email: true } }, verificationItems: { include: { file: true } }, verificationHistory: { orderBy: { createdAt: 'desc' } } }, orderBy: { submittedAt: 'asc' } });
+    return this.repo.getTeacherApplications();
   }
 
   bookings() {
-    return this.db.booking.findMany({ include: { student: { select: { name: true, phone: true } }, teacher: { select: { nameFa: true, nameEn: true, slug: true } }, payment: true, classRecord: true }, orderBy: { startsAt: 'desc' }, take: 200 });
+    return this.repo.getBookings();
   }
 
   tickets() {
-    return this.db.ticket.findMany({ include: { user: { select: { name: true, phone: true } }, replies: { orderBy: { createdAt: 'asc' }, take: 5 } }, orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }], take: 200 });
+    return this.repo.getTickets();
   }
 
   notificationDeliveries() {
-    return this.db.notificationDelivery.findMany({ include: { notification: { select: { userId: true, type: true, titleFa: true } } }, orderBy: { createdAt: 'desc' }, take: 200 });
+    return this.repo.getNotificationDeliveries();
   }
 
   roles() {
-    return this.db.userRole.findMany({ include: { user: { select: { phone: true, name: true } }, permissions: { include: { permission: true } } }, orderBy: { userId: 'asc' }, take: 300 });
+    return this.repo.getRoles();
   }
 
   permissions() {
@@ -149,7 +150,7 @@ export class AdminService {
   }
 
   payments() {
-    return this.db.payment.findMany({ include: { refunds: true, reconciliations: true, user: { select: { phone: true, name: true } } }, orderBy: { createdAt: 'desc' }, take: 200 });
+    return this.repo.getPayments();
   }
 
   settings() {
@@ -164,7 +165,7 @@ export class AdminService {
     return this.db.cmsPage.findMany({ orderBy: { slug: 'asc' } });
   }
 
-  upsertCms(slug: string, d: any) {
+  upsertCms(slug: string, d: Record<string, unknown>) {
     return this.db.cmsPage.upsert({ where: { slug }, create: { slug, seo: d.seo ?? {}, ...d }, update: d });
   }
 }

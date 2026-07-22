@@ -1,44 +1,14 @@
+import { TeacherStatus } from '@prisma/client';
 import { Body, Controller, Get, Param, Patch, Post, Put, Query } from '@nestjs/common';
-import { ArrayNotEmpty, IsArray, IsEmail, IsEnum, IsIn, IsOptional, IsString, Matches } from 'class-validator';
-import { Role, UserStatus } from '@prisma/client';
 import { CurrentUser, Permissions, Roles, type AuthUser } from '../../common/auth';
 import { TeachersService } from '../teachers/teachers.service';
 import { AdminService } from './admin.service';
-
-class TransitionDto {
-  @IsIn(['DOCUMENT_REVIEW', 'INTERVIEW', 'DEMO_REVIEW', 'APPROVED', 'REJECTED'])
-  status!: any;
-
-  @IsOptional()
-  @IsString()
-  note?: string;
-}
-class RoleDto {
-  @IsString()
-  userId!: string;
-
-  @IsIn(['STUDENT', 'TEACHER', 'ADMIN', 'STAFF', 'EXAMINER', 'SUPPORT', 'FINANCE'])
-  role!: Role;
-}
-
-class PermissionDto extends RoleDto {
-  @IsString()
-  permission!: string;
-}
-class CreateUserDto {
-  @Matches(/^09\d{9}$/) phone!: string;
-  @IsString() name!: string;
-  @IsOptional() @IsEmail() email?: string;
-  @IsOptional() @IsIn(['fa','en']) locale?: string;
-  @IsOptional() roles?: Role[];
-}
-class UserStatusDto { @IsIn(['ACTIVE','SUSPENDED','DELETED']) status!: UserStatus; }
-class UserRolesDto {
-  @IsArray()
-  @ArrayNotEmpty()
-  @IsEnum(Role, { each: true })
-  roles!: Role[];
-}
+import { TransitionDto } from './dto/request/transition.dto';
+import { RoleDto } from './dto/request/role.dto';
+import { PermissionDto } from './dto/request/permission.dto';
+import { CreateUserDto } from './dto/request/create-user.dto';
+import { UserStatusDto } from './dto/request/user-status.dto';
+import { UserRolesDto } from './dto/request/user-roles.dto';
 
 @Roles('ADMIN', 'STAFF')
 @Controller('admin')
@@ -75,7 +45,7 @@ export class AdminController {
   @Permissions('teachers.verify')
   @Post('teacher-applications/:id/transition')
   transition(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() d: TransitionDto) {
-    return this.teachers.transition(id, d.status, u.id, d.note);
+    return this.teachers.transition(id, d.status as TeacherStatus, u.id, d.note);
   }
 
   @Permissions('bookings.read')
@@ -138,5 +108,5 @@ export class AdminController {
 
   @Permissions('cms.manage')
   @Put('cms/:slug')
-  upsert(@Param('slug') slug: string, @Body() d: any) { return this.s.upsertCms(slug, d); }
+  upsert(@Param('slug') slug: string, @Body() d: Record<string, unknown>) { return this.s.upsertCms(slug, d); }
 }
