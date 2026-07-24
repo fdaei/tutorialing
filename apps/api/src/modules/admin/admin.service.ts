@@ -166,6 +166,16 @@ export class AdminService {
   }
 
   upsertCms(slug: string, d: Record<string, unknown>) {
-    return this.db.cmsPage.upsert({ where: { slug }, create: { slug, seo: d.seo ?? {}, ...d }, update: d });
+    const titleFa = String(d.titleFa ?? slug);
+    const titleEn = String(d.titleEn ?? slug);
+    const contentFa = (d.contentFa ?? {}) as Prisma.InputJsonValue;
+    const contentEn = (d.contentEn ?? {}) as Prisma.InputJsonValue;
+    const seo = (d.seo ?? {}) as Prisma.InputJsonValue;
+    const published = d.published === true;
+    return this.db.cmsPage.upsert({
+      where: { slug },
+      create: { slug, titleFa, titleEn, contentFa, contentEn, seo, published },
+      update: { titleFa, titleEn, contentFa, contentEn, seo, published },
+    });
   }
 }

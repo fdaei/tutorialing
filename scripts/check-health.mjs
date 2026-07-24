@@ -1,4 +1,4 @@
-const base=process.env.API_URL||'http://localhost:4000';
+const base=process.env.API_URL||'http://localhost:4001';
 try{
  const response=await fetch(`${base}/api/health`),body=await response.json();
  if(!response.ok||body.status!=='ok'||body.database!=='connected')throw new Error('API or database is not healthy');

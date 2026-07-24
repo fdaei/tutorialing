@@ -1,7 +1,7 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { Queue, Worker } from 'bullmq';
 import { PrismaService } from '../../prisma.service';
-import { ConfigService } from '@nestjs/config';
+import { config } from '../../config';
 
 @Injectable()
 export class QueueService implements OnModuleInit, OnModuleDestroy {

@@ -12,7 +12,7 @@ export class LearningRepository {
         student: { select: { name: true } },
         teacher: { select: { nameFa: true, nameEn: true } },
         milestones: { orderBy: { order: 'asc' } },
-        assignments: { orderBy: { createdAt: 'desc' }, take: 10 },
+        assignments: { orderBy: { dueAt: 'desc' }, take: 10 },
       },
       orderBy: { createdAt: 'desc' },
     });

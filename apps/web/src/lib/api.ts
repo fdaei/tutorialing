@@ -1,4 +1,4 @@
-const API=process.env.NEXT_PUBLIC_API_URL??'http://localhost:4000/api';
+const API=process.env.NEXT_PUBLIC_API_URL??'http://localhost:4001/api';
 function locale(){if(typeof document==='undefined')return undefined;return document.documentElement.lang.startsWith('en')?'en':'fa'}
 export type ApiErrorBody={code?:string;message?:string;fieldErrors?:Record<string,string>;requestId?:string;timestamp?:string};
 export class ApiError extends Error{details:ApiErrorBody;constructor(public status:number,details:unknown){const body=(details&&typeof details==='object'?details:{}) as ApiErrorBody;super(body.message||`Request failed (${status})`);this.name='ApiError';this.details=body}}

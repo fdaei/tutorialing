@@ -191,7 +191,21 @@ export class TestsService {
     const answer = await this.db.testAnswer.findFirst({ where: { id: answerId, attempt: { status: 'UNDER_REVIEW' }, reviewStatus: { in: ['PENDING', 'IN_REVIEW'] } } });
     if (!answer) throw notFound('REVIEW_ANSWER_NOT_FOUND', 'پاسخ در صف بررسی پیدا نشد.', 'The answer was not found in the review queue.');
     if (answer.reviewStatus === 'IN_REVIEW' && answer.reviewerId && answer.reviewerId !== examinerId) throw conflict('ANSWER_ALREADY_CLAIMED', 'این پاسخ توسط ارزیاب دیگری در حال بررسی است.', 'Another examiner is already reviewing this answer.');
-    return this.db.testAnswer.update({ where: { id: answerId }, data: { reviewStatus: 'IN_REVIEW', reviewerId: examinerId } });
+    return this.db.testAnswer.update({
+      where: { id: answerId },
+      data: { reviewStatus: 'IN_REVIEW', reviewerId: examinerId },
+      include: {
+        file: true,
+        reviewer: { select: { id: true, name: true } },
+        question: { include: { section: true } },
+        attempt: {
+          include: {
+            user: { select: { name: true, phone: true } },
+            test: { select: { titleFa: true, titleEn: true, language: true } },
+          },
+        },
+      },
+    });
   }
 
   async reviewAnswer(examinerId: string, data: { answerId: string; band: number; criteria: object; feedbackFa: string; feedbackEn: string; status: 'APPROVED' | 'NEEDS_REVISION' }) {
@@ -277,7 +291,7 @@ export class TestsService {
   private definitionData(input: unknown, partial = false) {
     const data = this.record(input), out: Record<string, unknown> = {};
     for (const key of ['slug', 'titleFa', 'titleEn', 'descriptionFa', 'descriptionEn'] as const) {
-      if (data[key] !== undefined) out[key] = this.requiredString(data[key], key, key.startsWith('description') ? 4000 : 160);
+      if (data[key] !== undefined) out[key] = this.requiredString(data[key], key, key.startsWith('description') ? 4001 : 160);
       else if (!partial) throw badRequest('TEST_FIELD_REQUIRED', `فیلد ${key} الزامی است.`, `${key} is required.`);
     }
     if (data.languageId !== undefined) out.language = { connect: { id: this.requiredString(data.languageId, 'languageId', 100) } };
