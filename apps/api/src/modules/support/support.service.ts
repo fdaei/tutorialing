@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Prisma, Role, TicketStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
 import { badRequest, forbidden, notFound } from '../../common/errors';
-import { ConfigService } from '@nestjs/config';
+import { config } from '../../config';
 
 const STAFF_ROLES: Role[] = ['ADMIN', 'STAFF', 'SUPPORT'];
 const isStaff = (roles: string[]) => roles.some((role) => STAFF_ROLES.includes(role as Role));

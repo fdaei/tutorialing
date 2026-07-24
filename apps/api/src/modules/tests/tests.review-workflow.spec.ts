@@ -1,6 +1,31 @@
 import { TestsService } from './tests.service';
 
 describe('TestsService descriptive review workflow', () => {
+  it('returns the complete queue item after an examiner claims an answer', async () => {
+    const claimed = {
+      id: 'answer-1',
+      question: { type: 'essay', section: { skill: 'writing' } },
+      attempt: { user: { phone: '09120000000' }, test: { language: { nameEn: 'English' } } },
+    };
+    const db = {
+      testAnswer: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'answer-1', reviewStatus: 'PENDING' }),
+        update: jest.fn().mockResolvedValue(claimed),
+      },
+    } as any;
+    const service = new TestsService(db, {} as any);
+
+    await expect(service.claimAnswer('examiner-1', 'answer-1')).resolves.toBe(claimed);
+    expect(db.testAnswer.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'answer-1' },
+      data: { reviewStatus: 'IN_REVIEW', reviewerId: 'examiner-1' },
+      include: expect.objectContaining({
+        question: { include: { section: true } },
+        attempt: expect.any(Object),
+      }),
+    }));
+  });
+
   it('removes the final answer from pending and approves the attempt transactionally', async () => {
     const tx = {
       testAnswer: {

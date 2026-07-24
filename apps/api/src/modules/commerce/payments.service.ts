@@ -1,8 +1,8 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService, Tx } from '../../prisma.service';
+import { config } from '../../config';
 import { QueueService } from '../queue/queue.service';
 import { GatewayService } from './gateway.service';
-import { ConfigService } from '@nestjs/config';
 import { WalletService } from './wallet.service';
 import { PayDto } from './dto/request/pay.dto';
 
@@ -12,8 +12,7 @@ export class PaymentsService {
     private db: PrismaService,
     private queue: QueueService,
     private gateway: GatewayService,
-    private wallet: WalletService,
-    private configService: ConfigService
+    private wallet: WalletService
   ) {}
 
   async createPayment(userId: string, d: PayDto) {
@@ -23,7 +22,7 @@ export class PaymentsService {
         const booking = await tx.booking.findUnique({ where: { id: d.referenceId }, include: { teacher: true } });
         if (!booking || booking.studentId !== userId || booking.status !== 'PENDING_PAYMENT') throw new NotFoundException();
         bookingId = booking.id;
-        subtotal = booking.type === 'trial' ? booking.teacher.trialPrice : booking.teacher.hourlyRate;
+        subtotal = booking.type === 'trial' ? booking.teacher.trialPrice : booking.teacher.regularPrice;
       } else {
         const pkg = await tx.package.findUnique({ where: { id: d.referenceId, approvalStatus: 'APPROVED' } });
         if (!pkg) throw new NotFoundException();
@@ -59,7 +58,7 @@ export class PaymentsService {
 
   async gatewayRedirect(userId: string, paymentId: string) {
     const payment = await this.db.payment.findFirstOrThrow({ where: { id: paymentId, userId, status: 'PENDING' } });
-    const result = await this.gateway.request(payment.gatewayAmount, `LingoSpeak ${payment.purpose}`, `${this.configService.get('app.apiUrl') ?? 'http://localhost:4000'}/api/payments/callback`);
+    const result = await this.gateway.request(payment.gatewayAmount, `LingoSpeak ${payment.purpose}`, `${config().API_URL}/api/payments/callback`);
     await this.db.payment.update({ where: { id: payment.id }, data: { authority: result.authority } });
     return result;
   }

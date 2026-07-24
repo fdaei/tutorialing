@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, ApiError } from '@/lib/api';
+import { api, ApiError, apiMessage, type EducationalLanguage } from '@/lib/api';
 import { useTranslations } from './locale-provider';
 
 type Role = 'student' | 'teacher' | 'admin';
@@ -23,13 +23,38 @@ async function sha256(file: File) {
   return [...new Uint8Array(data)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-async function uploadFile(file: File, purpose: string) {
+const allowedUploadTypes = ['image/jpeg', 'image/png', 'application/pdf', 'video/mp4', 'video/webm', 'video/quicktime'];
+
+async function uploadFile(file: File, purpose: string, fa: boolean) {
+  if (!allowedUploadTypes.includes(file.type)) {
+    throw new Error(tr(fa, 'فرمت فایل مجاز نیست. برای مدارک از PDF، JPG یا PNG و برای ویدئو از MP4، WebM یا MOV استفاده کنید.', 'Unsupported file format. Use PDF, JPG, or PNG for documents and MP4, WebM, or MOV for videos.'));
+  }
+  if (file.size > 50 * 1024 * 1024) {
+    throw new Error(tr(fa, 'حجم فایل نباید بیشتر از ۵۰ مگابایت باشد.', 'The file must not be larger than 50 MB.'));
+  }
   const checksum = await sha256(file);
   const upload = await api<UploadResponse>('/files/uploads', {
     method: 'POST',
     body: JSON.stringify({ originalName: file.name, mimeType: file.type, size: file.size, checksum, purpose }),
   });
-  await fetch(upload.uploadUrl, { method: 'PUT', body: file, headers: { 'content-type': file.type, 'x-amz-meta-checksum': checksum } });
+  let uploadedToStorage = false;
+  try {
+    const response = await fetch(upload.uploadUrl, {
+      method: 'PUT',
+      body: file,
+      headers: { 'content-type': file.type, 'x-amz-meta-checksum': checksum },
+    });
+    uploadedToStorage = response.ok;
+  } catch {
+    uploadedToStorage = false;
+  }
+  if (!uploadedToStorage) {
+    await api(`/files/uploads/${upload.fileId}/content`, {
+      method: 'POST',
+      headers: { 'content-type': file.type, 'x-content-checksum': checksum },
+      body: file,
+    });
+  }
   await api(`/files/${upload.fileId}/complete`, { method: 'POST' });
   return upload.fileId;
 }
@@ -48,7 +73,14 @@ function useAction(endpoint: string) {
 }
 
 function Status({ error, ok, fa }: { error: unknown; ok: boolean } & Localized) {
-  if (error) return <p role="alert" className="mt-3 rounded-2xl bg-red-50 p-3 text-sm text-red-800">{error instanceof ApiError ? error.message : tr(fa, 'عملیات ناموفق بود.', 'The operation failed.')}</p>;
+  if (error) {
+    const fields = error instanceof ApiError ? Object.entries(error.details.fieldErrors ?? {}) : [];
+    return <div role="alert" className="mt-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-900">
+      <p className="font-black">{apiMessage(error, tr(fa, 'عملیات ناموفق بود.', 'The operation failed.'))}</p>
+      {fields.length > 0 && <ul className="mt-2 list-inside list-disc space-y-1">{fields.map(([field, message]) => <li key={field}><span className="font-bold">{field}:</span> {message}</li>)}</ul>}
+      {error instanceof ApiError && error.details.requestId && <p className="mt-2 text-xs text-red-700">{tr(fa, 'شناسه پیگیری', 'Request ID')}: <span className="font-mono" dir="ltr">{error.details.requestId}</span></p>}
+    </div>;
+  }
   if (ok) return <p role="status" className="mt-3 rounded-2xl bg-lavender p-3 text-sm font-bold text-purple">{tr(fa, 'با موفقیت ذخیره شد.', 'Saved successfully.')}</p>;
   return null;
 }
@@ -133,22 +165,10 @@ function StudentActions({ section, endpoint, fa }: Omit<Props, 'role'> & Localiz
 
 function TeacherActions({ section, endpoint, fa }: Omit<Props, 'role'> & Localized) {
   const action = useAction(endpoint);
+  if (['profile','languages','specialties'].includes(section)) return <TeacherApplicationForm endpoint={endpoint} fa={fa}/>;
+  if (section === 'video') return <TeacherIntroVideo endpoint={endpoint} fa={fa}/>;
   if (section === 'verification') return <div className="grid gap-5 xl:grid-cols-2">
-    <Shell title={tr(fa, 'پروفایل درخواست مدرس', 'Teacher application profile')}>
-      <form className="mt-4 grid gap-4" onSubmit={(event) => {
-        event.preventDefault(); const form = new FormData(event.currentTarget);
-        action.mutate(() => api('/teacher/application', { method: 'POST', body: JSON.stringify({ nameFa: value(form, 'nameFa'), nameEn: value(form, 'nameEn'), bioFa: value(form, 'bioFa'), bioEn: value(form, 'bioEn'), specialties: list(form, 'specialties'), languages: list(form, 'languages'), experienceYears: numeric(form, 'experienceYears') }) }));
-      }}>
-        <Field name="nameFa" label={tr(fa, 'نام فارسی', 'Persian name')} required />
-        <Field name="nameEn" label={tr(fa, 'نام انگلیسی', 'English name')} required dir="ltr" />
-        <Area name="bioFa" label={tr(fa, 'بیوگرافی فارسی', 'Persian biography')} required />
-        <Area name="bioEn" label={tr(fa, 'بیوگرافی انگلیسی', 'English biography')} required dir="ltr" />
-        <Field name="specialties" label={tr(fa, 'تخصص‌ها، جداشده با کاما', 'Specialties, comma separated')} defaultValue="writing,speaking" dir="ltr" />
-        <Field name="languages" label={tr(fa, 'زبان‌ها، جداشده با کاما', 'Languages, comma separated')} defaultValue="fa,en" dir="ltr" />
-        <Field name="experienceYears" label={tr(fa, 'سال تجربه', 'Years of experience')} type="number" min={0} defaultValue={3} />
-        <Submit fa={fa} busy={action.isPending}>{tr(fa, 'ذخیره درخواست', 'Save application')}</Submit>
-      </form><Status fa={fa} error={action.error} ok={action.isSuccess} />
-    </Shell>
+    <TeacherApplicationForm endpoint={endpoint} fa={fa}/>
     <TeacherFiles endpoint={endpoint} fa={fa} />
   </div>;
 
@@ -197,31 +217,63 @@ function TeacherActions({ section, endpoint, fa }: Omit<Props, 'role'> & Localiz
   return null;
 }
 
+function TeacherIntroVideo({endpoint,fa}:{endpoint:string}&Localized){
+ const action=useAction(endpoint),application=useQuery({queryKey:[endpoint],queryFn:()=>api<{introVideoKey?:string;introVideoFileId?:string}>(endpoint)});
+ const preview=useQuery({queryKey:['teacher-intro-preview',application.data?.introVideoFileId],queryFn:()=>api<{url:string}>(`/files/${application.data!.introVideoFileId}/download`),enabled:Boolean(application.data?.introVideoFileId)});
+ const[busy,setBusy]=useState(false),[error,setError]=useState('');
+ return <Shell title={tr(fa,'ویدیوی معرفی','Introduction video')}><p className="mt-2 text-sm leading-7 text-muted">{tr(fa,'یک ویدیوی MP4، WebM یا MOV حداکثر ۵۰ مگابایت بارگذاری کنید. با ثبت فایل جدید، ویدیوی قبلی جایگزین می‌شود.','Upload an MP4, WebM, or MOV video up to 50 MB. A new upload replaces the previous video.')}</p><p className="mt-3 rounded-xl bg-[#f5f6fa] p-3 text-sm">{application.data?.introVideoKey?tr(fa,'ویدیوی معرفی ثبت شده است.','An introduction video is saved.'):tr(fa,'هنوز ویدیویی ثبت نشده است.','No introduction video has been uploaded.')}</p>{preview.data?.url&&<video controls preload="metadata" className="mt-4 max-h-96 w-full rounded-2xl bg-black" src={preview.data.url}/>}<form className="mt-4" onSubmit={async event=>{event.preventDefault();const element=event.currentTarget,form=new FormData(element),file=form.get('file');if(!(file instanceof File)||!file.size)return;setBusy(true);setError('');try{const fileId=await uploadFile(file,'teacher-intro-video',fa);await action.mutateAsync(()=>api('/teacher/profile/intro-video',{method:'PUT',body:JSON.stringify({fileId})}));element.reset()}catch(reason){setError(apiMessage(reason,tr(fa,'بارگذاری ویدئو ناموفق بود.','Video upload failed.')))}finally{setBusy(false)}}}><input name="file" type="file" accept=".mp4,.webm,.mov" required className="w-full rounded-xl border hairline p-3"/><Submit fa={fa} busy={busy||action.isPending}>{tr(fa,'ذخیره ویدیوی معرفی','Save introduction video')}</Submit></form>{error&&<p role="alert" className="mt-3 rounded-xl bg-red-50 p-3 text-red-800">{error}</p>}<Status fa={fa} error={action.error} ok={action.isSuccess}/></Shell>
+}
+
+function TeacherApplicationForm({endpoint,fa}:{endpoint:string}&Localized){
+ const action=useAction(endpoint);
+ const languages=useQuery({queryKey:['languages'],queryFn:()=>api<EducationalLanguage[]>('/languages')});
+ const application=useQuery({queryKey:[endpoint],queryFn:()=>api<{nameFa?:string;nameEn?:string;bioFa?:string;bioEn?:string;specialties?:string[];experienceYears?:number;languageLinks?:{languageId:string}[]}>(endpoint)});
+ const current=application.data;
+ return <Shell title={tr(fa,'پروفایل درخواست مدرس','Teacher application profile')}><p className="mt-2 text-sm leading-7 text-muted">{tr(fa,'نام و بیوگرافی را فارسی و انگلیسی بنویسید. تخصص‌ها را مثل writing,speaking وارد کنید و حداقل یک زبان را از گزینه‌های زیر انتخاب کنید.','Enter names and biographies in both languages, use specialties such as writing,speaking, and select at least one teaching language below.')}</p>
+  <form key={current?'loaded':'loading'} className="mt-4 grid gap-4" onSubmit={event=>{event.preventDefault();const form=new FormData(event.currentTarget);action.mutate(()=>api('/teacher/application',{method:'POST',body:JSON.stringify({nameFa:value(form,'nameFa'),nameEn:value(form,'nameEn'),bioFa:value(form,'bioFa'),bioEn:value(form,'bioEn'),specialties:list(form,'specialties'),languageIds:form.getAll('languageIds').map(String),levels:list(form,'levels'),experienceYears:numeric(form,'experienceYears')})}))}}>
+   <Field name="nameFa" label={tr(fa,'نام فارسی؛ مثال: علی رضایی','Persian name')} defaultValue={current?.nameFa} required/><Field name="nameEn" label={tr(fa,'نام انگلیسی؛ مثال: Ali Rezaei','English name')} defaultValue={current?.nameEn} required dir="ltr"/>
+   <Area name="bioFa" label={tr(fa,'بیوگرافی فارسی؛ حداقل ۴۰ حرف درباره سابقه و روش تدریس','Persian biography; at least 40 characters')} defaultValue={current?.bioFa} minLength={40} required/><Area name="bioEn" label={tr(fa,'بیوگرافی انگلیسی؛ حداقل ۴۰ حرف','English biography; at least 40 characters')} defaultValue={current?.bioEn} minLength={40} required dir="ltr"/>
+   <Field name="specialties" label={tr(fa,'تخصص‌ها با کاما؛ مثال: writing,speaking','Specialties; e.g. writing,speaking')} defaultValue={current?.specialties?.join(',')||'writing,speaking'} dir="ltr" required/><Field name="levels" label={tr(fa,'سطح‌ها با کاما؛ مثال: A1,A2,B1','Levels; e.g. A1,A2,B1')} defaultValue="A1,A2,B1,B2,C1" dir="ltr"/>
+   <fieldset><legend className="mb-2 text-sm font-bold">{tr(fa,'زبان‌هایی که تدریس می‌کنید','Languages you teach')}</legend><div className="flex flex-wrap gap-2">{languages.data?.map(language=><label key={language.id} className="rounded-xl border hairline px-3 py-2"><input name="languageIds" value={language.id} type="checkbox" className="mx-2" defaultChecked={current?.languageLinks?.some(link=>link.languageId===language.id)}/>{language.flag} {fa?language.nameFa:language.nameEn}</label>)}</div></fieldset>
+   <Field name="experienceYears" label={tr(fa,'تعداد سال سابقه؛ مثلاً ۳','Years of experience; e.g. 3')} type="number" min={0} max={60} defaultValue={current?.experienceYears??3}/><Submit fa={fa} busy={action.isPending}>{tr(fa,'ذخیره اطلاعات','Save application')}</Submit>
+  </form><Status fa={fa} error={action.error} ok={action.isSuccess}/></Shell>
+}
+
 function TeacherFiles({ endpoint, fa }: { endpoint: string } & Localized) {
   const action = useAction(endpoint);
+  const application = useQuery({ queryKey: [endpoint], queryFn: () => api<{ verificationItems?: { id:string;kind:string;status:string;rejectionReason?:string;note?:string }[] }>(endpoint) });
   const [busy, setBusy] = useState(false);
   const [fileError, setFileError] = useState('');
+  const uploadedKinds = new Set((application.data?.verificationItems ?? []).filter(item => ['SUBMITTED', 'UNDER_REVIEW', 'APPROVED'].includes(item.status)).map(item => item.kind.toLowerCase()));
+  const documentsReady = uploadedKinds.has('identity') && uploadedKinds.has('certificate');
   return <Shell title={tr(fa, 'مدارک و ویدئوی معرفی', 'Documents and introduction video')}>
     <form className="mt-4 grid gap-4" onSubmit={async (event) => {
-      event.preventDefault(); setBusy(true); setFileError(''); const form = new FormData(event.currentTarget);
+      event.preventDefault(); setBusy(true); setFileError(''); const formElement = event.currentTarget; const form = new FormData(formElement);
       try {
         const file = form.get('file');
         if (!(file instanceof File) || !file.size) throw new Error(tr(fa, 'فایلی انتخاب نشده است.', 'Select a file first.'));
         const kind = value(form, 'kind');
-        const fileId = await uploadFile(file, kind === 'intro-video' ? 'teacher-intro-video' : 'teacher-verification');
-        action.mutate(() => kind === 'intro-video' ? api('/teacher/profile/intro-video', { method: 'PUT', body: JSON.stringify({ fileId }) }) : api('/teacher/application/documents', { method: 'POST', body: JSON.stringify({ kind, fileId }) }));
-      } catch (error) { setFileError(error instanceof Error ? error.message : tr(fa, 'آپلود ناموفق بود.', 'Upload failed.')); }
+        const fileId = await uploadFile(file, kind === 'intro-video' ? 'teacher-intro-video' : 'teacher-verification', fa);
+        await action.mutateAsync(() => kind === 'intro-video' ? api('/teacher/profile/intro-video', { method: 'PUT', body: JSON.stringify({ fileId }) }) : api('/teacher/application/documents', { method: 'POST', body: JSON.stringify({ kind, fileId }) }));
+        formElement.reset();
+      } catch (error) { setFileError(apiMessage(error, tr(fa, 'آپلود ناموفق بود. اتصال و نوع فایل را بررسی و دوباره تلاش کنید.', 'Upload failed. Check the connection and file type, then try again.'))); }
       finally { setBusy(false); }
     }}>
-      <Select name="kind" label={tr(fa, 'نوع مدرک', 'Document type')}><option value="identity">{tr(fa, 'هویت', 'Identity')}</option><option value="certificate">{tr(fa, 'مدرک آموزشی', 'Certificate')}</option><option value="demo">{tr(fa, 'دموی تدریس', 'Teaching demo')}</option><option value="intro-video">{tr(fa, 'ویدئوی معرفی', 'Introduction video')}</option></Select>
-      <input name="file" type="file" className="rounded-2xl border hairline p-3" required />
+      <Select name="kind" label={tr(fa, 'نوع مدرک', 'Document type')}><option value="identity">{tr(fa, 'هویت', 'Identity')}</option><option value="certificate">{tr(fa, 'مدرک آموزشی', 'Certificate')}</option><option value="experience">{tr(fa, 'سابقه کاری', 'Experience')}</option><option value="demo-lesson">{tr(fa, 'دموی تدریس', 'Teaching demo')}</option><option value="intro-video">{tr(fa, 'ویدئوی معرفی', 'Introduction video')}</option></Select>
+      <label className="block"><span className="mb-2 block text-sm font-bold">{tr(fa, 'فایل (حداکثر ۵۰ مگابایت)', 'File (maximum 50 MB)')}</span><input name="file" type="file" accept=".pdf,.jpg,.jpeg,.png,.mp4,.webm,.mov" className="w-full rounded-2xl border hairline p-3" required /></label>
       <Submit fa={fa} busy={busy || action.isPending}>{tr(fa, 'آپلود و اتصال', 'Upload and attach')}</Submit>
     </form>
-    <form className="mt-5" onSubmit={(event) => { event.preventDefault(); action.mutate(() => api('/teacher/application/submit', { method: 'POST' })); }}><Submit fa={fa} busy={action.isPending}>{tr(fa, 'ارسال برای بررسی', 'Submit for review')}</Submit></form>
+    <p className={`mt-5 rounded-xl p-3 text-sm ${documentsReady?'bg-emerald-50 text-emerald-800':'bg-amber-50 text-amber-900'}`}>{documentsReady?tr(fa,'هر دو مدرک الزامی بارگذاری شده‌اند؛ درخواست را ارسال کنید.','Both required documents are uploaded; submit your application.'):tr(fa,'برای ارسال درخواست، یک مدرک «هویت» و یک «مدرک آموزشی» جداگانه بارگذاری کنید.','Upload one Identity document and one Teaching certificate before submitting.')}</p>
+    <div className="mt-3 grid gap-2">{(application.data?.verificationItems??[]).map(item=><div key={item.id} className="flex items-center justify-between rounded-xl border hairline p-3 text-sm"><span>{documentKind(item.kind,fa)}</span><span className="font-bold">{documentStatus(item.status,fa)}</span></div>)}</div>
+    {(application.data?.verificationItems??[]).filter(item=>['REJECTED','NEEDS_REVISION'].includes(item.status)).map(item=><form key={item.id} className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-4" onSubmit={async event=>{event.preventDefault();const element=event.currentTarget,form=new FormData(element),file=form.get('file');if(!(file instanceof File)||!file.size)return;setBusy(true);setFileError('');try{const fileId=await uploadFile(file,'teacher-verification',fa);await action.mutateAsync(()=>api(`/teacher/application/documents/${item.id}/resubmit`,{method:'POST',body:JSON.stringify({fileId})}));element.reset()}catch(error){setFileError(apiMessage(error,tr(fa,'ارسال مجدد مدرک ناموفق بود.','Document resubmission failed.')))}finally{setBusy(false)}}}><strong>{tr(fa,'نیازمند اصلاح: ','Needs revision: ')}{item.kind}</strong><p className="my-2 text-sm text-amber-900">{item.rejectionReason||item.note||tr(fa,'نسخه اصلاح‌شده مدرک را بارگذاری کنید.','Upload a corrected version.')}</p><input name="file" type="file" accept=".pdf,.jpg,.jpeg,.png" required className="w-full rounded-xl border bg-white p-2"/><Submit fa={fa} busy={busy||action.isPending}>{tr(fa,'بارگذاری نسخه جدید و ارسال مجدد','Upload corrected file and resubmit')}</Submit></form>)}
+    <form className="mt-2" onSubmit={(event) => { event.preventDefault(); action.mutate(() => api('/teacher/application/submit', { method: 'POST' })); }}><Submit fa={fa} busy={action.isPending||application.isLoading||!documentsReady}>{tr(fa, 'ارسال برای بررسی', 'Submit for review')}</Submit></form>
     {fileError && <p role="alert" className="mt-3 rounded-2xl bg-red-50 p-3 text-sm text-red-800">{fileError}</p>}
     <Status fa={fa} error={action.error} ok={action.isSuccess} />
   </Shell>;
 }
+
+function documentKind(kind:string,fa:boolean){const map:Record<string,[string,string]>={identity:['مدرک هویتی','Identity'],certificate:['مدرک آموزشی','Teaching certificate'],experience:['سابقه کاری','Experience'],['demo-lesson']:['دموی تدریس','Teaching demo']};return(map[kind]??[kind,kind])[fa?0:1]}
+function documentStatus(status:string,fa:boolean){const map:Record<string,[string,string]>={SUBMITTED:['ارسال‌شده','Submitted'],UNDER_REVIEW:['در حال بررسی','Under review'],APPROVED:['تأییدشده','Approved'],REJECTED:['ردشده','Rejected'],NEEDS_REVISION:['نیازمند اصلاح','Needs revision']};return(map[status]??[status,status])[fa?0:1]}
 
 function TicketForm({ endpoint, fa }: { endpoint: string } & Localized) {
   const action = useAction(endpoint);

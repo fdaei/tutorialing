@@ -1,6 +1,20 @@
 import { SupportService } from './support.service';
 
 describe('SupportService status and assignment history', () => {
+  it('limits a regular user ticket list to tickets owned by that user', async () => {
+    const findMany = jest.fn().mockResolvedValue([]);
+    const count = jest.fn().mockResolvedValue(0);
+    const service = new SupportService({
+      ticket: { findMany, count },
+      $transaction: jest.fn().mockResolvedValue([[], 0]),
+    } as any);
+
+    await service.list('student-1', ['STUDENT'], { page: 1, pageSize: 20 });
+
+    expect(findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { userId: 'student-1' } }));
+    expect(count).toHaveBeenCalledWith({ where: { userId: 'student-1' } });
+  });
+
   it('persists a status transition, history, system message, and user notification', async () => {
     const tx = {
       ticket: { findUnique: jest.fn().mockResolvedValue({ id: 'ticket-1', userId: 'student-1', subject: 'Help', status: 'OPEN' }), update: jest.fn().mockResolvedValue({ id: 'ticket-1', status: 'IN_PROGRESS' }) },

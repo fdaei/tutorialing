@@ -28,7 +28,7 @@ export class TeachersRepository {
       include: {
         user: { select: { name: true, phone: true } },
         languageLinks: { where: { active: true }, include: { language: true } },
-        reviews: { where: { moderationStatus: 'APPROVED' }, include: { student: { select: { name: true } }, reply: true }, orderBy: { createdAt: 'desc' } },
+        reviews: { where: { moderationStatus: 'APPROVED' }, include: { student: { select: { name: true } } }, orderBy: { createdAt: 'desc' } },
         packages: { where: { approvalStatus: 'APPROVED' } },
         _count: { select: { bookings: { where: { status: 'COMPLETED' } }, reviews: { where: { moderationStatus: 'APPROVED' } } } },
       },

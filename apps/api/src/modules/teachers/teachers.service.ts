@@ -216,8 +216,8 @@ export class TeachersService {
     });
   }
 
-  mine(userId: string) {
-    return this.db.teacher.findUnique({
+  async mine(userId: string) {
+    const teacher = await this.db.teacher.findUnique({
       where: { userId },
       include: {
         languageLinks: { include: { language: true }, orderBy: { language: { order: 'asc' } } },
@@ -226,6 +226,9 @@ export class TeachersService {
         priceHistory: { orderBy: { createdAt: 'desc' }, take: 20 },
       },
     });
+    if (!teacher?.introVideoKey) return teacher;
+    const file = await this.db.storedFile.findFirst({ where: { ownerId: userId, key: teacher.introVideoKey, status: 'SAFE' }, select: { id: true } });
+    return { ...teacher, introVideoFileId: file?.id };
   }
 
   async submit(userId: string) {

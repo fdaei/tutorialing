@@ -1,6 +1,7 @@
 import { PanelActions } from '@/components/panel-actions';
 import { PanelShell, studentNav } from '@/components/panel-shell';
 import { ResourceView } from '@/components/resource-view';
+import { MyTicketManager } from '@/components/my-ticket-manager';
 import {requestLocale} from '@/lib/server-locale';
 
 const map: Record<string, [string,string, string]> = {
@@ -20,6 +21,6 @@ export default async function Section({ params }: { params: Promise<{ section: s
   const [titleFa,titleEn, endpoint] = map[section] ?? ['بخش موردنظر','Section', '/users/me'];
   return <PanelShell title="پنل زبان‌آموز" items={studentNav}>
     <PanelActions role="student" section={section} endpoint={endpoint} />
-    <ResourceView title={fa?titleFa:titleEn} endpoint={endpoint} />
+    {section === 'tickets' ? <MyTicketManager /> : <ResourceView title={fa?titleFa:titleEn} endpoint={endpoint} />}
   </PanelShell>;
 }
