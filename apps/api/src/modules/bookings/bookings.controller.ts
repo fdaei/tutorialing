@@ -1,16 +1,24 @@
 import { Body, Controller, Get, Param, Post, Put } from '@nestjs/common';
+import { plainToInstance } from 'class-transformer';
 import { CurrentUser, Roles, type AuthUser } from '../../common/auth';
 import { BookingsService } from './bookings.service';
 import { BookingDto } from './dto/request/booking.dto';
 import { CancelDto } from './dto/request/cancel.dto';
 import { RescheduleDto } from './dto/request/reschedule.dto';
 import { AttendanceDto } from './dto/request/attendance.dto';
+import { BookingResponseDto } from './dto/response/booking-response.dto';
 
 @Controller('bookings')
 export class BookingsController {
   constructor(private s: BookingsService) {}
-  @Post() create(@CurrentUser() u:AuthUser,@Body() d:BookingDto){return this.s.create(u.id,d);}
-  @Get('me') mine(@CurrentUser() u:AuthUser){return this.s.list(u.id,u.roles.includes('TEACHER')?'teacher':'student');}
+  @Post() async create(@CurrentUser() u:AuthUser,@Body() d:BookingDto) {
+    const b = await this.s.create(u.id,d);
+    return plainToInstance(BookingResponseDto, b, { excludeExtraneousValues: true });
+  }
+  @Get('me') async mine(@CurrentUser() u:AuthUser) {
+    const list = await this.s.list(u.id,u.roles.includes('TEACHER')?'teacher':'student');
+    return plainToInstance(BookingResponseDto, list, { excludeExtraneousValues: true });
+  }
   @Roles('TEACHER') @Get('students') students(@CurrentUser() u:AuthUser){return this.s.students(u.id);}
   @Post(':id/cancel') cancel(@CurrentUser() u:AuthUser,@Param('id') id:string,@Body() d:CancelDto){return this.s.cancel(u.id,id,d.reason);}
   @Post(':id/reschedule') reschedule(@CurrentUser() u:AuthUser,@Param('id') id:string,@Body() d:RescheduleDto){return this.s.reschedule(u.id,id,d);}
