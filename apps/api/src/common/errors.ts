@@ -21,6 +21,57 @@ export const forbidden = (code: string, fa: string, en: string) =>
   new DomainException(HttpStatus.FORBIDDEN, code, { fa, en });
 export const notFound = (code: string, fa: string, en: string) =>
   new DomainException(HttpStatus.NOT_FOUND, code, { fa, en });
+export const tooManyRequests = (code: string, fa: string, en: string) =>
+  new DomainException(HttpStatus.TOO_MANY_REQUESTS, code, { fa, en });
+
+/**
+ * Prisma's known request errors otherwise reach the client as an untranslated
+ * 500 with the raw driver message. Only the codes that represent a caller
+ * mistake are mapped; anything else stays a 500 so genuine faults are not
+ * disguised as client errors.
+ */
+export function prismaToDomain(error: unknown): DomainException | undefined {
+  if (!isPrismaKnownError(error)) return undefined;
+  switch (error.code) {
+    case 'P2002':
+      return conflict(
+        'RESOURCE_ALREADY_EXISTS',
+        'این رکورد از قبل ثبت شده است.',
+        'This record already exists.',
+      );
+    case 'P2025':
+      return notFound('RESOURCE_NOT_FOUND', 'رکورد موردنظر پیدا نشد.', 'The requested record was not found.');
+    case 'P2003':
+      return badRequest(
+        'RELATED_RECORD_MISSING',
+        'یکی از موارد مرتبط وجود ندارد یا حذف شده است.',
+        'A related record is missing or has been removed.',
+      );
+    case 'P2014':
+      return conflict(
+        'RELATED_RECORD_IN_USE',
+        'این رکورد به رکوردهای دیگری وابسته است و قابل تغییر نیست.',
+        'This record is referenced by other records and cannot be changed.',
+      );
+    default:
+      return undefined;
+  }
+}
+
+/**
+ * Structural check rather than `instanceof`: the API and the generated Prisma
+ * client can resolve to different module instances, which makes `instanceof`
+ * silently false.
+ */
+export function isPrismaKnownError(error: unknown): error is { code: string; meta?: unknown } {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    typeof (error as { code: unknown }).code === 'string' &&
+    /^P\d{4}$/.test((error as { code: string }).code)
+  );
+}
 
 function constraintMessage(property: string, constraint: string): { fa: string; en: string } {
   if (property === 'phone') return {

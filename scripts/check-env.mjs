@@ -6,4 +6,7 @@ let database;
 try{database=new URL(process.env.DATABASE_URL)}catch{console.error('Blocking: DATABASE_URL is not a valid URL.');process.exit(1)}
 const same=decodeURIComponent(database.username)===process.env.POSTGRES_USER&&decodeURIComponent(database.password)===process.env.POSTGRES_PASSWORD&&database.pathname.slice(1)===process.env.POSTGRES_DB;
 if(!same){console.error('Blocking: DATABASE_URL credentials/database do not match Docker Compose PostgreSQL variables.');process.exit(1)}
+const devOtp=process.env.AUTH_DEV_OTP==='true';
+if(devOtp&&process.env.NODE_ENV==='production'){console.error('Blocking: AUTH_DEV_OTP=true accepts the fixed code 123456 for every account and must never be set with NODE_ENV=production.');process.exit(1)}
+if(!devOtp&&!process.env.KAVENEGAR_API_KEY){console.warn('Warning: neither AUTH_DEV_OTP=true nor KAVENEGAR_API_KEY is set, so OTP delivery will fail and nobody can sign in.')}
 console.log('Environment validation passed; no secret values were printed.');

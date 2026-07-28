@@ -251,7 +251,7 @@ npm run db:migrate:dev -w @lingospeak/api -- --name <migration-name>
 | وب | [http://localhost:3000](http://localhost:3000) |
 | API | [http://localhost:4001/api](http://localhost:4001/api) |
 | سلامت API | [http://localhost:4001/api/health](http://localhost:4001/api/health) |
-| Swagger | [http://localhost:4001/docs](http://localhost:4001/docs) |
+| Swagger (فقط خارج از production) | [http://localhost:4001/docs](http://localhost:4001/docs) |
 | MinIO API | [http://localhost:9000](http://localhost:9000) |
 | MinIO Console | [http://localhost:9001](http://localhost:9001) |
 
@@ -287,8 +287,13 @@ seed چند کاربر با نقش‌های متفاوت ایجاد می‌کن�
 | زبان‌آموز دارای جلسه آینده | `09121111112` | `123456` |
 | زبان‌آموز دارای تیکت | `09121111113` | `123456` |
 
-کاربران password ثابت ندارند و ورود با شماره تلفن و OTP انجام می‌شود. در محیط
-`development` کد OTP همه حساب‌ها `123456` است.
+کاربران password ثابت ندارند و ورود با شماره تلفن و OTP انجام می‌شود. کد ثابت
+`123456` فقط زمانی فعال است که `AUTH_DEV_OTP=true` تنظیم شده باشد؛ این مقدار در
+`.env.example` برای توسعهٔ محلی وجود دارد و به‌صورت پیش‌فرض خاموش است.
+
+بدون این متغیر، سرویس کد تصادفی تولید می‌کند و اگر `KAVENEGAR_API_KEY` تنظیم
+نشده باشد درخواست OTP با خطای 503 رد می‌شود. ترکیب `AUTH_DEV_OTP=true` با
+`NODE_ENV=production` باعث می‌شود API اصلاً بالا نیاید.
 
 اطلاعات ورود سرویس‌های محلی با تنظیمات پیش‌فرض `.env.example`:
 

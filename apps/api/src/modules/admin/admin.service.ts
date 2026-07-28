@@ -1,7 +1,23 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, Role, UserStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
+import { forbidden } from '../../common/errors';
 import { AdminRepository } from './admin.repository';
+import { CmsPageDto } from './dto/request/cms-page.dto';
+
+/**
+ * `roles.manage` is a delegable permission, so its holder is not necessarily an
+ * ADMIN. Without this guard a STAFF user granted `roles.manage` could simply
+ * assign themselves the ADMIN role (which auto-grants every permission) and
+ * escalate out of their delegated scope. Privilege changes must always be
+ * applied by a second person, so self-targeted grants are refused outright.
+ */
+const selfElevation = () =>
+  forbidden(
+    'SELF_PRIVILEGE_CHANGE',
+    'نمی‌توانید نقش یا دسترسی خودتان را تغییر دهید؛ این کار باید توسط مدیر دیگری انجام شود.',
+    'You cannot change your own roles or permissions; another administrator must do it.',
+  );
 
 @Injectable()
 export class AdminService {
@@ -65,7 +81,10 @@ export class AdminService {
     if(!normalized.length)throw new BadRequestException('At least one role is required');
     const user=await this.db.user.findUnique({where:{id:userId},include:{roles:true}});if(!user)throw new NotFoundException('User not found');
     const before=user.roles.map(item=>item.role);
+    // Order matters: dropping your own ADMIN also reads as a self-addition of
+    // whatever replaces it, so the more specific message is checked first.
     if(userId===actorId&&before.includes('ADMIN')&&!normalized.includes('ADMIN'))throw new BadRequestException('You cannot remove your own admin role');
+    if(userId===actorId&&normalized.some(role=>!before.includes(role)))throw selfElevation();
     if(before.includes('ADMIN')&&!normalized.includes('ADMIN')){const admins=await this.db.userRole.count({where:{role:'ADMIN'}});if(admins<=1)throw new BadRequestException('Cannot remove the last admin role')}
     await this.db.$transaction(async tx=>{
       await tx.userRole.deleteMany({where:{userId,role:{notIn:normalized}}});
@@ -101,6 +120,7 @@ export class AdminService {
   }
 
   async assignRole(actorId: string, userId: string, role: Role) {
+    if (userId === actorId) throw selfElevation();
     const user = await this.db.user.findUnique({ where: { id: userId } });
     if (!user) throw new NotFoundException('User not found');
     const out = await this.db.userRole.upsert({ where: { userId_role: { userId, role } }, create: { userId, role }, update: {} });
@@ -116,6 +136,7 @@ export class AdminService {
 
   async revokeRole(actorId: string, userId: string, role: Role) {
     if (role === 'ADMIN') {
+      if (userId === actorId) throw new BadRequestException('You cannot remove your own admin role');
       const admins = await this.db.userRole.count({ where: { role: 'ADMIN' } });
       if (admins <= 1) throw new BadRequestException('Cannot revoke the last admin role');
     }
@@ -125,6 +146,7 @@ export class AdminService {
   }
 
   async grantPermission(actorId: string, userId: string, role: Role, permissionKey: string) {
+    if (userId === actorId) throw selfElevation();
     const permission = await this.db.permission.findUnique({ where: { key: permissionKey } });
     if (!permission) throw new NotFoundException('Permission not found');
     await this.db.userRole.upsert({ where: { userId_role: { userId, role } }, create: { userId, role }, update: {} });
@@ -165,9 +187,9 @@ export class AdminService {
     return this.db.cmsPage.findMany({ orderBy: { slug: 'asc' } });
   }
 
-  upsertCms(slug: string, d: Record<string, unknown>) {
-    const titleFa = String(d.titleFa ?? slug);
-    const titleEn = String(d.titleEn ?? slug);
+  upsertCms(slug: string, d: CmsPageDto) {
+    const titleFa = d.titleFa ?? slug;
+    const titleEn = d.titleEn ?? slug;
     const contentFa = (d.contentFa ?? {}) as Prisma.InputJsonValue;
     const contentEn = (d.contentEn ?? {}) as Prisma.InputJsonValue;
     const seo = (d.seo ?? {}) as Prisma.InputJsonValue;

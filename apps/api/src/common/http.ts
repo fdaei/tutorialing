@@ -10,7 +10,7 @@ import {
 } from '@nestjs/common';
 import type { NextFunction, Request, Response } from 'express';
 import { randomUUID } from 'crypto';
-import type { LocalizedFields } from './errors';
+import { prismaToDomain, type LocalizedFields } from './errors';
 
 type Locale = 'fa' | 'en';
 
@@ -41,16 +41,21 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 export class ApiExceptionFilter implements ExceptionFilter {
   private readonly log = new Logger(ApiExceptionFilter.name);
 
-  catch(error: unknown, host: ArgumentsHost) {
+  catch(caught: unknown, host: ArgumentsHost) {
     const response = host.switchToHttp().getResponse<Response>();
     const request = host.switchToHttp().getRequest<Request>();
     const locale = requestLocale(request);
+    // Translate constraint violations into the bilingual DomainException shape
+    // before formatting, so a duplicate key surfaces as a 409 the UI can read
+    // rather than a raw 500 carrying the driver's message.
+    const error = prismaToDomain(caught) ?? caught;
     const status = error instanceof HttpException ? error.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR;
     const rawBody = error instanceof HttpException ? error.getResponse() : 'Internal server error';
     const body = isRecord(rawBody) ? rawBody : { message: rawBody };
 
     if (status >= 500) {
-      this.log.error(`${request.method} ${request.url}`, error instanceof Error ? error.stack : String(error));
+      // Log the original error: the mapped DomainException has no stack worth keeping.
+      this.log.error(`${request.method} ${request.url}`, caught instanceof Error ? caught.stack : String(caught));
     }
 
     const localizedFields: Record<string, string> = {};

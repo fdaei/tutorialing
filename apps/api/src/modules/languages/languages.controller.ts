@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestj
 import { CurrentUser, Permissions, Public, Roles, type AuthUser } from '../../common/auth';
 import { LanguagesService } from './languages.service';
 import { LanguageDto } from './dto/request/language.dto';
+import { UpdateLanguageDto } from './dto/request/update-language.dto';
 
 @Controller('languages')
 export class LanguagesController {
@@ -20,6 +21,6 @@ export class AdminLanguagesController {
     return this.service.adminList(Math.max(1, Number(page)), Math.min(100, Math.max(1, Number(limit))), search, active === undefined ? undefined : active === 'true');
   }
   @Post() create(@CurrentUser() user: AuthUser, @Body() body: LanguageDto) { return this.service.create(user.id, body); }
-  @Patch(':id') update(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: Partial<LanguageDto>) { return this.service.update(user.id, id, body); }
+  @Patch(':id') update(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: UpdateLanguageDto) { return this.service.update(user.id, id, body); }
   @Delete(':id') remove(@CurrentUser() user: AuthUser, @Param('id') id: string) { return this.service.remove(user.id, id); }
 }

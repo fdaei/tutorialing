@@ -1,9 +1,9 @@
 import '../env';
-import { envSchema } from './env.validation';
+import { envSchemaWithGuards } from './env.validation';
 
-let cachedConfig: ReturnType<typeof envSchema.parse> | undefined;
+let cachedConfig: ReturnType<typeof envSchemaWithGuards.parse> | undefined;
 
 export function config() {
-  cachedConfig ??= envSchema.parse(process.env);
+  cachedConfig ??= envSchemaWithGuards.parse(process.env);
   return cachedConfig;
 }

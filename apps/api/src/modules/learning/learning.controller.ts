@@ -4,6 +4,7 @@ import { LearningService } from './learning.service';
 import { EvaluationDto } from './dto/request/evaluation.dto';
 import { PlanDto } from './dto/request/plan.dto';
 import { AssignmentDto } from './dto/request/assignment.dto';
+import { SubmissionDto } from './dto/request/submission.dto';
 
 @Controller('learning')
 export class LearningController {
@@ -33,7 +34,7 @@ export class LearningController {
   }
 
   @Post('assignments/:id/submit')
-  submit(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() d: { submission: string }) {
+  submit(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() d: SubmissionDto) {
     return this.s.submit(u.id, id, d.submission);
   }
 }

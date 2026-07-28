@@ -4,5 +4,7 @@ export * from './decorators/public.decorator';
 export * from './decorators/roles.decorator';
 export * from './decorators/permissions.decorator';
 export * from './decorators/current-user.decorator';
+export * from './decorators/rate-limit.decorator';
 export * from './guards/access-token.guard';
 export * from './guards/authorization.guard';
+export * from './guards/rate-limit.guard';
