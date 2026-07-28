@@ -9,7 +9,7 @@ import {api,publicApi,ApiError,apiField} from '@/lib/api';
 import {useTranslations} from '@/components/locale-provider';
 import {localePath} from '@/lib/i18n';
 import {LanguageSwitcher} from '@/components/language-switcher';
-import {canOpenRequestedPanel,panelHome,type PanelIdentity} from '@/lib/panel-access';
+import {canOpenRequestedPanel,panelHome,safeInternalPath,type PanelIdentity} from '@/lib/panel-access';
 
 export default function Auth(){
  const router=useRouter(),params=useSearchParams(),{locale}=useTranslations(),fa=locale==='fa',p=(href:string)=>localePath(href,locale),Arrow=fa?ArrowLeft:ArrowRight;
@@ -17,7 +17,11 @@ export default function Auth(){
  const otpRefs=useRef<Array<HTMLInputElement|null>>([]),code=digits.join('');
  useEffect(()=>{let cancelled=false;api<PanelIdentity>('/users/me').then(user=>{if(cancelled)return;go(user)}).catch(()=>undefined);return()=>{cancelled=true}},[]);
  useEffect(()=>{if(!wait)return;const timer=setInterval(()=>setWait(value=>Math.max(0,value-1)),1000);return()=>clearInterval(timer)},[wait]);
- function go(user:PanelIdentity){const requested=params.get('next'),next=requested?.startsWith('/')&&canOpenRequestedPanel(requested,user)?requested:undefined,home=panelHome(user);router.replace(next?(next.startsWith('/en')||fa?next:p(next)):p(home))}
+ // `?next=` is attacker-controllable, so it is normalized to a same-origin path
+ // and checked against the panel allow-list before it is ever navigated to;
+ // anything rejected falls back to the user's own panel home. localePath()
+ // already strips and re-adds the /en prefix, so it is safe to apply to either.
+ function go(user:PanelIdentity){const requested=safeInternalPath(params.get('next'));const target=requested&&canOpenRequestedPanel(requested,user)?requested:panelHome(user);router.replace(p(target))}
  async function send(){setError(undefined);if(!/^09\d{9}$/.test(phone)){setError(new ApiError(400,{code:'PHONE_INVALID',message:fa?'شماره موبایل معتبر نیست.':'The mobile number is invalid.',fieldErrors:{phone:fa?'شماره باید با 09 شروع شود و دقیقاً 11 رقم باشد؛ مانند 09123456789.':'It must start with 09 and contain exactly 11 digits, such as 09123456789.'}}));return}setBusy(true);try{const response=await publicApi<{challengeId:string;resendIn:number;developmentCode?:string}>('/auth/otp/request',{method:'POST',body:JSON.stringify({phone})});setChallenge(response.challengeId);setWait(response.resendIn);setDevCode(response.developmentCode);setDigits(['','','','','','']);setStep('otp');setTimeout(()=>otpRefs.current[0]?.focus(),20)}catch(caught){setError(caught)}finally{setBusy(false)}}
  async function verify(){setError(undefined);if(code.length!==6){setError(new ApiError(400,{code:'OTP_INVALID',message:fa?'کد تأیید کامل نیست.':'The verification code is incomplete.',fieldErrors:{code:fa?'هر 6 رقم پیامک‌شده را وارد کنید.':'Enter all six digits from the SMS.'}}));return}setBusy(true);try{const response=await publicApi<{accessToken:string;user?:PanelIdentity}>('/auth/otp/verify',{method:'POST',credentials:'include',body:JSON.stringify({phone,challengeId:challenge,code})});sessionStorage.setItem('access_token',response.accessToken);go(response.user??{})}catch(caught){setError(caught)}finally{setBusy(false)}}
  function changeDigit(index:number,raw:string){const value=raw.replace(/\D/g,'').slice(-1);setDigits(current=>current.map((digit,i)=>i===index?value:digit));if(value&&index<5)otpRefs.current[index+1]?.focus()}

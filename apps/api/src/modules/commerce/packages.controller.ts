@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, Post } from '@nestjs/common';
 import { CurrentUser, Roles, type AuthUser } from '../../common/auth';
 import { PackagesService } from './packages.service';
 import { PackageDto } from './dto/request/package.dto';
+import { PackageApprovalDto } from './dto/request/package-approval.dto';
 
 @Controller('packages')
 export class PackagesController {
@@ -20,7 +21,7 @@ export class PackagesController {
 
   @Roles('ADMIN', 'STAFF')
   @Post(':id/approval')
-  approve(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() d: { status: 'APPROVED' | 'REJECTED' }) {
+  approve(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() d: PackageApprovalDto) {
     return this.s.approvePackage(id, u.id, d.status);
   }
 }

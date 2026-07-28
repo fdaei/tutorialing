@@ -5,7 +5,32 @@ import { BookingsRepository } from './bookings.repository';
 import { badRequest, conflict, forbidden, notFound } from '../../common/errors';
 import { QueueService } from '../queue/queue.service';
 import { AvailabilityService } from './availability.service';
-import { RedisService } from './redis.service';
+import { RedisService } from '../../common/redis.service';
+
+type RefundTier = { beforeHours: number; refundPercent: number };
+
+/**
+ * Reads the cancellation tiers out of a booking's `policySnapshot`.
+ *
+ * The column is `Json`, which also admits JSON `null`, arrays, and scalars — a
+ * teacher whose policy was never filled in, or seeded/legacy rows, can all leave
+ * something other than an object in there. Reaching straight for `.tiers` on
+ * that threw a TypeError inside the cancellation transaction, so the student
+ * could not cancel at all. Anything unusable is treated as "no tiers agreed",
+ * which yields a 0% refund — the same outcome the previous `?? []` produced for
+ * an empty policy, without the crash.
+ */
+export function refundTiers(snapshot: Prisma.JsonValue): RefundTier[] {
+  if (typeof snapshot !== 'object' || snapshot === null || Array.isArray(snapshot)) return [];
+  const raw = (snapshot as Record<string, unknown>).tiers;
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((tier): tier is RefundTier =>
+      typeof tier === 'object' && tier !== null &&
+      Number.isFinite((tier as RefundTier).beforeHours) &&
+      Number.isFinite((tier as RefundTier).refundPercent))
+    .sort((a, b) => b.beforeHours - a.beforeHours);
+}
 
 @Injectable()
 export class BookingsService {
@@ -99,7 +124,7 @@ export class BookingsService {
       if (!booking || booking.studentId !== userId) throw notFound('BOOKING_NOT_FOUND', 'رزرو پیدا نشد.', 'Booking was not found.');
       if (!['PENDING_PAYMENT', 'CONFIRMED'].includes(booking.status)) throw badRequest('BOOKING_NOT_CANCELLABLE', 'این رزرو در وضعیت فعلی قابل لغو نیست.', 'This booking cannot be cancelled in its current status.');
       const hours = (booking.startsAt.getTime() - Date.now()) / 3_600_000;
-      const tiers = ((booking.policySnapshot as { tiers?: { beforeHours: number; refundPercent: number }[] }).tiers ?? []).sort((a, b) => b.beforeHours - a.beforeHours);
+      const tiers = refundTiers(booking.policySnapshot);
       const refundPercent = tiers.find((tier) => hours >= tier.beforeHours)?.refundPercent ?? 0;
       await tx.booking.update({ where: { id }, data: { status: 'CANCELLED', cancelledAt: new Date(), cancellationReason: reason.trim() } });
       if (booking.enrollmentId) await tx.creditEntry.upsert({

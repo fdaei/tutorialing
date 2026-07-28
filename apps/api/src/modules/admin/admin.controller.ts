@@ -9,6 +9,8 @@ import { PermissionDto } from './dto/request/permission.dto';
 import { CreateUserDto } from './dto/request/create-user.dto';
 import { UserStatusDto } from './dto/request/user-status.dto';
 import { UserRolesDto } from './dto/request/user-roles.dto';
+import { SettingDto } from './dto/request/setting.dto';
+import { CmsPageDto } from './dto/request/cms-page.dto';
 
 @Roles('ADMIN', 'STAFF')
 @Controller('admin')
@@ -98,7 +100,7 @@ export class AdminController {
 
   @Permissions('settings.manage')
   @Put('settings/:key')
-  setting(@Param('key') key: string, @Body() d: { value: unknown; public: boolean }) {
+  setting(@Param('key') key: string, @Body() d: SettingDto) {
     return this.s.setSetting(key, d.value, d.public);
   }
 
@@ -108,5 +110,5 @@ export class AdminController {
 
   @Permissions('cms.manage')
   @Put('cms/:slug')
-  upsert(@Param('slug') slug: string, @Body() d: Record<string, unknown>) { return this.s.upsertCms(slug, d); }
+  upsert(@Param('slug') slug: string, @Body() d: CmsPageDto) { return this.s.upsertCms(slug, d); }
 }

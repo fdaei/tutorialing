@@ -5,6 +5,7 @@ import { StartDto } from './dto/request/start.dto';
 import { SaveDto } from './dto/request/save.dto';
 import { AnswerReviewDto } from './dto/request/answer-review.dto';
 import { ReorderDto } from './dto/request/reorder.dto';
+import { ImportQuestionsDto } from './dto/request/import-questions.dto';
 
 @Controller('tests')
 export class TestsController {
@@ -30,22 +31,28 @@ export class ExaminerController {
 @Roles('ADMIN', 'STAFF')
 @Permissions('tests.manage')
 @Controller('admin/tests')
+// Bodies here are typed `unknown` on purpose. ValidationPipe cannot validate an
+// unknown metatype, so these routes get no DTO layer — instead TestsService
+// (definitionData/sectionData/questionData/passage handlers) validates every
+// field individually and copies only recognised keys onto the Prisma input, so
+// unknown keys are dropped rather than mass-assigned. Keep new fields going
+// through those helpers; do not pass a raw body to Prisma.
 export class TestBuilderController {
   constructor(private s: TestsService) {}
   @Get() list() { return this.s.adminList(); }
-  @Post() create(@Body() d: Record<string, unknown>) { return this.s.createDefinition(d); }
-  @Post('simple') createSimple(@Body() d: Record<string, unknown>) { return this.s.createSimpleDefinition(d); }
-  @Patch(':id') update(@Param('id') id: string, @Body() d: Record<string, unknown>) { return this.s.updateDefinition(id, d); }
+  @Post() create(@Body() d: unknown) { return this.s.createDefinition(d); }
+  @Post('simple') createSimple(@Body() d: unknown) { return this.s.createSimpleDefinition(d); }
+  @Patch(':id') update(@Param('id') id: string, @Body() d: unknown) { return this.s.updateDefinition(id, d); }
   @Delete(':id') remove(@Param('id') id: string) { return this.s.deleteDefinition(id); }
-  @Post(':id/sections') section(@Param('id') id: string, @Body() d: Record<string, unknown>) { return this.s.addSection(id, d); }
-  @Patch('sections/:id') updateSection(@Param('id') id: string, @Body() d: Record<string, unknown>) { return this.s.updateSection(id, d); }
+  @Post(':id/sections') section(@Param('id') id: string, @Body() d: unknown) { return this.s.addSection(id, d); }
+  @Patch('sections/:id') updateSection(@Param('id') id: string, @Body() d: unknown) { return this.s.updateSection(id, d); }
   @Delete('sections/:id') removeSection(@Param('id') id: string) { return this.s.deleteSection(id); }
-  @Post('sections/:id/passages') passage(@Param('id') id: string, @Body() d: Record<string, unknown>) { return this.s.addPassage(id, d); }
-  @Patch('passages/:id') updatePassage(@Param('id') id: string, @Body() d: Record<string, unknown>) { return this.s.updatePassage(id, d); }
+  @Post('sections/:id/passages') passage(@Param('id') id: string, @Body() d: unknown) { return this.s.addPassage(id, d); }
+  @Patch('passages/:id') updatePassage(@Param('id') id: string, @Body() d: unknown) { return this.s.updatePassage(id, d); }
   @Delete('passages/:id') removePassage(@Param('id') id: string) { return this.s.deletePassage(id); }
-  @Post('sections/:id/questions') question(@Param('id') id: string, @Body() d: Record<string, unknown>) { return this.s.addQuestion(id, d); }
-  @Patch('questions/:id') updateQuestion(@Param('id') id: string, @Body() d: Record<string, unknown>) { return this.s.updateQuestion(id, d); }
+  @Post('sections/:id/questions') question(@Param('id') id: string, @Body() d: unknown) { return this.s.addQuestion(id, d); }
+  @Patch('questions/:id') updateQuestion(@Param('id') id: string, @Body() d: unknown) { return this.s.updateQuestion(id, d); }
   @Delete('questions/:id') removeQuestion(@Param('id') id: string) { return this.s.deleteQuestion(id); }
   @Patch('sections/:id/questions/reorder') reorder(@Param('id') id: string, @Body() d: ReorderDto) { return this.s.reorderQuestions(id, d.questionIds); }
-  @Post('sections/:id/questions/import') importQuestions(@Param('id') id: string, @Body() d: { rows: Record<string, unknown>[] }) { return this.s.importQuestions(id, d.rows); }
+  @Post('sections/:id/questions/import') importQuestions(@Param('id') id: string, @Body() d: ImportQuestionsDto) { return this.s.importQuestions(id, d.rows); }
 }

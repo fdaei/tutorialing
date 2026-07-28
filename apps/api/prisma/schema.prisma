@@ -603,12 +603,18 @@ model Payment {
   authority        String?          @unique
   gatewayReference String?
   idempotencyKey   String           @unique
+  // Records which discount this payment reserved a use of, so the reservation
+  // can be released again when the payment fails or expires.
+  discountId       String?
+  discount         Discount?        @relation(fields: [discountId], references: [id])
   callbackPayload  Json?
   verifiedAt       DateTime?
   refunds          Refund[]
   reconciliations  Reconciliation[]
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
+
+  @@index([discountId])
 }
 
 model WalletEntry {
@@ -639,6 +645,7 @@ model Discount {
   startsAt  DateTime?
   endsAt    DateTime?
   active    Boolean   @default(true)
+  payments  Payment[]
 }
 
 model Refund {
@@ -932,18 +939,19 @@ model StoredFile {
 }
 
 model Notification {
-  id         String                 @id @default(cuid())
-  userId     String
-  user       User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  type       String
-  titleFa    String
-  titleEn    String
-  bodyFa     String
-  bodyEn     String
-  data       Json?
-  readAt     DateTime?
-  deliveries NotificationDelivery[]
-  createdAt  DateTime               @default(now())
+  id             String                 @id @default(cuid())
+  userId         String
+  user           User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type           String
+  titleFa        String
+  titleEn        String
+  bodyFa         String
+  bodyEn         String
+  data           Json?
+  readAt         DateTime?
+  deliveries     NotificationDelivery[]
+  createdAt      DateTime               @default(now())
+  idempotencyKey String?                @unique
 
   @@index([userId, createdAt])
 }

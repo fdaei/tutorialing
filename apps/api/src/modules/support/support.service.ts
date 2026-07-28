@@ -93,15 +93,27 @@ export class SupportService {
       await tx.ticket.update({ where: { id: ticketId }, data: { status: nextStatus, lastReplyAt: new Date() } });
       if (nextStatus !== ticket.status) await tx.ticketStatusHistory.create({ data: { ticketId, fromStatus: ticket.status, toStatus: nextStatus, actorId: userId, note: 'Status changed automatically after reply' } });
       if (!internal) {
-        const targetUserId = staff ? ticket.userId : ticket.assignedToId;
-        if (targetUserId) await tx.notification.create({
-          data: {
-            userId: targetUserId, type: 'TICKET_REPLY', titleFa: 'پاسخ جدید تیکت', titleEn: 'New ticket reply',
-            bodyFa: `برای تیکت «${ticket.subject}» پاسخ جدید ثبت شد.`, bodyEn: `A new reply was added to “${ticket.subject}”.`,
-            data: { ticketId, href: staff ? `/dashboard/tickets/${ticketId}` : `/admin/tickets/${ticketId}` },
-            deliveries: { create: { channel: 'IN_APP', status: 'sent', sentAt: new Date() } },
-          },
-        });
+        // A staff reply goes to the ticket owner. A user reply goes to the
+        // assignee — but an unassigned ticket has none, and notifying nobody let
+        // a customer reply sit unseen in a queue that had just moved to
+        // WAITING_SUPPORT. In that case every active support user is notified so
+        // the reply is visible until someone picks the ticket up.
+        const recipientIds = staff
+          ? [ticket.userId]
+          : ticket.assignedToId
+            ? [ticket.assignedToId]
+            : await this.supportStaffIds(tx);
+        const href = staff ? `/dashboard/tickets/${ticketId}` : `/admin/tickets/${ticketId}`;
+        for (const recipientId of recipientIds) {
+          await tx.notification.create({
+            data: {
+              userId: recipientId, type: 'TICKET_REPLY', titleFa: 'پاسخ جدید تیکت', titleEn: 'New ticket reply',
+              bodyFa: `برای تیکت «${ticket.subject}» پاسخ جدید ثبت شد.`, bodyEn: `A new reply was added to “${ticket.subject}”.`,
+              data: { ticketId, href },
+              deliveries: { create: { channel: 'IN_APP', status: 'sent', sentAt: new Date() } },
+            },
+          });
+        }
       }
       return reply;
     });
@@ -152,8 +164,21 @@ export class SupportService {
 
   notifications(userId: string) { return this.db.notification.findMany({ where: { userId }, include: { deliveries: true }, orderBy: { createdAt: 'desc' }, take: 100 }); }
   read(userId: string, id: string) { return this.db.notification.updateMany({ where: { id, userId }, data: { readAt: new Date() } }); }
-  page(slug: string) { return this.db.cmsPage.findFirst({ where: { slug, published: true } }); }
+  async page(slug: string) {
+    const page = await this.db.cmsPage.findFirst({ where: { slug, published: true } });
+    if (!page) throw notFound('PAGE_NOT_FOUND', 'صفحه پیدا نشد.', 'Page was not found.');
+    return page;
+  }
   settings() { return this.db.setting.findMany({ where: { public: true } }); }
+
+  /** Active users who can act on an unassigned ticket. */
+  private async supportStaffIds(tx: Prisma.TransactionClient) {
+    const staff = await tx.user.findMany({
+      where: { status: 'ACTIVE', roles: { some: { role: { in: STAFF_ROLES } } } },
+      select: { id: true },
+    });
+    return staff.map((user) => user.id);
+  }
 
   private async sendAssignmentSmsIfEnabled(userId: string, notificationId: string, ticketId: string) {
     const [user, preference] = await Promise.all([
