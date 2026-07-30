@@ -40,6 +40,24 @@ export const envSchemaWithGuards = envSchema.superRefine((env, ctx) => {
       message: 'AUTH_DEV_OTP must not be enabled when NODE_ENV=production',
     });
   }
+  // Both providers fall back to a development adapter when their credential is
+  // absent. For the payment gateway that fallback accepts any `dev_` authority
+  // as a verified capture, so a production deploy that forgets the merchant ID
+  // would treat forged callbacks as real payments. Startup fails instead.
+  if (env.NODE_ENV === 'production' && !env.ZARINPAL_MERCHANT_ID) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['ZARINPAL_MERCHANT_ID'],
+      message: 'ZARINPAL_MERCHANT_ID is required when NODE_ENV=production: without it the payment gateway accepts unverified development callbacks',
+    });
+  }
+  if (env.NODE_ENV === 'production' && !env.KAVENEGAR_API_KEY) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['KAVENEGAR_API_KEY'],
+      message: 'KAVENEGAR_API_KEY is required when NODE_ENV=production: without it OTP and reminder SMS are only logged, never delivered',
+    });
+  }
 });
 
 export function validate(config: Record<string, unknown>) {

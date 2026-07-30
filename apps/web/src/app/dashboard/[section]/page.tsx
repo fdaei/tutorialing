@@ -3,6 +3,10 @@ import { PanelShell, studentNav } from '@/components/panel-shell';
 import { ResourceView } from '@/components/resource-view';
 import { MyTicketManager } from '@/components/my-ticket-manager';
 import {requestLocale} from '@/lib/server-locale';
+import {StudentTests} from '@/components/student-tests';
+import {StudentMatches} from '@/components/student-matches';
+import {StudentProfile} from '@/components/student-profile';
+import {StudentWallet} from '@/components/student-wallet';
 
 const map: Record<string, [string,string, string]> = {
   classes: ['کلاس‌ها و تقویم','Classes and calendar', '/bookings/me'],
@@ -20,7 +24,11 @@ export default async function Section({ params }: { params: Promise<{ section: s
   const locale=await requestLocale(),fa=locale==='fa';
   const [titleFa,titleEn, endpoint] = map[section] ?? ['بخش موردنظر','Section', '/users/me'];
   return <PanelShell title="پنل زبان‌آموز" items={studentNav}>
-    <PanelActions role="student" section={section} endpoint={endpoint} />
-    {section === 'tickets' ? <MyTicketManager /> : <ResourceView title={fa?titleFa:titleEn} endpoint={endpoint} />}
+    {section === 'tests' ? <StudentTests />
+      : section === 'matches' ? <StudentMatches />
+      : section === 'profile' ? <StudentProfile />
+      : section === 'wallet' ? <StudentWallet />
+      : section === 'tickets' ? <MyTicketManager />
+      : <><PanelActions role="student" section={section} endpoint={endpoint} /><ResourceView title={fa?titleFa:titleEn} endpoint={endpoint} /></>}
   </PanelShell>;
 }

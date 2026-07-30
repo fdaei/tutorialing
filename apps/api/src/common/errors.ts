@@ -53,6 +53,16 @@ export function prismaToDomain(error: unknown): DomainException | undefined {
         'این رکورد به رکوردهای دیگری وابسته است و قابل تغییر نیست.',
         'This record is referenced by other records and cannot be changed.',
       );
+    // Serializable transaction aborted by a concurrent write. The booking and
+    // wallet paths deliberately run at Serializable, so a genuine race here
+    // surfaced as an untranslated 500 telling the user nothing. It is a retry,
+    // not a fault: the caller reloads and tries again.
+    case 'P2034':
+      return conflict(
+        'CONCURRENT_UPDATE_CONFLICT',
+        'این مورد هم‌زمان توسط درخواست دیگری تغییر کرد. صفحه را دوباره بارگذاری کنید و مجدد تلاش کنید.',
+        'This item was changed by another request at the same time. Reload the page and try again.',
+      );
     default:
       return undefined;
   }

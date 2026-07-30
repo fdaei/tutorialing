@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, Post } from '@nestjs/common';
-import { CurrentUser, Roles, type AuthUser } from '../../common/auth';
+import { CurrentUser, Public, Roles, type AuthUser } from '../../common/auth';
 import { PackagesService } from './packages.service';
 import { PackageDto } from './dto/request/package.dto';
 import { PackageApprovalDto } from './dto/request/package-approval.dto';
@@ -17,6 +17,19 @@ export class PackagesController {
   @Get('enrollments/me')
   mine(@CurrentUser() u: AuthUser) {
     return this.s.enrollments(u.id);
+  }
+
+  @Roles('TEACHER')
+  @Get('me')
+  minePackages(@CurrentUser() u: AuthUser) {
+    return this.s.mine(u.id);
+  }
+
+  /** Buyable packages shown on a teacher's public profile. */
+  @Public()
+  @Get('teacher/:teacherId')
+  forTeacher(@Param('teacherId') teacherId: string) {
+    return this.s.listForTeacher(teacherId);
   }
 
   @Roles('ADMIN', 'STAFF')

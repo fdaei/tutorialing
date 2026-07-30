@@ -9,6 +9,9 @@ const base = {
   S3_BUCKET: 'lingospeak',
 };
 
+/** Production additionally requires the real SMS and gateway credentials. */
+const prod = { ...base, NODE_ENV: 'production', ZARINPAL_MERCHANT_ID: 'merchant-1', KAVENEGAR_API_KEY: 'sms-key' };
+
 describe('AUTH_DEV_OTP', () => {
   it('defaults to off so an environment that forgets it never accepts the fixed code', () => {
     expect(validate(base).AUTH_DEV_OTP).toBe(false);
@@ -22,8 +25,31 @@ describe('AUTH_DEV_OTP', () => {
   });
 
   it('refuses to start when combined with production', () => {
-    expect(() => validate({ ...base, NODE_ENV: 'production', AUTH_DEV_OTP: 'true' })).toThrow(/AUTH_DEV_OTP/);
-    expect(validate({ ...base, NODE_ENV: 'production', AUTH_DEV_OTP: 'false' }).AUTH_DEV_OTP).toBe(false);
+    expect(() => validate({ ...prod, AUTH_DEV_OTP: 'true' })).toThrow(/AUTH_DEV_OTP/);
+    expect(validate({ ...prod, AUTH_DEV_OTP: 'false' }).AUTH_DEV_OTP).toBe(false);
+  });
+});
+
+describe('production provider credentials', () => {
+  it('are optional outside production so local development needs no accounts', () => {
+    expect(validate(base).ZARINPAL_MERCHANT_ID).toBeUndefined();
+    expect(validate(base).KAVENEGAR_API_KEY).toBeUndefined();
+  });
+
+  it('refuses to start in production without the payment gateway merchant id', () => {
+    // Without it GatewayService.verify() accepts any `dev_` authority as a real
+    // capture, so forged callbacks would be treated as completed payments.
+    const { ZARINPAL_MERCHANT_ID: _omitted, ...withoutGateway } = prod;
+    expect(() => validate(withoutGateway)).toThrow(/ZARINPAL_MERCHANT_ID/);
+  });
+
+  it('refuses to start in production without the SMS key', () => {
+    const { KAVENEGAR_API_KEY: _omitted, ...withoutSms } = prod;
+    expect(() => validate(withoutSms)).toThrow(/KAVENEGAR_API_KEY/);
+  });
+
+  it('starts in production once both are configured', () => {
+    expect(validate(prod).NODE_ENV).toBe('production');
   });
 });
 

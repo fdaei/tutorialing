@@ -1,11 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma, ReviewStatus } from '@prisma/client';
-import { PrismaService } from '../../prisma.service';
+import { PrismaService, type Tx } from '../../prisma.service';
 import { badRequest, conflict, forbidden, notFound } from '../../common/errors';
+import { SettingsService } from '../../common/settings.service';
 
 @Injectable()
 export class ReviewsService {
-  constructor(private readonly db: PrismaService) {}
+  constructor(private readonly db: PrismaService, private readonly settings: SettingsService) {}
 
   private async refreshTeacherRating(teacherId: string, tx: PrismaService | Prisma.TransactionClient = this.db) {
     const approved = await tx.review.aggregate({
@@ -16,6 +17,49 @@ export class ReviewsService {
     await tx.teacher.update({
       where: { id: teacherId },
       data: { rating: Math.round((approved._avg.rating ?? 0) * 10) / 10, reviewsCount: approved._count._all },
+    });
+  }
+
+  /**
+   * Deactivates a teacher who has accumulated more than the allowed number of
+   * published 1-star reviews.
+   *
+   * Only moderator-approved, published reviews count, so the rule cannot be
+   * weaponised by submitting unmoderated 1-star reviews. The threshold is a
+   * setting rather than a literal so support can tune it without a deploy.
+   * Deactivation sets the teacher back to REJECTED, which is what every public
+   * query already filters on — the profile leaves search and becomes unbookable
+   * immediately, while the record and its history are preserved for appeal.
+   */
+  private async enforceOneStarLimit(tx: PrismaService | Prisma.TransactionClient, teacherId: string, actorId: string) {
+    const threshold = await this.settings.numeric('reviews.autoDeactivateOneStarCount', 5, 1_000, tx as Tx);
+    const oneStars = await tx.review.count({
+      where: { teacherId, rating: 1, moderationStatus: 'APPROVED', published: true },
+    });
+    if (oneStars <= threshold) return;
+    const teacher = await tx.teacher.findUnique({ where: { id: teacherId } });
+    if (!teacher || teacher.status === 'REJECTED') return;
+    await tx.teacher.update({ where: { id: teacherId }, data: { status: 'REJECTED' } });
+    await tx.auditLog.create({
+      data: {
+        actorId,
+        action: 'teacher.auto_deactivated',
+        entity: 'Teacher',
+        entityId: teacherId,
+        before: { status: teacher.status },
+        after: { status: 'REJECTED', reason: 'one_star_review_threshold', oneStarCount: oneStars, threshold },
+      },
+    });
+    await tx.notification.create({
+      data: {
+        userId: teacher.userId,
+        type: 'TEACHER_AUTO_DEACTIVATED',
+        titleFa: 'پروفایل شما غیرفعال شد',
+        titleEn: 'Your profile was deactivated',
+        bodyFa: `پروفایل شما به دلیل دریافت بیش از ${threshold} نظر یک‌ستاره تأییدشده غیرفعال شد و از نتایج جستجو حذف شده است. برای بررسی مجدد با پشتیبانی تماس بگیرید.`,
+        bodyEn: `Your profile was deactivated after receiving more than ${threshold} approved one-star reviews and has been removed from search. Contact support to request a review.`,
+        data: { teacherId, oneStarCount: oneStars, threshold },
+      },
     });
   }
 
@@ -63,6 +107,7 @@ export class ReviewsService {
         data: { moderationStatus: status, published: status === 'APPROVED', moderatedById: actorId, moderatedAt: new Date(), rejectionReason: status === 'APPROVED' ? null : note },
       });
       await this.refreshTeacherRating(review.teacherId, tx);
+      if (status === 'APPROVED' && review.rating === 1) await this.enforceOneStarLimit(tx, review.teacherId, actorId);
       await tx.notification.create({
         data: {
           userId: review.studentId,

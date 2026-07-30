@@ -1,30 +1,33 @@
+import type { Prisma } from '@prisma/client';
 import { refundTiers } from './bookings.service';
 
-const tiers = [
-  { beforeHours: 24, refundPercent: 100 },
-  { beforeHours: 2, refundPercent: 50 },
-];
+// The column is `Json`, so at runtime it can hold anything the writer put there.
+// The casts are the point of these cases: they reproduce values TypeScript would
+// never let the write path produce but the database happily returns.
+const snapshot = (value: unknown) => refundTiers(value as Prisma.JsonValue);
+
+const generous = { beforeHours: 24, refundPercent: 100 };
+const partial = { beforeHours: 2, refundPercent: 50 };
 
 describe('refundTiers', () => {
   it('returns tiers sorted from the most generous cut-off down', () => {
-    expect(refundTiers({ tiers: [tiers[1], tiers[0]] })).toEqual([tiers[0], tiers[1]]);
+    expect(snapshot({ tiers: [partial, generous] })).toEqual([generous, partial]);
   });
 
   it('survives every non-object shape the Json column can hold', () => {
     // Any of these previously threw inside the cancellation transaction, which
     // left the student unable to cancel at all.
-    expect(refundTiers(null)).toEqual([]);
-    expect(refundTiers([])).toEqual([]);
-    expect(refundTiers('none')).toEqual([]);
-    expect(refundTiers(7)).toEqual([]);
-    expect(refundTiers({})).toEqual([]);
-    expect(refundTiers({ tiers: null })).toEqual([]);
-    expect(refundTiers({ tiers: 'all' })).toEqual([]);
+    expect(snapshot(null)).toEqual([]);
+    expect(snapshot([])).toEqual([]);
+    expect(snapshot('none')).toEqual([]);
+    expect(snapshot(7)).toEqual([]);
+    expect(snapshot({})).toEqual([]);
+    expect(snapshot({ tiers: null })).toEqual([]);
+    expect(snapshot({ tiers: 'all' })).toEqual([]);
   });
 
   it('drops malformed tiers instead of comparing against non-numbers', () => {
-    expect(
-      refundTiers({ tiers: [{ beforeHours: '24', refundPercent: 100 }, null, { beforeHours: 2 }, tiers[1]] }),
-    ).toEqual([tiers[1]]);
+    const rows = [{ beforeHours: '24', refundPercent: 100 }, null, { beforeHours: 2 }, partial];
+    expect(snapshot({ tiers: rows })).toEqual([partial]);
   });
 });

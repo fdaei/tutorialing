@@ -3,6 +3,13 @@ import { PriceStatus, Role } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
 import { badRequest, forbidden, notFound } from '../../common/errors';
 
+/**
+ * The trial session is half the regular lesson price. Rounded down to a whole
+ * unit of currency so an odd regular price cannot produce a fractional amount —
+ * every price in the system is an integer.
+ */
+export const expectedTrialPrice = (regularPrice: number) => Math.floor(regularPrice / 2);
+
 @Injectable()
 export class PricingService {
   constructor(private readonly db: PrismaService) {}
@@ -51,6 +58,17 @@ export class PricingService {
         'قیمت جلسه عادی نباید کمتر از جلسه آزمایشی باشد.',
         'The regular lesson price cannot be lower than the trial price.',
         { proposedRegularPrice: { fa: 'قیمتی برابر یا بیشتر از جلسه آزمایشی وارد کنید.', en: 'Enter a value equal to or higher than the trial price.' } },
+      );
+    }
+    // The trial is priced at half the regular lesson by policy, not by teacher
+    // choice. Only `regular >= trial` was checked, so any trial price up to the
+    // full lesson rate was accepted and the discount could silently vanish.
+    if (trialPrice !== expectedTrialPrice(regularPrice)) {
+      throw badRequest(
+        'TRIAL_PRICE_NOT_HALF_REGULAR',
+        `قیمت جلسه آزمایشی باید نصف قیمت جلسه عادی باشد؛ برای این قیمت عادی، مقدار درست ${expectedTrialPrice(regularPrice)} تومان است.`,
+        `The trial price must be half the regular price; for this regular price it must be ${expectedTrialPrice(regularPrice)}.`,
+        { proposedTrialPrice: { fa: `مقدار ${expectedTrialPrice(regularPrice)} را وارد کنید.`, en: `Enter ${expectedTrialPrice(regularPrice)}.` } },
       );
     }
   }

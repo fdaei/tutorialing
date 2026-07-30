@@ -1,6 +1,6 @@
 'use client';
 
-import {useMemo,useState} from 'react';
+import {useMemo,useRef,useState} from 'react';
 import {useSearchParams} from 'next/navigation';
 import {useMutation,useQuery} from '@tanstack/react-query';
 import Link from 'next/link';
@@ -18,7 +18,26 @@ export default function Checkout(){
  const range=useMemo(()=>{const from=new Date();from.setSeconds(0,0);const to=new Date(from.getTime()+28*864e5);return{from:from.toISOString(),to:to.toISOString()}},[]);
  const teacher=useQuery({queryKey:['teacher-checkout',teacherId],queryFn:()=>publicApi<PublicTeacher>(`/teachers/${encodeURIComponent(teacherId)}`),enabled:!!teacherId});
  const slots=useQuery({queryKey:['slots',teacherId,lessonType,range.from,range.to],queryFn:()=>publicApi<Slot[]>(`/availability/${teacherId}/slots?from=${encodeURIComponent(range.from)}&to=${encodeURIComponent(range.to)}&type=${lessonType}`),enabled:!!teacherId});
- const checkout=useMutation({mutationFn:async()=>{if(!slot)throw new Error(fa?'یک زمان انتخاب کنید.':'Choose a time.');const booking=await api<{id:string}>('/bookings',{method:'POST',body:JSON.stringify({teacherId,startsAt:slot.startsAt,type:lessonType,policyAccepted:accepted,timezone:Intl.DateTimeFormat().resolvedOptions().timeZone})});const payment=await api<Payment>('/payments',{method:'POST',body:JSON.stringify({purpose:'booking',referenceId:booking.id,walletAmount:0,discountCode:discount.trim()||undefined,idempotencyKey:crypto.randomUUID()})});if(payment.status==='PAID'){location.href=p('/payment/success');return}const gateway=await api<{url:string}>(`/payments/${payment.id}/gateway`,{method:'POST'});location.href=gateway.url}});
+ // Checkout is two calls: reserve the booking, then start its payment. When the
+ // second one failed (a rejected discount code, say), pressing the button again
+ // used to reserve a *second* booking for the same slot — which the first one was
+ // already holding — so every retry died on SLOT_ALREADY_BOOKED until the 15
+ // minute payment window expired. Remembering the reserved booking makes a retry
+ // resume payment for it instead. It is cleared whenever the choice of slot or
+ // lesson type changes, since the reservation no longer matches what was picked.
+ const reservedRef=useRef<{bookingId:string;startsAt:string;type:'trial'|'regular'}|null>(null);
+ const checkout=useMutation({mutationFn:async()=>{
+  if(!slot)throw new Error(fa?'یک زمان انتخاب کنید.':'Choose a time.');
+  const held=reservedRef.current;
+  const bookingId=held&&held.startsAt===slot.startsAt&&held.type===lessonType
+   ?held.bookingId
+   :(await api<{id:string}>('/bookings',{method:'POST',body:JSON.stringify({teacherId,startsAt:slot.startsAt,type:lessonType,policyAccepted:accepted,timezone:Intl.DateTimeFormat().resolvedOptions().timeZone})})).id;
+  reservedRef.current={bookingId,startsAt:slot.startsAt,type:lessonType};
+  const payment=await api<Payment>('/payments',{method:'POST',body:JSON.stringify({purpose:'booking',referenceId:bookingId,walletAmount:0,discountCode:discount.trim()||undefined,idempotencyKey:crypto.randomUUID()})});
+  if(payment.status==='PAID'){location.href=p('/payment/success');return}
+  const gateway=await api<{url:string}>(`/payments/${payment.id}/gateway`,{method:'POST'});
+  location.href=gateway.url;
+ }});
  const days=useMemo(()=>{const base=new Date();base.setHours(0,0,0,0);return Array.from({length:28},(_,index)=>{const date=new Date(base.getTime()+index*864e5);const key=date.toLocaleDateString('en-CA');return{date,key,slots:(slots.data??[]).filter(item=>localKey(item.startsAt)===key)}})},[slots.data]);
  const weekDays=days.slice(week*7,week*7+7),selectedDay=slot?localKey(slot.startsAt):(weekDays.find(day=>day.slots.length)?.key??weekDays[0]?.key),daySlots=weekDays.find(day=>day.key===selectedDay)?.slots??[];
  const t=teacher.data,trialPrice=t?.approvedTrialPrice??t?.trialPrice??0,regularPrice=t?.approvedRegularPrice??t?.regularPrice??0,price=lessonType==='trial'?trialPrice:regularPrice,duration=lessonType==='trial'?(t?.trialDuration??30):(t?.lessonDuration??60),money=(value:number)=>new Intl.NumberFormat(fa?'fa-IR':'en-US').format(value)+(fa?' تومان':' IRR');

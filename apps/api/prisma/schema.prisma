@@ -173,6 +173,10 @@ model User {
   name                    String?
   email                   String?
   avatarKey               String?
+  // Date only; the time component is never read. Stored in UTC like every other
+  // timestamp — the Jalali birth date a student enters is converted on the way
+  // in, and the birthday discount rule compares month/day only.
+  birthDate               DateTime?
   locale                  String                    @default("fa")
   timezone                String                    @default("Asia/Tehran")
   profileComplete         Boolean                   @default(false)
@@ -280,7 +284,10 @@ model Teacher {
   regularPrice          Int                      @default(0)
   trialDuration         Int                      @default(30)
   lessonDuration        Int                      @default(60)
-  breakMinutes          Int                      @default(15)
+  // No gap between back-to-back lessons is required: an earlier draft mandated a
+  // 10-minute buffer and that decision was reversed. The field is kept so a
+  // teacher can still opt into a break, but it must not be imposed by default.
+  breakMinutes          Int                      @default(0)
   proposedTrialPrice    Int?
   proposedRegularPrice  Int?
   approvedTrialPrice    Int?
@@ -315,6 +322,12 @@ model Teacher {
   learningPlans         LearningPlan[]
   createdAt             DateTime                 @default(now())
   updatedAt             DateTime                 @updatedAt
+
+  // The public teacher listing is the busiest read on the site and had no index
+  // to serve it: every query filters `status = APPROVED` and then orders by
+  // `approvedAt` or `rating`.
+  @@index([status, approvedAt])
+  @@index([status, rating])
 }
 
 model VerificationItem {
@@ -345,6 +358,9 @@ model VerificationHistory {
   createdAt  DateTime       @default(now())
 }
 
+/// Indexed on ([teacherId, moderationStatus, published]) below: both the rating
+/// refresh and the one-star auto-deactivation count filter on exactly that
+/// combination, and neither had an index to use.
 model Review {
   id               String       @id @default(cuid())
   teacherId        String
@@ -365,6 +381,8 @@ model Review {
   respondedAt      DateTime?
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
+
+  @@index([teacherId, moderationStatus, published])
 }
 
 model Favorite {
@@ -451,6 +469,14 @@ model Booking {
   attendanceTeacher  Boolean?
   cancelledAt        DateTime?
   cancellationReason String?
+  // Rescheduling requires both sides to agree, so a proposed new time is held
+  // here until the counterparty accepts. Either party may propose; only the
+  // other one can accept, which is what makes it mutual. All four are cleared
+  // together once the proposal is accepted, declined, or superseded.
+  reschedulerId      String?
+  rescheduleStartsAt DateTime?
+  rescheduleTimezone String?
+  rescheduleAskedAt  DateTime?
   payment            Payment?
   creditReservations CreditEntry[]
   classRecord        ClassRecord?
@@ -481,8 +507,16 @@ model Package {
   titleEn         String
   descriptionFa   String
   descriptionEn   String
+  // Session count. Constrained to the sellable tiers (1/5/10/15/20) by
+  // PackagesService rather than by the database, so adding a tier later is a
+  // code change and not a migration.
   credits         Int
   lessonMinutes   Int
+  // Undiscounted total for `credits` lessons, derived from the teacher's
+  // approved regular price. `discountPercent` is the teacher's own discount for
+  // buying the tier up front, and `price` is what the student actually pays.
+  listPrice       Int                     @default(0)
+  discountPercent Int                     @default(0)
   price           Int
   active          Boolean                 @default(true)
   approvalStatus  ReviewStatus            @default(PENDING)
@@ -607,6 +641,10 @@ model Payment {
   // can be released again when the payment fails or expires.
   discountId       String?
   discount         Discount?        @relation(fields: [discountId], references: [id])
+  // Set instead of `discountId` when an automatic rule (e.g. birthday) gave the
+  // better deal. At most one of the two applies to a payment.
+  discountRuleId   String?
+  discountRule     DiscountRule?    @relation(fields: [discountRuleId], references: [id])
   callbackPayload  Json?
   verifiedAt       DateTime?
   refunds          Refund[]
@@ -615,6 +653,7 @@ model Payment {
   updatedAt        DateTime         @updatedAt
 
   @@index([discountId])
+  @@index([discountRuleId])
 }
 
 model WalletEntry {
@@ -646,6 +685,31 @@ model Discount {
   endsAt    DateTime?
   active    Boolean   @default(true)
   payments  Payment[]
+}
+
+enum DiscountTrigger {
+  BIRTHDAY
+}
+
+/**
+ * Automatic discounts applied without the student entering a code.
+ * Kept as rows rather than as a hardcoded birthday branch so the set of triggers
+ * and their values are configurable, and so a second trigger can be added
+ * without touching the checkout path. `windowDays` is how many days either side
+ * of the qualifying date the rule still applies.
+ */
+model DiscountRule {
+  id         String          @id @default(cuid())
+  trigger    DiscountTrigger
+  type       String
+  value      Int
+  maxAmount  Int?
+  windowDays Int             @default(7)
+  active     Boolean         @default(true)
+  payments   Payment[]
+  createdAt  DateTime        @default(now())
+
+  @@index([trigger, active])
 }
 
 model Refund {
@@ -839,6 +903,11 @@ model TestAnswer {
   updatedAt       DateTime            @updatedAt
 
   @@unique([attemptId, questionId])
+  // Backs the examiner review queue, which filters by reviewStatus and orders by
+  // updatedAt. Created by 20260719090000_multilanguage_workflows but never
+  // declared here, so `prisma migrate dev` would have generated a migration
+  // dropping it.
+  @@index([reviewStatus, updatedAt])
 }
 
 model TestScore {
@@ -1021,9 +1090,12 @@ model TicketReply {
   ticket       Ticket            @relation(fields: [ticketId], references: [id], onDelete: Cascade)
   authorId     String
   author       User              @relation("TicketReplyAuthor", fields: [authorId], references: [id])
-  authorRole   Role
-  direction    TicketDirection
-  messageType  TicketMessageType
+  // These defaults exist in the database from the migration that backfilled the
+  // columns. Declaring them keeps schema and migrations in agreement; the
+  // service always sets all three explicitly, so nothing relies on them.
+  authorRole   Role              @default(STUDENT)
+  direction    TicketDirection   @default(INBOUND)
+  messageType  TicketMessageType @default(USER_MESSAGE)
   body         String
   attachmentId String?
   internal     Boolean           @default(false)

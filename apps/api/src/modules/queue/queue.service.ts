@@ -4,6 +4,35 @@ import { PrismaService } from '../../prisma.service';
 import { config } from '../../config';
 import { releaseDiscount } from '../commerce/discount-reservation';
 
+/**
+ * Formats a lesson start time for a Kavenegar lookup token.
+ *
+ * Two problems with sending `startsAt.toISOString()`, which is what this used to
+ * do. Kavenegar rejects lookup tokens containing spaces and punctuation such as
+ * `:`, so the reminder SMS would fail to send at all; and a UTC instant is the
+ * wrong thing to show a student whose lesson time was quoted in their own zone.
+ * The booking's stored timezone is used, and the output is restricted to digits
+ * and hyphens so it always survives token validation.
+ *
+ * NOTE: the `lingospeak-reminder` template and this token format have to be
+ * confirmed against the Kavenegar panel before launch — the exact accepted
+ * character set is not documented and cannot be verified without a live key.
+ */
+export function reminderToken(startsAt: Date, timezone: string) {
+  const zone = (() => {
+    try { new Intl.DateTimeFormat('en-CA', { timeZone: timezone }).format(startsAt); return timezone; }
+    catch { return 'Asia/Tehran'; }
+  })();
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  }).formatToParts(startsAt);
+  const value = (kind: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === kind)?.value ?? '';
+  return {
+    date: `${value('year')}-${value('month')}-${value('day')}`,
+    time: `${value('hour')}-${value('minute')}`,
+  };
+}
+
 @Injectable()
 export class QueueService implements OnModuleInit, OnModuleDestroy {
   private cfg = config();
@@ -20,17 +49,20 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
       const reminder=await this.db.reminder.findUnique({where:{id:job.data.reminderId},include:{booking:{include:{student:true,teacher:{include:{user:true}}}}}});
       if(!reminder||reminder.status!=='scheduled'||reminder.booking.status!=='CONFIRMED')return;
       const failures:unknown[]=[];
+      // Same lesson time for both recipients, so it is formatted once. Rendered
+      // in the booking's timezone rather than UTC — see `reminderToken`.
+      const when=reminderToken(reminder.booking.startsAt,reminder.booking.timezone);
       for(const user of [reminder.booking.student,reminder.booking.teacher.user]){
         const dedupeKey=`reminder:${reminder.id}:${user.id}`;
         const notification=await this.db.notification.findUnique({where:{idempotencyKey:dedupeKey},include:{deliveries:true}})
-          ??await this.db.notification.create({data:{userId:user.id,type:'class-reminder',idempotencyKey:dedupeKey,titleFa:'یادآوری کلاس',titleEn:'Class reminder',bodyFa:`کلاس شما در ${reminder.booking.startsAt.toISOString()} برگزار می‌شود.`,bodyEn:`Your class starts at ${reminder.booking.startsAt.toISOString()}.`,deliveries:{create:{channel:'IN_APP',status:'sent',sentAt:new Date()}}},include:{deliveries:true}});
+          ??await this.db.notification.create({data:{userId:user.id,type:'class-reminder',idempotencyKey:dedupeKey,titleFa:'یادآوری کلاس',titleEn:'Class reminder',bodyFa:`کلاس شما در تاریخ ${when.date} ساعت ${when.time.replace('-',':')} برگزار می‌شود.`,bodyEn:`Your class starts on ${when.date} at ${when.time.replace('-',':')}.`,deliveries:{create:{channel:'IN_APP',status:'sent',sentAt:new Date()}}},include:{deliveries:true}});
         if(notification.deliveries.some(d=>d.channel==='SMS'&&d.status==='sent'))continue;
         const delivery=notification.deliveries.find(d=>d.channel==='SMS')
           ??await this.db.notificationDelivery.create({data:{notificationId:notification.id,channel:'SMS',status:'sending',attempts:1}});
         try{
           let providerId:string,response:object;
           if(this.cfg.KAVENEGAR_API_KEY){
-            const r=await fetch(`https://api.kavenegar.com/v1/${this.cfg.KAVENEGAR_API_KEY}/verify/lookup.json?receptor=${encodeURIComponent(user.phone)}&token=${encodeURIComponent(reminder.booking.startsAt.toISOString())}&template=lingospeak-reminder`,{method:'POST'});
+            const r=await fetch(`https://api.kavenegar.com/v1/${this.cfg.KAVENEGAR_API_KEY}/verify/lookup.json?receptor=${encodeURIComponent(user.phone)}&token=${encodeURIComponent(when.date)}&token2=${encodeURIComponent(when.time)}&template=lingospeak-reminder`,{method:'POST'});
             response=await r.json() as object;if(!r.ok)throw new Error('Kavenegar delivery failed');providerId=`kavenegar-${Date.now()}`;
           }else{providerId=`development-${Date.now()}`;response={adapter:'development',phone:user.phone,startsAt:reminder.booking.startsAt};}
           await this.db.notificationDelivery.update({where:{id:delivery.id},data:{status:'sent',providerId,providerResponse:response,sentAt:new Date()}});

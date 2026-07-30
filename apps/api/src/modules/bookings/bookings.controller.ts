@@ -4,7 +4,7 @@ import { CurrentUser, Roles, type AuthUser } from '../../common/auth';
 import { BookingsService } from './bookings.service';
 import { BookingDto } from './dto/request/booking.dto';
 import { CancelDto } from './dto/request/cancel.dto';
-import { RescheduleDto } from './dto/request/reschedule.dto';
+import { RescheduleDeclineDto, RescheduleDto } from './dto/request/reschedule.dto';
 import { AttendanceDto } from './dto/request/attendance.dto';
 import { BookingResponseDto } from './dto/response/booking-response.dto';
 
@@ -21,7 +21,11 @@ export class BookingsController {
   }
   @Roles('TEACHER') @Get('students') students(@CurrentUser() u:AuthUser){return this.s.students(u.id);}
   @Post(':id/cancel') cancel(@CurrentUser() u:AuthUser,@Param('id') id:string,@Body() d:CancelDto){return this.s.cancel(u.id,id,d.reason);}
-  @Post(':id/reschedule') reschedule(@CurrentUser() u:AuthUser,@Param('id') id:string,@Body() d:RescheduleDto){return this.s.reschedule(u.id,id,d);}
+  // Rescheduling is a two-step agreement: either party proposes, the other
+  // responds. No single party can move a confirmed lesson on their own.
+  @Post(':id/reschedule') requestReschedule(@CurrentUser() u:AuthUser,@Param('id') id:string,@Body() d:RescheduleDto){return this.s.requestReschedule(u.id,id,d);}
+  @Post(':id/reschedule/accept') acceptReschedule(@CurrentUser() u:AuthUser,@Param('id') id:string){return this.s.acceptReschedule(u.id,id);}
+  @Post(':id/reschedule/decline') declineReschedule(@CurrentUser() u:AuthUser,@Param('id') id:string,@Body() d:RescheduleDeclineDto){return this.s.declineReschedule(u.id,id,d.reason);}
   @Roles('TEACHER','ADMIN','STAFF') @Put(':id/attendance') attendance(@CurrentUser() u:AuthUser,@Param('id') id:string,@Body() d:AttendanceDto){return this.s.attendance(u.id,u.roles,id,d);}
   @Roles('TEACHER','ADMIN','STAFF') @Post(':id/complete') complete(@CurrentUser() u:AuthUser,@Param('id') id:string){return this.s.complete(u.id,u.roles,id);}
 }

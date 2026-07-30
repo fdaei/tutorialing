@@ -6,6 +6,14 @@ import { api, ApiError, apiMessage, type EducationalLanguage } from '@/lib/api';
 import { useTranslations } from './locale-provider';
 
 type Role = 'student' | 'teacher' | 'admin';
+
+/**
+ * Mirrors `PACKAGE_TIERS` in the API's packages.service.ts, which is the source
+ * of truth and rejects anything else. Duplicated rather than imported from
+ * `@lingospeak/contracts` because that package ships raw ESM TypeScript the
+ * compiled API cannot require at runtime; keep the two lists in step.
+ */
+const PACKAGE_TIERS = [1, 5, 10, 15, 20] as const;
 type Props = { role: Role; section: string; endpoint: string };
 type Localized = { fa: boolean };
 type UploadResponse = { fileId: string; uploadUrl: string };
@@ -296,13 +304,18 @@ function PackageForm({ endpoint, fa }: { endpoint: string } & Localized) {
   return <Shell title={tr(fa, 'ایجاد بسته آموزشی', 'Create teaching package')}>
     <form className="mt-4 grid gap-4 md:grid-cols-2" onSubmit={(event) => {
       event.preventDefault(); const form = new FormData(event.currentTarget);
-      action.mutate(() => api('/packages', { method: 'POST', body: JSON.stringify({ titleFa: value(form, 'titleFa'), titleEn: value(form, 'titleEn'), descriptionFa: value(form, 'descriptionFa'), descriptionEn: value(form, 'descriptionEn'), credits: numeric(form, 'credits', 8), lessonMinutes: numeric(form, 'lessonMinutes', 60), price: numeric(form, 'price') }) }));
+      // The price is derived server-side from the teacher's approved lesson rate
+      // and this discount, so a package cannot sell lessons at a rate that never
+      // passed price review. Only the tier and the discount are chosen here.
+      action.mutate(() => api('/packages', { method: 'POST', body: JSON.stringify({ titleFa: value(form, 'titleFa'), titleEn: value(form, 'titleEn'), descriptionFa: value(form, 'descriptionFa'), descriptionEn: value(form, 'descriptionEn'), credits: numeric(form, 'credits', 5), lessonMinutes: numeric(form, 'lessonMinutes', 60), discountPercent: numeric(form, 'discountPercent', 0) }) }));
     }}>
       <Field name="titleFa" label={tr(fa, 'عنوان فارسی', 'Persian title')} required />
       <Field name="titleEn" label={tr(fa, 'عنوان انگلیسی', 'English title')} required dir="ltr" />
-      <Field name="credits" label={tr(fa, 'تعداد اعتبار', 'Lesson credits')} type="number" min={1} defaultValue={8} />
-      <Field name="lessonMinutes" label={tr(fa, 'دقیقه هر جلسه', 'Minutes per lesson')} type="number" min={15} defaultValue={60} />
-      <Field name="price" label={tr(fa, 'قیمت به تومان', 'Price in toman')} type="number" min={1} required />
+      <Select name="credits" label={tr(fa, 'تعداد جلسات بسته', 'Sessions in package')}>
+        {PACKAGE_TIERS.map((tier) => <option key={tier} value={tier}>{tr(fa, `${tier} جلسه`, `${tier} session${tier === 1 ? '' : 's'}`)}</option>)}
+      </Select>
+      <Field name="lessonMinutes" label={tr(fa, 'دقیقه هر جلسه', 'Minutes per lesson')} type="number" min={15} max={240} defaultValue={60} />
+      <Field name="discountPercent" label={tr(fa, 'درصد تخفیف بسته', 'Package discount %')} type="number" min={0} max={80} defaultValue={0} />
       <Area name="descriptionFa" label={tr(fa, 'توضیح فارسی', 'Persian description')} required />
       <Area name="descriptionEn" label={tr(fa, 'توضیح انگلیسی', 'English description')} required dir="ltr" />
       <div className="md:col-span-2"><Submit fa={fa} busy={action.isPending}>{tr(fa, 'ثبت بسته برای تأیید', 'Submit package for approval')}</Submit></div>
