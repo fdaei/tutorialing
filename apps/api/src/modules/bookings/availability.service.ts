@@ -102,7 +102,9 @@ export class AvailabilityService {
       });
     }
     const lessonDuration = rule.lessonDuration ?? 60;
-    const breakMinutes = rule.breakMinutes ?? 15;
+    // No gap between back-to-back lessons is required — the earlier 10-minute
+    // buffer requirement was reversed. A teacher may still opt into one.
+    const breakMinutes = rule.breakMinutes ?? 0;
     if (!Number.isInteger(lessonDuration) || lessonDuration < 15 || lessonDuration > 240) {
       throw badRequest('LESSON_DURATION_INVALID', 'مدت کلاس باید بین ۱۵ تا ۲۴۰ دقیقه باشد.', 'Lesson duration must be between 15 and 240 minutes.');
     }

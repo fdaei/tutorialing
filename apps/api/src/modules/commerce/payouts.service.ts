@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { badRequest } from '../../common/errors';
 
@@ -12,8 +12,16 @@ export class PayoutsService {
         weekEnd: { fa: 'تاریخ پایان باید بعد از تاریخ شروع باشد و هر دو تاریخ را از تقویم انتخاب کنید.', en: 'The end date must be after the start date; choose both dates from the date picker.' },
       });
     }
+    // Eligibility is derived from `eligibleAt` rather than from a status flag.
+    // Selecting `status: 'ELIGIBLE'` matched nothing, because earnings are
+    // created PENDING and no code path ever promoted them — so every payout run
+    // reported "no eligible earnings" and teachers could never be paid. The old
+    // `createdAt` window was a second, independent cause: with a 7-day hold,
+    // `createdAt` inside a 7-day window forces `eligibleAt` past `weekEnd`, so
+    // the two filters could not both hold. The window now describes which
+    // earnings have matured by the end of the run, not when they were created.
     const earnings = await this.db.earning.findMany({
-      where: { status: 'ELIGIBLE', eligibleAt: { lte: weekEnd }, createdAt: { gte: weekStart, lte: weekEnd }, payoutItem: null },
+      where: { status: { in: ['PENDING', 'ELIGIBLE'] }, eligibleAt: { lte: weekEnd }, payoutItem: null },
       include: { booking: { select: { status: true, attendanceTeacher: true, attendanceStudent: true, startsAt: true, endsAt: true } } },
       orderBy: { createdAt: 'asc' },
     });
@@ -35,17 +43,51 @@ export class PayoutsService {
         }
       );
     }
-    return this.db.$transaction(async tx => tx.payoutBatch.create({
-      data: { weekStart, weekEnd, totalAmount: earnings.reduce((sum, e) => sum + e.netAmount, 0), items: { create: earnings.map(e => ({ earningId: e.id, teacherId: e.teacherId, amount: e.netAmount })) } },
-      include: { items: true },
-    }));
+    return this.db.$transaction(async tx => {
+      const batch = await tx.payoutBatch.create({
+        data: { weekStart, weekEnd, totalAmount: earnings.reduce((sum, e) => sum + e.netAmount, 0), items: { create: earnings.map(e => ({ earningId: e.id, teacherId: e.teacherId, amount: e.netAmount })) } },
+        include: { items: true },
+      });
+      // `PayoutItem.earningId` is unique, so two concurrent runs cannot batch
+      // the same earning — the loser fails the insert rather than paying twice.
+      await tx.earning.updateMany({ where: { id: { in: earnings.map(e => e.id) } }, data: { status: 'ELIGIBLE' } });
+      return batch;
+    });
   }
 
   async approvePayout(id: string, actorId: string, reference?: string) {
     return this.db.$transaction(async tx => {
       const batch = await tx.payoutBatch.findUniqueOrThrow({ where: { id }, include: { items: true } });
-      if (!['DRAFT', 'PENDING_APPROVAL'].includes(batch.status)) throw new BadRequestException();
+      if (!['DRAFT', 'PENDING_APPROVAL'].includes(batch.status)) throw badRequest(
+        'PAYOUT_BATCH_NOT_APPROVABLE',
+        'این دسته تسویه در وضعیت فعلی قابل تأیید نیست.',
+        'This payout batch cannot be approved in its current status.',
+      );
       await tx.earning.updateMany({ where: { id: { in: batch.items.map(i => i.earningId) } }, data: { status: 'PAID' } });
+      // The net amount was credited to the teacher's wallet when the lesson was
+      // completed. Transferring it to their bank account takes it back out, so
+      // the wallet keeps showing what the platform still owes them rather than
+      // counting the same earning twice.
+      if (reference) {
+        for (const item of batch.items) {
+          const teacher = await tx.teacher.findUniqueOrThrow({ where: { id: item.teacherId }, select: { userId: true } });
+          await tx.walletEntry.upsert({
+            where: { idempotencyKey: `payout-debit:${item.id}` },
+            create: {
+              userId: teacher.userId,
+              transactionId: `tx_${batch.id}`,
+              account: 'user_wallet',
+              direction: 'DEBIT',
+              amount: item.amount,
+              description: 'payout transferred to bank account',
+              referenceType: 'PayoutItem',
+              referenceId: item.id,
+              idempotencyKey: `payout-debit:${item.id}`,
+            },
+            update: {},
+          });
+        }
+      }
       return tx.payoutBatch.update({ where: { id }, data: { status: reference ? 'TRANSFERRED' : 'APPROVED', approvedById: actorId, approvedAt: new Date(), reference, transferredAt: reference ? new Date() : undefined } });
     });
   }

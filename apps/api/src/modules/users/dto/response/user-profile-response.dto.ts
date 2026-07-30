@@ -5,6 +5,7 @@ export class UserProfileResponseDto {
   @Expose() phone!: string;
   @Expose() name!: string;
   @Expose() email?: string;
+  @Expose() birthDate?: Date;
   @Expose() locale!: string;
   @Expose() timezone!: string;
   @Expose() profileComplete!: boolean;

@@ -6,6 +6,8 @@ import { badRequest, conflict, forbidden, notFound } from '../../common/errors';
 import { QueueService } from '../queue/queue.service';
 import { AvailabilityService } from './availability.service';
 import { RedisService } from '../../common/redis.service';
+import { EarningsService } from '../commerce/earnings.service';
+import { SettingsService } from '../../common/settings.service';
 
 type RefundTier = { beforeHours: number; refundPercent: number };
 
@@ -39,6 +41,8 @@ export class BookingsService {
     private redis: RedisService,
     private queue: QueueService,
     private availability: AvailabilityService,
+    private earnings: EarningsService,
+    private settings: SettingsService,
   ) {}
 
   async create(studentId:string,data:{teacherId:string;startsAt:string;type:'trial'|'regular';enrollmentId?:string;policyAccepted:boolean;timezone:string}) {
@@ -55,6 +59,7 @@ export class BookingsService {
       'The start time must be a valid future date and time.',
       { startsAt: { fa: 'تاریخ را از تقویم و ساعت را از فهرست نوبت‌های آزاد انتخاب کنید.', en: 'Choose a date from the calendar and a time from the available slots.' } },
     );
+    await this.assertWithinBookingWindow(startsAt);
     const lock = await this.redis.lock(`booking:${data.teacherId}:${startsAt.toISOString()}`);
     if (!lock) throw conflict('SLOT_LOCKED', 'کاربر دیگری در حال رزرو این ساعت است. چند لحظه بعد دوباره تلاش کنید یا ساعت دیگری انتخاب کنید.', 'Another user is reserving this slot. Try again shortly or choose another time.');
     try {
@@ -64,6 +69,9 @@ export class BookingsService {
           where: { studentId, status: { in: ['PENDING_PAYMENT', 'CONFIRMED'] }, startsAt: { lt: endsAt }, endsAt: { gt: startsAt } },
         });
         if (studentOverlap) throw conflict('STUDENT_BOOKING_OVERLAP', 'در این ساعت یک رزرو دیگر دارید. ساعت دیگری انتخاب کنید.', 'You already have another booking at this time. Choose another slot.');
+
+        if (data.type === 'regular' && !data.enrollmentId) await this.assertTrialCompleted(tx, studentId, data.teacherId);
+        if (data.type === 'trial') await this.assertTrialNotUsed(tx, studentId, data.teacherId);
 
         let enrollmentId: string | undefined;
         let creditBased = false;
@@ -107,6 +115,76 @@ export class BookingsService {
       else await this.queue.scheduleBooking(booking.id, booking.startsAt);
       return booking;
     } finally { await lock.release(); }
+  }
+
+  /**
+   * Enforces the booking window server-side. Both bounds were previously only
+   * present in the frontend form, so a direct API call could book a lesson
+   * starting in one minute — leaving the teacher no notice — or years ahead,
+   * locking a slot indefinitely against a price that will have changed.
+   */
+  private async assertWithinBookingWindow(startsAt: Date) {
+    const [minLeadMinutes, maxAdvanceDays] = await Promise.all([
+      this.settings.numeric('booking.minLeadMinutes', 120, 10_080),
+      this.settings.numeric('booking.maxAdvanceDays', 60, 730),
+    ]);
+    const leadMinutes = (startsAt.getTime() - Date.now()) / 60_000;
+    if (leadMinutes < minLeadMinutes) throw badRequest(
+      'BOOKING_LEAD_TIME_TOO_SHORT',
+      `رزرو باید حداقل ${minLeadMinutes} دقیقه پیش از شروع کلاس انجام شود.`,
+      `A lesson must be booked at least ${minLeadMinutes} minutes before it starts.`,
+      { startsAt: { fa: 'یک نوبت با فاصله زمانی بیشتر انتخاب کنید.', en: 'Choose a slot further in the future.' } },
+    );
+    if (leadMinutes / 1_440 > maxAdvanceDays) throw badRequest(
+      'BOOKING_TOO_FAR_AHEAD',
+      `تا حداکثر ${maxAdvanceDays} روز آینده می‌توانید رزرو کنید.`,
+      `You can book up to ${maxAdvanceDays} days ahead.`,
+      { startsAt: { fa: 'یک نوبت نزدیک‌تر انتخاب کنید.', en: 'Choose an earlier slot.' } },
+    );
+  }
+
+  /**
+   * The trial session is mandatory: a student's first lesson with a given teacher
+   * has to be a trial, so both sides can assess fit before committing to a full
+   * class. Nothing enforced this, so a student could book straight into a regular
+   * lesson. Credit-based bookings are exempt — buying a package is itself a
+   * deliberate commitment, and the trial precedes the purchase.
+   */
+  private async assertTrialCompleted(tx: Prisma.TransactionClient, studentId: string, teacherId: string) {
+    const priorTrial = await tx.booking.count({
+      where: { studentId, teacherId, type: 'trial', status: { in: ['COMPLETED', 'NO_SHOW'] } },
+    });
+    if (priorTrial) return;
+    const pendingTrial = await tx.booking.count({
+      where: { studentId, teacherId, type: 'trial', status: { in: ['PENDING_PAYMENT', 'CONFIRMED'] } },
+    });
+    throw badRequest(
+      'TRIAL_SESSION_REQUIRED',
+      pendingTrial
+        ? 'جلسه آزمایشی شما با این مدرس هنوز برگزار نشده است. پس از برگزاری آن می‌توانید کلاس عادی رزرو کنید.'
+        : 'برای رزرو کلاس با این مدرس، ابتدا باید یک جلسه آزمایشی برگزار کنید.',
+      pendingTrial
+        ? 'Your trial session with this teacher has not taken place yet. You can book a regular lesson once it is done.'
+        : 'You must take a trial session with this teacher before booking a regular lesson.',
+      { type: { fa: 'ابتدا «جلسه آزمایشی» را انتخاب و رزرو کنید.', en: 'Select and book a trial session first.' } },
+    );
+  }
+
+  /**
+   * The discounted trial is once per student-teacher pair. A cancelled trial does
+   * not consume the entitlement, so a student whose trial fell through can still
+   * take one; anything else already used it.
+   */
+  private async assertTrialNotUsed(tx: Prisma.TransactionClient, studentId: string, teacherId: string) {
+    const used = await tx.booking.count({
+      where: { studentId, teacherId, type: 'trial', status: { notIn: ['CANCELLED'] } },
+    });
+    if (used) throw conflict(
+      'TRIAL_ALREADY_USED',
+      'شما قبلاً با این مدرس جلسه آزمایشی داشته‌اید. برای ادامه، کلاس عادی رزرو کنید.',
+      'You have already had a trial session with this teacher. Book a regular lesson to continue.',
+      { type: { fa: '«کلاس عادی» را انتخاب کنید.', en: 'Select a regular lesson instead.' } },
+    );
   }
 
   list(userId:string,role:'student'|'teacher') {
@@ -153,24 +231,135 @@ export class BookingsService {
     });
   }
 
-  async reschedule(userId:string,id:string,data:{startsAt:string;timezone:string}) {
-    const existing = await this.db.booking.findUnique({ where: { id } });
-    if (!existing || existing.studentId !== userId) throw notFound('BOOKING_NOT_FOUND', 'رزرو پیدا نشد.', 'Booking was not found.');
-    if (existing.status !== 'CONFIRMED') throw badRequest('BOOKING_NOT_RESCHEDULABLE', 'فقط رزرو تأییدشده قابل جابه‌جایی است.', 'Only a confirmed booking can be rescheduled.');
+  /**
+   * Loads a booking either side of the engagement may act on, and reports which
+   * side the caller is. Rescheduling used to be student-only and unilateral.
+   */
+  private async partyOn(userId: string, id: string) {
+    const booking = await this.db.booking.findUnique({ where: { id }, include: { teacher: { select: { userId: true } } } });
+    if (!booking) throw notFound('BOOKING_NOT_FOUND', 'رزرو پیدا نشد.', 'Booking was not found.');
+    const party = booking.studentId === userId ? 'student' : booking.teacher.userId === userId ? 'teacher' : null;
+    if (!party) throw notFound('BOOKING_NOT_FOUND', 'رزرو پیدا نشد.', 'Booking was not found.');
+    if (booking.status !== 'CONFIRMED') throw badRequest('BOOKING_NOT_RESCHEDULABLE', 'فقط رزرو تأییدشده قابل جابه‌جایی است.', 'Only a confirmed booking can be rescheduled.');
+    return { booking, party, counterpartyId: party === 'student' ? booking.teacher.userId : booking.studentId };
+  }
+
+  /**
+   * Proposes a new time. Rescheduling has to be agreed by both sides and
+   * coordinated through the platform, so this only records the proposal and
+   * notifies the counterparty — the booking does not move until they accept.
+   * Either party may propose.
+   *
+   * The proposed slot is validated now so an impossible time is rejected while
+   * the proposer is still there to pick another, and validated again on accept
+   * because the slot can be taken in between.
+   */
+  async requestReschedule(userId: string, id: string, data: { startsAt: string; timezone: string }) {
+    const { booking, party, counterpartyId } = await this.partyOn(userId, id);
     const startsAt = new Date(data.startsAt);
     if (!Number.isFinite(startsAt.getTime()) || startsAt <= new Date()) throw badRequest('BOOKING_START_INVALID', 'زمان جدید باید در آینده باشد.', 'The new start time must be in the future.');
-    const lock = await this.redis.lock(`booking:${existing.teacherId}:${startsAt.toISOString()}`);
+    await this.assertWithinBookingWindow(startsAt);
+    await this.availability.assertSlotAvailable(this.db, booking.teacherId, startsAt, booking.type === 'trial' ? 'trial' : 'regular', id);
+    const updated = await this.db.booking.update({
+      where: { id },
+      data: { reschedulerId: userId, rescheduleStartsAt: startsAt, rescheduleTimezone: data.timezone, rescheduleAskedAt: new Date() },
+    });
+    await this.db.notification.create({
+      data: {
+        userId: counterpartyId,
+        type: 'BOOKING_RESCHEDULE_REQUESTED',
+        titleFa: 'درخواست جابه‌جایی کلاس',
+        titleEn: 'Lesson reschedule requested',
+        bodyFa: `${party === 'student' ? 'زبان‌آموز' : 'مدرس'} پیشنهاد جابه‌جایی این کلاس را ثبت کرده است. برای تأیید یا رد آن به صفحه کلاس بروید.`,
+        bodyEn: `The ${party} proposed a new time for this lesson. Open the lesson page to accept or decline.`,
+        data: { bookingId: id, proposedStartsAt: startsAt.toISOString(), requestedBy: party, href: `/dashboard/bookings/${id}` },
+      },
+    });
+    return { bookingId: id, status: 'reschedule_requested', proposedStartsAt: updated.rescheduleStartsAt };
+  }
+
+  /**
+   * Accepts the counterparty's proposal and performs the move. Guarded by the
+   * same Redis lock and Serializable re-check as a fresh booking, because the
+   * proposed slot may have been taken while the proposal sat waiting.
+   */
+  async acceptReschedule(userId: string, id: string) {
+    const { booking, party } = await this.partyOn(userId, id);
+    if (!booking.rescheduleStartsAt || !booking.reschedulerId) throw badRequest(
+      'NO_RESCHEDULE_REQUEST',
+      'درخواست جابه‌جایی فعالی برای این کلاس وجود ندارد.',
+      'There is no active reschedule request for this lesson.',
+    );
+    // The proposer accepting their own request would make this unilateral again.
+    if (booking.reschedulerId === userId) throw forbidden(
+      'RESCHEDULE_SELF_ACCEPT',
+      'تأیید جابه‌جایی باید توسط طرف دیگر انجام شود.',
+      'The other party has to accept the reschedule.',
+    );
+    const startsAt = booking.rescheduleStartsAt;
+    const timezone = booking.rescheduleTimezone ?? booking.timezone;
+    if (startsAt <= new Date()) throw badRequest(
+      'RESCHEDULE_REQUEST_STALE',
+      'زمان پیشنهادی گذشته است. از طرف مقابل بخواهید زمان جدیدی پیشنهاد کند.',
+      'The proposed time has passed. Ask the other party to propose a new one.',
+    );
+    const lock = await this.redis.lock(`booking:${booking.teacherId}:${startsAt.toISOString()}`);
     if (!lock) throw conflict('SLOT_LOCKED', 'کاربر دیگری در حال رزرو این ساعت است.', 'Another user is reserving this slot.');
     try {
-      const booking = await this.db.$transaction(async (tx) => {
-        const { endsAt } = await this.availability.assertSlotAvailable(tx, existing.teacherId, startsAt, existing.type === 'trial' ? 'trial' : 'regular', id);
-        const overlap = await tx.booking.count({ where: { id: { not: id }, studentId: userId, status: { in: ['PENDING_PAYMENT', 'CONFIRMED'] }, startsAt: { lt: endsAt }, endsAt: { gt: startsAt } } });
+      const moved = await this.db.$transaction(async (tx) => {
+        const { endsAt } = await this.availability.assertSlotAvailable(tx, booking.teacherId, startsAt, booking.type === 'trial' ? 'trial' : 'regular', id);
+        const overlap = await tx.booking.count({ where: { id: { not: id }, studentId: booking.studentId, status: { in: ['PENDING_PAYMENT', 'CONFIRMED'] }, startsAt: { lt: endsAt }, endsAt: { gt: startsAt } } });
         if (overlap) throw conflict('STUDENT_BOOKING_OVERLAP', 'در زمان جدید یک رزرو دیگر دارید.', 'You already have another booking at the new time.');
-        return tx.booking.update({ where: { id }, data: { startsAt, endsAt, timezone: data.timezone } });
+        return tx.booking.update({
+          where: { id },
+          data: { startsAt, endsAt, timezone, reschedulerId: null, rescheduleStartsAt: null, rescheduleTimezone: null, rescheduleAskedAt: null },
+        });
       }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
       await this.queue.scheduleBooking(id, startsAt);
-      return booking;
+      await this.db.notification.create({
+        data: {
+          userId: booking.reschedulerId,
+          type: 'BOOKING_RESCHEDULE_ACCEPTED',
+          titleFa: 'جابه‌جایی کلاس تأیید شد',
+          titleEn: 'Reschedule accepted',
+          bodyFa: 'درخواست جابه‌جایی شما تأیید شد و زمان کلاس به‌روزرسانی شده است.',
+          bodyEn: 'Your reschedule request was accepted and the lesson time has been updated.',
+          data: { bookingId: id, startsAt: startsAt.toISOString(), acceptedBy: party },
+        },
+      });
+      return moved;
     } finally { await lock.release(); }
+  }
+
+  /** Declines the proposal and leaves the booking at its original time. */
+  async declineReschedule(userId: string, id: string, reason?: string) {
+    const { booking } = await this.partyOn(userId, id);
+    if (!booking.rescheduleStartsAt || !booking.reschedulerId) throw badRequest(
+      'NO_RESCHEDULE_REQUEST',
+      'درخواست جابه‌جایی فعالی برای این کلاس وجود ندارد.',
+      'There is no active reschedule request for this lesson.',
+    );
+    if (booking.reschedulerId === userId) throw forbidden(
+      'RESCHEDULE_SELF_DECLINE',
+      'رد درخواست باید توسط طرف دیگر انجام شود.',
+      'The other party has to respond to the request.',
+    );
+    await this.db.booking.update({
+      where: { id },
+      data: { reschedulerId: null, rescheduleStartsAt: null, rescheduleTimezone: null, rescheduleAskedAt: null },
+    });
+    await this.db.notification.create({
+      data: {
+        userId: booking.reschedulerId,
+        type: 'BOOKING_RESCHEDULE_DECLINED',
+        titleFa: 'درخواست جابه‌جایی رد شد',
+        titleEn: 'Reschedule declined',
+        bodyFa: `درخواست جابه‌جایی شما پذیرفته نشد و کلاس در زمان قبلی برگزار می‌شود.${reason?.trim() ? ` دلیل: ${reason.trim()}` : ''}`,
+        bodyEn: `Your reschedule request was declined and the lesson stays at its original time.${reason?.trim() ? ` Reason: ${reason.trim()}` : ''}`,
+        data: { bookingId: id, reason: reason?.trim() ?? null },
+      },
+    });
+    return { bookingId: id, status: 'reschedule_declined' };
   }
 
   async attendance(actorId:string,roles:string[],id:string,data:{student?:boolean;teacher?:boolean;meetingUrl?:string}) {
@@ -204,12 +393,7 @@ export class BookingsService {
         update: {},
       });
       if (status === 'COMPLETED' && booking.price > 0) {
-        const commission = Math.round(booking.price * 0.2);
-        await tx.earning.upsert({
-          where: { bookingId: id },
-          create: { teacherId: booking.teacherId, bookingId: id, grossAmount: booking.price, commissionAmount: commission, netAmount: booking.price - commission, eligibleAt: new Date(Date.now() + 7 * 86_400_000) },
-          update: {},
-        });
+        await this.earnings.accrue(tx, booking);
         await tx.notification.create({
           data: {
             userId: booking.studentId,
