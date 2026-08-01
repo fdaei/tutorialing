@@ -3,6 +3,7 @@ import { Prisma, type BlockedPeriod } from '@prisma/client';
 import { fromZonedTime } from 'date-fns-tz';
 import { PrismaService } from '../../prisma.service';
 import { badRequest, conflict, notFound } from '../../common/errors';
+import { SettingsService } from '../../common/settings.service';
 
 type RuleInput = {
   weekday: number;
@@ -35,7 +36,7 @@ const localInstant = (day: string, minute: number, timezone: string) => {
 
 @Injectable()
 export class AvailabilityService {
-  constructor(private db: PrismaService) {}
+  constructor(private db: PrismaService, private settings: SettingsService) {}
 
   async mine(userId: string) {
     const teacher = await this.db.teacher.findUnique({ where: { userId } });
@@ -187,6 +188,12 @@ export class AvailabilityService {
 
   async slots(teacherId: string, from: Date, to: Date, type: SlotType = 'regular') {
     this.validateRange(from, to);
+    const [minLeadMinutes, maxAdvanceDays] = await Promise.all([
+      this.settings.numeric('booking.minLeadMinutes', 120, 10_080),
+      this.settings.numeric('booking.maxAdvanceDays', 60, 730),
+    ]);
+    const firstBookable = new Date(Date.now() + minLeadMinutes * 60_000);
+    const lastBookable = new Date(Date.now() + maxAdvanceDays * DAY_MS);
     const priceField = type === 'trial' ? 'approvedTrialPrice' : 'approvedRegularPrice';
     const teacher = await this.db.teacher.findFirst({
       where: { id: teacherId, status: 'APPROVED', [priceField]: { not: null } },
@@ -219,7 +226,10 @@ export class AvailabilityService {
         for (let minute = rule.startMinute; minute + stepDuration <= rule.endMinute; minute += stepDuration + breakMinutes) {
           const startsAt = localInstant(day, minute, rule.timezone);
           const endsAt = new Date(startsAt.getTime() + stepDuration * 60_000);
-          if (startsAt < from || endsAt > to || startsAt <= new Date()) continue;
+          // Public availability must apply the same booking window as
+          // BookingsService.create; otherwise the UI offers a slot that the
+          // booking endpoint immediately rejects.
+          if (startsAt < from || endsAt > to || startsAt < firstBookable || startsAt > lastBookable) continue;
           if (this.overlapsAny(startsAt, endsAt, teacher.blockedPeriods) || this.overlapsAny(startsAt, endsAt, teacher.bookings)) continue;
           result.push({ startsAt: startsAt.toISOString(), endsAt: endsAt.toISOString(), date: day, timezone: rule.timezone, type });
         }

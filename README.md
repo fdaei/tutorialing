@@ -206,6 +206,7 @@ npm run dev -w @lingospeak/web
 | `S3_BUCKET` | نام bucket فایل‌ها | `lingospeak` |
 | `KAVENEGAR_API_KEY` | کلید پیامک کاوه‌نگار | اختیاری در توسعه |
 | `ZARINPAL_MERCHANT_ID` | شناسه درگاه زرین‌پال | اختیاری در توسعه |
+| `ZARINPAL_SANDBOX` | استفاده از endpointهای آزمایشی زرین‌پال | `true` در توسعه، هرگز در production |
 
 نکات مهم:
 

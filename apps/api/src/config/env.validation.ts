@@ -15,6 +15,10 @@ export const envSchema = z.object({
   S3_BUCKET: z.string().min(1),
   KAVENEGAR_API_KEY: z.string().optional(),
   ZARINPAL_MERCHANT_ID: z.string().optional(),
+  ZARINPAL_SANDBOX: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((value) => value === 'true'),
   // Opt-in switch for the fixed local-development OTP (`123456`) and for
   // echoing that code back in the API response. It defaults to off so any
   // environment that forgets to configure it issues real random codes over a
@@ -49,6 +53,13 @@ export const envSchemaWithGuards = envSchema.superRefine((env, ctx) => {
       code: z.ZodIssueCode.custom,
       path: ['ZARINPAL_MERCHANT_ID'],
       message: 'ZARINPAL_MERCHANT_ID is required when NODE_ENV=production: without it the payment gateway accepts unverified development callbacks',
+    });
+  }
+  if (env.NODE_ENV === 'production' && env.ZARINPAL_SANDBOX) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['ZARINPAL_SANDBOX'],
+      message: 'ZARINPAL_SANDBOX must be disabled in production',
     });
   }
   if (env.NODE_ENV === 'production' && !env.KAVENEGAR_API_KEY) {

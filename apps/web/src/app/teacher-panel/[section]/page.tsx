@@ -5,6 +5,11 @@ import { TeacherAvailabilityManager } from '@/components/teacher-availability-ma
 import { PricingManager } from '@/components/pricing-manager';
 import { MyTicketManager } from '@/components/my-ticket-manager';
 import {requestLocale} from '@/lib/server-locale';
+import {TeacherProfileHub} from '@/components/teacher-profile-hub';
+import {TeacherFinance} from '@/components/teacher-finance';
+import {TeacherMore} from '@/components/teacher-more';
+import {TeacherPlannerCalendar} from '@/components/teacher-planner-calendar';
+import {redirect} from 'next/navigation';
 
 const map: Record<string, [string,string, string]> = {
   profile: ['پروفایل عمومی','Public profile', '/teacher/application'],
@@ -28,7 +33,8 @@ export default async function Section({ params }: { params: Promise<{ section: s
   const { section } = await params;
   const locale=await requestLocale(),fa=locale==='fa';
   const [titleFa,titleEn, endpoint] = map[section] ?? ['پنل مدرس','Teacher panel', '/users/me'];
-  const editable=['profile','verification','video','languages','specialties'];
-  const content=section==='availability'||section==='calendar'?<TeacherAvailabilityManager/>:section==='pricing'?<PricingManager mode="teacher"/>:section==='tickets'?<><PanelActions role="teacher" section={section} endpoint={endpoint}/><MyTicketManager/></>:editable.includes(section)?<PanelActions role="teacher" section={section} endpoint={endpoint}/>:<><PanelActions role="teacher" section={section} endpoint={endpoint}/><ResourceView title={fa?titleFa:titleEn} endpoint={endpoint}/></>;
+  if(['verification','video','languages','specialties'].includes(section))redirect(`/${locale==='fa'?'':'en/'}teacher-panel/profile`);
+  if(section==='calendar')redirect(`/${locale==='fa'?'':'en/'}teacher-panel/availability`);
+  const content=section==='profile'?<TeacherProfileHub/>:section==='availability'?<div className="grid gap-6"><TeacherPlannerCalendar/><TeacherAvailabilityManager/></div>:section==='pricing'?<PricingManager mode="teacher"/>:section==='earnings'?<TeacherFinance/>:section==='more'?<TeacherMore locale={locale}/>:section==='tickets'?<><PanelActions role="teacher" section={section} endpoint={endpoint}/><MyTicketManager/></>:<><PanelActions role="teacher" section={section} endpoint={endpoint}/><ResourceView title={fa?titleFa:titleEn} endpoint={endpoint}/></>;
   return <PanelShell title="پنل مدرس" items={teacherNav}>{content}</PanelShell>;
 }

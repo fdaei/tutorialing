@@ -31,6 +31,12 @@ export class CommerceController {
     return { balance: await this.walletSvc.walletBalance(u.id) };
   }
 
+  @Get('wallet/transactions')
+  transactions(@CurrentUser() u: AuthUser) { return this.walletSvc.transactions(u.id); }
+
+  @Get('invoices')
+  invoices(@CurrentUser() u: AuthUser) { return this.walletSvc.invoices(u.id); }
+
   @Roles('ADMIN', 'FINANCE')
   @Permissions('payments.refund')
   @Post(':id/refunds')

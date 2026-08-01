@@ -1,7 +1,7 @@
 import { DiscountDto } from './dto/request/discount.dto';
 import { PayoutWindowDto } from './dto/request/payout-window.dto';
 import { PayoutApprovalDto } from './dto/request/payout-approval.dto';
-import { Body, Controller, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post } from '@nestjs/common';
 import { CurrentUser, Permissions, Roles, type AuthUser } from '../../common/auth';
 import { PayoutsService } from './payouts.service';
 import { DiscountsService } from './discounts.service';
@@ -20,6 +20,16 @@ export class PayoutsController {
   @Post(':id/approve')
   approve(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() d: PayoutApprovalDto) {
     return this.s.approvePayout(id, u.id, d.reference);
+  }
+
+  @Get('withdrawals')
+  withdrawals() {
+    return this.s.withdrawalRequests();
+  }
+
+  @Post('withdrawals/:id/transfer')
+  transferWithdrawal(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() d: PayoutApprovalDto) {
+    return this.s.transferWithdrawal(id, u.id, d.reference);
   }
 
   @Post('discounts')

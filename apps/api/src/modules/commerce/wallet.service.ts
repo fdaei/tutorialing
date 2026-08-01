@@ -12,6 +12,20 @@ export class WalletService {
     return cred - deb;
   }
 
+  async transactions(userId: string) {
+    const entries = await this.db.walletEntry.findMany({ where: { userId, account: 'user_wallet' }, orderBy: { createdAt: 'desc' }, take: 100 });
+    let running = await this.walletBalance(userId);
+    return entries.map(entry => {
+      const balanceAfter = running;
+      running += entry.direction === 'CREDIT' ? -entry.amount : entry.amount;
+      return { ...entry, balanceAfter, status: 'SUCCESS' as const };
+    });
+  }
+
+  invoices(userId: string) {
+    return this.db.payment.findMany({ where: { userId }, orderBy: { createdAt: 'desc' }, take: 100, select: { id: true, purpose: true, amount: true, status: true, gatewayReference: true, createdAt: true } });
+  }
+
   ledger(tx: Tx, userId: string, direction: 'DEBIT' | 'CREDIT', amount: number, description: string, referenceType: string, referenceId: string, idempotencyKey: string) {
     return tx.walletEntry.create({
       data: { userId, transactionId: `tx_${referenceId}`, account: 'user_wallet', direction, amount, description, referenceType, referenceId, idempotencyKey }
