@@ -50,8 +50,13 @@ export class RateLimitGuard implements CanActivate {
       throw new ServiceUnavailableException('Rate limiter unavailable');
     }
 
+    const response = http.getResponse<Response>();
+    response.setHeader('RateLimit-Limit', String(options.limit));
+    response.setHeader('RateLimit-Remaining', String(Math.max(0, options.limit - count)));
+    response.setHeader('RateLimit-Reset', String(retryAfter));
+
     if (count > options.limit) {
-      http.getResponse<Response>().setHeader('Retry-After', String(retryAfter));
+      response.setHeader('Retry-After', String(retryAfter));
       throw tooManyRequests(
         'RATE_LIMITED',
         `درخواست‌های شما بیش از حد مجاز است. ${retryAfter} ثانیه دیگر دوباره تلاش کنید.`,

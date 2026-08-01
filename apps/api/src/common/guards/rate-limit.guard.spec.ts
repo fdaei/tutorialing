@@ -46,6 +46,20 @@ describe('RateLimitGuard', () => {
     expect(over.setHeader).toHaveBeenCalledWith('Retry-After', '42');
   });
 
+  it('sets RateLimit-* headers on both allowed and rejected responses (RATE-007)', async () => {
+    const consume: Consume = jest.fn().mockResolvedValue({ count: 2, retryAfter: 42 });
+    const allowed = build(limit, consume);
+    await allowed.guard.canActivate(allowed.context);
+    expect(allowed.setHeader).toHaveBeenCalledWith('RateLimit-Limit', '3');
+    expect(allowed.setHeader).toHaveBeenCalledWith('RateLimit-Remaining', '1');
+    expect(allowed.setHeader).toHaveBeenCalledWith('RateLimit-Reset', '42');
+
+    const overConsume: Consume = jest.fn().mockResolvedValue({ count: 5, retryAfter: 42 });
+    const over = build(limit, overConsume);
+    await expect(over.guard.canActivate(over.context)).rejects.toBeDefined();
+    expect(over.setHeader).toHaveBeenCalledWith('RateLimit-Remaining', '0');
+  });
+
   it('separates counters per client IP', async () => {
     const consume: Consume = jest.fn().mockResolvedValue({ count: 1, retryAfter: 600 });
     const other = build(limit, consume, '198.51.100.4');
