@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
-import { CurrentUser, Permissions, Public, Roles, type AuthUser } from '../../common/auth';
+import { CurrentUser, Permissions, Public, RateLimit, RATE_LIMIT_TIERS, Roles, type AuthUser } from '../../common/auth';
 import { TestsService } from './tests.service';
 import { StartDto } from './dto/request/start.dto';
 import { SaveDto } from './dto/request/save.dto';
@@ -11,12 +11,12 @@ import { ImportQuestionsDto } from './dto/request/import-questions.dto';
 export class TestsController {
   constructor(private s: TestsService) {}
   @Public() @Get() list(@Query('languageId') languageId?: string) { return this.s.list(languageId); }
-  @Post('attempts') start(@CurrentUser() u: AuthUser, @Body() d: StartDto) { return this.s.start(u.id, d.testId); }
+  @RateLimit(RATE_LIMIT_TIERS.examSubmission) @Post('attempts') start(@CurrentUser() u: AuthUser, @Body() d: StartDto) { return this.s.start(u.id, d.testId); }
   @Get('attempts/history') history(@CurrentUser() u: AuthUser) { return this.s.history(u.id); }
   @Get('attempts/:id') resume(@CurrentUser() u: AuthUser, @Param('id') id: string) { return this.s.resume(u.id, id); }
-  @Patch('attempts/:id/answers') save(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() d: SaveDto) { return this.s.save(u.id, id, d.answers); }
-  @Post('attempts/:id/sections/:sectionId/submit') section(@CurrentUser() u: AuthUser, @Param('id') id: string, @Param('sectionId') sectionId: string) { return this.s.submitSection(u.id, id, sectionId); }
-  @Post('attempts/:id/submit') submit(@CurrentUser() u: AuthUser, @Param('id') id: string) { return this.s.submit(u.id, id); }
+  @RateLimit(RATE_LIMIT_TIERS.examAutosave) @Patch('attempts/:id/answers') save(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() d: SaveDto) { return this.s.save(u.id, id, d.answers); }
+  @RateLimit(RATE_LIMIT_TIERS.examSubmission) @Post('attempts/:id/sections/:sectionId/submit') section(@CurrentUser() u: AuthUser, @Param('id') id: string, @Param('sectionId') sectionId: string) { return this.s.submitSection(u.id, id, sectionId); }
+  @RateLimit(RATE_LIMIT_TIERS.examSubmission) @Post('attempts/:id/submit') submit(@CurrentUser() u: AuthUser, @Param('id') id: string) { return this.s.submit(u.id, id); }
 }
 
 @Roles('EXAMINER', 'ADMIN')
@@ -30,6 +30,7 @@ export class ExaminerController {
 
 @Roles('ADMIN', 'STAFF')
 @Permissions('tests.manage')
+@RateLimit(RATE_LIMIT_TIERS.adminWrite)
 @Controller('admin/tests')
 // Bodies here are typed `unknown` on purpose. ValidationPipe cannot validate an
 // unknown metatype, so these routes get no DTO layer — instead TestsService

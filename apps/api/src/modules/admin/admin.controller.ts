@@ -1,6 +1,6 @@
 import { TeacherStatus } from '@prisma/client';
 import { Body, Controller, Get, Param, Patch, Post, Put, Query } from '@nestjs/common';
-import { CurrentUser, Permissions, Roles, type AuthUser } from '../../common/auth';
+import { CurrentUser, Permissions, RateLimit, RATE_LIMIT_TIERS, Roles, type AuthUser } from '../../common/auth';
 import { TeachersService } from '../teachers/teachers.service';
 import { AdminService } from './admin.service';
 import { TransitionDto } from './dto/request/transition.dto';
@@ -29,14 +29,17 @@ export class AdminController {
   user(@Param('id') id: string) { return this.s.userDetail(id); }
 
   @Permissions('roles.manage')
+  @RateLimit(RATE_LIMIT_TIERS.adminWrite)
   @Post('users')
   createUser(@CurrentUser() u: AuthUser, @Body() d: CreateUserDto) { return this.s.createUser(u.id, d); }
 
   @Permissions('roles.manage')
+  @RateLimit(RATE_LIMIT_TIERS.adminWrite)
   @Patch('users/:id/status')
   userStatus(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() d: UserStatusDto) { return this.s.updateUserStatus(u.id, id, d.status); }
 
   @Permissions('roles.manage')
+  @RateLimit(RATE_LIMIT_TIERS.adminWrite)
   @Patch('users/:id/roles')
   userRoles(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() d: UserRolesDto) { return this.s.setUserRoles(u.id, id, d.roles); }
 
@@ -45,6 +48,7 @@ export class AdminController {
   applications() { return this.s.applications(); }
 
   @Permissions('teachers.verify')
+  @RateLimit(RATE_LIMIT_TIERS.adminWrite)
   @Post('teacher-applications/:id/transition')
   transition(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() d: TransitionDto) {
     return this.teachers.transition(id, d.status as TeacherStatus, u.id, d.note);
@@ -71,14 +75,17 @@ export class AdminController {
   permissions() { return this.s.permissions(); }
 
   @Permissions('roles.manage')
+  @RateLimit(RATE_LIMIT_TIERS.adminWrite)
   @Post('roles')
   assignRole(@CurrentUser() u: AuthUser, @Body() d: RoleDto) { return this.s.assignRole(u.id, d.userId, d.role); }
 
   @Permissions('roles.manage')
+  @RateLimit(RATE_LIMIT_TIERS.adminWrite)
   @Post('roles/revoke')
   revokeRole(@CurrentUser() u: AuthUser, @Body() d: RoleDto) { return this.s.revokeRole(u.id, d.userId, d.role); }
 
   @Permissions('roles.manage')
+  @RateLimit(RATE_LIMIT_TIERS.adminWrite)
   @Post('permissions/grant')
   grantPermission(@CurrentUser() u: AuthUser, @Body() d: PermissionDto) { return this.s.grantPermission(u.id, d.userId, d.role, d.permission); }
 
@@ -99,6 +106,7 @@ export class AdminController {
   settings() { return this.s.settings(); }
 
   @Permissions('settings.manage')
+  @RateLimit(RATE_LIMIT_TIERS.adminWrite)
   @Put('settings/:key')
   setting(@Param('key') key: string, @Body() d: SettingDto) {
     return this.s.setSetting(key, d.value, d.public);
@@ -109,6 +117,7 @@ export class AdminController {
   cms() { return this.s.cms(); }
 
   @Permissions('cms.manage')
+  @RateLimit(RATE_LIMIT_TIERS.adminWrite)
   @Put('cms/:slug')
   upsert(@Param('slug') slug: string, @Body() d: CmsPageDto) { return this.s.upsertCms(slug, d); }
 }

@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Post } from '@nestjs/common';
-import { CurrentUser, Roles, type AuthUser } from '../../common/auth';
+import { CurrentUser, RateLimit, RATE_LIMIT_TIERS, Roles, type AuthUser } from '../../common/auth';
 import { PayoutsService } from './payouts.service';
 import { WithdrawalRequestDto } from './dto/request/withdrawal-request.dto';
 
@@ -13,6 +13,7 @@ export class TeacherFinanceController {
     return this.s.teacherFinance(u.id);
   }
 
+  @RateLimit(RATE_LIMIT_TIERS.moneyAdjacent)
   @Post('withdrawals')
   withdraw(@CurrentUser() u: AuthUser, @Body() body: WithdrawalRequestDto) {
     return this.s.requestWithdrawal(u.id, body.amount, body.iban);
