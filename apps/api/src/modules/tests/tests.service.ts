@@ -38,11 +38,30 @@ export class TestsService {
     });
   }
 
+  // Student-facing: `include` on `questions` here would pull back every scalar
+  // column of Question, including `answerKey`/`scoringRule` -- the grading
+  // key. An in-progress (or under-review) attempt must never see those, so
+  // this relation is the one spot in the resume tree that uses an explicit
+  // `select` instead, whitelisting everything except the two grading fields.
   resume(userId: string, id: string) {
     return this.db.testAttempt.findFirst({
       where: { id, userId },
       include: {
-        test: { include: { language: true, sections: { include: { passages: { include: { audioFile: true }, orderBy: { order: 'asc' } }, questions: { include: { audioFile: true }, orderBy: { order: 'asc' } } }, orderBy: { order: 'asc' } } } },
+        test: {
+          include: {
+            language: true,
+            sections: {
+              include: {
+                passages: { include: { audioFile: true }, orderBy: { order: 'asc' } },
+                questions: {
+                  select: { id: true, sectionId: true, passageId: true, prompt: true, type: true, choices: true, audioFileId: true, audioFile: true, points: true, order: true },
+                  orderBy: { order: 'asc' },
+                },
+              },
+              orderBy: { order: 'asc' },
+            },
+          },
+        },
         answers: true, sectionStates: true, scores: true,
       },
     });
