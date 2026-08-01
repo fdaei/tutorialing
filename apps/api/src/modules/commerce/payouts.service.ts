@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
 import { badRequest } from '../../common/errors';
 
@@ -107,6 +108,12 @@ export class PayoutsService {
   async requestWithdrawal(userId: string, amount: number, iban: string) {
     const teacher = await this.db.teacher.findUniqueOrThrow({ where: { userId } });
     const normalizedIban = iban.replace(/\s/g, '').toUpperCase();
+    // Serializable, matching every other balance-checking transaction in this
+    // domain (payments.service.ts, bookings.service.ts): at the default
+    // READ COMMITTED level, two concurrent requests could both read the same
+    // `available` balance before either's create commits, letting a teacher
+    // over-withdraw. Under Serializable, Postgres aborts the loser with P2034,
+    // which the global exception filter already maps to a 409.
     return this.db.$transaction(async tx => {
       const ledger = await tx.walletEntry.groupBy({ by: ['direction'], where: { userId, account: 'user_wallet' }, _sum: { amount: true } });
       const balance = (ledger.find(row => row.direction === 'CREDIT')?._sum.amount ?? 0) - (ledger.find(row => row.direction === 'DEBIT')?._sum.amount ?? 0);
@@ -116,7 +123,7 @@ export class PayoutsService {
         amount: { fa: `حداکثر مبلغ قابل برداشت ${available.toLocaleString('fa-IR')} تومان است.`, en: `The maximum available amount is ${available.toLocaleString('en-US')} IRR.` },
       });
       return tx.withdrawalRequest.create({ data: { teacherId: teacher.id, amount, iban: normalizedIban } });
-    });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   }
 
   withdrawalRequests() {
