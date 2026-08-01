@@ -27,8 +27,9 @@ function harness(options: { heldPayment?: Record<string, unknown> | null; existi
   const wallet = { walletBalance: jest.fn().mockResolvedValue(0), ledger: jest.fn() };
   const queue = { scheduleBooking: jest.fn() };
   const autoDiscounts = { evaluate: jest.fn().mockResolvedValue(null) };
-  const svc = new PaymentsService(db as never, queue as never, {} as never, wallet as never, autoDiscounts as never);
-  return { svc, db, tx, queue, wallet, autoDiscounts, created };
+  const redis = { lock: jest.fn().mockResolvedValue({ token: 't', release: jest.fn() }) };
+  const svc = new PaymentsService(db as never, queue as never, {} as never, wallet as never, autoDiscounts as never, redis as never);
+  return { svc, db, tx, queue, wallet, autoDiscounts, redis, created };
 }
 
 const pay = (over: Record<string, unknown> = {}) => ({
@@ -167,7 +168,8 @@ function callbackHarness(options: { paymentStatus?: string; bookingStatus?: stri
   };
   const gateway = { verify: jest.fn().mockResolvedValue({ ok: true, reference: 'REF-1' }) };
   const queue = { scheduleBooking: jest.fn() };
-  const svc = new PaymentsService(db as never, queue as never, gateway as never, { ledger: jest.fn() } as never, { evaluate: jest.fn().mockResolvedValue(null) } as never);
+  const redis = { lock: jest.fn().mockResolvedValue({ token: 't', release: jest.fn() }) };
+  const svc = new PaymentsService(db as never, queue as never, gateway as never, { ledger: jest.fn() } as never, { evaluate: jest.fn().mockResolvedValue(null) } as never, redis as never);
   return { svc, db, tx, gateway, queue, payment };
 }
 
@@ -238,5 +240,55 @@ describe('PaymentsService.callback', () => {
     await h.svc.callback('auth-1', 'OK');
     expect(h.gateway.verify).not.toHaveBeenCalled();
     expect(h.tx.booking.update).not.toHaveBeenCalled();
+  });
+});
+
+function gatewayRedirectHarness(payment: Record<string, unknown>, lockResult: unknown = { token: 't', release: jest.fn() }) {
+  const db = {
+    payment: {
+      findFirstOrThrow: jest.fn().mockResolvedValue(payment),
+      update: jest.fn().mockResolvedValue({}),
+    },
+  };
+  const gateway = {
+    request: jest.fn().mockResolvedValue({ authority: 'new-authority', url: 'https://gateway.example/new-authority' }),
+    resumeUrl: jest.fn().mockImplementation((authority: string) => `https://gateway.example/${authority}`),
+  };
+  const redis = { lock: jest.fn().mockResolvedValue(lockResult) };
+  const svc = new PaymentsService(db as never, {} as never, gateway as never, {} as never, {} as never, redis as never);
+  return { svc, db, gateway, redis };
+}
+
+describe('PaymentsService.gatewayRedirect', () => {
+  it('reuses the existing authority instead of opening a second Zarinpal session (FIN-002)', async () => {
+    const h = gatewayRedirectHarness({ id: 'payment-1', authority: 'existing-authority' });
+    const result = await h.svc.gatewayRedirect('user-1', 'payment-1');
+    expect(h.gateway.request).not.toHaveBeenCalled();
+    expect(h.db.payment.update).not.toHaveBeenCalled();
+    expect(result).toEqual({ authority: 'existing-authority', url: 'https://gateway.example/existing-authority' });
+  });
+
+  it('requests a new authority and persists it when none exists yet', async () => {
+    const h = gatewayRedirectHarness({ id: 'payment-1', authority: null, gatewayAmount: 100_000, purpose: 'booking' });
+    const result = await h.svc.gatewayRedirect('user-1', 'payment-1');
+    expect(h.gateway.request).toHaveBeenCalledTimes(1);
+    expect(h.db.payment.update).toHaveBeenCalledWith({ where: { id: 'payment-1' }, data: { authority: 'new-authority' } });
+    expect(result).toEqual({ authority: 'new-authority', url: 'https://gateway.example/new-authority' });
+  });
+
+  it('rejects a concurrent call for the same payment instead of racing a second gateway session', async () => {
+    const h = gatewayRedirectHarness({ id: 'payment-1', authority: null }, null);
+    await expect(h.svc.gatewayRedirect('user-1', 'payment-1')).rejects.toMatchObject({
+      response: { code: 'PAYMENT_GATEWAY_BUSY' },
+    });
+    expect(h.gateway.request).not.toHaveBeenCalled();
+  });
+
+  it('always releases the lock, even when the gateway call fails', async () => {
+    const release = jest.fn();
+    const h = gatewayRedirectHarness({ id: 'payment-1', authority: null, gatewayAmount: 100_000, purpose: 'booking' }, { token: 't', release });
+    h.gateway.request.mockRejectedValue(new Error('zarinpal down'));
+    await expect(h.svc.gatewayRedirect('user-1', 'payment-1')).rejects.toThrow('zarinpal down');
+    expect(release).toHaveBeenCalledTimes(1);
   });
 });

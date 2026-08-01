@@ -29,6 +29,15 @@ export class GatewayService {
   return{authority,url:`${startBase}/pg/StartPay/${authority}`};
  }
 
+ // Reconstructs the same redirect URL `request()` would have returned for an
+ // authority it already issued, so a payment that already has one can be
+ // resumed without opening a second Zarinpal session for the same payment.
+ resumeUrl(authority:string){
+  const{cfg,startBase}=this.options();
+  if(authority.startsWith('dev_'))return`${cfg.WEB_URL}/payment/development?authority=${authority}`;
+  return`${startBase}/pg/StartPay/${authority}`;
+ }
+
  async verify(authority:string,amount:number){
   const{cfg,merchantId,apiBase}=this.options();
   if(authority.startsWith('dev_')&&!merchantId)return{ok:true,reference:`DEV-${createHash('sha1').update(authority).digest('hex').slice(0,12)}`};
