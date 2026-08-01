@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
-import { CurrentUser, Permissions, Public, Roles, type AuthUser } from '../../common/auth';
+import { CurrentUser, Permissions, Public, RateLimit, RATE_LIMIT_TIERS, Roles, type AuthUser } from '../../common/auth';
 import { PaymentsService } from './payments.service';
 import { WalletService } from './wallet.service';
 import { RefundsService } from './refunds.service';
@@ -10,17 +10,20 @@ import { RefundDto } from './dto/request/refund.dto';
 export class CommerceController {
   constructor(private s: PaymentsService, private walletSvc: WalletService, private refundSvc: RefundsService) {}
 
+  @RateLimit(RATE_LIMIT_TIERS.paymentInit)
   @Post()
   create(@CurrentUser() u: AuthUser, @Body() d: PayDto) {
     return this.s.createPayment(u.id, d);
   }
 
+  @RateLimit(RATE_LIMIT_TIERS.paymentInit)
   @Post(':id/gateway')
   gateway(@CurrentUser() u: AuthUser, @Param('id') id: string) {
     return this.s.gatewayRedirect(u.id, id);
   }
 
   @Public()
+  @RateLimit(RATE_LIMIT_TIERS.paymentCallback)
   @Get('callback')
   callback(@Query('Authority') a: string, @Query('Status') status: string) {
     return this.s.callback(a, status);
@@ -39,6 +42,7 @@ export class CommerceController {
 
   @Roles('ADMIN', 'FINANCE')
   @Permissions('payments.refund')
+  @RateLimit(RATE_LIMIT_TIERS.moneyAdjacent)
   @Post(':id/refunds')
   refund(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() d: RefundDto) {
     return this.refundSvc.refund(u.id, id, d.amount, d.reason, d.idempotencyKey);

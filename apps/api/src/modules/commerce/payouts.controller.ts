@@ -2,12 +2,13 @@ import { DiscountDto } from './dto/request/discount.dto';
 import { PayoutWindowDto } from './dto/request/payout-window.dto';
 import { PayoutApprovalDto } from './dto/request/payout-approval.dto';
 import { Body, Controller, Get, Param, Post } from '@nestjs/common';
-import { CurrentUser, Permissions, Roles, type AuthUser } from '../../common/auth';
+import { CurrentUser, Permissions, RateLimit, RATE_LIMIT_TIERS, Roles, type AuthUser } from '../../common/auth';
 import { PayoutsService } from './payouts.service';
 import { DiscountsService } from './discounts.service';
 
 @Roles('ADMIN', 'FINANCE')
 @Permissions('payouts.manage')
+@RateLimit(RATE_LIMIT_TIERS.moneyAdjacent)
 @Controller('payouts')
 export class PayoutsController {
   constructor(private s: PayoutsService, private discountSvc: DiscountsService) {}
