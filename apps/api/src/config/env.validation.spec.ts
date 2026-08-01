@@ -43,6 +43,10 @@ describe('production provider credentials', () => {
     expect(() => validate(withoutGateway)).toThrow(/ZARINPAL_MERCHANT_ID/);
   });
 
+  it('refuses to use the Zarinpal sandbox in production', () => {
+    expect(() => validate({ ...prod, ZARINPAL_SANDBOX: 'true' })).toThrow(/ZARINPAL_SANDBOX/);
+  });
+
   it('refuses to start in production without the SMS key', () => {
     const { KAVENEGAR_API_KEY: _omitted, ...withoutSms } = prod;
     expect(() => validate(withoutSms)).toThrow(/KAVENEGAR_API_KEY/);

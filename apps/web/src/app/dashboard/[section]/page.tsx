@@ -7,6 +7,7 @@ import {StudentTests} from '@/components/student-tests';
 import {StudentMatches} from '@/components/student-matches';
 import {StudentProfile} from '@/components/student-profile';
 import {StudentWallet} from '@/components/student-wallet';
+import {TeacherPlannerCalendar} from '@/components/teacher-planner-calendar';
 
 const map: Record<string, [string,string, string]> = {
   classes: ['کلاس‌ها و تقویم','Classes and calendar', '/bookings/me'],
@@ -25,6 +26,7 @@ export default async function Section({ params }: { params: Promise<{ section: s
   const [titleFa,titleEn, endpoint] = map[section] ?? ['بخش موردنظر','Section', '/users/me'];
   return <PanelShell title="پنل زبان‌آموز" items={studentNav}>
     {section === 'tests' ? <StudentTests />
+      : section === 'classes' ? <TeacherPlannerCalendar mode="student" />
       : section === 'matches' ? <StudentMatches />
       : section === 'profile' ? <StudentProfile />
       : section === 'wallet' ? <StudentWallet />

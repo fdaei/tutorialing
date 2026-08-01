@@ -39,6 +39,7 @@ const users = {
   completedStudent: { id: 'user-student-completed', phone: '09121111111', name: 'نازنین کاظمی', email: 'nazanin@local.test', role: Role.STUDENT },
   futureStudent: { id: 'user-student-future', phone: '09121111112', name: 'علی رضایی', email: 'ali@local.test', role: Role.STUDENT },
   ticketStudent: { id: 'user-student-ticket', phone: '09121111113', name: 'مریم احمدی', email: 'maryam@local.test', role: Role.STUDENT },
+  demoStudent: { id: 'user-student-demo-09390315707', phone: '09390315707', name: 'کاربر نمایشی لینگواسپیک', email: 'demo.student@local.test', role: Role.STUDENT },
 } as const;
 
 const permissionKeys = [
@@ -54,7 +55,11 @@ async function seedUsersAndPermissions() {
     await db.user.upsert({
       where: { phone: user.phone },
       create: { id: user.id, phone: user.phone, name: user.name, email: user.email, profileComplete: true, locale: 'fa', timezone: 'Asia/Tehran' },
-      update: { name: user.name, email: user.email, profileComplete: true, status: 'ACTIVE' },
+      // A developer may have signed in with a demo phone before running the
+      // seed, which creates that user with a random cuid. Reconcile it to the
+      // deterministic seed id so all following role and relation upserts keep
+      // working on repeated runs (Prisma cascades the id update locally).
+      update: { id: user.id, name: user.name, email: user.email, profileComplete: true, status: 'ACTIVE' },
     });
     await db.userRole.upsert({
       where: { userId_role: { userId: user.id, role: user.role } },
@@ -206,6 +211,49 @@ async function seedTeachers() {
   });
 }
 
+async function seedPackages() {
+  const rows = [
+    {
+      id: 'package-sara-5',
+      teacherId: 'teacher-sara',
+      titleFa: 'بسته ۵ جلسه‌ای انگلیسی',
+      titleEn: '5-session English package',
+      descriptionFa: 'پنج جلسه خصوصی برای تقویت مکالمه و رایتینگ.',
+      descriptionEn: 'Five private lessons focused on conversation and writing.',
+      credits: 5,
+      lessonMinutes: 60,
+      listPrice: 3_450_000,
+      discountPercent: 5,
+      price: 3_277_500,
+    },
+    {
+      id: 'package-arman-5',
+      teacherId: 'teacher-arman',
+      titleFa: 'بسته ۵ جلسه‌ای آلمانی',
+      titleEn: '5-session German package',
+      descriptionFa: 'پنج جلسه خصوصی زبان آلمانی از سطح A1 تا B2.',
+      descriptionEn: 'Five private German lessons for levels A1 through B2.',
+      credits: 5,
+      lessonMinutes: 60,
+      listPrice: 3_100_000,
+      discountPercent: 5,
+      price: 2_945_000,
+    },
+  ];
+  for (const row of rows) {
+    await db.package.upsert({
+      where: { id: row.id },
+      create: { ...row, approvalStatus: 'APPROVED', approvedById: users.admin.id, active: true },
+      update: {
+        titleFa: row.titleFa, titleEn: row.titleEn, descriptionFa: row.descriptionFa,
+        descriptionEn: row.descriptionEn, credits: row.credits, lessonMinutes: row.lessonMinutes,
+        listPrice: row.listPrice, discountPercent: row.discountPercent, price: row.price,
+        approvalStatus: 'APPROVED', approvedById: users.admin.id, active: true,
+      },
+    });
+  }
+}
+
 async function seedTests() {
   const listeningAudio = await db.storedFile.upsert({
     where: { id: 'file-listening-audio' },
@@ -336,6 +384,81 @@ async function seedBookingsFinanceAndReviews() {
   await db.teacher.update({ where: { id: completed.teacherId }, data: { rating: rating._avg.rating ?? 0, reviewsCount: rating._count._all } });
 
   void eligible;
+}
+
+async function seedDemoExperience() {
+  const student = users.demoStudent;
+  const policy = await db.cancellationPolicy.findUniqueOrThrow({ where: { id: 'policy-flexible' } });
+  const demoTeachers = [
+    ['ava','آوا مرادی','Ava Moradi','female','lang-en','English',['IELTS','speaking'],['B1','B2','C1'],320000,760000,4.9],
+    ['pouya','پویا شریفی','Pouya Sharifi','male','lang-en','English',['IELTS','writing'],['B2','C1'],350000,820000,4.8],
+    ['leila','لیلا زمانی','Leila Zamani','female','lang-de','Deutsch',['conversation','grammar'],['A1','A2','B1'],270000,640000,4.7],
+    ['navid','نوید رستگار','Navid Rastegar','male','lang-fr','Français',['conversation','DELF'],['A1','A2','B1','B2'],280000,660000,4.6],
+    ['shadi','شادی فرهمند','Shadi Farahmand','female','lang-es','Español',['conversation','DELE'],['A1','A2','B1'],250000,590000,4.9],
+    ['amirali','امیرعلی توکلی','Amirali Tavakoli','male','lang-tr','Türkçe',['conversation','travel'],['A1','A2','B1'],230000,540000,4.5],
+    ['yuna','یونا کیم','Yuna Kim','female','lang-ko','한국어',['TOPIK','conversation'],['Beginner','Intermediate'],300000,710000,4.9],
+    ['marco','مارکو رضایی','Marco Rezaei','male','lang-it','Italiano',['conversation','CILS'],['A1','A2','B1'],260000,610000,4.7],
+    ['elena','النا کریمی','Elena Karimi','female','lang-ru','Русский',['conversation','grammar'],['A1','A2','B1'],275000,650000,4.8],
+    ['samir','سمیر موسوی','Samir Mousavi','male','lang-ar','العربية',['conversation','business'],['A1','A2','B1','B2'],240000,570000,4.6],
+  ] as const;
+  for (let index=0; index<demoTeachers.length; index+=1) {
+    const [key,nameFa,nameEn,gender,languageId,nativeName,specialties,levels,trial,regular,rating]=demoTeachers[index]!;
+    const userId=`user-teacher-demo-${key}`,teacherId=`teacher-demo-${key}`;
+    await db.user.upsert({where:{phone:`091300001${String(index).padStart(2,'0')}`},create:{id:userId,phone:`091300001${String(index).padStart(2,'0')}`,name:nameFa,email:`${key}@demo.local`,profileComplete:true,locale:'fa',timezone:'Asia/Tehran'},update:{name:nameFa,status:'ACTIVE'}});
+    await db.userRole.upsert({where:{userId_role:{userId,role:Role.TEACHER}},create:{userId,role:Role.TEACHER},update:{}});
+    await db.teacher.upsert({where:{id:teacherId},create:{id:teacherId,userId,slug:`demo-${key}`,nameFa,nameEn,bioFa:`مدرس حرفه‌ای ${nativeName} با برنامه آموزشی شخصی‌سازی‌شده و تجربه کلاس آنلاین.`,bioEn:`Professional ${nativeName} teacher with personalized online lessons.`,status:TeacherStatus.APPROVED,rating,reviewsCount:18+index*7,experienceYears:4+index%6,gender,trialPrice:trial,regularPrice:regular,trialDuration:30,lessonDuration:60,approvedTrialPrice:trial,approvedRegularPrice:regular,proposedTrialPrice:trial,proposedRegularPrice:regular,priceStatus:PriceStatus.APPROVED,priceReviewedById:users.admin.id,priceReviewedAt:at(-30,9),specialties:[...specialties],languages:[nativeName],targetBands:languageId==='lang-en'?[6.5,7,7.5,8]:[],policyId:policy.id,submittedAt:at(-40,9),approvedAt:at(-30,9)},update:{status:TeacherStatus.APPROVED,rating,reviewsCount:18+index*7,approvedTrialPrice:trial,approvedRegularPrice:regular,specialties:[...specialties],policyId:policy.id}});
+    await db.teacherLanguage.upsert({where:{teacherId_languageId:{teacherId,languageId}},create:{teacherId,languageId,levels:[...levels],specialties:[...specialties],active:true},update:{levels:[...levels],specialties:[...specialties],active:true}});
+    for(const weekday of [0,1,2,3,4,5])await db.availabilityRule.upsert({where:{id:`rule-${teacherId}-${weekday}`},create:{id:`rule-${teacherId}-${weekday}`,teacherId,weekday,startMinute:540,endMinute:1260,timezone:'Asia/Tehran',lessonDuration:60,breakMinutes:0,active:true},update:{active:true,startMinute:540,endMinute:1260}});
+  }
+
+  const testSpecs=[
+    ['test-demo-ielts','ielts-academic-full-demo','lang-en','IELTS','آزمون جامع IELTS Academic','IELTS Academic Full Mock',165],
+    ['test-demo-german','german-demo-b1','lang-de','B1','آزمون تعیین سطح آلمانی','German Placement Test',45],
+    ['test-demo-french','french-demo-a2','lang-fr','A2','آزمون تعیین سطح فرانسوی','French Placement Test',40],
+    ['test-demo-spanish','spanish-demo-a2','lang-es','A2','آزمون تعیین سطح اسپانیایی','Spanish Placement Test',40],
+  ] as const;
+  for(const [id,slug,languageId,level,titleFa,titleEn,durationMinutes] of testSpecs)await db.testDefinition.upsert({where:{slug},create:{id,slug,languageId,level,titleFa,titleEn,descriptionFa:'آزمون استاندارد نمایشی با سؤالات واقع‌گرایانه برای تجربه کامل سامانه',descriptionEn:'A realistic full-flow demonstration assessment',durationMinutes,published:true},update:{published:true,titleFa,titleEn,durationMinutes}});
+  const ieltsSections=[
+    ['listening','Listening',30],['reading','Academic Reading',60],['writing','Academic Writing',60],['speaking','Speaking',15],
+  ] as const;
+  for(let i=0;i<ieltsSections.length;i+=1){const[skill,title,durationMinutes]=ieltsSections[i]!;await db.testSection.upsert({where:{id:`section-demo-ielts-${skill}`},create:{id:`section-demo-ielts-${skill}`,testId:'test-demo-ielts',skill,title,instructions:{fa:`دستورالعمل بخش ${title} را بخوانید و در زمان تعیین‌شده پاسخ دهید.`,en:`Complete the ${title} section within the time limit.`},durationMinutes,order:i+1},update:{title,durationMinutes,order:i+1}})}
+  const simpleSections=[['german','test-demo-german','Lesen'],['french','test-demo-french','Compréhension'],['spanish','test-demo-spanish','Comprensión']] as const;
+  for(const[key,testId,title]of simpleSections)await db.testSection.upsert({where:{id:`section-demo-${key}`},create:{id:`section-demo-${key}`,testId,skill:'reading',title,instructions:{fa:'متن را بخوانید و پاسخ درست را انتخاب کنید.',en:'Read and choose the correct answer.'},durationMinutes:40,order:1},update:{title}});
+  const demoQuestions=[
+    ['q-demo-ielts-l1','section-demo-ielts-listening','single_choice','سخنران جلسه را برای چه ساعتی تنظیم می‌کند؟','What time does the speaker arrange the meeting?',['۹:۳۰','۱۰:۰۰','۱۰:۳۰','۱۱:۰۰'],1],
+    ['q-demo-ielts-r1','section-demo-ielts-reading','single_choice','طبق متن، مهم‌ترین مزیت یادگیری ترکیبی چیست؟','According to the passage, what is the main benefit of blended learning?',['کاهش کامل هزینه','انعطاف‌پذیری همراه با تعامل','حذف مدرس','آزمون کمتر'],1],
+    ['q-demo-ielts-w1','section-demo-ielts-writing','essay','نموداری روند یادگیری آنلاین را نشان می‌دهد. ویژگی‌های اصلی را خلاصه و مقایسه کنید.','The chart shows trends in online learning. Summarise and compare the main features.',null,null],
+    ['q-demo-ielts-w2','section-demo-ielts-writing','essay','برخی معتقدند آموزش آنلاین جای کلاس حضوری را می‌گیرد. تا چه حد موافقید؟','Some believe online education will replace classrooms. To what extent do you agree?',null,null],
+    ['q-demo-ielts-s1','section-demo-ielts-speaking','recording','درباره مهارتی که دوست دارید در آینده یاد بگیرید صحبت کنید.','Describe a skill you would like to learn in the future.',null,null],
+    ['q-demo-german','section-demo-german','single_choice','کدام جمله از نظر دستوری درست است؟','Which sentence is grammatically correct?',['Ich gehe heute zur Arbeit.','Ich heute gehen Arbeit.','Heute ich Arbeit geht.'],0],
+    ['q-demo-french','section-demo-french','single_choice','عبارت درست برای معرفی خود چیست؟','Choose the correct introduction.',['Je m’appelle Marie.','Je suis appelle Marie.','Moi appeler Marie.'],0],
+    ['q-demo-spanish','section-demo-spanish','single_choice','گزینه درست را انتخاب کنید.','Choose the correct sentence.',['Me llamo Carlos.','Yo llama Carlos.','Mi llamar Carlos.'],0],
+  ] as const;
+  for(let i=0;i<demoQuestions.length;i+=1){const[id,sectionId,type,promptFa,promptEn,choices,answerKey]=demoQuestions[i]!;await db.question.upsert({where:{id},create:{id,sectionId,type,prompt:{fa:promptFa,en:promptEn},choices:choices?{fa:choices,en:choices}:undefined,answerKey:answerKey??undefined,scoringRule:type==='essay'?{minWords:id.endsWith('w2')?250:150}:type==='recording'?{minSeconds:60}:undefined,points:type==='single_choice'?1:9,order:i+1},update:{prompt:{fa:promptFa,en:promptEn},choices:choices?{fa:choices,en:choices}:undefined,answerKey:answerKey??undefined}})}
+
+  const attempts=[
+    ['attempt-demo-ielts','test-demo-ielts',TestStatus.IN_PROGRESS,undefined,undefined],
+    ['attempt-demo-german','test-demo-german',TestStatus.APPROVED,6.5,-18],
+    ['attempt-demo-french','test-demo-french',TestStatus.APPROVED,5.5,-35],
+    ['attempt-demo-spanish','test-demo-spanish',TestStatus.UNDER_REVIEW,undefined,-2],
+  ] as const;
+  for(const[id,testId,status,overallBand,days]of attempts)await db.testAttempt.upsert({where:{id},create:{id,userId:student.id,testId,status,currentSectionId:status===TestStatus.IN_PROGRESS?'section-demo-ielts-listening':null,startedAt:at(days??-1,8),expiresAt:at((days??-1)+2,8),submittedAt:status===TestStatus.IN_PROGRESS?null:at(days??-1,10),overallBand},update:{status,currentSectionId:status===TestStatus.IN_PROGRESS?'section-demo-ielts-listening':null,overallBand,submittedAt:status===TestStatus.IN_PROGRESS?null:at(days??-1,10)}});
+  for(const[skill,,duration]of ieltsSections)await db.attemptSectionState.upsert({where:{attemptId_sectionId:{attemptId:'attempt-demo-ielts',sectionId:`section-demo-ielts-${skill}`}},create:{attemptId:'attempt-demo-ielts',sectionId:`section-demo-ielts-${skill}`,status:skill==='listening'?'available':'locked',remainingSeconds:duration*60},update:{remainingSeconds:duration*60}});
+
+  const session=await db.matchingSession.upsert({where:{id:'match-demo-student'},create:{id:'match-demo-student',userId:student.id,languageId:'lang-en',currentLevel:'B2',learningGoal:'IELTS Academic 7.5',targetLevel:'C1',targetBand:7.5,currentBand:6.5,examDate:at(90,8),weakSkills:['writing','speaking'],maxTrialPrice:400000,availability:{days:[1,3,5],time:'evening'},suitableDays:[1,3,5],preferredTime:'evening',trialRequired:true,classType:'private',timezone:'Asia/Tehran'},update:{targetBand:7.5,currentBand:6.5}});
+  for(let rank=1;rank<=10;rank+=1){const key=demoTeachers[rank-1]![0];await db.matchingRecommendation.upsert({where:{sessionId_rank:{sessionId:session.id,rank}},create:{sessionId:session.id,teacherId:`teacher-demo-${key}`,rank,score:96-rank*2,reasons:{fa:['هماهنگ با بودجه و زمان شما','تجربه تدریس آنلاین'],en:['Matches your budget and schedule']},audit:{compatibleSlots:12-rank%4,price:demoTeachers[rank-1]![8]}},update:{teacherId:`teacher-demo-${key}`,score:96-rank*2}})}
+
+  const bookings=[['booking-demo-completed','teacher-demo-ava',-8,BookingStatus.COMPLETED,760000],['booking-demo-upcoming','teacher-demo-pouya',3,BookingStatus.CONFIRMED,350000],['booking-demo-upcoming-2','teacher-demo-leila',7,BookingStatus.CONFIRMED,270000]] as const;
+  for(const[id,teacherId,days,status,price]of bookings){const booking=await db.booking.upsert({where:{id},create:{id,studentId:student.id,teacherId,startsAt:at(days,14),endsAt:at(days,15),timezone:'Asia/Tehran',type:id.includes('completed')?'regular':'trial',status,price,policySnapshot:{title:'flexible'},meetingUrl:`https://meet.jit.si/lingospeak-${id}`,attendanceStudent:status===BookingStatus.COMPLETED?true:null,attendanceTeacher:status===BookingStatus.COMPLETED?true:null},update:{startsAt:at(days,14),endsAt:at(days,15),status}});await db.payment.upsert({where:{id:`payment-${id}`},create:{id:`payment-${id}`,bookingId:booking.id,userId:student.id,purpose:'BOOKING',referenceId:booking.id,subtotal:price,discountAmount:id.includes('completed')?76000:0,walletAmount:id.includes('completed')?200000:0,gatewayAmount:id.includes('completed')?484000:price,amount:id.includes('completed')?684000:price,status:PaymentStatus.PAID,idempotencyKey:`seed-demo-${id}`,gatewayReference:`LS-DEMO-${1000+days}`,verifiedAt:at(days-1,12)},update:{status:PaymentStatus.PAID,verifiedAt:at(days-1,12)}})}
+  const ledger=[
+    ['topup-1','CREDIT',2500000,'افزایش موجودی از درگاه پرداخت','TopUp','wallet-topup-demo-1',-20],
+    ['class-1','DEBIT',200000,'پرداخت بخشی از هزینه کلاس IELTS','Payment','payment-booking-demo-completed',-9],
+    ['gift-1','CREDIT',300000,'اعتبار هدیه خوش‌آمدگویی','Gift','welcome-demo',-6],
+    ['refund-1','CREDIT',180000,'بازگشت وجه جلسه لغوشده','Refund','refund-demo',-4],
+    ['reserve-1','DEBIT',350000,'رزرو جلسه آزمایشی آینده','Payment','payment-booking-demo-upcoming',-1],
+  ] as const;
+  for(const[id,direction,amount,description,referenceType,referenceId,days]of ledger)await db.walletEntry.upsert({where:{idempotencyKey:`seed-demo-ledger-${id}`},create:{id:`wallet-demo-${id}`,userId:student.id,transactionId:`TX-DEMO-${id.toUpperCase()}`,account:'user_wallet',direction,amount,description,referenceType,referenceId,idempotencyKey:`seed-demo-ledger-${id}`,createdAt:at(days,12)},update:{amount,description}});
+  await db.learningPlan.upsert({where:{id:'plan-demo-ielts'},create:{id:'plan-demo-ielts',studentId:student.id,teacherId:'teacher-demo-ava',title:'مسیر آمادگی IELTS Academic نمره ۷٫۵',targetBand:7.5,examDate:at(90,8),weakSkills:['writing','speaking'],status:'active',milestones:{create:[{title:'تسلط بر Writing Task 1',dueAt:at(20,8),order:1},{title:'آزمون آزمایشی کامل',dueAt:at(55,8),order:2},{title:'مرور نهایی Speaking',dueAt:at(80,8),order:3}]},assignments:{create:[{title:'تحلیل نمودار خطی',instructions:'یک پاسخ ۱۵۰ کلمه‌ای برای Task 1 بنویسید.',dueAt:at(4,8),status:'pending'},{title:'ضبط Speaking Part 2',instructions:'دو دقیقه درباره یک تجربه آموزشی صحبت کنید.',dueAt:at(6,8),status:'pending'}]}},update:{title:'مسیر آمادگی IELTS Academic نمره ۷٫۵',targetBand:7.5,status:'active'}});
 }
 
 async function seedTicketsCmsAndSettings() {
@@ -551,8 +674,10 @@ async function main() {
   await seedUsersAndPermissions();
   await seedLanguages();
   await seedTeachers();
+  await seedPackages();
   await seedTests();
   await seedBookingsFinanceAndReviews();
+  await seedDemoExperience();
   await seedTicketsCmsAndSettings();
   await seedAudit();
   console.log('Seed completed successfully with multilingual workflow data.');

@@ -19,7 +19,16 @@ export function TeacherAvailabilityManager(){
  const [rules,setRules]=useState<Rule[]>([]),[blockStart,setBlockStart]=useState<Date|null>(null),[blockEnd,setBlockEnd]=useState<Date|null>(null),[blockReason,setBlockReason]=useState(''),[overrideDate,setOverrideDate]=useState<Date|null>(null),[overrideAvailable,setOverrideAvailable]=useState(false),[overrideStart,setOverrideStart]=useState('09:00'),[overrideEnd,setOverrideEnd]=useState('17:00'),[overrideReason,setOverrideReason]=useState('');
  useEffect(()=>{if(query.data)setRules(query.data.rules)},[query.data]);
  const invalidate=async()=>{await Promise.all([qc.invalidateQueries({queryKey:['availability-me']}),qc.invalidateQueries({queryKey:['slots']})])};
- const saveRules=useMutation({mutationFn:()=>api('/availability/me/rules',{method:'PUT',body:JSON.stringify({rules:rules.map(rule=>({...rule,timezone:rule.timezone||query.data?.timezone||'Asia/Tehran'}))})}),onSuccess:invalidate});
+ // Only send fields accepted by RulesDto. Rows loaded from the API also contain
+ // an `id`; forwarding it makes forbidNonWhitelisted reject an otherwise valid rule.
+ const saveRules=useMutation({mutationFn:()=>api('/availability/me/rules',{method:'PUT',body:JSON.stringify({rules:rules.map(rule=>({
+  weekday:rule.weekday,
+  startMinute:rule.startMinute,
+  endMinute:rule.endMinute,
+  timezone:rule.timezone||query.data?.timezone||'Asia/Tehran',
+  lessonDuration:rule.lessonDuration??60,
+  breakMinutes:rule.breakMinutes??15,
+ }))})}),onSuccess:invalidate});
  const addBlock=useMutation({mutationFn:()=>api('/availability/me/blocks',{method:'POST',body:JSON.stringify({startsAt:blockStart?.toISOString(),endsAt:blockEnd?.toISOString(),reason:blockReason||undefined})}),onSuccess:()=>{setBlockStart(null);setBlockEnd(null);setBlockReason('');invalidate()}});
  const removeBlock=useMutation({mutationFn:(id:string)=>api(`/availability/me/blocks/${id}`,{method:'DELETE'}),onSuccess:invalidate});
  const addOverride=useMutation({mutationFn:()=>{if(!overrideDate)throw new Error(fa?'تاریخ را انتخاب کنید.':'Choose a date.');const [sh=0,sm=0]=overrideStart.split(':').map(Number),[eh=0,em=0]=overrideEnd.split(':').map(Number);return api('/availability/me/overrides',{method:'POST',body:JSON.stringify({date:dateOnlyIso(overrideDate),available:overrideAvailable,startMinute:overrideAvailable?sh*60+sm:undefined,endMinute:overrideAvailable?eh*60+em:undefined,reason:overrideReason||undefined})})},onSuccess:()=>{setOverrideDate(null);setOverrideReason('');invalidate()}});
@@ -36,6 +45,6 @@ function minutes(value?:number){if(value==null)return'—';return`${String(Math.
 function dateOnlyIso(date:Date){return new Date(Date.UTC(date.getFullYear(),date.getMonth(),date.getDate())).toISOString()}
 function formatDate(value:string,fa:boolean){return new Intl.DateTimeFormat(fa?'fa-IR-u-ca-persian':'en-US',{dateStyle:'full',timeZone:'UTC'}).format(new Date(value))}
 function formatDateTime(value:string,fa:boolean){return new Intl.DateTimeFormat(fa?'fa-IR-u-ca-persian':'en-US',{dateStyle:'medium',timeStyle:'short'}).format(new Date(value))}
-function InlineError({error,field,fa}:{error:unknown;field:string;fa:boolean}){return <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-800">{apiMessage(error,fa?'ذخیره ناموفق بود.':'Could not save.')} {apiField(error,field)}</p>}
+function InlineError({error,field,fa}:{error:unknown;field:string;fa:boolean}){const detail=apiField(error,field);return <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-800">{detail||apiMessage(error,fa?'ذخیره ناموفق بود.':'Could not save.')}</p>}
 function Success({text}:{text:string}){return <p role="status" className="mt-3 rounded-xl bg-green-50 p-3 text-sm text-green-800">{text}</p>}
 function ErrorBox({message,retry}:{message:string;retry:()=>void}){return <div role="alert" className="rounded-3xl bg-red-50 p-6 text-red-800">{message} <button onClick={retry} className="font-bold underline">Retry</button></div>}

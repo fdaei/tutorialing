@@ -1,2 +1,45 @@
 import{BadGatewayException,Injectable}from'@nestjs/common';import{createHash,randomUUID}from'crypto';import{config}from'../../config';
-@Injectable()export class GatewayService{async request(amount:number,description:string,callbackUrl:string){const cfg=config();if(!cfg.ZARINPAL_MERCHANT_ID){const authority=`dev_${randomUUID()}`;return{authority,url:`${cfg.WEB_URL}/payment/development?authority=${authority}`}}const response=await fetch('https://payment.zarinpal.com/pg/v4/payment/request.json',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({merchant_id:cfg.ZARINPAL_MERCHANT_ID,amount,description,callback_url:callbackUrl})});if(!response.ok)throw new BadGatewayException('Payment gateway unavailable');const body=await response.json()as{data:{authority:string}};return{authority:body.data.authority,url:`https://payment.zarinpal.com/pg/StartPay/${body.data.authority}`}}async verify(authority:string,amount:number){const cfg=config();if(authority.startsWith('dev_')&&!cfg.ZARINPAL_MERCHANT_ID)return{ok:true,reference:`DEV-${createHash('sha1').update(authority).digest('hex').slice(0,12)}`};const response=await fetch('https://payment.zarinpal.com/pg/v4/payment/verify.json',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({merchant_id:cfg.ZARINPAL_MERCHANT_ID,amount,authority})});if(!response.ok)return{ok:false};const body=await response.json()as{data:{code:number;ref_id:number}};return{ok:[100,101].includes(body.data.code),reference:String(body.data.ref_id)}}}
+
+const SANDBOX_MERCHANT_ID='XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX';
+type ZarinpalResponse={data?:{authority?:string;code?:number;ref_id?:number|string;message?:string};errors?:unknown};
+// All LingoSpeak prices and ledger entries are stored in toman, while Zarinpal
+// v4 accepts and verifies amounts in rial. Keep the conversion at this provider
+// boundary so the rest of the finance domain stays in one unit.
+const toRial=(toman:number)=>toman*10;
+
+@Injectable()
+export class GatewayService {
+ private options(){
+  const cfg=config(),sandbox=cfg.ZARINPAL_SANDBOX;
+  return{
+   cfg,
+   merchantId:cfg.ZARINPAL_MERCHANT_ID||(sandbox?SANDBOX_MERCHANT_ID:''),
+   apiBase:sandbox?'https://sandbox.zarinpal.com':'https://payment.zarinpal.com',
+   startBase:sandbox?'https://sandbox.zarinpal.com':'https://payment.zarinpal.com',
+  };
+ }
+
+ async request(amount:number,description:string,callbackUrl:string){
+  const{cfg,merchantId,apiBase,startBase}=this.options();
+  if(!merchantId){const authority=`dev_${randomUUID()}`;return{authority,url:`${cfg.WEB_URL}/payment/development?authority=${authority}`}}
+  const response=await fetch(`${apiBase}/pg/v4/payment/request.json`,{method:'POST',headers:{'content-type':'application/json','accept':'application/json'},body:JSON.stringify({merchant_id:merchantId,amount:toRial(amount),description,callback_url:callbackUrl})});
+  const body=await this.body(response);
+  const authority=body.data?.authority;
+  if(!response.ok||body.data?.code!==100||!authority)throw new BadGatewayException('Zarinpal payment request failed');
+  return{authority,url:`${startBase}/pg/StartPay/${authority}`};
+ }
+
+ async verify(authority:string,amount:number){
+  const{cfg,merchantId,apiBase}=this.options();
+  if(authority.startsWith('dev_')&&!merchantId)return{ok:true,reference:`DEV-${createHash('sha1').update(authority).digest('hex').slice(0,12)}`};
+  if(!merchantId)return{ok:false};
+  const response=await fetch(`${apiBase}/pg/v4/payment/verify.json`,{method:'POST',headers:{'content-type':'application/json','accept':'application/json'},body:JSON.stringify({merchant_id:merchantId,amount:toRial(amount),authority})});
+  const body=await this.body(response);
+  const ok=response.ok&&[100,101].includes(body.data?.code??0);
+  return{ok,...(ok&&body.data?.ref_id!=null?{reference:String(body.data.ref_id)}:{})};
+ }
+
+ private async body(response:Response){
+  try{return await response.json()as ZarinpalResponse}catch{throw new BadGatewayException('Zarinpal returned an invalid response')}
+ }
+}

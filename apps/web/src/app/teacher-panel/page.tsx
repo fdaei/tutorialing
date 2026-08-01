@@ -1,1 +1,3 @@
-import{PanelShell,teacherNav}from'@/components/panel-shell';import{ResourceView}from'@/components/resource-view';import{requestLocale}from'@/lib/server-locale';export default async function TeacherHome(){const fa=(await requestLocale())==='fa';return <PanelShell title="پنل مدرس" items={teacherNav}><ResourceView title={fa?'کلاس‌های امروز و آینده':'Today and upcoming classes'} endpoint="/bookings/me"/></PanelShell>}
+import{PanelShell,teacherNav}from'@/components/panel-shell';
+import{TeacherDashboard}from'@/components/teacher-dashboard';
+export default function TeacherHome(){return <PanelShell title="پنل مدرس" items={teacherNav}><TeacherDashboard/></PanelShell>}

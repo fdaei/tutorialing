@@ -97,6 +97,43 @@ export class PayoutsService {
     const earnings = await this.db.earning.findMany({ where: { teacherId: teacher.id }, orderBy: { createdAt: 'desc' } });
     const totals = await this.db.earning.groupBy({ by: ['status'], where: { teacherId: teacher.id }, _sum: { netAmount: true }, orderBy: { status: 'asc' } });
     const payouts = await this.db.payoutItem.findMany({ where: { teacherId: teacher.id }, include: { batch: true }, orderBy: { batch: { createdAt: 'desc' } } });
-    return { earnings, totals, payouts };
+    const withdrawals = await this.db.withdrawalRequest.findMany({ where: { teacherId: teacher.id }, orderBy: { createdAt: 'desc' }, take: 50 });
+    const ledger = await this.db.walletEntry.groupBy({ by: ['direction'], where: { userId, account: 'user_wallet' }, _sum: { amount: true } });
+    const walletBalance = (ledger.find(row => row.direction === 'CREDIT')?._sum.amount ?? 0) - (ledger.find(row => row.direction === 'DEBIT')?._sum.amount ?? 0);
+    const reservedAmount = withdrawals.filter(row => ['PENDING', 'APPROVED'].includes(row.status)).reduce((sum, row) => sum + row.amount, 0);
+    return { earnings, totals, payouts, withdrawals, walletBalance, reservedAmount, availableToWithdraw: Math.max(0, walletBalance - reservedAmount) };
+  }
+
+  async requestWithdrawal(userId: string, amount: number, iban: string) {
+    const teacher = await this.db.teacher.findUniqueOrThrow({ where: { userId } });
+    const normalizedIban = iban.replace(/\s/g, '').toUpperCase();
+    return this.db.$transaction(async tx => {
+      const ledger = await tx.walletEntry.groupBy({ by: ['direction'], where: { userId, account: 'user_wallet' }, _sum: { amount: true } });
+      const balance = (ledger.find(row => row.direction === 'CREDIT')?._sum.amount ?? 0) - (ledger.find(row => row.direction === 'DEBIT')?._sum.amount ?? 0);
+      const pending = await tx.withdrawalRequest.aggregate({ where: { teacherId: teacher.id, status: { in: ['PENDING', 'APPROVED'] } }, _sum: { amount: true } });
+      const available = balance - (pending._sum.amount ?? 0);
+      if (amount > available) throw badRequest('WITHDRAWAL_INSUFFICIENT_BALANCE', 'مبلغ برداشت بیشتر از موجودی قابل برداشت است.', 'The withdrawal amount exceeds the available balance.', {
+        amount: { fa: `حداکثر مبلغ قابل برداشت ${available.toLocaleString('fa-IR')} تومان است.`, en: `The maximum available amount is ${available.toLocaleString('en-US')} IRR.` },
+      });
+      return tx.withdrawalRequest.create({ data: { teacherId: teacher.id, amount, iban: normalizedIban } });
+    });
+  }
+
+  withdrawalRequests() {
+    return this.db.withdrawalRequest.findMany({ include: { teacher: { select: { nameFa: true, nameEn: true, user: { select: { phone: true } } } } }, orderBy: { createdAt: 'desc' }, take: 200 });
+  }
+
+  async transferWithdrawal(id: string, actorId: string, reference?: string) {
+    return this.db.$transaction(async tx => {
+      const request = await tx.withdrawalRequest.findUniqueOrThrow({ where: { id }, include: { teacher: { select: { userId: true } } } });
+      if (!['PENDING', 'APPROVED'].includes(request.status)) throw badRequest('WITHDRAWAL_NOT_TRANSFERABLE', 'این درخواست قبلاً تعیین تکلیف شده است.', 'This request has already been processed.');
+      if (!reference) throw badRequest('WITHDRAWAL_REFERENCE_REQUIRED', 'شماره پیگیری بانکی الزامی است.', 'A bank transfer reference is required.');
+      await tx.walletEntry.upsert({
+        where: { idempotencyKey: `withdrawal-debit:${request.id}` },
+        create: { userId: request.teacher.userId, transactionId: `tx_${request.id}`, account: 'user_wallet', direction: 'DEBIT', amount: request.amount, description: 'teacher wallet withdrawal', referenceType: 'WithdrawalRequest', referenceId: request.id, idempotencyKey: `withdrawal-debit:${request.id}` },
+        update: {},
+      });
+      return tx.withdrawalRequest.update({ where: { id }, data: { status: 'TRANSFERRED', reference, reviewedById: actorId, reviewedAt: new Date(), transferredAt: new Date() } });
+    });
   }
 }

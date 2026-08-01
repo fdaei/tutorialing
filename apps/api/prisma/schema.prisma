@@ -106,6 +106,13 @@ enum PayoutStatus {
   FAILED
 }
 
+enum WithdrawalStatus {
+  PENDING
+  APPROVED
+  TRANSFERRED
+  REJECTED
+}
+
 enum NotificationChannel {
   IN_APP
   SMS
@@ -319,6 +326,7 @@ model Teacher {
   reviews               Review[]
   matches               MatchingRecommendation[]
   earnings              Earning[]
+  withdrawalRequests    WithdrawalRequest[]
   learningPlans         LearningPlan[]
   createdAt             DateTime                 @default(now())
   updatedAt             DateTime                 @updatedAt
@@ -773,6 +781,25 @@ model PayoutItem {
   earning   Earning     @relation(fields: [earningId], references: [id])
   teacherId String
   amount    Int
+}
+
+model WithdrawalRequest {
+  id            String           @id @default(cuid())
+  teacherId     String
+  teacher       Teacher          @relation(fields: [teacherId], references: [id])
+  amount        Int
+  iban          String
+  status        WithdrawalStatus @default(PENDING)
+  reference     String?
+  rejectionNote String?
+  reviewedById  String?
+  reviewedAt    DateTime?
+  transferredAt DateTime?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  @@index([teacherId, createdAt])
+  @@index([status, createdAt])
 }
 
 model TestDefinition {

@@ -97,12 +97,12 @@ function Shell({ title, children }: { title: string; children: React.ReactNode }
   return <section className="mb-7 rounded-3xl border hairline bg-white p-5 shadow-soft"><h3 className="text-lg font-black">{title}</h3>{children}</section>;
 }
 
-function Field({ label, ...props }: React.InputHTMLAttributes<HTMLInputElement> & { label: string }) {
-  return <label className="block"><span className="mb-2 block text-sm font-bold">{label}</span><input {...props} className="w-full rounded-2xl border hairline px-4 py-3 outline-none transition focus:border-purple focus:ring-4 focus:ring-violet/15" /></label>;
+function Field({ label, error, ...props }: React.InputHTMLAttributes<HTMLInputElement> & { label: string; error?: string }) {
+  return <label className="block"><span className="mb-2 block text-sm font-bold">{label}</span><input {...props} aria-invalid={Boolean(error)} aria-describedby={error&&`${props.name}-error`} className={`w-full rounded-2xl border px-4 py-3 outline-none transition focus:ring-4 ${error?'border-red-400 bg-red-50/30 focus:border-red-500 focus:ring-red-100':'hairline focus:border-purple focus:ring-violet/15'}`} />{error&&<span id={`${props.name}-error`} className="mt-1.5 block text-xs font-bold text-red-600">{error}</span>}</label>;
 }
 
-function Area({ label, ...props }: React.TextareaHTMLAttributes<HTMLTextAreaElement> & { label: string }) {
-  return <label className="block"><span className="mb-2 block text-sm font-bold">{label}</span><textarea {...props} className="min-h-28 w-full rounded-2xl border hairline px-4 py-3 outline-none transition focus:border-purple focus:ring-4 focus:ring-violet/15" /></label>;
+function Area({ label, error, ...props }: React.TextareaHTMLAttributes<HTMLTextAreaElement> & { label: string; error?: string }) {
+  return <label className="block"><span className="mb-2 block text-sm font-bold">{label}</span><textarea {...props} aria-invalid={Boolean(error)} aria-describedby={error&&`${props.name}-error`} className={`min-h-28 w-full rounded-2xl border px-4 py-3 outline-none transition focus:ring-4 ${error?'border-red-400 bg-red-50/30 focus:border-red-500 focus:ring-red-100':'hairline focus:border-purple focus:ring-violet/15'}`} />{error&&<span id={`${props.name}-error`} className="mt-1.5 block text-xs font-bold text-red-600">{error}</span>}</label>;
 }
 
 function Select({ label, name, children }: { label: string; name: string; children: React.ReactNode }) {
@@ -175,10 +175,7 @@ function TeacherActions({ section, endpoint, fa }: Omit<Props, 'role'> & Localiz
   const action = useAction(endpoint);
   if (['profile','languages','specialties'].includes(section)) return <TeacherApplicationForm endpoint={endpoint} fa={fa}/>;
   if (section === 'video') return <TeacherIntroVideo endpoint={endpoint} fa={fa}/>;
-  if (section === 'verification') return <div className="grid gap-5 xl:grid-cols-2">
-    <TeacherApplicationForm endpoint={endpoint} fa={fa}/>
-    <TeacherFiles endpoint={endpoint} fa={fa} />
-  </div>;
+  if (section === 'verification') return <TeacherFiles endpoint={endpoint} fa={fa} />;
 
   if (section === 'availability') return <div className="grid gap-5 xl:grid-cols-3">
     <Shell title={tr(fa, 'قانون هفتگی', 'Weekly rule')}>
@@ -235,15 +232,16 @@ function TeacherIntroVideo({endpoint,fa}:{endpoint:string}&Localized){
 function TeacherApplicationForm({endpoint,fa}:{endpoint:string}&Localized){
  const action=useAction(endpoint);
  const languages=useQuery({queryKey:['languages'],queryFn:()=>api<EducationalLanguage[]>('/languages')});
- const application=useQuery({queryKey:[endpoint],queryFn:()=>api<{nameFa?:string;nameEn?:string;bioFa?:string;bioEn?:string;specialties?:string[];experienceYears?:number;languageLinks?:{languageId:string}[]}>(endpoint)});
+ const application=useQuery({queryKey:[endpoint],queryFn:()=>api<{nameFa?:string;nameEn?:string;bioFa?:string;bioEn?:string;specialties?:string[];experienceYears?:number;languageLinks?:{languageId:string;levels?:string[]}[]}>(endpoint)});
  const current=application.data;
+ const fieldError=(name:string)=>action.error instanceof ApiError?action.error.details.fieldErrors?.[name]:undefined;
  return <Shell title={tr(fa,'پروفایل درخواست مدرس','Teacher application profile')}><p className="mt-2 text-sm leading-7 text-muted">{tr(fa,'نام و بیوگرافی را فارسی و انگلیسی بنویسید. تخصص‌ها را مثل writing,speaking وارد کنید و حداقل یک زبان را از گزینه‌های زیر انتخاب کنید.','Enter names and biographies in both languages, use specialties such as writing,speaking, and select at least one teaching language below.')}</p>
   <form key={current?'loaded':'loading'} className="mt-4 grid gap-4" onSubmit={event=>{event.preventDefault();const form=new FormData(event.currentTarget);action.mutate(()=>api('/teacher/application',{method:'POST',body:JSON.stringify({nameFa:value(form,'nameFa'),nameEn:value(form,'nameEn'),bioFa:value(form,'bioFa'),bioEn:value(form,'bioEn'),specialties:list(form,'specialties'),languageIds:form.getAll('languageIds').map(String),levels:list(form,'levels'),experienceYears:numeric(form,'experienceYears')})}))}}>
-   <Field name="nameFa" label={tr(fa,'نام فارسی؛ مثال: علی رضایی','Persian name')} defaultValue={current?.nameFa} required/><Field name="nameEn" label={tr(fa,'نام انگلیسی؛ مثال: Ali Rezaei','English name')} defaultValue={current?.nameEn} required dir="ltr"/>
-   <Area name="bioFa" label={tr(fa,'بیوگرافی فارسی؛ حداقل ۴۰ حرف درباره سابقه و روش تدریس','Persian biography; at least 40 characters')} defaultValue={current?.bioFa} minLength={40} required/><Area name="bioEn" label={tr(fa,'بیوگرافی انگلیسی؛ حداقل ۴۰ حرف','English biography; at least 40 characters')} defaultValue={current?.bioEn} minLength={40} required dir="ltr"/>
-   <Field name="specialties" label={tr(fa,'تخصص‌ها با کاما؛ مثال: writing,speaking','Specialties; e.g. writing,speaking')} defaultValue={current?.specialties?.join(',')||'writing,speaking'} dir="ltr" required/><Field name="levels" label={tr(fa,'سطح‌ها با کاما؛ مثال: A1,A2,B1','Levels; e.g. A1,A2,B1')} defaultValue="A1,A2,B1,B2,C1" dir="ltr"/>
-   <fieldset><legend className="mb-2 text-sm font-bold">{tr(fa,'زبان‌هایی که تدریس می‌کنید','Languages you teach')}</legend><div className="flex flex-wrap gap-2">{languages.data?.map(language=><label key={language.id} className="rounded-xl border hairline px-3 py-2"><input name="languageIds" value={language.id} type="checkbox" className="mx-2" defaultChecked={current?.languageLinks?.some(link=>link.languageId===language.id)}/>{language.flag} {fa?language.nameFa:language.nameEn}</label>)}</div></fieldset>
-   <Field name="experienceYears" label={tr(fa,'تعداد سال سابقه؛ مثلاً ۳','Years of experience; e.g. 3')} type="number" min={0} max={60} defaultValue={current?.experienceYears??3}/><Submit fa={fa} busy={action.isPending}>{tr(fa,'ذخیره اطلاعات','Save application')}</Submit>
+   <Field name="nameFa" label={tr(fa,'نام فارسی؛ مثال: علی رضایی','Persian name')} defaultValue={current?.nameFa} minLength={2} maxLength={80} error={fieldError('nameFa')} required/><Field name="nameEn" label={tr(fa,'نام انگلیسی؛ مثال: Ali Rezaei','English name')} defaultValue={current?.nameEn} minLength={2} maxLength={80} error={fieldError('nameEn')} required dir="ltr"/>
+   <Area name="bioFa" label={tr(fa,'بیوگرافی فارسی؛ حداقل ۴۰ حرف درباره سابقه و روش تدریس','Persian biography; at least 40 characters')} defaultValue={current?.bioFa} minLength={40} maxLength={3000} error={fieldError('bioFa')} required/><Area name="bioEn" label={tr(fa,'بیوگرافی انگلیسی؛ حداقل ۴۰ حرف','English biography; at least 40 characters')} defaultValue={current?.bioEn} minLength={40} maxLength={3000} error={fieldError('bioEn')} required dir="ltr"/>
+   <Field name="specialties" label={tr(fa,'تخصص‌ها با کاما؛ مثال: writing,speaking','Specialties; e.g. writing,speaking')} defaultValue={current?.specialties?.join(',')||'writing,speaking'} error={fieldError('specialties')} dir="ltr" required/><Field name="levels" label={tr(fa,'سطح‌ها با کاما؛ مثال: A1,A2,B1','Levels; e.g. A1,A2,B1')} defaultValue={current?.languageLinks?.flatMap(link=>link.levels??[]).filter((level,index,all)=>all.indexOf(level)===index).join(',')||'A1,A2,B1,B2,C1'} error={fieldError('levels')} dir="ltr"/>
+   <fieldset className={fieldError('languageIds')?'rounded-2xl border border-red-300 bg-red-50/30 p-3':''}><legend className="mb-2 text-sm font-bold">{tr(fa,'زبان‌هایی که تدریس می‌کنید (حداقل یک مورد)','Languages you teach (select at least one)')}</legend><div className="flex flex-wrap gap-2">{languages.data?.map(language=><label key={language.id} className="rounded-xl border hairline bg-white px-3 py-2"><input name="languageIds" value={language.id} type="checkbox" className="mx-2" defaultChecked={current?.languageLinks?.some(link=>link.languageId===language.id)}/>{language.flag} {fa?language.nameFa:language.nameEn}</label>)}</div>{fieldError('languageIds')&&<span role="alert" className="mt-2 block text-xs font-bold text-red-600">{fieldError('languageIds')}</span>}</fieldset>
+   <Field name="experienceYears" label={tr(fa,'تعداد سال سابقه؛ مثلاً ۳','Years of experience; e.g. 3')} type="number" min={0} max={60} step={1} defaultValue={current?.experienceYears??3} error={fieldError('experienceYears')}/><Submit fa={fa} busy={action.isPending||languages.isLoading}>{tr(fa,'ذخیره اطلاعات','Save application')}</Submit>
   </form><Status fa={fa} error={action.error} ok={action.isSuccess}/></Shell>
 }
 
