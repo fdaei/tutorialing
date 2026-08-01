@@ -86,10 +86,17 @@ export class ApiExceptionFilter implements ExceptionFilter {
   }
 }
 
+// Only a short, safe-charset client-supplied id is trusted for correlation;
+// anything else (unbounded length, unexpected characters) falls back to a
+// fresh id rather than being reflected verbatim into the response header,
+// logs, and downstream tracing systems.
+const SAFE_REQUEST_ID = /^[A-Za-z0-9_-]{1,100}$/;
+
 @Injectable()
 export class RequestIdMiddleware implements NestMiddleware {
   use(req: Request, res: Response, next: NextFunction) {
-    const id = String(req.headers['x-request-id'] ?? randomUUID());
+    const supplied = req.headers['x-request-id'];
+    const id = typeof supplied === 'string' && SAFE_REQUEST_ID.test(supplied) ? supplied : randomUUID();
     res.setHeader('x-request-id', id);
     res.setHeader('content-language', requestLocale(req));
     next();
