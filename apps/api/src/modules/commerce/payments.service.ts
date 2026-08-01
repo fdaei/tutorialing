@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { Prisma, type Payment, type PaymentStatus } from '@prisma/client';
 import { PrismaService, Tx } from '../../prisma.service';
+import { RedisService } from '../../common/redis.service';
 import { badRequest, conflict, isPrismaKnownError } from '../../common/errors';
 import { config } from '../../config';
 import { QueueService } from '../queue/queue.service';
@@ -18,6 +19,7 @@ export class PaymentsService {
     private gateway: GatewayService,
     private wallet: WalletService,
     private autoDiscounts: AutoDiscountsService,
+    private redis: RedisService,
   ) {}
 
   async createPayment(userId: string, d: PayDto) {
@@ -153,11 +155,26 @@ export class PaymentsService {
     await tx.payment.update({ where: { id: held.id }, data: { bookingId: null } });
   }
 
+  // Locked per-payment: without this, two concurrent calls (double-click,
+  // network retry) each request a fresh Zarinpal authority and the second
+  // `payment.update` silently overwrites the first, orphaning a Zarinpal
+  // session that may still be the one the user actually completes.
   async gatewayRedirect(userId: string, paymentId: string) {
-    const payment = await this.db.payment.findFirstOrThrow({ where: { id: paymentId, userId, status: 'PENDING' } });
-    const result = await this.gateway.request(payment.gatewayAmount, `LingoSpeak ${payment.purpose}`, `${config().API_URL}/api/payments/callback`);
-    await this.db.payment.update({ where: { id: payment.id }, data: { authority: result.authority } });
-    return result;
+    const lock = await this.redis.lock(`payment-gateway:${paymentId}`);
+    if (!lock) throw conflict(
+      'PAYMENT_GATEWAY_BUSY',
+      'درخواست پرداخت قبلی هنوز در حال پردازش است. لطفاً چند لحظه صبر کنید.',
+      'A previous payment request is still being processed. Please wait a moment and try again.',
+    );
+    try {
+      const payment = await this.db.payment.findFirstOrThrow({ where: { id: paymentId, userId, status: 'PENDING' } });
+      if (payment.authority) return { authority: payment.authority, url: this.gateway.resumeUrl(payment.authority) };
+      const result = await this.gateway.request(payment.gatewayAmount, `LingoSpeak ${payment.purpose}`, `${config().API_URL}/api/payments/callback`);
+      await this.db.payment.update({ where: { id: payment.id }, data: { authority: result.authority } });
+      return result;
+    } finally {
+      await lock.release();
+    }
   }
 
   /**
