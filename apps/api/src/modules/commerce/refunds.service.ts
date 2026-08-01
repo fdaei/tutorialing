@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma.service';
 import { WalletService } from './wallet.service';
+import { conflict } from '../../common/errors';
 
 @Injectable()
 export class RefundsService {
@@ -11,6 +12,11 @@ export class RefundsService {
       const existing = await tx.refund.findUnique({ where: { idempotencyKey } });
       if (existing) return existing;
       const payment = await tx.payment.findUniqueOrThrow({ where: { id: paymentId } });
+      if (payment.status !== 'PAID' && payment.status !== 'PARTIALLY_REFUNDED') throw conflict(
+        'PAYMENT_NOT_REFUNDABLE',
+        'این پرداخت هنوز تسویه نشده و قابل بازگشت وجه نیست.',
+        'This payment has not been captured yet and cannot be refunded.',
+      );
       const aggregate = await tx.refund.aggregate({ where: { paymentId, status: 'completed' }, _sum: { amount: true } });
       const already = aggregate._sum.amount ?? 0;
       if (amount <= 0 || amount > payment.amount - already) throw new BadRequestException('Refund amount invalid');
