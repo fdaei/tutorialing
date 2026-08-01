@@ -19,9 +19,30 @@ const selfElevation = () =>
     'You cannot change your own roles or permissions; another administrator must do it.',
   );
 
+const adminGrantRequiresAdmin = () =>
+  forbidden(
+    'ADMIN_GRANT_REQUIRES_ADMIN',
+    'فقط یک مدیر کل می‌تواند نقش مدیر کل را اعطا کند.',
+    'Only an existing ADMIN can grant the ADMIN role.',
+  );
+
 @Injectable()
 export class AdminService {
   constructor(private db: PrismaService, private repo: AdminRepository) {}
+
+  /**
+   * `roles.manage`/`permissions.manage` are delegable to STAFF without full
+   * ADMIN (see the comment on `selfElevation`). `userId === actorId` alone
+   * doesn't stop a STAFF holder from creating a fresh account with `roles:
+   * ['ADMIN']`, or from using a second, proxy account to grant ADMIN to a
+   * first one — neither targets the actor's own row. Any call that would
+   * result in a user newly holding ADMIN must itself be made by an existing
+   * ADMIN.
+   */
+  private async assertActorIsAdminToGrantAdmin(actorId: string) {
+    const actorIsAdmin = await this.db.userRole.findUnique({ where: { userId_role: { userId: actorId, role: 'ADMIN' } } });
+    if (!actorIsAdmin) throw adminGrantRequiresAdmin();
+  }
 
   async dashboard() {
     const [users, teachers, pendingTeachers, attempts, pendingReviews, bookings, payments, payouts, tickets, revenue, credits, debits, recentActivity] = await this.db.$transaction([
@@ -65,6 +86,7 @@ export class AdminService {
 
   async createUser(actorId:string,d:{phone:string;name:string;email?:string;locale?:string;roles?:Role[]}){
     const roles:Role[]=d.roles?.length?d.roles:['STUDENT'];
+    if(roles.includes('ADMIN'))await this.assertActorIsAdminToGrantAdmin(actorId);
     const user=await this.db.user.create({data:{phone:d.phone,name:d.name.trim(),email:d.email?.trim()||undefined,locale:d.locale??'fa',profileComplete:true,roles:{create:roles.map(role=>({role}))}},include:{roles:true}});
     if(roles.includes('ADMIN'))await this.grantAdminPermissions(user.id);
     await this.db.auditLog.create({data:{actorId,action:'user.created',entity:'User',entityId:user.id,after:{phone:user.phone,roles}}});return user;
@@ -85,6 +107,7 @@ export class AdminService {
     // whatever replaces it, so the more specific message is checked first.
     if(userId===actorId&&before.includes('ADMIN')&&!normalized.includes('ADMIN'))throw new BadRequestException('You cannot remove your own admin role');
     if(userId===actorId&&normalized.some(role=>!before.includes(role)))throw selfElevation();
+    if(normalized.includes('ADMIN')&&!before.includes('ADMIN'))await this.assertActorIsAdminToGrantAdmin(actorId);
     if(before.includes('ADMIN')&&!normalized.includes('ADMIN')){const admins=await this.db.userRole.count({where:{role:'ADMIN'}});if(admins<=1)throw new BadRequestException('Cannot remove the last admin role')}
     await this.db.$transaction(async tx=>{
       await tx.userRole.deleteMany({where:{userId,role:{notIn:normalized}}});
@@ -121,6 +144,7 @@ export class AdminService {
 
   async assignRole(actorId: string, userId: string, role: Role) {
     if (userId === actorId) throw selfElevation();
+    if (role === 'ADMIN') await this.assertActorIsAdminToGrantAdmin(actorId);
     const user = await this.db.user.findUnique({ where: { id: userId } });
     if (!user) throw new NotFoundException('User not found');
     const out = await this.db.userRole.upsert({ where: { userId_role: { userId, role } }, create: { userId, role }, update: {} });
@@ -147,6 +171,7 @@ export class AdminService {
 
   async grantPermission(actorId: string, userId: string, role: Role, permissionKey: string) {
     if (userId === actorId) throw selfElevation();
+    if (role === 'ADMIN') await this.assertActorIsAdminToGrantAdmin(actorId);
     const permission = await this.db.permission.findUnique({ where: { key: permissionKey } });
     if (!permission) throw new NotFoundException('Permission not found');
     await this.db.userRole.upsert({ where: { userId_role: { userId, role } }, create: { userId, role }, update: {} });
