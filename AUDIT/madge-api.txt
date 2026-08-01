@@ -1,0 +1,7 @@
+npm notice run npx
+npm notice run 'madge' --circular --extensions ts apps/api/src
+- Finding files
+Processed 173 files (1.5s) 
+
+✔ No circular dependency found!
+
