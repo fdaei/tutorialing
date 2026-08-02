@@ -12,8 +12,13 @@ type Finance={earnings:Earning[];withdrawals:Withdrawal[];totals:{status:string;
 
 export function TeacherFinance(){
  const{locale}=useTranslations(),fa=locale==='fa',qc=useQueryClient(),[amount,setAmount]=useState(''),[iban,setIban]=useState('');
+ // Held across renders and only rotated after a request is accepted, so a
+ // double-click or a retry after a dropped response reuses the same key and the
+ // API converges it onto the first request instead of opening a second
+ // withdrawal. Minting a fresh key per submit would defeat the point.
+ const[requestKey,setRequestKey]=useState(()=>crypto.randomUUID());
  const query=useQuery({queryKey:['/teacher/finance'],queryFn:()=>api<Finance>('/teacher/finance')});
- const withdraw=useMutation({mutationFn:()=>api('/teacher/finance/withdrawals',{method:'POST',body:JSON.stringify({amount:Number(amount),iban:iban.replace(/\s/g,'').toUpperCase()})}),onSuccess:async()=>{setAmount('');await qc.invalidateQueries({queryKey:['/teacher/finance']})}});
+ const withdraw=useMutation({mutationFn:()=>api('/teacher/finance/withdrawals',{method:'POST',body:JSON.stringify({amount:Number(amount),iban:iban.replace(/\s/g,'').toUpperCase(),idempotencyKey:requestKey})}),onSuccess:async()=>{setAmount('');setRequestKey(crypto.randomUUID());await qc.invalidateQueries({queryKey:['/teacher/finance']})}});
  if(query.isLoading)return <div className="grid gap-4"><div className="skeleton h-52 rounded-3xl"/><div className="skeleton h-72 rounded-3xl"/></div>;
  if(query.isError)return <div role="alert" className="panel-card p-8 text-red-700">{fa?'اطلاعات کیف پول دریافت نشد.':'Could not load wallet data.'}</div>;
  const data=query.data!,paid=data.totals.find(x=>x.status==='PAID')?._sum.netAmount??0,lifetime=data.totals.reduce((sum,x)=>sum+(x._sum.netAmount??0),0);

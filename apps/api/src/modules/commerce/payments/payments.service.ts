@@ -1,15 +1,15 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { Prisma, type Payment, type PaymentStatus } from '@prisma/client';
-import { PrismaService, Tx } from '../../prisma.service';
-import { RedisService } from '../../common/redis.service';
-import { badRequest, conflict, isPrismaKnownError } from '../../common/errors';
-import { config } from '../../config';
-import { QueueService } from '../queue/queue.service';
+import { PrismaService, Tx } from '../../../prisma.service';
+import { RedisService } from '../../../common/redis.service';
+import { badRequest, conflict, isPrismaKnownError } from '../../../common/errors';
+import { config } from '../../../config';
+import { QueueService } from '../../queue/queue.service';
 import { GatewayService } from './gateway.service';
 import { WalletService } from './wallet.service';
-import { PayDto } from './dto/request/pay.dto';
-import { releaseDiscount } from './discount-reservation';
-import { AutoDiscountsService } from './auto-discounts.service';
+import { PayDto } from '../dto/request/payments.dto';
+import { releaseDiscount } from '../discounts/discount-reservation';
+import { AutoDiscountsService } from '../discounts/auto-discounts.service';
 
 @Injectable()
 export class PaymentsService {
@@ -185,7 +185,7 @@ export class PaymentsService {
    * class. Anything already REFUNDED must be left alone: re-verifying it would
    * credit an amount that has already gone back to the student.
    */
-  private static readonly SETTLEABLE: PaymentStatus[] = ['PENDING', 'EXPIRED', 'FAILED'];
+  static readonly SETTLEABLE: PaymentStatus[] = ['PENDING', 'EXPIRED', 'FAILED'];
 
   async callback(authority: string, status: string) {
     const payment = await this.db.payment.findUnique({ where: { authority } });
@@ -195,16 +195,44 @@ export class PaymentsService {
     if (status !== 'OK') return this.failPayment(payment.id, { authority, status });
     const result = await this.gateway.verify(authority, payment.gatewayAmount);
     if (!result.ok) return this.failPayment(payment.id, { authority, status });
-    const paid = await this.db.$transaction(async tx => {
-      const current = await tx.payment.findUniqueOrThrow({ where: { id: payment.id } });
-      if (current.status === 'PAID') return current;
-      await tx.payment.update({ where: { id: payment.id }, data: { status: 'PAID', gatewayReference: result.reference, verifiedAt: new Date(), callbackPayload: { authority, status } } });
-      await this.fulfill(tx, payment.id, current.status);
+    return this.settleVerified(payment.id, result.reference, { authority, status });
+  }
+
+  /**
+   * Commits a capture the gateway has already confirmed: marks the payment PAID
+   * and grants the entitlement. Shared by the user-facing callback and by
+   * `ReconciliationService`, which arrives at the same point from the other
+   * direction — a capture the gateway kept but we never recorded.
+   *
+   * Retried once on `P2034`. Two genuinely simultaneous callbacks for one
+   * authority both enter this Serializable transaction and Postgres aborts the
+   * loser; before the retry, that abort surfaced to the caller as a 409 even
+   * though the payment had in fact succeeded. The retry re-reads the row the
+   * winner committed and returns it as an ordinary success instead.
+   */
+  async settleVerified(paymentId: string, reference: string | undefined, payload: object) {
+    const commit = () => this.db.$transaction(async tx => {
+      const current = await tx.payment.findUniqueOrThrow({ where: { id: paymentId } });
+      // Re-checked inside the transaction, not just before it: on the retry
+      // path the winner may have moved the payment on to PAID *or* straight to
+      // REFUNDED via `returnCapture`, and re-fulfilling either one would grant
+      // a second entitlement or undo the return.
+      if (!PaymentsService.SETTLEABLE.includes(current.status)) return current;
+      await tx.payment.update({ where: { id: paymentId }, data: { status: 'PAID', gatewayReference: reference, verifiedAt: new Date(), callbackPayload: payload as Prisma.InputJsonValue } });
+      await this.fulfill(tx, paymentId, current.status);
       // `fulfill` can move the payment straight on to REFUNDED, so the row is
       // re-read rather than returning the pre-fulfil update result.
-      return tx.payment.findUniqueOrThrow({ where: { id: payment.id } });
+      return tx.payment.findUniqueOrThrow({ where: { id: paymentId } });
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
-    // Only a booking that this callback actually confirmed gets reminders.
+
+    let paid;
+    try {
+      paid = await commit();
+    } catch (error) {
+      if (!isPrismaKnownError(error) || error.code !== 'P2034') throw error;
+      paid = await commit();
+    }
+    // Only a booking this settlement actually confirmed gets reminders.
     if (paid.status === 'PAID' && paid.bookingId) {
       const booking = await this.db.booking.findUnique({ where: { id: paid.bookingId } });
       if (booking?.status === 'CONFIRMED') await this.queue.scheduleBooking(booking.id, booking.startsAt);

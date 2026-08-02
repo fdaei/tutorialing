@@ -6,7 +6,7 @@ import { badRequest, conflict, forbidden, notFound } from '../../common/errors';
 import { QueueService } from '../queue/queue.service';
 import { AvailabilityService } from './availability.service';
 import { RedisService } from '../../common/redis.service';
-import { EarningsService } from '../commerce/earnings.service';
+import { EarningsService } from '../commerce/payouts/earnings.service';
 import { SettingsService } from '../../common/settings.service';
 
 type RefundTier = { beforeHours: number; refundPercent: number };

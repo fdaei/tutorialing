@@ -1,4 +1,4 @@
-import{BadGatewayException,Injectable}from'@nestjs/common';import{createHash,randomUUID}from'crypto';import{config}from'../../config';
+import{BadGatewayException,Injectable}from'@nestjs/common';import{createHash,randomUUID}from'crypto';import{config}from'../../../config';
 
 const SANDBOX_MERCHANT_ID='XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX';
 type ZarinpalResponse={data?:{authority?:string;code?:number;ref_id?:number|string;message?:string};errors?:unknown};

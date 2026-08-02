@@ -784,19 +784,24 @@ model PayoutItem {
 }
 
 model WithdrawalRequest {
-  id            String           @id @default(cuid())
-  teacherId     String
-  teacher       Teacher          @relation(fields: [teacherId], references: [id])
-  amount        Int
-  iban          String
-  status        WithdrawalStatus @default(PENDING)
-  reference     String?
-  rejectionNote String?
-  reviewedById  String?
-  reviewedAt    DateTime?
-  transferredAt DateTime?
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
+  id             String           @id @default(cuid())
+  teacherId      String
+  teacher        Teacher          @relation(fields: [teacherId], references: [id])
+  amount         Int
+  iban           String
+  // Converges a double-submit (double-click, retry after a dropped response)
+  // onto one request instead of creating two legitimate-looking ones. Nullable
+  // because rows predating this column have no key; Postgres allows repeated
+  // NULLs under a unique index, so they do not collide with each other.
+  idempotencyKey String?          @unique
+  status         WithdrawalStatus @default(PENDING)
+  reference      String?
+  rejectionNote  String?
+  reviewedById   String?
+  reviewedAt     DateTime?
+  transferredAt  DateTime?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
 
   @@index([teacherId, createdAt])
   @@index([status, createdAt])

@@ -73,6 +73,32 @@ export class PricingService {
     }
   }
 
+  /**
+   * Puts a pair of prices in front of the reviewers.
+   *
+   * Both routes into review land here — the teacher naming their own price and
+   * the teacher accepting the reviewer's counter — and both have to leave the
+   * record in exactly the same shape: the counter cleared (it has either been
+   * superseded or consumed) and the previous verdict wiped, so a stale note or
+   * reviewer id cannot be read as a decision on the new proposal. Keeping that
+   * reset in one place is what stops the two paths from drifting.
+   */
+  private submitForReview(tx: Tx, teacherId: string, trialPrice: number, regularPrice: number) {
+    return tx.teacher.update({
+      where: { id: teacherId },
+      data: {
+        proposedTrialPrice: trialPrice,
+        proposedRegularPrice: regularPrice,
+        counterTrialPrice: null,
+        counterRegularPrice: null,
+        priceStatus: 'SUBMITTED',
+        priceReviewNote: null,
+        priceReviewedAt: null,
+        priceReviewedById: null,
+      },
+    });
+  }
+
   async propose(userId: string, trialPrice: number, regularPrice: number) {
     this.validatePrices(trialPrice, regularPrice);
     return this.db.$transaction(async (tx) => {
@@ -81,19 +107,7 @@ export class PricingService {
       if (['SUBMITTED', 'UNDER_REVIEW'].includes(teacher.priceStatus)) {
         throw badRequest('PRICE_ALREADY_UNDER_REVIEW', 'قیمت فعلی هنوز در حال بررسی است.', 'The current price proposal is still under review.');
       }
-      const updated = await tx.teacher.update({
-        where: { id: teacher.id },
-        data: {
-          proposedTrialPrice: trialPrice,
-          proposedRegularPrice: regularPrice,
-          counterTrialPrice: null,
-          counterRegularPrice: null,
-          priceStatus: 'SUBMITTED',
-          priceReviewNote: null,
-          priceReviewedAt: null,
-          priceReviewedById: null,
-        },
-      });
+      const updated = await this.submitForReview(tx, teacher.id, trialPrice, regularPrice);
       await tx.teacherPriceHistory.create({
         data: {
           teacherId: teacher.id,
