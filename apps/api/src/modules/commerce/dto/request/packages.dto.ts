@@ -1,5 +1,7 @@
 import { IsIn, IsInt, IsString, Max, MaxLength, Min } from 'class-validator';
-import { PACKAGE_TIERS } from '../../packages.service';
+import { PACKAGE_TIERS } from '@lingospeak/contracts';
+
+/** Request bodies for `PackagesController`. */
 
 export class PackageDto {
   @IsString() @MaxLength(120) titleFa!: string;
@@ -15,4 +17,9 @@ export class PackageDto {
    * package cannot be used to sell lessons at a rate that never passed review.
    */
   @IsInt() @Min(0) @Max(80) discountPercent!: number;
+}
+
+export class PackageApprovalDto {
+  @IsIn(['APPROVED', 'REJECTED'])
+  status!: 'APPROVED' | 'REJECTED';
 }

@@ -2,18 +2,14 @@
 
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+// Shared with the API's package validation, so the tiers this form offers and
+// the tiers the API accepts cannot drift apart.
+import { PACKAGE_TIERS } from '@lingospeak/contracts';
 import { api, ApiError, apiMessage, type EducationalLanguage } from '@/lib/api';
 import { useTranslations } from './locale-provider';
 
 type Role = 'student' | 'teacher' | 'admin';
 
-/**
- * Mirrors `PACKAGE_TIERS` in the API's packages.service.ts, which is the source
- * of truth and rejects anything else. Duplicated rather than imported from
- * `@lingospeak/contracts` because that package ships raw ESM TypeScript the
- * compiled API cannot require at runtime; keep the two lists in step.
- */
-const PACKAGE_TIERS = [1, 5, 10, 15, 20] as const;
 type Props = { role: Role; section: string; endpoint: string };
 type Localized = { fa: boolean };
 type UploadResponse = { fileId: string; uploadUrl: string };

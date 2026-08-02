@@ -12,7 +12,8 @@ function service(overrides: Record<string, unknown> = {}) {
     auditLog: { create: jest.fn().mockResolvedValue({}) },
     ...overrides,
   };
-  return { svc: new AdminService(db as never, {} as never), db };
+  const revocation = { revokeUser: jest.fn().mockResolvedValue(undefined) };
+  return { svc: new AdminService(db as never, {} as never, revocation as never), db, revocation };
 }
 
 describe('AdminService privilege self-escalation', () => {
@@ -105,5 +106,57 @@ describe('AdminService admin-grant requires an existing admin (SEC-001/SEC-003)'
     const { svc, db } = service({ userRole: { upsert: jest.fn().mockResolvedValue({}), count: jest.fn().mockResolvedValue(2), findUnique: jest.fn().mockResolvedValue({ userId: ACTOR, role: 'ADMIN' }) } });
     await expect(svc.assignRole(ACTOR, OTHER, 'ADMIN')).resolves.toBeDefined();
     expect(db.userRole.upsert).toHaveBeenCalled();
+  });
+});
+
+/**
+ * SEC-005. Roles, permissions and status are baked into the access token at
+ * issuance and `AccessGuard` never re-reads them, so a privilege change that
+ * doesn't publish a revocation leaves the old claims usable for up to 15 more
+ * minutes on the token the user already holds.
+ */
+describe('AdminService privilege changes revoke outstanding tokens', () => {
+  const adminActor = { userRole: { upsert: jest.fn().mockResolvedValue({}), count: jest.fn().mockResolvedValue(2), findUnique: jest.fn().mockResolvedValue({ userId: ACTOR, role: 'ADMIN' }), delete: jest.fn().mockResolvedValue({}), deleteMany: jest.fn().mockResolvedValue({}) } };
+
+  it('revokes when a user is suspended', async () => {
+    const { svc, revocation } = service({ user: { findUnique: jest.fn().mockResolvedValue({ id: OTHER, status: 'ACTIVE' }), update: jest.fn().mockResolvedValue({ id: OTHER, status: 'SUSPENDED' }) } });
+    await svc.updateUserStatus(ACTOR, OTHER, 'SUSPENDED');
+    expect(revocation.revokeUser).toHaveBeenCalledWith(OTHER);
+  });
+
+  // Reactivating cannot resurrect a token that was already voided, so there is
+  // nothing to revoke and no reason to cut short a fresh session.
+  it('does not revoke when a user is reactivated', async () => {
+    const { svc, revocation } = service({ user: { findUnique: jest.fn().mockResolvedValue({ id: OTHER, status: 'SUSPENDED' }), update: jest.fn().mockResolvedValue({ id: OTHER, status: 'ACTIVE' }) } });
+    await svc.updateUserStatus(ACTOR, OTHER, 'ACTIVE');
+    expect(revocation.revokeUser).not.toHaveBeenCalled();
+  });
+
+  it('revokes when a role is assigned', async () => {
+    const { svc, revocation } = service(adminActor);
+    await svc.assignRole(ACTOR, OTHER, 'FINANCE');
+    expect(revocation.revokeUser).toHaveBeenCalledWith(OTHER);
+  });
+
+  it('revokes when a role is taken away', async () => {
+    const { svc, revocation } = service(adminActor);
+    await svc.revokeRole(ACTOR, OTHER, 'FINANCE');
+    expect(revocation.revokeUser).toHaveBeenCalledWith(OTHER);
+  });
+
+  it('revokes when a permission is granted', async () => {
+    const { svc, revocation } = service(adminActor);
+    await svc.grantPermission(ACTOR, OTHER, 'FINANCE', 'payments.refund');
+    expect(revocation.revokeUser).toHaveBeenCalledWith(OTHER);
+  });
+
+  it('revokes when the whole role set is replaced', async () => {
+    const { svc, revocation } = service({
+      ...adminActor,
+      user: { findUnique: jest.fn().mockResolvedValue({ id: OTHER, roles: [{ role: 'FINANCE' }] }), findUniqueOrThrow: jest.fn().mockResolvedValue({ id: OTHER, roles: [] }) },
+      $transaction: jest.fn().mockImplementation((fn: (t: unknown) => unknown) => fn({ userRole: adminActor.userRole, auditLog: { create: jest.fn() } })),
+    });
+    await svc.setUserRoles(ACTOR, OTHER, ['STUDENT']);
+    expect(revocation.revokeUser).toHaveBeenCalledWith(OTHER);
   });
 });

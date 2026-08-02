@@ -28,6 +28,15 @@ export const bookingSchema = z.object({
   policyAccepted: z.literal(true),
   timezone: z.string().min(1),
 });
+/**
+ * Session counts a teacher may sell: a single session plus the 5/10/15/20
+ * bundles. Shared rather than duplicated because the API validates against it
+ * and the teacher panel renders the same choices, and a silent drift between
+ * the two shows up as a form offering a tier the API rejects.
+ */
+export const PACKAGE_TIERS = [1, 5, 10, 15, 20] as const;
+export type PackageTier = (typeof PACKAGE_TIERS)[number];
+
 export type MatchingInput = z.infer<typeof matchingSchema>;
 export type Skill = string;
 export type Role = 'student' | 'teacher' | 'admin';

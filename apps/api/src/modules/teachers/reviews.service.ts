@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma, ReviewStatus } from '@prisma/client';
-import { PrismaService, type Tx } from '../../prisma.service';
+import { ReviewStatus } from '@prisma/client';
+import { PrismaService, type DbClient, type Tx } from '../../prisma.service';
 import { badRequest, conflict, forbidden, notFound } from '../../common/errors';
 import { SettingsService } from '../../common/settings.service';
 
@@ -8,7 +8,7 @@ import { SettingsService } from '../../common/settings.service';
 export class ReviewsService {
   constructor(private readonly db: PrismaService, private readonly settings: SettingsService) {}
 
-  private async refreshTeacherRating(teacherId: string, tx: PrismaService | Prisma.TransactionClient = this.db) {
+  private async refreshTeacherRating(teacherId: string, tx: DbClient = this.db) {
     const approved = await tx.review.aggregate({
       where: { teacherId, moderationStatus: 'APPROVED', published: true },
       _avg: { rating: true },
@@ -31,7 +31,7 @@ export class ReviewsService {
    * query already filters on — the profile leaves search and becomes unbookable
    * immediately, while the record and its history are preserved for appeal.
    */
-  private async enforceOneStarLimit(tx: PrismaService | Prisma.TransactionClient, teacherId: string, actorId: string) {
+  private async enforceOneStarLimit(tx: DbClient, teacherId: string, actorId: string) {
     const threshold = await this.settings.numeric('reviews.autoDeactivateOneStarCount', 5, 1_000, tx as Tx);
     const oneStars = await tx.review.count({
       where: { teacherId, rating: 1, moderationStatus: 'APPROVED', published: true },

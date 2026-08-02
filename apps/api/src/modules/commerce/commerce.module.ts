@@ -1,9 +1,53 @@
-import{Module}from'@nestjs/common';import{CommerceController}from'./commerce.controller';
-import{PackagesController}from'./packages.controller';
-import{PayoutsController}from'./payouts.controller';
-import{TeacherFinanceController}from'./teacher-finance.controller';import{PaymentsService}from'./payments.service';
-import{PackagesService}from'./packages.service';
-import{WalletService}from'./wallet.service';
-import{PayoutsService}from'./payouts.service';
-import{DiscountsService}from'./discounts.service';
-import{RefundsService}from'./refunds.service';import{GatewayService}from'./gateway.service';import{EarningsService}from'./earnings.service';import{AutoDiscountsService}from'./auto-discounts.service';@Module({controllers:[CommerceController,PackagesController,PayoutsController,TeacherFinanceController],providers:[PaymentsService,PackagesService,WalletService,PayoutsService,DiscountsService,RefundsService,GatewayService,EarningsService,AutoDiscountsService],exports:[PaymentsService,PackagesService,WalletService,PayoutsService,DiscountsService,RefundsService,EarningsService,AutoDiscountsService]})export class CommerceModule{}
+import { Module } from '@nestjs/common';
+
+import { PaymentsController } from './payments/payments.controller';
+import { PaymentsService } from './payments/payments.service';
+import { GatewayService } from './payments/gateway.service';
+import { WalletService } from './payments/wallet.service';
+import { RefundsService } from './payments/refunds.service';
+import { ReconciliationService } from './payments/reconciliation.service';
+
+import { PayoutsController } from './payouts/payouts.controller';
+import { TeacherFinanceController } from './payouts/teacher-finance.controller';
+import { PayoutsService } from './payouts/payouts.service';
+import { EarningsService } from './payouts/earnings.service';
+
+import { DiscountsService } from './discounts/discounts.service';
+import { AutoDiscountsService } from './discounts/auto-discounts.service';
+
+import { PackagesController } from './packages/packages.controller';
+import { PackagesService } from './packages/packages.service';
+
+/**
+ * Money. Grouped into four concerns that map onto the sub-folders:
+ * `payments/` (checkout, gateway, wallet, refunds, reconciliation),
+ * `payouts/` (teacher earnings and withdrawals), `discounts/` (codes and
+ * automatic rules) and `packages/` (sellable session bundles).
+ */
+@Module({
+  controllers: [PaymentsController, PackagesController, PayoutsController, TeacherFinanceController],
+  providers: [
+    PaymentsService,
+    GatewayService,
+    WalletService,
+    RefundsService,
+    ReconciliationService,
+    PayoutsService,
+    EarningsService,
+    DiscountsService,
+    AutoDiscountsService,
+    PackagesService,
+  ],
+  exports: [
+    PaymentsService,
+    WalletService,
+    RefundsService,
+    ReconciliationService,
+    PayoutsService,
+    EarningsService,
+    DiscountsService,
+    AutoDiscountsService,
+    PackagesService,
+  ],
+})
+export class CommerceModule {}

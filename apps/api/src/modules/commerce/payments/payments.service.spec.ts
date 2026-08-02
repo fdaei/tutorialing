@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { PaymentsService } from './payments.service';
 
 const USER = 'student-1';
@@ -240,6 +241,36 @@ describe('PaymentsService.callback', () => {
     await h.svc.callback('auth-1', 'OK');
     expect(h.gateway.verify).not.toHaveBeenCalled();
     expect(h.tx.booking.update).not.toHaveBeenCalled();
+  });
+
+  // LOAD-002: two genuinely simultaneous callbacks for one authority both enter
+  // the Serializable transaction and Postgres aborts the loser. That abort used
+  // to surface as a 409 for a payment that had in fact succeeded.
+  it('retries once on a write conflict instead of surfacing a 409', async () => {
+    const h = callbackHarness();
+    const conflictError = new Prisma.PrismaClientKnownRequestError('write conflict', { code: 'P2034', clientVersion: '6' });
+    h.db.$transaction.mockRejectedValueOnce(conflictError);
+    await expect(h.svc.callback('auth-1', 'OK')).resolves.toMatchObject({ status: 'PAID' });
+    expect(h.db.$transaction).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not re-fulfil when the retry finds the winner already settled it', async () => {
+    const h = callbackHarness();
+    const conflictError = new Prisma.PrismaClientKnownRequestError('write conflict', { code: 'P2034', clientVersion: '6' });
+    h.db.$transaction.mockRejectedValueOnce(conflictError);
+    // The winning transaction committed REFUNDED (the slot was gone), so the
+    // retry must leave it alone rather than flipping it back to PAID.
+    h.payment.status = 'REFUNDED';
+    await h.svc.callback('auth-1', 'OK');
+    expect(h.tx.booking.update).not.toHaveBeenCalled();
+    expect(h.tx.refund.upsert).not.toHaveBeenCalled();
+  });
+
+  it('gives up rather than retrying a non-conflict failure', async () => {
+    const h = callbackHarness();
+    h.db.$transaction.mockRejectedValue(new Error('connection lost'));
+    await expect(h.svc.callback('auth-1', 'OK')).rejects.toThrow('connection lost');
+    expect(h.db.$transaction).toHaveBeenCalledTimes(1);
   });
 });
 

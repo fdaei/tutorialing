@@ -21,6 +21,7 @@ npm run db:migrate:dev -w @lingospeak/api -- --name <name>   # create a new migr
 npm run env:check         # validate .env against required vars/JWT length/DATABASE_URL consistency
 npm run health:api        # curl API health endpoint, checks DB connectivity
 
+npm run build:contracts   # build packages/contracts (dual ESM+CJS); prerequisite of build/typecheck/test
 npm run build              # build all workspaces
 npm run typecheck          # tsc --noEmit across workspaces
 npm run lint                # eslint across workspaces
@@ -51,7 +52,7 @@ Prisma commands (`apps/api`) must be run from repo root via the `db:*` npm scrip
 ### Monorepo layout
 - `apps/web` — Next.js App Router frontend.
 - `apps/api` — NestJS backend, domain-driven modules under `src/modules/*` (auth, bookings, commerce, users, teachers, learning, matching, admin, files, languages, queue, search, support, tests).
-- `packages/contracts` — shared Zod schemas/types (validation schemas, `TeacherCard`, etc.) consumed by both `web` and `api` as `@lingospeak/contracts`. Cross-cutting request/response shapes should be added here, not duplicated in each app.
+- `packages/contracts` — shared Zod schemas/types (validation schemas, `PACKAGE_TIERS`, `TeacherCard`, etc.) consumed by both `web` and `api` as `@lingospeak/contracts`. Cross-cutting request/response shapes should be added here, not duplicated in each app. It emits dual ESM + CJS (`npm run build:contracts`, two `tsc` passes plus a nested `{"type":"commonjs"}` marker) so the CommonJS API can `require()` it — the root `build`/`typecheck`/`test` scripts build it first, and `dist/` is gitignored. Don't point `main`/`types` back at raw `.ts`: that was the ESM/CJS mismatch that made the package unusable from `apps/api` and forced constants to be copy-pasted per app.
 
 ### API structure (`apps/api/src`) — see `ARCHITECTURE.md` for full detail
 Each feature module follows: `controllers/` (HTTP + guards only, no Prisma or business logic) → `services/` (business rules, transactions; large services split by responsibility, e.g. `payments.service.ts`, `wallet.service.ts`) → `repositories/` (complex/repeated Prisma queries) → `dto/request/` and `dto/response/` (class-validator input DTOs, class-transformer `@Expose()`-shaped output DTOs) → `mappers/` (Prisma entity → response DTO).
@@ -75,10 +76,14 @@ Default locale is Persian (RTL) served at bare paths; English is served under `/
 `ROUTE_RULES` is an explicit allow-list mapping path patterns to role/permission checks (`isAdmin`, `hasRole`, `hasPermission`); anything unmatched is denied. `safeInternalPath()` guards `?next=` redirect targets against protocol-relative URLs, `..` traversal, and control-character smuggling. **When adding a new panel/admin route, add its rule here** — order matters, since narrower `/admin/*` patterns must precede the catch-all `/admin` rule.
 
 ### Auth
-Phone + OTP based (no passwords). OTP delivery fails closed: without `AUTH_DEV_OTP=true` the API generates a random code via `crypto.randomInt` and returns 503 if no SMS provider (Kavenegar) is configured; the fixed dev code `123456` only works with that flag, and startup aborts if it's combined with `NODE_ENV=production`. JWT access/refresh tokens; per-IP rate limiting on auth routes (`RateLimitGuard`, backed by Redis) fails closed (503) if Redis is unreachable. Privilege escalation is blocked at the service layer: `assignRole`/`grantPermission`/`setUserRoles` reject `userId === actorId`.
+Phone + OTP based (no passwords). OTP delivery fails closed: without `AUTH_DEV_OTP=true` the API generates a random code via `crypto.randomInt` and returns 503 if no SMS provider (Kavenegar) is configured; the fixed dev code `123456` only works with that flag, and startup aborts if it's combined with `NODE_ENV=production`. OTP codes are stored as HMAC-SHA256 under a pepper derived from `JWT_ACCESS_SECRET` (a 6-digit code is rainbow-table-able under a bare digest); refresh-token hashing deliberately stays plain SHA-256, since a 32-byte random secret isn't. JWT access/refresh tokens; per-IP rate limiting on auth routes (`RateLimitGuard`, backed by Redis) fails closed (503) if Redis is unreachable. Privilege escalation is blocked at the service layer: `assignRole`/`grantPermission`/`setUserRoles` reject `userId === actorId`.
+
+Access tokens are stateless and carry roles/permissions from issuance time, so **any code path that suspends a user or changes their roles/permissions must call `TokenRevocationService.revokeUser()`** — `AccessGuard` rejects tokens whose `iat` predates that marker, and without the call the old privileges stay usable for up to 15 minutes. The check fails closed for ADMIN/FINANCE/STAFF/SUPPORT/EXAMINER and open for everyone else, so a Redis outage can't take down ordinary traffic.
 
 ### Payments / commerce
 Zarinpal integration (sandbox toggled via `ZARINPAL_SANDBOX`); wallet and payout logic split out into dedicated services under `modules/commerce`. Never enable `ZARINPAL_SANDBOX` in production.
+
+`gateway.verify()` captures money before the transaction that grants the entitlement commits, so a crash in between takes the payment without delivering anything. `ReconciliationService` is the repair path: a 10-minute `@Cron` sweep (Redis-locked to one instance) re-verifies stale settleable payments, writes a `Reconciliation` row per discrepancy, and settles through `PaymentsService.settleVerified()` — the same path a real callback uses. Route any new "the gateway says paid but we don't" handling through `settleVerified()` rather than reimplementing fulfilment.
 
 ## Security notes worth knowing before touching related code
 

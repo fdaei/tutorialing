@@ -1,0 +1,79 @@
+import { Prisma } from '@prisma/client';
+import { PayoutsService } from './payouts.service';
+
+const IBAN = 'IR000000000000000000000000';
+const KEY = 'withdrawal-key-1';
+
+function harness(options: { balanceCredit?: number; balanceDebit?: number; pendingAmount?: number; replay?: Record<string, unknown> | null; createError?: unknown } = {}) {
+  const tx = {
+    walletEntry: {
+      groupBy: jest.fn().mockResolvedValue([
+        { direction: 'CREDIT', _sum: { amount: options.balanceCredit ?? 100_000 } },
+        { direction: 'DEBIT', _sum: { amount: options.balanceDebit ?? 0 } },
+      ]),
+    },
+    withdrawalRequest: {
+      aggregate: jest.fn().mockResolvedValue({ _sum: { amount: options.pendingAmount ?? 0 } }),
+      create: jest.fn().mockImplementation(({ data }: { data: Record<string, unknown> }) =>
+        options.createError ? Promise.reject(options.createError) : Promise.resolve({ id: 'withdrawal-1', status: 'PENDING', ...data })),
+    },
+  };
+  const db = {
+    teacher: { findUniqueOrThrow: jest.fn().mockResolvedValue({ id: 'teacher-1' }) },
+    withdrawalRequest: { findUnique: jest.fn().mockResolvedValue(options.replay ?? null) },
+    $transaction: jest.fn().mockImplementation((fn: (t: unknown) => unknown) => Promise.resolve().then(() => fn(tx))),
+  };
+  const svc = new PayoutsService(db as never);
+  return { svc, db, tx };
+}
+
+const p2002 = Object.assign(new Prisma.PrismaClientKnownRequestError('unique', { code: 'P2002', clientVersion: '6' }), {});
+
+describe('PayoutsService.requestWithdrawal', () => {
+  it('runs the balance-check transaction at Serializable isolation (FIN-003)', async () => {
+    const h = harness();
+    await h.svc.requestWithdrawal('user-1', 50_000, IBAN, KEY);
+    expect(h.db.$transaction).toHaveBeenCalledWith(expect.any(Function), { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  });
+
+  it('rejects a withdrawal above the available balance', async () => {
+    const h = harness({ balanceCredit: 100_000, pendingAmount: 60_000 });
+    await expect(h.svc.requestWithdrawal('user-1', 50_000, IBAN, KEY)).rejects.toMatchObject({
+      response: { code: 'WITHDRAWAL_INSUFFICIENT_BALANCE' },
+    });
+    expect(h.tx.withdrawalRequest.create).not.toHaveBeenCalled();
+  });
+
+  it('allows a withdrawal within the available balance', async () => {
+    const h = harness({ balanceCredit: 100_000, pendingAmount: 0 });
+    const result = await h.svc.requestWithdrawal('user-1', 50_000, IBAN, KEY);
+    expect(result).toMatchObject({ amount: 50_000, idempotencyKey: KEY });
+    expect(h.tx.withdrawalRequest.create).toHaveBeenCalled();
+  });
+
+  // FIN-004. Serializable isolation stops two concurrent withdrawals from
+  // over-drawing the balance, but a double-click well within the balance is two
+  // individually-valid requests; only the key collapses them.
+  it('returns the original request when an idempotency key is replayed', async () => {
+    const h = harness({ replay: { id: 'withdrawal-1', teacherId: 'teacher-1', amount: 50_000, idempotencyKey: KEY } });
+    await expect(h.svc.requestWithdrawal('user-1', 50_000, IBAN, KEY)).resolves.toMatchObject({ id: 'withdrawal-1' });
+    expect(h.db.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('re-reads the winner when two concurrent submits share a key', async () => {
+    const h = harness({ createError: p2002 });
+    h.db.withdrawalRequest.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: 'withdrawal-1', teacherId: 'teacher-1', amount: 50_000, idempotencyKey: KEY });
+    await expect(h.svc.requestWithdrawal('user-1', 50_000, IBAN, KEY)).resolves.toMatchObject({ id: 'withdrawal-1' });
+  });
+
+  // A key is client-chosen, so guessing another teacher's key must not hand
+  // back their withdrawal request.
+  it('refuses a key already used by another teacher', async () => {
+    const h = harness({ replay: { id: 'withdrawal-9', teacherId: 'teacher-other', amount: 50_000, idempotencyKey: KEY } });
+    await expect(h.svc.requestWithdrawal('user-1', 50_000, IBAN, KEY)).rejects.toMatchObject({
+      response: { code: 'WITHDRAWAL_KEY_CONFLICT' },
+    });
+  });
+});

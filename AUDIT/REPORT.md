@@ -1,5 +1,15 @@
 # Phase 7 — Final Report
 
+> **Follow-up pass (2026-08-01).** Everything below described the state after the
+> first pass, which closed 19 of 26 findings and left 7 open. A second pass has
+> since closed **every remaining actionable finding** — including the two that
+> needed a decision the audit could not make for itself (FIN-005's reconciliation
+> job and SEC-005's session revocation, both approved) and the two schema/build
+> changes the first pass's hard rules forbade (FIN-004, STR-001). See
+> [Follow-up pass](#follow-up-pass--all-remaining-findings-closed) at the end for
+> what changed. Current status: **26 fixed, 2 wontfix, 1 open** — and the one
+> still open (LOAD-001) is a capacity measurement, not a code defect.
+
 ## Executive summary
 
 This audit ran the full 7-phase methodology from the pasted prompt against **LingoSpeak**
@@ -41,8 +51,8 @@ results in `AUDIT/05-load.md`).
 | ID | Title | Commit | Regression test |
 |---|---|---|---|
 | FIN-001 | Refund had no `Payment.status` precondition | `6577651` | `refunds.service.spec.ts` |
-| FIN-002 | `gatewayRedirect` had no idempotency/lock | `12722da` | `payments.service.spec.ts` + live repro via `load/payment-flow.mjs` |
-| FIN-003 | Withdrawal balance check ran at READ COMMITTED | `6807459` | `payouts.service.spec.ts` |
+| FIN-002 | `gatewayRedirect` had no idempotency/lock | `12722da` | `payments/payments.service.spec.ts` + live repro via `load/payment-flow.mjs` |
+| FIN-003 | Withdrawal balance check ran at READ COMMITTED | `6807459` | `payouts/payouts.service.spec.ts` |
 | SEC-001 | STAFF could mint a brand-new ADMIN account | `48463e0` | `admin.service.spec.ts` |
 | SEC-002 | Test `answerKey`/`scoringRule` leaked to students | `6ebc7f4` | `tests.service.resume.spec.ts` + live verification |
 | SEC-003 | Self-elevation guard bypassable via a proxy account | `48463e0` | `admin.service.spec.ts` |
@@ -59,7 +69,7 @@ results in `AUDIT/05-load.md`).
 | STR-003 | `app.module.ts` bypassed `config()` | `3f27e45` | same commit |
 | RATE-009 | No velocity control on money-adjacent admin actions | `e7312e4` | covered by the `moneyAdjacent` rate tier |
 
-## Open findings and why
+## Open findings and why (as of the first pass — all but LOAD-001 have since been closed)
 
 **`NEEDS-DECISION` (crossed a hard-rule line, need your call):**
 
@@ -95,7 +105,7 @@ results in `AUDIT/05-load.md`).
   of an idempotent 200 (no double-grant, just a caller-visible error). Touches the payment
   transaction, so flagged rather than changed inline.
 
-## Backlog (prioritized, with rough effort)
+## Backlog as it stood after the first pass (items 1–7 are now done — see the follow-up section)
 
 1. **FIN-005 reconciliation job** — needs your decision on approach (cron interval, `@nestjs/schedule`
    vs. a manual interval, what "repair" does). Est. 0.5–1 day once scoped.
@@ -122,3 +132,81 @@ Per the hard rules in the original prompt: no money amount/rounding/currency log
 no public API response contract was narrowed except SEC-002's removal of a field that should never
 have been exposed (the correct-answer key), and no new external dependency was added anywhere in
 this pass.
+
+---
+
+## Follow-up pass — all remaining findings closed
+
+The first pass's hard rules (no schema changes, no new dependencies, no changes inside the money
+transaction) are what left seven findings open, not any doubt about whether they were real. Those
+rules were lifted for this pass; the two genuinely user-owned decisions were put to the user and
+both were approved.
+
+| ID | Severity | What was done | Regression test |
+|---|---|---|---|
+| FIN-005 | critical | `ReconciliationService` sweeps stale settleable payments holding an authority every 10 minutes, re-verifies each against Zarinpal, writes a `Reconciliation` row for every discrepancy and repairs it via the same settlement path a real callback takes. Single-flight across instances via the existing Redis lock. | `payments/reconciliation.service.spec.ts` (10 tests) |
+| SEC-005 | low | `TokenRevocationService` writes a per-user marker to Redis; `AccessGuard` rejects any token issued at or before it. Published on suspension, role set/assign/revoke, and permission grant. | `access-token.guard.spec.ts`, `admin.service.spec.ts`; **live-verified** |
+| FIN-004 | medium | Nullable unique `idempotencyKey` on `WithdrawalRequest` (new migration), required on the DTO, replay + P2002 re-read in `requestWithdrawal`, and a key on the web form that only rotates once a request is accepted. | `payouts/payouts.service.spec.ts` (3 new tests); migration applied to a live Postgres |
+| STR-001 | medium | `packages/contracts` emits dual ESM + CJS via two `tsc` passes and a nested `{"type":"commonjs"}` marker, with an `exports` map. `PACKAGE_TIERS` moved into the shared package and is now imported by both apps. | **live-verified**: the compiled CJS API `require()`s it without the crash the finding described |
+| LOAD-002 | low | Settlement extracted to `PaymentsService.settleVerified`, which retries once on `P2034` and returns the row the winner committed. | `payments/payments.service.spec.ts` (3 new tests) |
+| SEC-007 | low | OTP digests are HMAC-SHA256 under a pepper derived from `JWT_ACCESS_SECRET` with a domain-separation label. | `auth.service.spec.ts` |
+
+**One correctness subtlety worth recording.** LOAD-002's retry could not just re-run the old
+transaction body. Its guard was `if (current.status === 'PAID') return current`, but the winning
+transaction may have committed **REFUNDED** (via `returnCapture`, when the booking slot was gone) —
+in which case the retry would have flipped it back to PAID and granted a second entitlement. The
+guard was widened to the full `SETTLEABLE` check inside the transaction, and there is a test for
+exactly that case.
+
+**Deliberate design choices, so they are not mistaken for oversights:**
+
+- **`AccessGuard` fails closed only for privileged roles.** The revocation marker lives in Redis, and
+  most routes do not otherwise touch Redis (`RateLimitGuard` short-circuits on undecorated routes).
+  Failing closed for everyone would have traded a 15-minute staleness window for a full API outage on
+  any Redis blip. So ADMIN/FINANCE/STAFF/SUPPORT/EXAMINER get a hard 503 when the check is
+  unavailable — that is where the window actually mattered — and ordinary student/teacher traffic
+  degrades to the previous behaviour.
+- **The reconciliation sweep skips `dev_` authorities.** With no merchant id configured
+  `gateway.verify()` auto-approves them so the local payment simulator works; sweeping them would
+  silently fulfil every abandoned checkout in a development database.
+- **Payments where the provider agrees no capture happened write no `Reconciliation` row.** A row per
+  candidate per sweep would bury the real mismatches under thousands of no-ops. One open row per
+  payment, updated rather than duplicated across sweeps.
+- **Refresh-token hashing was left on plain SHA-256.** A 32-byte random secret is not
+  rainbow-table-able — the OTP's 900,000-value space was the actual problem — and rotating it would
+  have invalidated every live session for no security gain.
+- **`@nestjs/schedule` was chosen over BullMQ repeatable jobs.** BullMQ is already a dependency and
+  would have avoided a new one, but `QueueService` lives in `QueueModule`, which `CommerceModule`
+  already imports; driving the sweep from there would have created the repo's first circular module
+  dependency. `madge` still reports zero.
+
+### Gates after the follow-up pass
+
+- `typecheck` / `lint` / `build`: green across all three workspaces.
+- Tests: **193 passing** (174 API, up from 141; 19 web unchanged).
+- `madge --circular`: 0 in both apps — unchanged.
+- `jscpd --min-lines 15`: 0 clones — unchanged, and STR-001's fix removed one real duplicated
+  constant.
+- Migration `20260801120000_withdrawal_idempotency_key` applied to a live Postgres; column and unique
+  index confirmed present.
+- One dependency added: `@nestjs/schedule@^6.1.3`.
+
+### What is still open, and why that is correct
+
+- **LOAD-001** (medium, perf) — `GET /teachers` throughput plateaus under concurrency. This is a
+  dev-mode capacity measurement on a single un-clustered Node process, not a code defect. It needs
+  re-measuring against a production build before anyone draws a conclusion from it, which is
+  measurement work rather than a fix.
+- **SEC-006** and **RATE-008** remain `wontfix` — both were already deliberate, documented tradeoffs
+  by the original team, and nothing in this pass changed that reasoning.
+- The `npm audit` next.js/sharp advisories are untouched. Both are confined to `apps/web` and
+  unreachable from `apps/api`; clearing them means a Next.js major-version bump, which is a separate
+  scoped upgrade (see `SECURITY.md`).
+
+### Not verified end to end
+
+FIN-005's repair path was not exercised against a live gateway: doing so needs a real
+`ZARINPAL_MERCHANT_ID`, which this environment does not have. The sweep's scheduling, locking,
+candidate selection, flagging and repair dispatch are unit-tested, and the API boots with the job
+registered — but the actual Zarinpal `verify` round-trip on a stale payment has only been tested
+against a mock.

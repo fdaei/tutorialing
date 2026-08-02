@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { PrismaService } from '../../prisma.service';
-import { badRequest } from '../../common/errors';
+import { PrismaService } from '../../../prisma.service';
+import { badRequest, conflict, isPrismaKnownError } from '../../../common/errors';
 
 @Injectable()
 export class PayoutsService {
@@ -105,9 +105,14 @@ export class PayoutsService {
     return { earnings, totals, payouts, withdrawals, walletBalance, reservedAmount, availableToWithdraw: Math.max(0, walletBalance - reservedAmount) };
   }
 
-  async requestWithdrawal(userId: string, amount: number, iban: string) {
+  async requestWithdrawal(userId: string, amount: number, iban: string, idempotencyKey: string) {
     const teacher = await this.db.teacher.findUniqueOrThrow({ where: { userId } });
     const normalizedIban = iban.replace(/\s/g, '').toUpperCase();
+    // Replaying a key returns the original request rather than hitting the
+    // unique index, so a client retrying after a dropped response converges
+    // instead of either erroring or opening a second withdrawal.
+    const replay = await this.db.withdrawalRequest.findUnique({ where: { idempotencyKey } });
+    if (replay) return this.assertOwnedByTeacher(replay, teacher.id);
     // Serializable, matching every other balance-checking transaction in this
     // domain (payments.service.ts, bookings.service.ts): at the default
     // READ COMMITTED level, two concurrent requests could both read the same
@@ -122,8 +127,29 @@ export class PayoutsService {
       if (amount > available) throw badRequest('WITHDRAWAL_INSUFFICIENT_BALANCE', 'مبلغ برداشت بیشتر از موجودی قابل برداشت است.', 'The withdrawal amount exceeds the available balance.', {
         amount: { fa: `حداکثر مبلغ قابل برداشت ${available.toLocaleString('fa-IR')} تومان است.`, en: `The maximum available amount is ${available.toLocaleString('en-US')} IRR.` },
       });
-      return tx.withdrawalRequest.create({ data: { teacherId: teacher.id, amount, iban: normalizedIban } });
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+      return tx.withdrawalRequest.create({ data: { teacherId: teacher.id, amount, iban: normalizedIban, idempotencyKey } });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+      .catch(async error => {
+        // Two concurrent submits of the same key: the loser hits the unique
+        // index and re-reads the winner's row.
+        if (!isPrismaKnownError(error) || error.code !== 'P2002') throw error;
+        const raced = await this.db.withdrawalRequest.findUnique({ where: { idempotencyKey } });
+        if (!raced) throw error;
+        return this.assertOwnedByTeacher(raced, teacher.id);
+      });
+  }
+
+  /**
+   * An idempotency key is client-chosen, so a guessed key must not disclose
+   * another teacher's withdrawal request.
+   */
+  private assertOwnedByTeacher<T extends { teacherId: string }>(request: T, teacherId: string) {
+    if (request.teacherId !== teacherId) throw conflict(
+      'WITHDRAWAL_KEY_CONFLICT',
+      'این کلید درخواست قبلاً استفاده شده است.',
+      'This request key has already been used.',
+    );
+    return request;
   }
 
   withdrawalRequests() {

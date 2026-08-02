@@ -1,20 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../../prisma.service';
-import { badRequest, conflict, notFound } from '../../common/errors';
-
-/**
- * Session counts a teacher may sell: a single session plus the 5/10/15/20
- * bundles. Kept here rather than as a database constraint so adding a tier is a
- * code change, and referenced by `PackageDto` so validation and the pricing
- * maths cannot drift apart.
- *
- * Deliberately not shared through `@lingospeak/contracts`: that package is
- * `type: module` pointing at raw TypeScript with no build step, so the compiled
- * CommonJS API crashes on import at runtime even though tsc and jest accept it.
- * The teacher panel keeps its own copy of this list — see the note there.
- */
-export const PACKAGE_TIERS = [1, 5, 10, 15, 20] as const;
-export type PackageTier = (typeof PACKAGE_TIERS)[number];
+import { PrismaService } from '../../../prisma.service';
+import { PACKAGE_TIERS, type PackageTier } from '@lingospeak/contracts';
+import { badRequest, conflict, notFound } from '../../../common/errors';
 
 export type PackageInput = {
   titleFa: string;

@@ -1,21 +1,18 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma, type BlockedPeriod } from '@prisma/client';
+import { type BlockedPeriod } from '@prisma/client';
 import { fromZonedTime } from 'date-fns-tz';
-import { PrismaService } from '../../prisma.service';
+import { PrismaService, type DbClient } from '../../prisma.service';
 import { badRequest, conflict, notFound } from '../../common/errors';
 import { SettingsService } from '../../common/settings.service';
-
-type RuleInput = {
-  weekday: number;
-  startMinute: number;
-  endMinute: number;
-  timezone: string;
-  lessonDuration?: number;
-  breakMinutes?: number;
-};
-
-type SlotType = 'trial' | 'regular';
-type DbClient = PrismaService | Prisma.TransactionClient;
+import type {
+  AdminBlockedPeriodInput,
+  AvailabilityOverrideInput,
+  AvailabilityRuleInput,
+  AvailabilitySlot,
+  BlockedPeriodInput,
+  NormalizedAvailabilityRule,
+  SlotType,
+} from './availability.types';
 
 const DAY_MS = 86_400_000;
 const dateKey = (date: Date) => date.toISOString().slice(0, 10);
@@ -61,7 +58,7 @@ export class AvailabilityService {
     return { teacherId: teacher.id, timezone: rules[0]?.timezone ?? 'Asia/Tehran', rules, overrides, blocks };
   }
 
-  async setRules(userId: string, rules: RuleInput[]) {
+  async setRules(userId: string, rules: AvailabilityRuleInput[]) {
     const teacher = await this.db.teacher.findUnique({ where: { userId } });
     if (!teacher) throw notFound('TEACHER_PROFILE_NOT_FOUND', 'پروفایل مدرس پیدا نشد.', 'Teacher profile was not found.');
     const normalized = rules.map((rule, index) => this.validateRule(rule, index));
@@ -85,7 +82,7 @@ export class AvailabilityService {
     });
   }
 
-  private validateRule(rule: RuleInput, index: number) {
+  private validateRule(rule: AvailabilityRuleInput, index: number): NormalizedAvailabilityRule {
     const field = `rules.${index}`;
     if (!Number.isInteger(rule.weekday) || rule.weekday < 0 || rule.weekday > 6) {
       throw badRequest('AVAILABILITY_WEEKDAY_INVALID', 'روز هفته معتبر نیست.', 'The weekday is invalid.', {
@@ -120,7 +117,7 @@ export class AvailabilityService {
     return { ...rule, lessonDuration, breakMinutes };
   }
 
-  async addOverride(userId: string, data: { date: string; available: boolean; startMinute?: number; endMinute?: number; reason?: string }) {
+  async addOverride(userId: string, data: AvailabilityOverrideInput) {
     const teacher = await this.db.teacher.findUnique({ where: { userId } });
     if (!teacher) throw notFound('TEACHER_PROFILE_NOT_FOUND', 'پروفایل مدرس پیدا نشد.', 'Teacher profile was not found.');
     const date = utcDate(data.date);
@@ -147,13 +144,13 @@ export class AvailabilityService {
     return { ok: true };
   }
 
-  async addBlock(userId: string, data: { startsAt: string; endsAt: string; reason?: string }) {
+  async addBlock(userId: string, data: BlockedPeriodInput) {
     const teacher = await this.db.teacher.findUnique({ where: { userId } });
     if (!teacher) throw notFound('TEACHER_PROFILE_NOT_FOUND', 'پروفایل مدرس پیدا نشد.', 'Teacher profile was not found.');
     return this.createBlock(teacher.id, data, false);
   }
 
-  async addAdminBlock(data: { teacherId?: string; startsAt: string; endsAt: string; reason?: string }) {
+  async addAdminBlock(data: AdminBlockedPeriodInput) {
     if (!data.teacherId) throw badRequest('TEACHER_REQUIRED', 'مدرس را انتخاب کنید.', 'Select a teacher.', {
       teacherId: { fa: 'مدرس را با نام، موبایل یا ایمیل جستجو و انتخاب کنید.', en: 'Search for and select a teacher by name, phone, or email.' },
     });
@@ -162,7 +159,7 @@ export class AvailabilityService {
     return this.createBlock(data.teacherId, data, true);
   }
 
-  private async createBlock(teacherId: string, data: { startsAt: string; endsAt: string; reason?: string }, adminCreated: boolean) {
+  private async createBlock(teacherId: string, data: BlockedPeriodInput, adminCreated: boolean) {
     const startsAt = new Date(data.startsAt);
     const endsAt = new Date(data.endsAt);
     if (!Number.isFinite(startsAt.getTime()) || !Number.isFinite(endsAt.getTime())) {
@@ -186,7 +183,7 @@ export class AvailabilityService {
     return { ok: true };
   }
 
-  async slots(teacherId: string, from: Date, to: Date, type: SlotType = 'regular') {
+  async slots(teacherId: string, from: Date, to: Date, type: SlotType = 'regular'): Promise<AvailabilitySlot[]> {
     this.validateRange(from, to);
     const [minLeadMinutes, maxAdvanceDays] = await Promise.all([
       this.settings.numeric('booking.minLeadMinutes', 120, 10_080),
@@ -208,7 +205,7 @@ export class AvailabilityService {
     const duration = type === 'trial' ? teacher.trialDuration : teacher.lessonDuration;
     const timezone = teacher.availabilityRules[0]?.timezone ?? 'Asia/Tehran';
     const overrides = new Map(teacher.availabilityOverrides.map((row) => [dateKey(row.date), row]));
-    const result: { startsAt: string; endsAt: string; date: string; timezone: string; type: SlotType }[] = [];
+    const result: AvailabilitySlot[] = [];
     const firstLocalDay = utcDate(zonedDateKey(from, timezone));
     const lastLocalDay = utcDate(zonedDateKey(new Date(to.getTime() - 1), timezone));
     for (let cursor = firstLocalDay; cursor <= lastLocalDay; cursor = new Date(cursor.getTime() + DAY_MS)) {

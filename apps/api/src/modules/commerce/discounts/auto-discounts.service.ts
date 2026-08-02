@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { DiscountRule } from '@prisma/client';
-import { PrismaService, Tx } from '../../prisma.service';
+import { PrismaService, Tx } from '../../../prisma.service';
 
 const DAY_MS = 86_400_000;
 

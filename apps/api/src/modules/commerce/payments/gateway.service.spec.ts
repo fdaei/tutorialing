@@ -1,7 +1,7 @@
-import { config } from '../../config';
+import { config } from '../../../config';
 import { GatewayService } from './gateway.service';
 
-jest.mock('../../config', () => ({ config: jest.fn() }));
+jest.mock('../../../config', () => ({ config: jest.fn() }));
 
 const mockedConfig = jest.mocked(config);
 

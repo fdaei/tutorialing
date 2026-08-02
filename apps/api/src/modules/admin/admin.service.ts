@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { Prisma, Role, UserStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
 import { forbidden } from '../../common/errors';
+import { TokenRevocationService } from '../../common/token-revocation.service';
 import { AdminRepository } from './admin.repository';
 import { CmsPageDto } from './dto/request/cms-page.dto';
 
@@ -28,7 +29,7 @@ const adminGrantRequiresAdmin = () =>
 
 @Injectable()
 export class AdminService {
-  constructor(private db: PrismaService, private repo: AdminRepository) {}
+  constructor(private db: PrismaService, private repo: AdminRepository, private revocation: TokenRevocationService) {}
 
   /**
    * `roles.manage`/`permissions.manage` are delegable to STAFF without full
@@ -95,7 +96,12 @@ export class AdminService {
   async updateUserStatus(actorId:string,userId:string,status:UserStatus){
     const before=await this.db.user.findUnique({where:{id:userId}});if(!before)throw new NotFoundException('User not found');
     if(before.id===actorId&&status!=='ACTIVE')throw new BadRequestException('You cannot disable your own account');
-    const user=await this.db.user.update({where:{id:userId},data:{status}});await this.db.auditLog.create({data:{actorId,action:'user.status.changed',entity:'User',entityId:userId,before:{status:before.status},after:{status}}});return user;
+    const user=await this.db.user.update({where:{id:userId},data:{status}});
+    // Suspending or deleting an account has to reach the token the user is
+    // already holding; without this they keep acting on it for up to 15 more
+    // minutes, since `AccessGuard` never re-reads their status.
+    if(status!=='ACTIVE')await this.revocation.revokeUser(userId);
+    await this.db.auditLog.create({data:{actorId,action:'user.status.changed',entity:'User',entityId:userId,before:{status:before.status},after:{status}}});return user;
   }
 
   async setUserRoles(actorId:string,userId:string,roles:Role[]){
@@ -115,6 +121,10 @@ export class AdminService {
       await tx.auditLog.create({data:{actorId,action:'user.roles.changed',entity:'User',entityId:userId,before:{roles:before},after:{roles:normalized}}});
     });
     if(normalized.includes('ADMIN'))await this.grantAdminPermissions(userId);
+    // Roles are baked into the access token at issuance, so a demotion that
+    // isn't paired with a revocation leaves the removed role usable until the
+    // token expires.
+    await this.revocation.revokeUser(userId);
     return this.db.user.findUniqueOrThrow({where:{id:userId},include:{roles:true}});
   }
 
@@ -149,6 +159,7 @@ export class AdminService {
     if (!user) throw new NotFoundException('User not found');
     const out = await this.db.userRole.upsert({ where: { userId_role: { userId, role } }, create: { userId, role }, update: {} });
     if(role==='ADMIN')await this.grantAdminPermissions(userId);
+    await this.revocation.revokeUser(userId);
     await this.db.auditLog.create({ data: { actorId, action: 'role.assigned', entity: 'UserRole', entityId: userId, after: { role } } });
     return out;
   }
@@ -165,6 +176,7 @@ export class AdminService {
       if (admins <= 1) throw new BadRequestException('Cannot revoke the last admin role');
     }
     await this.db.userRole.delete({ where: { userId_role: { userId, role } } });
+    await this.revocation.revokeUser(userId);
     await this.db.auditLog.create({ data: { actorId, action: 'role.revoked', entity: 'UserRole', entityId: userId, before: { role } } });
     return { ok: true };
   }
@@ -176,6 +188,7 @@ export class AdminService {
     if (!permission) throw new NotFoundException('Permission not found');
     await this.db.userRole.upsert({ where: { userId_role: { userId, role } }, create: { userId, role }, update: {} });
     const out = await this.db.rolePermission.upsert({ where: { userId_role_permissionId: { userId, role, permissionId: permission.id } }, create: { userId, role, permissionId: permission.id }, update: {} });
+    await this.revocation.revokeUser(userId);
     await this.db.auditLog.create({ data: { actorId, action: 'permission.granted', entity: 'RolePermission', entityId: userId, after: { role, permission: permissionKey } } });
     return out;
   }
