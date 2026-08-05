@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
-import { badRequest } from '../../common/errors';
+import { badRequest } from '../../common';
 import { AvailabilityService } from '../bookings/availability.service';
 
 type MatchInput = {

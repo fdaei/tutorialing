@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Post, Put, Query } from '@nestjs/common';
-import { CurrentUser, Public, Roles, type AuthUser } from '../../common/auth';
+import { CurrentUser, Public, Roles, type AuthUser } from '../../common';
 import { AvailabilityService } from './availability.service';
 import type { SlotType } from './availability.types';
 import { RulesDto } from './dto/request/rules.dto';

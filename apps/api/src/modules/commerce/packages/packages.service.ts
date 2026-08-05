@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../prisma.service';
 import { PACKAGE_TIERS, type PackageTier } from '@lingospeak/contracts';
-import { badRequest, conflict, notFound } from '../../../common/errors';
+import { badRequest, conflict, notFound } from '../../../common';
 
 export type PackageInput = {
   titleFa: string;

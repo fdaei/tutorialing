@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, Post } from '@nestjs/common';
-import { CurrentUser, Public, Roles, type AuthUser } from '../../../common/auth';
+import { CurrentUser, Public, Roles, type AuthUser } from '../../../common';
 import { PackagesService } from './packages.service';
 import { PackageDto, PackageApprovalDto } from '../dto/request/packages.dto';
 

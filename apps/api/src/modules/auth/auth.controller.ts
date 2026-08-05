@@ -1,4 +1,4 @@
-import {Body,Controller,Ip,Post,Req,Res} from '@nestjs/common';import type{Request,Response}from'express';import {Public,RateLimit}from'../../common/auth';import{AuthService}from'./auth.service';
+import {Body,Controller,Ip,Post,Req,Res} from '@nestjs/common';import type{Request,Response}from'express';import {Public,RateLimit}from'../../common';import{AuthService}from'./auth.service';
 import { RequestOtpDto } from './dto/request/request-otp.dto';
 import { VerifyOtpDto } from './dto/request/verify-otp.dto';
 import { config } from '../../config';

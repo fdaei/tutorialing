@@ -3,7 +3,7 @@ import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import type { Request } from 'express';
 import { PUBLIC_KEY } from '../constants/auth.constants';
-import { TokenRevocationService } from '../token-revocation.service';
+import { TokenRevocationService } from '../services/token-revocation.service';
 import { AuthUser } from '../types/authenticated-user.type';
 
 /**

@@ -8,8 +8,8 @@ import {
 import { Reflector } from '@nestjs/core';
 import type { Request, Response } from 'express';
 import { RATE_LIMIT_KEY, type RateLimitOptions } from '../decorators/rate-limit.decorator';
-import { tooManyRequests } from '../errors';
-import { RedisService } from '../redis.service';
+import { tooManyRequests } from '../exceptions/domain.exception';
+import { RedisService } from '../services/redis.service';
 
 /**
  * Per-IP fixed-window limiter for routes annotated with `@RateLimit()`.

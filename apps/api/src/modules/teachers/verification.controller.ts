@@ -1,5 +1,5 @@
 import { Body, Controller, Param, Post, Put } from '@nestjs/common';
-import { CurrentUser, Permissions, Roles, type AuthUser } from '../../common/auth';
+import { CurrentUser, Permissions, Roles, type AuthUser } from '../../common';
 import { VerificationService } from './verification.service';
 import { DocumentDto } from './dto/request/document.dto';
 import { ResubmitDto } from './dto/request/resubmit.dto';

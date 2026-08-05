@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PriceStatus, Role } from '@prisma/client';
-import { PrismaService } from '../../prisma.service';
-import { badRequest, forbidden, notFound } from '../../common/errors';
+import { PrismaService, type Tx } from '../../prisma.service';
+import { badRequest, forbidden, notFound } from '../../common';
 
 /**
  * The trial session is half the regular lesson price. Rounded down to a whole

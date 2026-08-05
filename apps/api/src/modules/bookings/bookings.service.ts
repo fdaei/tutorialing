@@ -2,12 +2,12 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
 import { BookingsRepository } from './bookings.repository';
-import { badRequest, conflict, forbidden, notFound } from '../../common/errors';
+import { badRequest, conflict, forbidden, notFound } from '../../common';
 import { QueueService } from '../queue/queue.service';
 import { AvailabilityService } from './availability.service';
-import { RedisService } from '../../common/redis.service';
+import { RedisService } from '../../common';
 import { EarningsService } from '../commerce/payouts/earnings.service';
-import { SettingsService } from '../../common/settings.service';
+import { SettingsService } from '../../common';
 
 type RefundTier = { beforeHours: number; refundPercent: number };
 

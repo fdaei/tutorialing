@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma, Role } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
-import { badRequest } from '../../common/errors';
+import { badRequest } from '../../common';
 
 type SearchEntity = 'users'|'teachers'|'tests'|'passages'|'bookings'|'payments'|'roles'|'languages'|'support-agents';
 

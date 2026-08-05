@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Param, Post, Put } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
-import { CurrentUser, Roles, type AuthUser } from '../../common/auth';
+import { CurrentUser, Roles, type AuthUser } from '../../common';
 import { BookingsService } from './bookings.service';
 import { BookingDto } from './dto/request/booking.dto';
 import { CancelDto } from './dto/request/cancel.dto';

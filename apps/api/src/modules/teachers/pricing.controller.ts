@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { PriceStatus } from '@prisma/client';
-import { CurrentUser, Permissions, Roles, type AuthUser } from '../../common/auth';
+import { CurrentUser, Permissions, Roles, type AuthUser } from '../../common';
 import { PricingService } from './pricing.service';
 import { ProposalDto } from './dto/request/proposal.dto';
 import { PriceReviewDto } from './dto/request/price-review.dto';

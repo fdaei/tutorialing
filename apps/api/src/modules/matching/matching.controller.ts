@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Post } from '@nestjs/common';
-import { CurrentUser, type AuthUser } from '../../common/auth';
+import { CurrentUser, type AuthUser } from '../../common';
 import { MatchingService } from './matching.service';
 import { MatchDto } from './dto/request/match.dto';
 

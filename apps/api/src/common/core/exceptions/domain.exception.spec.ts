@@ -1,5 +1,5 @@
 import { HttpStatus } from '@nestjs/common';
-import { prismaToDomain } from './errors';
+import { prismaToDomain } from './domain.exception';
 
 const prismaError = (code: string) => Object.assign(new Error('prisma failed'), { code });
 

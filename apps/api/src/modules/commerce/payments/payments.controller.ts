@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
-import { CurrentUser, Permissions, Public, RateLimit, RATE_LIMIT_TIERS, Roles, type AuthUser } from '../../../common/auth';
+import { CurrentUser, Permissions, Public, RateLimit, RATE_LIMIT_TIERS, Roles, type AuthUser } from '../../../common';
 import { PaymentsService } from './payments.service';
 import { WalletService } from './wallet.service';
 import { RefundsService } from './refunds.service';

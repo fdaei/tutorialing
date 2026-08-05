@@ -1,5 +1,5 @@
 import { Body, Controller, Get, NotFoundException, Param, Patch, Post, Query } from '@nestjs/common';
-import { CurrentUser, Public, Roles, type AuthUser } from '../../common/auth';
+import { CurrentUser, Public, Roles, type AuthUser } from '../../common';
 import { TeachersService } from './teachers.service';
 import { ApplicationDto } from './dto/request/application.dto';
 

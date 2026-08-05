@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService, Tx } from '../prisma.service';
+import { PrismaService, Tx } from '../../../prisma.service';
 
 /**
  * Reads operational rules the admin panel owns out of the `Setting` table.

@@ -1,5 +1,5 @@
 import {BadRequestException,Injectable,UnauthorizedException} from '@nestjs/common';
-import{tooManyRequests}from'../../common/errors';
+import{tooManyRequests}from'../../common';
 import {JwtService} from '@nestjs/jwt';import{createHash,createHmac,randomBytes,randomInt,randomUUID,timingSafeEqual}from'crypto';
 import{PrismaService}from'../../prisma.service';import{config}from'../../config';import{SmsService}from'./sms.service';
 const hash=(s:string)=>createHash('sha256').update(s).digest('hex');

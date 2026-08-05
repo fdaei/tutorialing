@@ -7,8 +7,8 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
-import { ApiExceptionFilter } from './common/http';
-import { validationResponse } from './common/errors';
+import { ApiExceptionFilter } from './common';
+import { validationResponse } from './common';
 import { config } from './config';
 
 async function bootstrap() {

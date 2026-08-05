@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { LanguageDirection, Prisma, ProficiencySystem } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
-import { badRequest, conflict, notFound } from '../../common/errors';
+import { badRequest, conflict, notFound } from '../../common';
 
 export type LanguageInput = {
   code: string;

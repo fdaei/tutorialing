@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, Patch, Post, Put, Query } from '@nestjs/common';
-import { CurrentUser, Permissions, Public, Roles, type AuthUser } from '../../common/auth';
+import { CurrentUser, Permissions, Public, Roles, type AuthUser } from '../../common';
 import { SupportService } from './support.service';
 import { TicketDto } from './dto/request/ticket.dto';
 import { ReplyDto } from './dto/request/reply.dto';

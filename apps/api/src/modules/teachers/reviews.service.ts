@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { ReviewStatus } from '@prisma/client';
 import { PrismaService, type DbClient, type Tx } from '../../prisma.service';
-import { badRequest, conflict, forbidden, notFound } from '../../common/errors';
-import { SettingsService } from '../../common/settings.service';
+import { badRequest, conflict, forbidden, notFound } from '../../common';
+import { SettingsService } from '../../common';
 
 @Injectable()
 export class ReviewsService {

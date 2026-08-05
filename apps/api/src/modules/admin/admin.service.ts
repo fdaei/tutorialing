@@ -1,8 +1,8 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, Role, UserStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
-import { forbidden } from '../../common/errors';
-import { TokenRevocationService } from '../../common/token-revocation.service';
+import { forbidden } from '../../common';
+import { TokenRevocationService } from '../../common';
 import { AdminRepository } from './admin.repository';
 import { CmsPageDto } from './dto/request/cms-page.dto';
 
