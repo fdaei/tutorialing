@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma, type AnswerReviewStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
-import { badRequest, conflict, notFound } from '../../common/errors';
+import { badRequest, conflict, notFound } from '../../common';
 import { ScoringService } from './scoring.service';
 
 const OBJECTIVE_TYPES = new Set(['single_choice', 'multiple_choice', 'true_false']);

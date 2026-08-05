@@ -62,7 +62,6 @@ export type AvailabilitySlot = {
   endsAt: string;
   /** Teacher-local calendar day the slot belongs to, `YYYY-MM-DD`. */
   date: string;
-  /** IANA timezone `date` is expressed in. */
   timezone: string;
   type: SlotType;
 };

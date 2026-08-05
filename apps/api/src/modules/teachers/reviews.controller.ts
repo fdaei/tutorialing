@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { ReviewStatus } from '@prisma/client';
-import { CurrentUser, Permissions, Roles, type AuthUser } from '../../common/auth';
+import { CurrentUser, Permissions, Roles, type AuthUser } from '../../common';
 import { ReviewsService } from './reviews.service';
 import { CreateReviewDto } from './dto/request/create-review.dto';
 import { ModerateReviewDto } from './dto/request/moderate-review.dto';

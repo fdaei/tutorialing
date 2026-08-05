@@ -4,7 +4,7 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomUUID } from 'crypto';
 import type { Readable } from 'stream';
 import { PrismaService } from '../../prisma.service';
-import { badRequest, notFound } from '../../common/errors';
+import { badRequest, notFound } from '../../common';
 import { config } from '../../config';
 
 const allowed = new Set([

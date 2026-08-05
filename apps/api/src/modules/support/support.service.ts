@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma, Role, TicketStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
-import { badRequest, forbidden, notFound } from '../../common/errors';
+import { badRequest, forbidden, notFound } from '../../common';
 import { config } from '../../config';
 
 const STAFF_ROLES: Role[] = ['ADMIN', 'STAFF', 'SUPPORT'];

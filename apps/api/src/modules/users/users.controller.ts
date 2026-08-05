@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Put } from '@nestjs/common';
-import { CurrentUser, type AuthUser } from '../../common/auth';
+import { CurrentUser, type AuthUser } from '../../common';
 import { UsersService } from './users.service';
 import { ProfileDto } from './dto/request/profile.dto';
 import { LocaleDto } from './dto/request/locale.dto';

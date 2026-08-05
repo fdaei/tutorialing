@@ -1,7 +1,7 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma.service';
 import { WalletService } from './wallet.service';
-import { conflict } from '../../../common/errors';
+import { conflict } from '../../../common';
 
 @Injectable()
 export class RefundsService {

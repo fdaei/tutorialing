@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { Booking } from '@prisma/client';
 import { PrismaService, Tx } from '../../../prisma.service';
-import { SettingsService } from '../../../common/settings.service';
+import { SettingsService } from '../../../common';
 
 /** Used when the setting row is absent or unusable. */
 const DEFAULT_COMMISSION_PERCENT = 20;

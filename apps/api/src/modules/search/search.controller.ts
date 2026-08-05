@@ -1,5 +1,5 @@
 import { Controller, Get, Param, Query } from '@nestjs/common';
-import { RateLimit, RATE_LIMIT_TIERS, Roles } from '../../common/auth';
+import { RateLimit, RATE_LIMIT_TIERS, Roles } from '../../common';
 import { SearchService } from './search.service';
 // This is an internal lookup/autocomplete tool for staff panels (entities
 // include `roles`, `support-agents`, raw `payments`/`bookings` rows) -- not

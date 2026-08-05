@@ -1,6 +1,6 @@
 import { TeacherStatus } from '@prisma/client';
 import { Body, Controller, Get, Param, Patch, Post, Put, Query } from '@nestjs/common';
-import { CurrentUser, Permissions, RateLimit, RATE_LIMIT_TIERS, Roles, type AuthUser } from '../../common/auth';
+import { CurrentUser, Permissions, RateLimit, RATE_LIMIT_TIERS, Roles, type AuthUser } from '../../common';
 import { TeachersService } from '../teachers/teachers.service';
 import { AdminService } from './admin.service';
 import { TransitionDto } from './dto/request/transition.dto';

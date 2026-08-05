@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../prisma.service';
-import { badRequest, conflict, isPrismaKnownError } from '../../../common/errors';
+import { badRequest, conflict, isPrismaKnownError } from '../../../common';
 
 @Injectable()
 export class PayoutsService {

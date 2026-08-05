@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Headers, Param, Post, Req } from '@nestjs/common';
 import type { Request } from 'express';
-import { CurrentUser, RateLimit, RATE_LIMIT_TIERS, type AuthUser } from '../../common/auth';
+import { CurrentUser, RateLimit, RATE_LIMIT_TIERS, type AuthUser } from '../../common';
 import { FilesService } from './files.service';
 import { UploadDto } from './dto/request/upload.dto';
 

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DocumentStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma.service';
-import { badRequest, forbidden, notFound } from '../../common/errors';
+import { badRequest, forbidden, notFound } from '../../common';
 
 @Injectable()
 export class VerificationService {

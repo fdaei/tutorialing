@@ -1,7 +1,7 @@
 import { Controller, Get, ServiceUnavailableException } from '@nestjs/common';
-import { Public } from './common/auth';
+import { Public } from './common';
 import { PrismaService } from './prisma.service';
-import { RedisService } from './common/redis.service';
+import { RedisService } from './common';
 
 type Check = 'connected' | 'unavailable';
 

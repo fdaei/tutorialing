@@ -1,5 +1,5 @@
 import { Controller, Get, Param, Put } from '@nestjs/common';
-import { CurrentUser, type AuthUser } from '../../common/auth';
+import { CurrentUser, type AuthUser } from '../../common';
 import { SupportService } from './support.service';
 
 @Controller('notifications')

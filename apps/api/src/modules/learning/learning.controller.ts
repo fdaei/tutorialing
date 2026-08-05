@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, Post } from '@nestjs/common';
-import { CurrentUser, Roles, type AuthUser } from '../../common/auth';
+import { CurrentUser, Roles, type AuthUser } from '../../common';
 import { LearningService } from './learning.service';
 import { EvaluationDto } from './dto/request/evaluation.dto';
 import { PlanDto } from './dto/request/plan.dto';

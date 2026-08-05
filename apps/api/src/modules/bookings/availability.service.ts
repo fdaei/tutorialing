@@ -2,8 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { type BlockedPeriod } from '@prisma/client';
 import { fromZonedTime } from 'date-fns-tz';
 import { PrismaService, type DbClient } from '../../prisma.service';
-import { badRequest, conflict, notFound } from '../../common/errors';
-import { SettingsService } from '../../common/settings.service';
+import { badRequest, conflict, notFound } from '../../common';
+import { SettingsService } from '../../common';
 import type {
   AdminBlockedPeriodInput,
   AvailabilityOverrideInput,
