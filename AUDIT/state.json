@@ -1,8 +1,8 @@
 {
   "$comment": "Audit state for the Prompt-1 methodology run started 2026-08-08. The previous schema-documentation pass's state was preserved as AUDIT/state.schema-pass.json.",
-  "phase": 0,
-  "phaseName": "Discovery and baseline",
-  "status": "complete",
+  "phase": 1,
+  "phaseName": "Financial correctness audit",
+  "status": "deliverable written; FIN-101 deferred into the approved unit migration",
   "baselineCommit": "ebdb499",
   "startedAt": "2026-08-08",
   "priorPasses": {
@@ -23,7 +23,11 @@
     "lint": "PASS",
     "test": "PASS",
     "build": "PASS",
-    "testCounts": { "api": 174, "web": 19, "total": 193 },
+    "testCounts": {
+      "api": 174,
+      "web": 19,
+      "total": 193
+    },
     "e2e": "NOT_RUN",
     "npmAudit": "NOT_RUN",
     "appBooted": false
@@ -50,33 +54,81 @@
       "status": "open",
       "verified": true,
       "evidence": "Canonical unit is Toman per gateway.service.ts:5-8; every web money formatter emits 'IRR' for locale en on the same integer.",
+      "phase": 1,
+      "note": "Fix folded into the Toman->Rial migration plan (01-financial.md 1.7)"
+    },
+    {
+      "id": "FIN-102",
+      "severity": "CRITICAL",
+      "category": "financial",
+      "title": "Refund could exceed the captured amount under concurrency",
+      "location": "apps/api/src/modules/commerce/payments/refunds.service.ts:11-27; apps/web/src/components/panel-actions.tsx:449",
+      "impact": "Over-refund lands as withdrawable wallet credit. A double-click on the admin refund button was sufficient.",
+      "status": "fixed",
+      "verified": true,
+      "fix_commit": "ec8f3e4",
+      "regression_test": "refunds.service.spec.ts 'runs the over-refund check at Serializable isolation (FIN-102)' - fails pre-fix, passes post-fix",
+      "phase": 1
+    },
+    {
+      "id": "FIN-103",
+      "severity": "LOW",
+      "category": "financial",
+      "title": "Reconciliation.providerAmount records our own gatewayAmount, not the provider's",
+      "location": "apps/api/src/modules/commerce/payments/reconciliation.service.ts:155-156",
+      "impact": "Defeats the independent cross-check the Reconciliation table exists to provide; a real amount mismatch would be invisible.",
+      "status": "open",
+      "verified": true,
       "phase": 1
     }
   ],
-  "fixed": [],
+  "fixed": [
+    {
+      "id": "FIN-102",
+      "commit": "ec8f3e4",
+      "gates": "typecheck/lint green; 194 tests (175 api, 19 web)"
+    }
+  ],
   "verified": [
     "Baseline gates re-measured at ebdb499: typecheck/lint/test/build all green, 193 tests",
     "No Float or Decimal on any money column in schema.prisma; all money is Int",
     "Toman->Rial conversion is symmetric across gateway request() and verify()",
     "Booking double-booking guarded by Redis lock + Postgres Serializable (SSI), not app checks alone",
-    "Language and TeacherLanguage model target language as first-class reference data"
+    "Language and TeacherLanguage model target language as first-class reference data",
+    "Verify-before-grant: entitlement granted only on gateway.verify() ok; callback params never grant (payments.service.ts:190-199)",
+    "Amount tampering: subtotal re-derived from booking.price/pkg.price server-side; no price/rate/commission accepted from request body",
+    "IDOR: payments.service.ts:61 rejects a booking whose studentId != userId",
+    "Wallet: append-only ledger, derived balance, no mutable balance column; Serializable + negative-balance backstop",
+    "Commission split sums back exactly (net derived by subtraction, not independently rounded)",
+    "10 financial invariants documented in 01-financial.md 1.6, all holding"
   ],
-  "blocked": [
-    {
-      "id": "SCOPE-001",
-      "what": "Prompt 2 scope assumptions contradict the repository on 4 points (backend exists; canonical money unit is Toman not Rial; locale routing is bare-fa + /en prefix not /fa + /en; courses do not exist).",
-      "needs": "User decision before any Prompt-2 code is written.",
-      "askedAt": "2026-08-08"
-    }
-  ],
+  "blocked": [],
   "inheritedOpen": [
     {
       "id": "LOAD-001",
       "severity": "MEDIUM",
       "note": "GET /teachers throughput plateau. Dev-mode capacity measurement, not a code defect. Needs re-measurement against a production build."
     },
-    { "id": "SEC-006", "status": "wontfix", "note": "CSP connect-src/media-src breadth, pending NEXT_PUBLIC_S3_ORIGIN" },
-    { "id": "RATE-008", "status": "wontfix", "note": "fixed-window ~2x boundary burst, accepted at current limits" }
+    {
+      "id": "SEC-006",
+      "status": "wontfix",
+      "note": "CSP connect-src/media-src breadth, pending NEXT_PUBLIC_S3_ORIGIN"
+    },
+    {
+      "id": "RATE-008",
+      "status": "wontfix",
+      "note": "fixed-window ~2x boundary burst, accepted at current limits"
+    }
   ],
-  "next_action": "Await user decision on SCOPE-001, then begin Phase 1 (financial correctness) starting with FIN-101."
+  "next_action": "Execute MIG-001 step 1 (single shared formatMoney, closes FIN-101), then steps 2-5; then Phase 2 security.",
+  "approvedChanges": [
+    {
+      "id": "MIG-001",
+      "what": "Migrate canonical money storage from Toman to Rial",
+      "approvedBy": "user 2026-08-08 (against audit recommendation to keep Toman)",
+      "plan": "AUDIT/01-financial.md section 1.7",
+      "status": "planned, not executed",
+      "scope": "28 money columns of 70 Int columns; Discount.value/DiscountRule.value conditional on type<>'percent'; CreditEntry.amount and all counts/percentages excluded"
+    }
+  ]
 }
