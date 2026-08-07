@@ -24,9 +24,10 @@
     "test": "PASS",
     "build": "PASS",
     "testCounts": {
-      "api": 174,
-      "web": 19,
-      "total": 193
+      "api": 175,
+      "web": 24,
+      "total": 199,
+      "note": "baseline was 193; +1 FIN-102, +5 money.spec"
     },
     "e2e": "NOT_RUN",
     "npmAudit": "NOT_RUN",
@@ -51,11 +52,13 @@
       "title": "English locale labels Toman amounts as IRR, understating every price 10x",
       "location": "apps/web/src/lib/i18n.ts:37 + 11 component sites",
       "impact": "English-locale users see prices 10x lower than actual. Withdrawal form (teacher-finance.tsx:29) labels a Toman input as IRR.",
-      "status": "open",
+      "status": "fixed",
       "verified": true,
       "evidence": "Canonical unit is Toman per gateway.service.ts:5-8; every web money formatter emits 'IRR' for locale en on the same integer.",
       "phase": 1,
-      "note": "Fix folded into the Toman->Rial migration plan (01-financial.md 1.7)"
+      "note": "Closed by MIG-001 step 1 (centralised formatter), independent of the unit migration.",
+      "fix_commit": "bc19ed1",
+      "regression_test": "money.spec.ts 'labels the amount as Toman in both locales, never IRR (FIN-101)'"
     },
     {
       "id": "FIN-102",
@@ -87,6 +90,11 @@
       "id": "FIN-102",
       "commit": "ec8f3e4",
       "gates": "typecheck/lint green; 194 tests (175 api, 19 web)"
+    },
+    {
+      "id": "FIN-101",
+      "commit": "bc19ed1",
+      "gates": "typecheck/lint/build green; 199 tests (175 api, 24 web)"
     }
   ],
   "verified": [
@@ -100,7 +108,8 @@
     "IDOR: payments.service.ts:61 rejects a booking whose studentId != userId",
     "Wallet: append-only ledger, derived balance, no mutable balance column; Serializable + negative-balance backstop",
     "Commission split sums back exactly (net derived by subtraction, not independently rounded)",
-    "10 financial invariants documented in 01-financial.md 1.6, all holding"
+    "10 financial invariants documented in 01-financial.md 1.6, all holding",
+    "All 12 web money formatters replaced by one shared lib/money.ts; no IRR label remains outside comments/tests"
   ],
   "blocked": [],
   "inheritedOpen": [
@@ -120,15 +129,24 @@
       "note": "fixed-window ~2x boundary burst, accepted at current limits"
     }
   ],
-  "next_action": "Execute MIG-001 step 1 (single shared formatMoney, closes FIN-101), then steps 2-5; then Phase 2 security.",
+  "next_action": "Phase 2 security audit (route x role matrix, OWASP table). MIG-001 steps 2-5 gated on a verified DB backup.",
   "approvedChanges": [
     {
       "id": "MIG-001",
       "what": "Migrate canonical money storage from Toman to Rial",
       "approvedBy": "user 2026-08-08 (against audit recommendation to keep Toman)",
       "plan": "AUDIT/01-financial.md section 1.7",
-      "status": "planned, not executed",
-      "scope": "28 money columns of 70 Int columns; Discount.value/DiscountRule.value conditional on type<>'percent'; CreditEntry.amount and all counts/percentages excluded"
+      "status": "step 1 of 5 done (bc19ed1); steps 2-5 pending",
+      "scope": "28 money columns of 70 Int columns; Discount.value/DiscountRule.value conditional on type<>'percent'; CreditEntry.amount and all counts/percentages excluded",
+      "stepsDone": [
+        "1. centralise formatter on current unit (Toman) - closes FIN-101"
+      ],
+      "stepsPending": [
+        "2. scale money literals, delete toRial()",
+        "3. data migration (irreversible; needs verified backup)",
+        "4. flip formatter to divide by 10",
+        "5. fixtures + migration tests"
+      ]
     }
   ]
 }
