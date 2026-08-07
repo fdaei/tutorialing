@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { api, apiMessage } from '@/lib/api';
 import { useTranslations } from './locale-provider';
+import { formatMoney } from '@/lib/money';
 
 type Aggregate = { status: string; _count: { _all: number }; _sum: Record<string, number | null> };
 type Reports = {
@@ -97,7 +98,7 @@ export function AdminFinanceCenter() {
   const refresh = () => Promise.all([reports.refetch(), payments.refetch(), withdrawals.refetch()]);
 
   const money = (value: number) =>
-    fa ? `${value.toLocaleString('fa-IR')} تومان` : `${value.toLocaleString('en-US')} IRR`;
+    formatMoney(value, fa ? 'fa' : 'en');
   const date = (value: string) =>
     new Intl.DateTimeFormat(fa ? 'fa-IR' : 'en-US', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
 

@@ -34,5 +34,7 @@ export const messages = {
 export type MessageKey = keyof typeof messages.fa;
 export function translate(locale: Locale, key: MessageKey) { return messages[locale][key] ?? messages.fa[key] ?? key; }
 export function formatNumber(value: number, locale: Locale) { return new Intl.NumberFormat(locale === 'fa' ? 'fa-IR' : 'en-US').format(value); }
-export function formatMoney(value: number, locale: Locale) { return new Intl.NumberFormat(locale === 'fa' ? 'fa-IR' : 'en-US', { style:'currency', currency:'IRR', maximumFractionDigits:0 }).format(value); }
+// Money formatting lives in `./money`, not here: this one was dead code that
+// labelled Toman values as IRR (FIN-101), and every component hand-rolled its
+// own formatter instead of calling it.
 export function formatDate(value: Date | string, locale: Locale) { return new Intl.DateTimeFormat(locale === 'fa' ? 'fa-IR-u-ca-persian' : 'en-US', { dateStyle:'medium', timeStyle:'short' }).format(new Date(value)); }

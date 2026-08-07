@@ -5,6 +5,7 @@ import {useMutation,useQuery,useQueryClient} from '@tanstack/react-query';
 import {ChevronLeft,ChevronRight,Eye,Search,ShieldCheck,UserRound,X} from 'lucide-react';
 import {api,ApiError,Paginated} from '@/lib/api';
 import {useTranslations} from './locale-provider';
+import {formatMoney} from '@/lib/money';
 
 type Role='STUDENT'|'TEACHER'|'ADMIN'|'STAFF'|'EXAMINER'|'SUPPORT'|'FINANCE';
 type User={id:string;name?:string;phone:string;email?:string;status:string;locale:string;createdAt:string;roles:{role:Role}[]};
@@ -45,7 +46,7 @@ function activityTitle(row:Activity,kind:string,fa:boolean){if(kind==='attempt')
 function Status({value,fa}:{value:string;fa:boolean}){return <span className="inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">{fa?statusFa[value]??value:value.replaceAll('_',' ').toLowerCase()}</span>}
 function roleLabel(role:Role){return role[0]+role.slice(1).toLowerCase()}
 function date(value:string,fa:boolean){return new Intl.DateTimeFormat(fa?'fa-IR':'en-US',{dateStyle:'medium'}).format(new Date(value))}
-function money(value:number,fa:boolean){return `${new Intl.NumberFormat(fa?'fa-IR':'en-US').format(value)} ${fa?'تومان':'IRR'}`}
+function money(value:number,fa:boolean){return formatMoney(value,fa?'fa':'en')}
 function countLabel(key:string,fa:boolean){const labels:Record<string,[string,string]>={bookings:['رزرو','Bookings'],attempts:['آزمون','Tests'],payments:['پرداخت','Payments'],tickets:['تیکت','Tickets'],learningPlans:['برنامه','Plans'],enrollments:['بسته آموزشی','Enrollments']};return labels[key]?.[fa?0:1]??key}
 function ErrorBox({fa,error,retry}:{fa:boolean;error:unknown;retry:()=>void}){return <div role="alert" className="m-5 rounded-2xl bg-red-50 p-4 text-red-700">{errorMessage(error,fa)} <button onClick={retry} className="font-black underline">{fa?'تلاش دوباره':'Try again'}</button></div>}
 function errorMessage(error:unknown,fa:boolean){return error instanceof ApiError?error.message:fa?'دریافت یا ذخیره اطلاعات ناموفق بود.':'Could not load or save data.'}

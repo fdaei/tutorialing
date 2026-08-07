@@ -6,6 +6,7 @@ import {ArrowLeft,ArrowRight,CalendarClock,CheckCircle2,CircleDollarSign,Clock3,
 import {api} from '@/lib/api';
 import {localePath} from '@/lib/i18n';
 import {useTranslations} from './locale-provider';
+import {formatMoney,formatNumber} from '@/lib/money';
 
 type Row=Record<string,unknown>;
 type Finance={earnings?:{netAmount:number;status:string}[]};
@@ -21,7 +22,7 @@ export function TeacherDashboard(){
  const completed=all.filter(item=>item.status==='COMPLETED').length,students=new Set(all.map(item=>String(item.studentId??'')).filter(Boolean)).size;
  const balance=(finance.data?.earnings??[]).filter(item=>item.status!=='PAID').reduce((sum,item)=>sum+item.netAmount,0);
  const verified=application.data?.status==='APPROVED',docs=(application.data?.verificationItems??[]).filter(item=>item.status==='APPROVED').length;
- const number=(value:number)=>new Intl.NumberFormat(fa?'fa-IR':'en-US').format(value),money=(value:number)=>`${number(value)} ${fa?'تومان':'IRR'}`;
+ const number=(value:number)=>formatNumber(value,fa?'fa':'en'),money=(value:number)=>formatMoney(value,fa?'fa':'en');
  return <div className="teacher-workspace">
   <header className="flex flex-wrap items-end justify-between gap-4"><div><p className="mb-2 text-sm font-bold text-blue">{fa?'مرکز کار مدرس':'Teacher workspace'}</p><h1 className="text-3xl font-black md:text-4xl">{fa?'سلام، امروز چه خبر؟':'Here’s your teaching day'}</h1><p className="mt-2 text-muted">{fa?'کلاس بعدی، کارهای ضروری و وضعیت درآمدت یک‌جا هستند.':'Your next class, essential tasks, and earnings in one place.'}</p></div><Link href={p('/teacher-panel/availability')} className="secondary-button"><CalendarClock size={18}/>{fa?'مدیریت برنامه':'Manage schedule'}</Link></header>
   <section className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
