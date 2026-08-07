@@ -34,7 +34,12 @@ export class AccessGuard implements CanActivate {
     if (!token) throw new UnauthorizedException('Authentication required');
     let payload: AuthUser & { iat?: number };
     try {
-      payload = await this.jwt.verifyAsync<AuthUser & { iat?: number }>(token);
+      // Pin the algorithm. The signing key is symmetric, so an attacker cannot
+      // forge an RS256 token and jsonwebtoken already refuses `alg: none` unless
+      // it is explicitly allowed -- but leaving the allowlist open means any
+      // future move to an asymmetric key silently reintroduces the confusion
+      // attack. Cheaper to pin now than to remember later.
+      payload = await this.jwt.verifyAsync<AuthUser & { iat?: number }>(token, { algorithms: ['HS256'] });
     } catch {
       throw new UnauthorizedException('Invalid or expired access token');
     }
