@@ -268,19 +268,28 @@ All durations/minutes, `weekday`, all `order`/`rank`/`version`, `attempts`, `siz
 
 ### Execution order
 
-1. **Display layer first, behind the new unit.** Introduce one shared `formatMoney(rial, locale)` in
-   `apps/web/src/lib/money.ts` that divides by 10 for display and labels Toman in *both* locales.
-   Delete the 11 hand-rolled formatters. This alone closes FIN-101.
-2. **Code constants.** `toRial()` deleted from `gateway.service.ts`; `request()`/`verify()` pass the
-   stored value straight through. Audit every money literal (e.g. the 100,000 minimum withdrawal) and
-   scale it.
-3. **Migration**, in one transaction, with the conditional discount clause, and a verification query
-   asserting I2/I3/I4 still hold across every existing row afterwards.
-4. **Tests.** Update every money fixture; add a migration test asserting a percent discount is
-   unchanged and a fixed discount is scaled.
-5. **Rounding review.** Rial values are 10× larger, so `round(x*pct/100)` gains a digit of precision —
-   strictly an improvement. But `Package.discountPercent` and any Toman-denominated *display*
-   rounding must be re-checked for values that are no longer multiples of 10.
+The display layer must be **centralised before** the data changes, but must not yet divide — the
+database is still Toman until step 3. Centralising first means step 4 is a one-line change to a
+single function instead of twelve.
+
+1. **Centralise the formatter on the current unit.** One `formatMoney(value, locale)` in
+   `apps/web/src/lib/money.ts`, treating `value` as **Toman** (still true at this point) and
+   labelling it Toman in *both* locales. Delete the 11 hand-rolled formatters and the dead
+   `i18n.formatMoney`. **This closes FIN-101 on its own**, independent of whether the migration
+   ever runs.
+2. **Code constants.** Delete `toRial()` from `gateway.service.ts`; `request()`/`verify()` pass the
+   stored value straight through. Audit every money literal (e.g. the 100,000 minimum withdrawal,
+   the `< 100_000` guard in `teacher-finance.tsx`) and scale each by 10.
+3. **Migration**, in one transaction, with the conditional discount clause, plus a verification query
+   asserting I2/I3/I4 still hold across every existing row afterwards. Requires a verified backup.
+4. **Flip the formatter.** `formatMoney` now divides by 10 to display Toman from Rial storage. One
+   function, one line. Decide rounding for values that are not multiples of 10 (commission splits in
+   Rial can produce them) — round half-up to the nearest Toman for display only, never for storage.
+5. **Tests.** Update every money fixture; add a migration test asserting a `percent` discount is
+   unchanged and a `fixed` discount is scaled, and a formatter test pinning the label in both
+   locales — the gap that let FIN-101 through.
+
+Steps 1 and 2 are independently valuable and low-risk. Steps 3–5 are the irreversible part.
 
 ### Risk
 

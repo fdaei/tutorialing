@@ -3,6 +3,7 @@
 import{useQuery}from'@tanstack/react-query';
 import{api}from'@/lib/api';
 import{useTranslations}from'./locale-provider';
+import{formatMoney}from'@/lib/money';
 
 type Locale='fa'|'en';
 type Row=Record<string,unknown>;
@@ -49,7 +50,7 @@ const labelsEn:Record<string,string>={name:'Name',nameFa:'Persian name',nameEn:'
 const faStatus:Record<string,string>={ACTIVE:'فعال',SUSPENDED:'تعلیق‌شده',DELETED:'حذف‌شده',PENDING:'در انتظار',PENDING_PAYMENT:'در انتظار پرداخت',PAID:'پرداخت‌شده',PARTIALLY_REFUNDED:'بخشی بازپرداخت‌شده',REFUNDED:'بازپرداخت‌شده',CONFIRMED:'تأییدشده',COMPLETED:'تکمیل‌شده',CANCELLED:'لغوشده',NO_SHOW:'عدم حضور',OPEN:'باز',WAITING_SUPPORT:'منتظر پشتیبانی',RESOLVED:'حل‌شده',CLOSED:'بسته',DRAFT:'پیش‌نویس',SUBMITTED:'ارسال‌شده',DOCUMENT_REVIEW:'بررسی مدارک',INTERVIEW:'مصاحبه',DEMO_REVIEW:'بررسی دمو',APPROVED:'تأییدشده',REJECTED:'ردشده',IN_PROGRESS:'در حال انجام',NEEDS_REVISION:'نیازمند اصلاح',UNDER_REVIEW:'در حال بررسی'};
 function format(value:unknown,key:string,locale:Locale){
   if(typeof value==='string'&&(/At$/.test(key)||['startsAt','endsAt','examDate','dueAt'].includes(key))){const date=new Date(value);if(!isNaN(date.getTime()))return new Intl.DateTimeFormat(locale==='fa'?'fa-IR':'en-US',{dateStyle:'medium',timeStyle:key==='examDate'||key==='dueAt'?undefined:'short'}).format(date)}
-  if(typeof value==='number'&&['amount','price','balance','revenue','walletLiability'].some(part=>key.toLowerCase().includes(part.toLowerCase())))return new Intl.NumberFormat(locale==='fa'?'fa-IR':'en-US').format(value)+(locale==='fa'?' تومان':' IRR');
+  if(typeof value==='number'&&['amount','price','balance','revenue','walletLiability'].some(part=>key.toLowerCase().includes(part.toLowerCase())))return formatMoney(value,locale);
   if(typeof value==='boolean')return locale==='fa'?(value?'بله':'خیر'):(value?'Yes':'No');
   if(typeof value==='string'){const translated=locale==='fa'?faStatus[value]:enStatus[value];if(translated)return translated}
   return String(value);
