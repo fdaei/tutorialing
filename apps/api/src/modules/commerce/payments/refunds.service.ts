@@ -1,4 +1,5 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../prisma.service';
 import { WalletService } from './wallet.service';
 import { conflict } from '../../../common';
@@ -24,6 +25,13 @@ export class RefundsService {
       await this.wallet.ledger(tx, payment.userId, 'CREDIT', amount, 'refund', 'Refund', refund.id, `refund-ledger:${refund.id}`);
       await tx.payment.update({ where: { id: payment.id }, data: { status: already + amount === payment.amount ? 'REFUNDED' : 'PARTIALLY_REFUNDED' } });
       return refund;
-    });
+      // The over-refund guard above reads SUM(refund.amount) and then inserts a
+      // row that changes that same sum. At READ COMMITTED two concurrent
+      // refunds both read the pre-insert total, both pass, and the payment is
+      // refunded twice as real withdrawable wallet credit. `idempotencyKey`
+      // only catches a replay of the *same* key, and the admin panel mints a
+      // fresh UUID per click. Serializable makes Postgres detect the write skew
+      // and abort the loser, matching the withdrawal path (FIN-003).
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   }
 }

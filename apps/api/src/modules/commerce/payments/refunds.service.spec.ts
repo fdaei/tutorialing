@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { RefundsService } from './refunds.service';
 
 function harness(payment: Record<string, unknown>) {
@@ -15,7 +16,7 @@ function harness(payment: Record<string, unknown>) {
   const db = { $transaction: jest.fn().mockImplementation((fn: (t: unknown) => unknown) => fn(tx)) };
   const wallet = { ledger: jest.fn() };
   const svc = new RefundsService(db as never, wallet as never);
-  return { svc, tx, wallet };
+  return { svc, tx, wallet, db };
 }
 
 describe('RefundsService.refund', () => {
@@ -48,5 +49,21 @@ describe('RefundsService.refund', () => {
     const refund = await h.svc.refund('admin-1', 'payment-1', 60_000, 'test', 'key-2');
     expect(refund).toMatchObject({ amount: 60_000 });
     expect(h.tx.payment.update).toHaveBeenCalledWith({ where: { id: 'payment-1' }, data: { status: 'REFUNDED' } });
+  });
+
+  // FIN-102. The over-refund guard reads SUM(refund.amount) and then inserts a
+  // new refund row. Under READ COMMITTED two concurrent refunds with different
+  // idempotency keys both read the same stale total, both pass the check and
+  // both insert -- refunding more than was ever captured, as real withdrawable
+  // wallet credit. `idempotencyKey` does not help: it is client-supplied and the
+  // admin panel mints a fresh UUID on every click, so a double-click is two
+  // distinct keys. Serializable makes Postgres abort the loser of the race.
+  // Fails on the pre-fix code, which passed no isolation level at all.
+  it('runs the over-refund check at Serializable isolation (FIN-102)', async () => {
+    const h = harness({ id: 'payment-1', status: 'PAID', amount: 100_000, userId: 'user-1' });
+    await h.svc.refund('admin-1', 'payment-1', 100_000, 'test', 'key-1');
+    expect(h.db.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+    });
   });
 });

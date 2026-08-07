@@ -443,10 +443,17 @@ function AdminBookingActions({ endpoint, fa }: { endpoint: string } & Localized)
 
 function AdminFinanceActions({ endpoint, fa }: { endpoint: string } & Localized) {
   const action = useAction(endpoint);
+  // FIN-102. A refund moves real money, so its idempotency key must stay stable
+  // across every retry of the *same* intended refund and rotate only once one
+  // has been accepted -- the same discipline the withdrawal form uses. Minting
+  // the key inline on each submit (the previous behaviour) meant a double-click
+  // sent two distinct keys, so the API's replay guard never matched and the
+  // payment was refunded twice.
+  const [refundKey, setRefundKey] = useState(() => crypto.randomUUID());
   return <div className="grid gap-5 xl:grid-cols-3">
     <Shell title={tr(fa, 'بازپرداخت', 'Refund')}><form className="mt-4 grid gap-4" onSubmit={(event) => {
       event.preventDefault(); const form = new FormData(event.currentTarget);
-      action.mutate(() => api(`/payments/${value(form, 'paymentId')}/refunds`, { method: 'POST', body: JSON.stringify({ amount: numeric(form, 'amount'), reason: value(form, 'reason'), idempotencyKey: crypto.randomUUID() }) }));
+      action.mutate(() => api(`/payments/${value(form, 'paymentId')}/refunds`, { method: 'POST', body: JSON.stringify({ amount: numeric(form, 'amount'), reason: value(form, 'reason'), idempotencyKey: refundKey }) }), { onSuccess: () => setRefundKey(crypto.randomUUID()) });
     }}><PaymentSelect fa={fa}/><Field name="amount" label={tr(fa, 'مبلغ', 'Amount')} type="number" min={1} required /><Field name="reason" label={tr(fa, 'دلیل', 'Reason')} required /><Submit fa={fa} busy={action.isPending}>{tr(fa, 'ثبت بازپرداخت', 'Create refund')}</Submit></form><Status fa={fa} error={action.error} ok={action.isSuccess} /></Shell>
     <Shell title={tr(fa, 'کد تخفیف', 'Discount code')}><form className="mt-4 grid gap-4" onSubmit={(event) => {
       event.preventDefault(); const form = new FormData(event.currentTarget);
