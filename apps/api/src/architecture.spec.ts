@@ -1,0 +1,88 @@
+import { readdirSync, readFileSync, statSync } from 'fs';
+import { join, relative } from 'path';
+
+/**
+ * Structural guardrails (Phase 3).
+ *
+ * These pin the module boundaries so a future change breaks a test rather than
+ * a feature. They live in a test rather than in ESLint because ESLint 9's
+ * `no-restricted-imports` did not apply the boundary globs reliably — see the
+ * note in `eslint.config.mjs`.
+ */
+
+const MODULES_DIR = join(__dirname, 'modules');
+const MODULES = readdirSync(MODULES_DIR).filter((name) => statSync(join(MODULES_DIR, name)).isDirectory());
+
+function sourceFiles(dir: string): string[] {
+  return readdirSync(dir).flatMap((entry) => {
+    const full = join(dir, entry);
+    if (statSync(full).isDirectory()) return sourceFiles(full);
+    return full.endsWith('.ts') && !full.endsWith('.spec.ts') ? [full] : [];
+  });
+}
+
+const IMPORT = /from\s+'([^']+)'/g;
+
+/** Every (file, importSpecifier) pair under src/modules, specs excluded. */
+function moduleImports() {
+  return sourceFiles(MODULES_DIR).flatMap((file) => {
+    const src = readFileSync(file, 'utf8');
+    return [...src.matchAll(IMPORT)].map((m) => ({ file: relative(__dirname, file), spec: m[1] ?? '' }));
+  });
+}
+
+describe('module boundaries', () => {
+  it('exposes every feature module as a directory under src/modules', () => {
+    expect(MODULES.length).toBeGreaterThan(10);
+    expect(MODULES).toContain('commerce');
+  });
+
+  /**
+   * A module may depend on another module's *top-level* surface
+   * (`../commerce`, `../teachers/teachers.service`) because that is what the
+   * owning module exports through Nest DI. Reaching into a nested folder
+   * (`../commerce/payouts/earnings.service`) couples the importer to internal
+   * layout the other module is free to change — and the `3b04c00` restructure
+   * did exactly that kind of move.
+   */
+  it('never reaches into another module\'s internal folders (STR-202)', () => {
+    const group = MODULES.join('|');
+    // ../<module>/<something>/<something...>  — two or more segments deep.
+    const deep = new RegExp(`^(?:\\.\\./)+(${group})/[^/]+/`);
+    const violations = moduleImports()
+      .filter(({ file, spec }) => {
+        const match = deep.exec(spec);
+        const owner = match?.[1];
+        if (!owner) return false;
+        // Importing deeply *within your own module* is fine.
+        return !file.startsWith(`modules/${owner}/`);
+      })
+      .map(({ file, spec }) => `${file} -> ${spec}`);
+
+    expect(violations).toEqual([]);
+  });
+
+  it('keeps the commerce public surface small and explicit', () => {
+    const barrel = readFileSync(join(MODULES_DIR, 'commerce', 'index.ts'), 'utf8');
+    const exported = [...barrel.matchAll(/export\s*\{\s*([^}]+)\}/g)].flatMap((m) => (m[1] ?? '').split(',').map((s) => s.trim()));
+    expect(exported.sort()).toEqual(['EarningsService', 'releaseDiscount']);
+  });
+
+  /**
+   * `common/` is the only thing every module is allowed to share. If a feature
+   * module ever appears here, the shared layer has grown a dependency on a
+   * feature and the direction of the graph has inverted.
+   */
+  it('keeps common/ free of any dependency on a feature module', () => {
+    const group = MODULES.join('|');
+    const intoModules = new RegExp(`(?:\\.\\./)+modules/(${group})\\b`);
+    const violations = sourceFiles(join(__dirname, 'common'))
+      .flatMap((file) => {
+        const src = readFileSync(file, 'utf8');
+        return [...src.matchAll(IMPORT)]
+          .filter((m) => intoModules.test(m[1] ?? ''))
+          .map((m) => `${relative(__dirname, file)} -> ${m[1] ?? ''}`);
+      });
+    expect(violations).toEqual([]);
+  });
+});

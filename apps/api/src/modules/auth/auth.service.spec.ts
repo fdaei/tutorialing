@@ -9,7 +9,6 @@ process.env.S3_ACCESS_KEY ??= 'minio';
 process.env.S3_SECRET_KEY ??= 'secret';
 process.env.S3_BUCKET ??= 'lingospeak';
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
 const { AuthService } = require('./auth.service') as typeof import('./auth.service');
 
 const PHONE = '09120000000';
