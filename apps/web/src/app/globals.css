@@ -13,7 +13,10 @@
   --canvas:#f8f9fd;
   --surface:#fff;
   --line:#e5e8f1;
-  --muted:#6f7890;
+  /* DES-505: was #6f7890, which is 4.19:1 on --canvas and fails WCAG AA for
+     body text. Used 218 times across 45 files via `text-muted`, so this one
+     line is the whole fix. #5b6478 measures 5.59:1. */
+  --muted:#5b6478;
   --green:#26a66f;
   --orange:#f28a32;
   --red:#ec5861;
