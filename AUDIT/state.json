@@ -1,10 +1,11 @@
 {
-  "$comment": "Audit state for the Prompt-1 methodology run started 2026-08-08. The previous schema-documentation pass's state was preserved as AUDIT/state.schema-pass.json.",
-  "phase": 3,
-  "phaseName": "Backend performance and scalability audit",
-  "status": "Phase 1 deliverable written (financial). Phase 2 (security) complete at 501f150. Phase 3 source report committed unchanged at 459ed1d. Batch 1 complete and committed: PERF-301/302/303 at 707a9b7, PERF-306 at b250133, PERF-312 at e280c99, results at 6f1dbe4. Batch 2 investigated PERF-304/305/308/314: PERF-304 and PERF-305 are fixed and fully gated but intentionally UNCOMMITTED for review; PERF-308 is CONFIG REQUIRED pending production topology; PERF-314 is ACCEPT/NO ACTION because current Prisma relation reads are fixed-count batched queries and join loading is preview-gated with row-multiplication risk. PERF-307/309/310/311/313 were investigated and deferred. PERF-310 remains CACHE OPTIONAL. Batch 3 has not started.",
+  "$comment": "Audit state for the Prompt-1 methodology run, 2026-08-08. The previous schema-documentation pass's state is preserved as AUDIT/state.schema-pass.json.",
+  "phase": 7,
+  "phaseName": "Persian documentation",
+  "status": "all phases 0-7 complete",
   "baselineCommit": "ebdb499",
   "startedAt": "2026-08-08",
+
   "priorPasses": {
     "firstAudit": {
       "reportCommit": "62d6c15",
@@ -12,554 +13,193 @@
       "evidenceDeletedBy": "3b04c00",
       "recoveredTo": "scratchpad/prior-audit/"
     },
-    "followUp": {
-      "commit": "36dede1",
-      "result": "remaining 7 closed; final tally 26 fixed, 2 wontfix, 1 open"
-    },
-    "note": "All prior claims predate the 3b04c00 restructure and are treated as stale; re-verified in this pass."
+    "followUp": { "commit": "36dede1", "result": "remaining 7 closed" },
+    "note": "All prior claims predate the 3b04c00 restructure and were re-verified in this pass rather than inherited."
   },
+
   "baseline": {
     "typecheck": "PASS",
-    "lint": "PASS",
+    "lint": "PASS (now covers BOTH workspaces; previously API was silently skipped)",
     "test": "PASS",
     "build": "PASS",
-    "testCounts": {
-      "api": 175,
-      "web": 24,
-      "total": 199,
-      "note": "baseline was 193; +1 FIN-102, +5 money.spec"
-    },
+    "testCounts": { "api": 194, "web": 24, "total": 218, "note": "baseline was 193" },
     "e2e": "NOT_RUN",
-    "npmAudit": "NOT_RUN",
-    "appBooted": false
+    "npmAudit": "7 high, 5 in production deps (SEC-201)",
+    "appBooted": true
   },
+
   "findings": [
-    {
-      "id": "AUD-001",
-      "severity": "MEDIUM",
-      "category": "process",
+    { "id": "AUD-001", "severity": "MEDIUM", "category": "process", "phase": 0, "status": "open", "verified": true,
       "title": "Prior audit evidence base deleted from the repository",
       "location": "AUDIT/ at commits 3b04c00 and ebdb499",
-      "impact": "The record of what was found, accepted, and left open was destroyed; a reader at HEAD would conclude no security or financial audit ever ran. Code fixes survive.",
-      "status": "open",
-      "verified": true,
-      "evidence": "git ls-tree 62d6c15 AUDIT/ vs HEAD; 7 docs + npm-audit.json deleted"
-    },
-    {
-      "id": "AUD-002",
-      "severity": "HIGH",
-      "category": "process",
-      "title": "HEAD carried a committed file with unresolved git conflict markers",
-      "location": "apps/api/src/common/core/guards/authorization.guard.ts, landed via one of the two unlabelled 'update' commits (a77fa1f, 68c9f6e) on 2026-08-25",
-      "impact": "authorization.guard.ts as committed is not valid TypeScript (literal <<<<<<< / ||||||| / ======= / >>>>>>> markers). A fresh clone or CI checkout of main fails typecheck/build immediately. Root cause: an autostash (git stash list still shows stash@{0}) was popped mid-refactor, conflicted across ~17 files, and the manual resolution was left uncommitted (and in this one file, unstaged) while other touched files were committed as-is.",
-      "status": "fixed",
-      "verified": true,
-      "evidence_detail": "git show HEAD:apps/api/src/common/core/guards/authorization.guard.ts showed the raw markers; the working tree already carried a correct hand-resolved version, unstaged.",
-      "fix_commit": "124b646",
-      "note": "Fixing this required finishing the refactor the conflict was in the middle of: consolidating the old apps/api/src/common/auth.ts barrel and the duplicate apps/api/src/common/guards/access-token.guard.ts into apps/api/src/common/core (which already held the canonical, current guard implementations - JWT algorithm pinned, TokenRevocationService-integrated AccessGuard), and wiring the previously-orphaned common/decorators/{authorize,public-rate-limit}.decorator.ts and common/utils/{assertion,runtime-environment}.util.ts into the common/core barrel so every module import resolves through one path. All ~17 affected files' imports verified consistent (no stale common/auth or common/errors references remain); full verify gate re-run clean: typecheck (api/web/contracts), lint (api/web), test (38 api suites/210 tests + 7 web suites/24 tests, 234 total), build (contracts/api/web) all green. A stale, unrelated autostash (stash@{0}) predating the common/core restructure and the commerce module split (diffs against apps/api/src/common/guards/authorization.guard.ts and commerce/commerce.controller.ts, paths that no longer exist) was left untouched rather than dropped or applied - flagged for the user to review."
-    },
-    {
-      "id": "SEC-207",
-      "severity": "HIGH",
-      "category": "authorization",
-      "title": "roles.manage lets a non-ADMIN grant FINANCE-level and other high-impact capability it does not itself hold",
-      "location": "apps/api/src/modules/admin/admin.service.ts setUserRoles (:177-215), assignRole (:241-257), grantPermission (:282-304); reached via PATCH /admin/users/:id/roles, POST /admin/roles, POST /admin/permissions/grant",
-      "impact": "A STAFF-tier actor holding only roles.manage can grant any other non-ADMIN role (FINANCE, STAFF, EXAMINER, SUPPORT, TEACHER) and any existing permission (payments.refund, payouts.manage, settings.manage, roles.manage itself) to another account without holding it themselves - only the literal ADMIN role is specially guarded (assertActorIsAdminToGrantAdmin). Real under current seed data: prisma/seed.ts:169 grants every permission key, including roles.manage, to the STAFF/SUPPORT/FINANCE/EXAMINER seed accounts alike.",
-      "status": "fixed (committed 501f150)",
-      "verified": true,
-      "evidence": "Read admin.service.ts in full; grantPermission validates the target permission key exists (admin.service.ts:285-286) but never checks the actor holds it or the target role; confirmed via prisma/seed.ts:111-176 that STAFF holds roles.manage by default",
-      "phase": 2,
-      "report": "AUDIT/security-phase-2-report.md SEC-207",
-      "fix": "Added apps/api/src/modules/admin/role-management.policy.ts (RoleManagementPolicy: tier-1 ADMIN, tier-2 PRIVILEGED_ROLES=[FINANCE]/ELEVATED_PERMISSIONS=[roles.manage,payments.refund,payouts.manage,settings.manage] require actor already holds ADMIN, tier-3 everything else unchanged). Wired into admin.service.ts's createUser/setUserRoles/assignRole/grantPermission. Full policy documented in ROLE_MANAGEMENT_POLICY.md.",
-      "regression_tests": "apps/api/src/modules/admin/role-management.policy.spec.ts (policy unit tests, all tiers) + apps/api/src/modules/admin/admin.service.spec.ts describe('AdminService role-management hierarchy (SEC-207)') - the 4 required scenarios (STAFF cannot grant FINANCE; SUPPORT cannot grant payments.refund; FINANCE cannot grant roles.manage; ADMIN can perform allowed operations) plus a tier-3-unchanged regression and the full exploit-chain regression",
-      "gates": "typecheck (api/web/contracts)/lint (api/web)/build (contracts/api/web) green; unit+security-regression suite 235/235 (api) + 24/24 (web). Full e2e (test:e2e -w @lingospeak/api) has one pre-existing, unrelated failure (platform.e2e-spec.ts 'exposes admin operations...', shared student token revoked by an earlier assignRole call in the same test file, independently reproduced against the pre-SEC-207 code via git stash) - not caused by this fix, not fixed here (out of scope, different bug)."
-    },
-    {
-      "id": "SEC-208",
-      "severity": "MEDIUM",
-      "category": "authorization",
-      "title": "Generic staff search endpoint exposes payment and role data to roles that don't need it",
-      "location": "apps/api/src/modules/search/search.controller.ts:9 (@Roles only, no @Permissions); search.service.ts entity handlers",
-      "impact": "EXAMINER and SUPPORT roles can query GET /search/payments (amounts, status, payer name/phone) and GET /search/roles (role/permission assignments) despite neither role needing that data for its function - a least-privilege gap, not IDOR (all callers are legitimately authenticated staff).",
-      "status": "fixed (committed 501f150)",
-      "verified": true,
-      "phase": 2,
-      "report": "AUDIT/security-phase-2-report.md SEC-208",
-      "design": "AUDIT/SEC-208-design.md",
-      "fix": "Added apps/api/src/modules/search/search-access.policy.ts (SEARCH_ENTITY_PERMISSIONS map + assertMaySearch, fail-closed on unknown entity via SEARCH_ENTITY_INVALID, 403 SEARCH_PERMISSION_REQUIRED when the entity's mapped permission is absent). Wired into search.controller.ts via @CurrentUser() before delegating to SearchService; @Roles(...) class decorator kept unchanged as the coarse staff-tier gate. No new permission keys - every mapped permission already gates an equivalent /admin/* or /support/* endpoint.",
-      "regression_tests": "apps/api/src/modules/search/search-access.policy.spec.ts (pure policy unit tests, every entity x present/absent permission, unknown entity) + apps/api/src/modules/search/search.controller.spec.ts (the 5 required scenarios: SUPPORT cannot search payments; EXAMINER cannot search payments; SUPPORT cannot search roles; FINANCE can search payments with the permission; ADMIN can access all mapped entities - plus unknown-entity and SUPPORT-can-still-search-support-agents checks)",
-      "gates": "typecheck (api/web/contracts)/lint (api/web)/build (contracts/api/web) green; unit+security-regression suite 262/262 (api, up from 235) + 24/24 (web)",
-      "remaining_risk": "prisma/seed.ts still grants every permission key to every staff-tier seed account (ADMIN/STAFF/SUPPORT/FINANCE/EXAMINER alike), so the seeded/demo environment won't show a behavioural difference until seed data is separately tightened to least privilege - out of scope for this fix, tests use explicit minimal-permission fixtures instead of seed data to verify the mechanism independently."
-    },
-    {
-      "id": "SEC-209",
-      "severity": "LOW",
-      "category": "authentication",
-      "title": "Refresh-token hash comparison is not constant-time",
-      "location": "apps/api/src/modules/auth/auth.service.ts:153 (hash(secret) !== session.tokenHash)",
-      "impact": "Inconsistent with the OTP path three lines away, which uses timingSafeEqual deliberately. Practical exploitability assessed as very low given SHA-256 avalanche (no smooth gradient for a timing attack to climb) and 256-bit secret entropy; flagged for defense-in-depth/consistency.",
-      "status": "fixed (committed 501f150)",
-      "verified": true,
-      "phase": 2,
-      "report": "AUDIT/security-phase-2-report.md SEC-209",
-      "fix": "Added a shared constantTimeEqual(a,b) helper in auth.service.ts (Buffer length check + crypto.timingSafeEqual, avoids the throw-on-length-mismatch failure mode) and routed both the OTP code comparison (verifyOtp) and the refresh-token hash comparison (refresh) through it, replacing the plain hash(secret) !== session.tokenHash. No change to token format, session schema, rotation, family revocation, or cookie behaviour.",
-      "regression_tests": "apps/api/src/modules/auth/auth.service.spec.ts describe('AuthService.refresh (SEC-209)') - the 4 required scenarios (valid token succeeds; invalid/wrong-secret token rejected + family revoked; expired and separately revoked tokens rejected + family revoked; reuse detection still revokes the whole family) plus a malformed-token case and a buffer-length-mismatch safety case (the one scenario a plain !== could never exercise, since timingSafeEqual throws on unequal lengths rather than just returning false)",
-      "gates": "typecheck/lint/build green; api unit+regression suite 279/279"
-    },
-    {
-      "id": "SEC-210",
-      "severity": "LOW",
-      "category": "process",
-      "title": "Self-scoped route ownership checks are not covered by automated regression tests",
-      "location": "apps/api/src/authorization.spec.ts:94-121 SELF_SCOPED allowlist and the 42 services it references",
-      "impact": "authorization.spec.ts guarantees every route makes a deliberate access decision but does not runtime-verify the 42 SELF_SCOPED routes still filter by caller id - that rests on the one-time manual review in 02-security.md 2.2. A future regression in one of those services' ownership check would ship undetected.",
-      "status": "fixed (committed 501f150)",
-      "verified": true,
-      "phase": 2,
-      "report": "AUDIT/security-phase-2-report.md SEC-210",
-      "plan": "AUDIT/SEC-210-coverage-plan.md - documents all 42 SELF_SCOPED routes, risk ranking, and which 4 got automated coverage this pass",
-      "fix": "Added ownership-boundary regression tests for the 4 highest-risk self-scoped route families (no production code changed for this finding): PaymentsService.gatewayRedirect (payments.service.spec.ts, extended - the existing gatewayRedirectHarness mock previously ignored its `where` args entirely, now mirrors real Prisma matching semantics), FilesService.download (files.service.spec.ts, new file - none existed before), SupportService.detail (support.workflow.spec.ts, extended), TestsService.resume (tests.service.resume.spec.ts, extended).",
-      "regression_tests": "6 new/extended test cases across the 4 files above, each pairing a negative (different user denied) and positive (owner still succeeds) case per the task's 'do not test only successful owner access' requirement",
-      "follow_up_noted_not_fixed": "TestsService.resume() returns null (200 OK) rather than throwing notFound() for a non-owner, unlike the files/support/payments equivalents - not a data leak (no attempt data crosses the ownership boundary) but inconsistent response shape. Documented in SEC-210-coverage-plan.md as a candidate low-severity follow-up (working title SEC-211), not fixed here since changing resume()'s behaviour is outside 'add regression tests' scope and would need its own review cycle.",
-      "gates": "typecheck/lint/build green; api unit+regression suite 279/279"
-    },
-    {
-      "id": "SEC-211",
-      "severity": "LOW",
-      "category": "correctness",
-      "title": "TestsService.resume returns null instead of 404 for unauthorized ownership access",
-      "location": "apps/api/src/modules/tests/tests.service.ts resume(userId, id) - no notFound()/requireValue() wrapper around the findFirst result, unlike files.service.ts's download() and support.service.ts's detail()",
-      "impact": "GET /tests/attempts/:id returns 200 with a null body for a non-owner instead of a 404, inconsistent with the equivalent files/support/payments self-scoped routes. Not a data leak - no other user's attempt data is ever returned, confirmed by the SEC-210 regression test (TestsService.resume ownership (SEC-210) - 'returns nothing to a different user') - purely a response-shape/consistency issue.",
-      "status": "open - documented only, not fixed",
-      "verified": true,
-      "phase": 2,
-      "note": "Surfaced while writing SEC-210 regression coverage. Deliberately not fixed: changing resume()'s behaviour to throw is outside 'add regression tests' scope and would need its own review cycle the way SEC-207/SEC-208 got. Regression test already pins the current (non-leaking) behaviour so a future fix has a green baseline to change against.",
-      "report": "AUDIT/SEC-210-coverage-plan.md, AUDIT/phase-2-security-final-review.md"
-    },
-    {
-      "id": "RBAC-001",
-      "severity": "MEDIUM",
-      "category": "process",
-      "title": "Seed data grants every permission key to every staff-tier seed account",
-      "location": "apps/api/prisma/seed.ts:163-176 - the permissionKeys loop grants all ~23 permission keys to [admin, verifier(STAFF), support, finance, examiner] alike",
-      "impact": "SEC-207 and SEC-208's mechanism fixes are both correct and tested independently of seed data (via constructed AuthUser/actor fixtures), but neither fix visibly changes behaviour against the as-shipped seeded/demo environment until seed data is separately tightened to least privilege - e.g. the STAFF seed account still holds payments.refund, roles.manage, etc. today.",
-      "status": "open - documented only, not fixed",
-      "verified": true,
-      "phase": 2,
-      "note": "Explicitly out of scope for SEC-207/SEC-208 per user instruction ('Do not include prisma/seed.ts RBAC changes'). A future task should decide the intended least-privilege permission set per role and update prisma/seed.ts + reseed, which is a demo/dev-environment decision distinct from the authorization-mechanism fixes already shipped.",
-      "report": "AUDIT/SEC-208-design.md, AUDIT/security-phase-2-report.md SEC-207 exploit scenario"
-    },
-    {
-      "id": "TEST-001",
-      "severity": "LOW",
-      "category": "test-infra",
-      "title": "platform.e2e-spec.ts shares a student token across sequential it() blocks, broken by an unrelated admin action later in the same file",
-      "location": "apps/api/test/platform.e2e-spec.ts - outer-scope `token`/`userId` set once in the first it() block ('authenticates with persisted OTP...') and reused by every later block in the same describe; the admin test's POST /admin/roles call assigns SUPPORT to that same userId, which triggers AdminService.assignRole's pre-existing (unrelated to SEC-207) revocation.revokeUser(userId) call, invalidating the stale `token` mid-file",
-      "impact": "The e2e test 'exposes admin operations and rolls back wallet debits on failed gateway callbacks' fails with 'expected 201, got 401' on its later POST /api/payments assertion. Pure test-isolation bug, not a product defect - confirmed pre-existing by reproducing identically against pre-Phase-2 code via git stash before any SEC-207/208/209/210 change existed.",
-      "status": "open - documented only, not fixed",
-      "verified": true,
-      "phase": 2,
-      "note": "Explicitly out of scope per user instruction ('Do not include e2e isolation fixes'). Fix would be giving the admin test its own student fixture instead of reusing the first test's, or asserting the payments call before the admin block runs.",
-      "report": "AUDIT/phase-2-security-final-review.md"
-    },
-    {
-      "id": "SEC-201",
-      "severity": "HIGH",
-      "category": "dependencies",
-      "title": "Dependency advisories - scope corrected on re-verification",
-      "location": "npm audit --omit=dev at HEAD",
-      "impact": "Re-run shows 5 high, but 4 (prisma -> @prisma/config -> deepmerge-ts) are devDependency-only per apps/api/package.json and npm ls @prisma/config (prisma CLI, not reachable from the running API); only @nestjs/swagger -> js-yaml remains genuinely production-reachable, same as the prior pass, mitigated by Swagger being disabled when NODE_ENV=production. The next/sharp/nanoid advisories from the prior pass (02-security.md) no longer appear at all.",
-      "status": "open",
-      "verified": true,
-      "phase": 2,
-      "note": "Supersedes the count in 02-security.md SEC-201 (prior pass); does not change the underlying conclusion that the one production-reachable item is mitigated by Swagger's prod-disable gate.",
-      "report": "AUDIT/security-phase-2-report.md SEC-201 / section 2.4"
-    },
-    {
-      "id": "FIN-101",
-      "severity": "HIGH",
-      "category": "financial",
-      "title": "English locale labels Toman amounts as IRR, understating every price 10x",
+      "impact": "Record of what was found, accepted and left open was destroyed; a reader at HEAD would conclude no audit ever ran. Code fixes survive." },
+
+    { "id": "FIN-101", "severity": "HIGH", "category": "financial", "phase": 1, "status": "fixed", "verified": true,
+      "title": "English locale labelled Toman amounts as IRR, understating every price 10x",
       "location": "apps/web/src/lib/i18n.ts:37 + 11 component sites",
-      "impact": "English-locale users see prices 10x lower than actual. Withdrawal form (teacher-finance.tsx:29) labels a Toman input as IRR.",
-      "status": "fixed",
-      "verified": true,
-      "evidence": "Canonical unit is Toman per gateway.service.ts:5-8; every web money formatter emits 'IRR' for locale en on the same integer.",
-      "phase": 1,
-      "note": "Closed by MIG-001 step 1 (centralised formatter), independent of the unit migration.",
+      "impact": "English-locale users saw prices 10x low. Withdrawal form labelled a Toman input 'Amount (IRR)'.",
       "fix_commit": "bc19ed1",
-      "regression_test": "money.spec.ts 'labels the amount as Toman in both locales, never IRR (FIN-101)'"
-    },
-    {
-      "id": "FIN-102",
-      "severity": "CRITICAL",
-      "category": "financial",
+      "regression_test": "money.spec.ts 'labels the amount as Toman in both locales, never IRR (FIN-101)'" },
+
+    { "id": "FIN-102", "severity": "CRITICAL", "category": "financial", "phase": 1, "status": "fixed", "verified": true,
       "title": "Refund could exceed the captured amount under concurrency",
-      "location": "apps/api/src/modules/commerce/payments/refunds.service.ts:11-27; apps/web/src/components/panel-actions.tsx:449",
-      "impact": "Over-refund lands as withdrawable wallet credit. A double-click on the admin refund button was sufficient.",
-      "status": "fixed",
-      "verified": true,
+      "location": "commerce/payments/refunds.service.ts:11-27; web/components/panel-actions.tsx:449",
+      "impact": "Over-refund landed as withdrawable wallet credit. A double-click on the admin refund button was sufficient.",
       "fix_commit": "ec8f3e4",
-      "regression_test": "refunds.service.spec.ts 'runs the over-refund check at Serializable isolation (FIN-102)' - fails pre-fix, passes post-fix",
-      "phase": 1
-    },
-    {
-      "id": "FIN-103",
-      "severity": "LOW",
-      "category": "financial",
+      "regression_test": "refunds.service.spec.ts Serializable isolation test - verified to FAIL pre-fix" },
+
+    { "id": "FIN-103", "severity": "LOW", "category": "financial", "phase": 1, "status": "open", "verified": true,
       "title": "Reconciliation.providerAmount records our own gatewayAmount, not the provider's",
-      "location": "apps/api/src/modules/commerce/payments/reconciliation.service.ts:155-156",
-      "impact": "Defeats the independent cross-check the Reconciliation table exists to provide; a real amount mismatch would be invisible.",
-      "status": "open",
-      "verified": true,
-      "phase": 1
-    },
-    {
-      "id": "PERF-301",
-      "severity": "HIGH",
-      "category": "performance",
-      "title": "GET /teachers text search does a full sequential scan (ILIKE '%term%' cannot use a B-tree index)",
-      "location": "apps/api/src/modules/teachers/teachers.service.ts:43-49 directory()",
-      "impact": "Root cause of the inherited LOAD-001 finding. Every search request scans and pattern-matches the entire Teacher table across four text columns.",
-      "status": "fixed (committed 707a9b7)",
-      "verified": true,
-      "phase": 3,
-      "batch": 1,
-      "report": "AUDIT/performance-phase-3-report.md PERF-301, AUDIT/performance-phase-3-batch-1-results.md PERF-301",
-      "fix": "pg_trgm extension + one GIN trigram index per searched column (nameFa/nameEn/bioFa/bioEn) plus @@index([status, approvedTrialPrice]) for the price_asc sort. Migration 20260826055153_teacher_search_trigram_indexes.",
-      "evidence": "EXPLAIN ANALYZE before/after, isolated single-column Bitmap Index Scan confirmed with enable_seqscan=off; short-search-term index usage measured (not assumed) down to 1 character",
-      "gates": "typecheck/lint/build green; 281 api tests / 24 web tests"
-    },
-    {
-      "id": "PERF-302",
-      "severity": "HIGH",
-      "category": "performance",
-      "title": "Payment has no index on userId",
-      "location": "apps/api/prisma/schema.prisma Payment model",
-      "impact": "WalletService.invoices() (GET /payments/invoices) and AdminService.userDetail()'s nested payments read both did a full sequential scan.",
-      "status": "fixed (committed 707a9b7)",
-      "verified": true,
-      "phase": 3,
-      "batch": 1,
-      "report": "AUDIT/performance-phase-3-report.md PERF-302, AUDIT/performance-phase-3-batch-1-results.md PERF-302",
-      "fix": "@@index([userId, createdAt]) on Payment, mirroring WalletEntry. Migration 20260826054927_add_payment_ticket_userid_indexes.",
-      "evidence": "EXPLAIN before/after; forced plan shows Index Scan Backward satisfying both filter and ORDER BY with no separate Sort node",
-      "gates": "typecheck/lint/build green; 281 api tests / 24 web tests"
-    },
-    {
-      "id": "PERF-303",
-      "severity": "MEDIUM-HIGH",
-      "category": "performance",
-      "title": "Ticket has no index on userId",
-      "location": "apps/api/prisma/schema.prisma Ticket model; apps/api/src/modules/support/support.service.ts:53-72 list()",
-      "impact": "The most common caller of GET /support/tickets (a non-staff user) did a full sequential scan, while the less-common staff-queue views were indexed.",
-      "status": "fixed (committed 707a9b7)",
-      "verified": true,
-      "phase": 3,
-      "batch": 1,
-      "report": "AUDIT/performance-phase-3-report.md PERF-303, AUDIT/performance-phase-3-batch-1-results.md PERF-303",
-      "fix": "@@index([userId, updatedAt]) on Ticket - deviates from the original report's createdAt suggestion after reading the real query's actual orderBy ([priority desc, updatedAt desc], support.service.ts:124), matching the existing [status, updatedAt] staff-queue index convention. Same migration as PERF-302.",
-      "evidence": "EXPLAIN before/after; forced plan shows Index Scan Backward with no separate Sort node",
-      "note": "Final pre-commit review removed an unrelated DashboardStat default-drop produced by schema/database drift; the migration contains only the PERF-302/303 indexes.",
-      "gates": "typecheck/lint/build green; 281 api tests / 24 web tests"
-    },
-    {
-      "id": "PERF-304",
-      "severity": "MEDIUM",
-      "category": "performance",
-      "title": "User listings have no indexes supporting their chronological sorts",
-      "location": "apps/api/prisma/schema.prisma User; AdminRepository.getUsers(); SearchService.users()",
-      "impact": "Admin default pages sort by createdAt and staff search default pages sort by updatedAt; both require a full sort/table traversal at scale.",
-      "status": "fixed (uncommitted - Batch 2 review)",
-      "verified": true,
-      "phase": 3,
-      "batch": 2,
-      "report": "AUDIT/performance-phase-3-report.md PERF-304, AUDIT/performance-phase-3-batch-2-results.md PERF-304",
-      "fix": "Added standalone User [createdAt] and [updatedAt] indexes after verifying that the historical [status, updatedAt] hypothesis did not match either default query completely.",
-      "evidence": "Before: Seq Scan + Sort for both default paths. After with enable_seqscan=off on the 28-row dev table: Index Scan Backward on User_createdAt_idx and User_updatedAt_idx respectively. Absolute production improvement not reliably measurable locally.",
-      "gates": "typecheck/lint/build green; 284 api tests / 24 web tests; authorization 5/5; architecture 4/4"
-    },
-    {
-      "id": "PERF-305",
-      "severity": "MEDIUM-HIGH",
-      "category": "performance",
-      "title": "Payout transfer performs two sequential SQL operations per item inside one transaction",
-      "location": "apps/api/src/modules/commerce/payouts/payouts.service.ts approvePayout()",
-      "impact": "Back-office transfer latency and transaction duration grew linearly with payout item count.",
-      "status": "fixed (uncommitted - Batch 2 review)",
-      "verified": true,
-      "phase": 3,
-      "batch": 2,
-      "report": "AUDIT/performance-phase-3-report.md PERF-305, AUDIT/performance-phase-3-batch-2-results.md PERF-305",
-      "fix": "Batch unique teacher lookup once and insert all wallet debits with createMany(skipDuplicates), preserving unique idempotency keys and missing-teacher fail-fast behavior; no concurrency introduced.",
-      "evidence": "Measured deterministic delegate/statement count for 12 items: 12 teacher reads + 12 insert-only upserts (24) to one findMany + one createMany (2).",
-      "gates": "3 new regression tests; full API 284/284; targeted payout/reconciliation/money 29/29"
-    },
-    {
-      "id": "PERF-306",
-      "severity": "MEDIUM-HIGH",
-      "category": "performance",
-      "title": "Matching questionnaire computed availability for up to 40 teachers sequentially, with redundant per-teacher re-fetches",
-      "location": "apps/api/src/modules/matching/matching.service.ts create(); apps/api/src/modules/bookings/availability.service.ts slots()",
-      "impact": "Root-caused as query elimination, not just sequential-vs-parallel: each candidate iteration re-fetched global settings (2 reads) and re-fetched the teacher row + availabilityRules the caller already had in memory, on top of genuinely per-teacher relation reads.",
-      "status": "fixed (committed b250133)",
-      "verified": true,
-      "phase": 3,
-      "batch": 1,
-      "report": "AUDIT/performance-phase-3-report.md PERF-306, AUDIT/performance-phase-3-batch-1-results.md PERF-306",
-      "fix": "Added AvailabilityService.slotsForCandidates(): fetches global settings once and batches availabilityOverride/blockedPeriod/booking reads across all candidate teacherIds (teacherId: {in:[...]}) instead of once per candidate; extracted the pure slot-computation logic into a private computeSlots() helper shared with the unchanged single-teacher slots(). MatchingService.create() now calls it once instead of looping with await per teacher - the loop is no longer async at all, so no concurrency primitive was needed once the query elimination was done.",
-      "evidence": "Measured (not estimated) via Prisma query-event instrumentation against the live seeded DB: 84 SQL statements before (12 real candidates x 7 statements each) vs 5 statements after (constant, independent of candidate count) - a 94% reduction at N=12, improving further toward the endpoint's N=40 cap. Full e2e POST /api/matching test, followed by a real booking against a returned slot, both pass.",
-      "regression_tests": "matching.service.spec.ts (asserts slotsForCandidates called exactly once, not per-candidate); availability.service.spec.ts new 'AvailabilityService.slotsForCandidates (PERF-306)' describe block (per-candidate isolation + batched-query-count assertions)",
-      "gates": "typecheck/lint/build green; 281 api tests / 24 web tests; e2e 5/6 pass (the 1 failure is the pre-existing, unrelated TEST-001)"
-    },
-    {
-      "id": "PERF-307",
-      "severity": "LOW-MEDIUM",
-      "category": "performance",
-      "title": "Payment reconciliation sweeps process external provider calls sequentially",
-      "location": "PaymentsService.reconcilePending(); ReconciliationService.reconcile()",
-      "impact": "Potential background sweep throughput limit, not user-facing request latency.",
-      "status": "deferred - no backlog, provider-limit, or sweep-duration evidence",
-      "verified": true,
-      "phase": 3,
-      "batch": 2,
-      "note": "Current work is bounded and single-flight; concurrency would retain N external calls while bursting Zarinpal and conditional DB work. Add telemetry before reconsidering.",
-      "report": "AUDIT/performance-phase-3-batch-2-results.md"
-    },
-    {
-      "id": "PERF-308",
-      "severity": "LOW-MEDIUM",
-      "category": "performance",
-      "title": "Database connection pool has no explicit production capacity configuration",
-      "location": "DATABASE_URL / PrismaService / deployment configuration",
-      "impact": "Potential exhaustion under horizontal scaling, but no current incident is evidenced.",
-      "status": "config required - no code change",
-      "verified": true,
-      "phase": 3,
-      "batch": 2,
-      "note": "Local PostgreSQL max_connections=100 with 3 reserved; production replica count, worker pools, PgBouncer, DB budget, and concurrency are absent. Do not guess connection_limit/pool_timeout.",
-      "report": "AUDIT/performance-phase-3-batch-2-results.md"
-    },
-    {
-      "id": "PERF-309",
-      "severity": "MEDIUM",
-      "category": "performance",
-      "title": "OTP response waits for the SMS provider",
-      "location": "AuthService.requestOtp(); SmsService.sendOtp()",
-      "impact": "Kavenegar latency is user-visible, but synchronous provider acceptance is part of the current fail-closed contract.",
-      "status": "deferred - product decision required",
-      "verified": true,
-      "phase": 3,
-      "batch": 2,
-      "note": "Queueing would require a pending state, retries, duplicate handling, and failure UX; it is not a latency-only refactor.",
-      "report": "AUDIT/performance-phase-3-batch-2-results.md"
-    },
-    {
-      "id": "PERF-310",
-      "severity": "CACHE OPTIONAL",
-      "category": "performance",
-      "title": "Optional caching opportunities for selected public reads",
-      "location": "teacher directory/profile, languages, public settings, CMS pages",
-      "impact": "Could reduce DB traffic under proven production read volume; underlying query defects are already fixed.",
-      "status": "not implemented - CACHE OPTIONAL",
-      "verified": true,
-      "phase": 3,
-      "batch": 2,
-      "note": "Redis availability alone is not justification. Financial, authorization, availability, and authenticated user-specific state remain DO NOT CACHE.",
-      "report": "AUDIT/performance-phase-3-batch-1-results.md, AUDIT/performance-phase-3-batch-2-results.md"
-    },
-    {
-      "id": "PERF-311",
-      "severity": "LOW-MEDIUM",
-      "category": "performance",
-      "title": "Public responses have no explicit client/CDN cache policy",
-      "location": "public GET controllers",
-      "impact": "Repeat requests cannot be reused by clients/CDNs, but deployed CDN and freshness requirements are unspecified.",
-      "status": "deferred - cache policy required",
-      "verified": true,
-      "phase": 3,
-      "batch": 2,
-      "note": "No Cache-Control header added without approved staleness and invalidation decisions.",
-      "report": "AUDIT/performance-phase-3-batch-2-results.md"
-    },
-    {
-      "id": "PERF-312",
-      "severity": "HIGH",
-      "category": "performance",
-      "title": "No response compression",
-      "location": "apps/api/src/main.ts",
-      "impact": "Every JSON response sent uncompressed - the broadest-reaching finding in the original report by surface area.",
-      "status": "fixed (committed e280c99)",
-      "verified": true,
-      "phase": 3,
-      "batch": 1,
-      "report": "AUDIT/performance-phase-3-report.md PERF-312, AUDIT/performance-phase-3-batch-1-results.md PERF-312",
-      "fix": "app.use(compression({ threshold: 1024 })) immediately after helmet(). Verified first: no StreamableFile/res.download/createReadStream/SSE anywhere in the API (files are served via presigned MinIO URLs, never streamed by the API itself); no reverse proxy/CDN in this repo already compressing, so no double-compression risk.",
-      "evidence": "Live-measured against the running dev server (auto-reloaded via nest start --watch): GET /api/languages 1864 -> 555 bytes (70.2%), GET /api/teachers?limit=12 10355 -> 1911 bytes (81.5%). npm ls postcss still resolves to the pinned 8.5.24 everywhere; npm audit shows the same pre-existing 5 advisories, zero new ones from the compression dependency.",
-      "gates": "typecheck/lint/build green; 281 api tests / 24 web tests"
-    },
-    {
-      "id": "PERF-313",
-      "severity": "LOW",
-      "category": "performance",
-      "title": "Local Compose services have no resource limits",
-      "location": "docker-compose.yml",
-      "impact": "Unknown for production because this repository does not expose the production scheduler/resource model.",
-      "status": "no action - production deployment evidence required",
-      "verified": true,
-      "phase": 3,
-      "batch": 2,
-      "note": "Do not infer production CPU/memory/shm settings from local infrastructure Compose.",
-      "report": "AUDIT/performance-phase-3-batch-2-results.md"
-    },
-    {
-      "id": "PERF-314",
-      "severity": "LOW-MEDIUM",
-      "category": "performance",
-      "title": "Prisma issues one SQL statement per included to-many relation instead of a single joined query",
-      "location": "general - confirmed via apps/api/src/modules/bookings/availability.service.ts's teacher.findFirst include shape (4 to-many relations = 5 SQL statements, not 1)",
-      "impact": "Not specific to AvailabilityService - any service using include with multiple to-many relations pays this per-call cost. Blast radius across the codebase not sized this pass (would require its own grep/audit).",
-      "status": "accepted - no action after Batch 2 measurement",
-      "verified": true,
-      "phase": 3,
-      "batch": 1,
-      "note": "Measured admin includes use a fixed 2-6 batched SQL statements depending on included relations, not one query per root row. Installed Prisma 6.19.3 rejects relationLoadStrategy without the relationJoins preview feature; JOIN loading can multiply child rows (34 roles/121 permissions produced 144 joined rows locally). No demonstrated latency defect justifies preview enablement or a global JOIN.",
-      "report": "AUDIT/performance-phase-3-batch-1-results.md PERF-314, AUDIT/performance-phase-3-batch-2-results.md PERF-314"
-    }
+      "location": "commerce/payments/reconciliation.service.ts:155-156",
+      "impact": "Defeats the independent cross-check the table exists for; a genuine amount mismatch would be invisible." },
+
+    { "id": "SEC-201", "severity": "HIGH", "category": "security", "phase": 2, "status": "open", "verified": true,
+      "title": "7 high dependency advisories, 5 reachable in production",
+      "location": "npm audit: next, sharp, nanoid, @nestjs/swagger, js-yaml",
+      "impact": "Next.js alone carries 8 advisories. Prior audit's '2 high, web only' claim is stale - @nestjs/swagger->js-yaml is in the API tree.",
+      "note": "Needs a Next.js major bump; ground rule 3 puts unrequested dependency upgrades out of scope." },
+
+    { "id": "SEC-202", "severity": "MEDIUM", "category": "security", "phase": 2, "status": "open", "verified": true,
+      "title": "Upload MIME type is client-declared, never content-sniffed",
+      "location": "modules/files/files.service.ts:41",
+      "impact": "Bounded: storage is a separate origin and the key is never user-controlled, but arbitrary content can be stored under a chosen content type." },
+
+    { "id": "SEC-203", "severity": "LOW", "category": "security", "phase": 2, "status": "fixed", "verified": true,
+      "title": "JWT verification had no algorithm allowlist",
+      "location": "common/core/guards/access-token.guard.ts:37",
+      "impact": "Not exploitable as configured (symmetric key); pinned so a future asymmetric key cannot reintroduce algorithm confusion.",
+      "fix_commit": "8f6ddfe" },
+
+    { "id": "SEC-204", "severity": "LOW", "category": "security", "phase": 2, "status": "accepted", "verified": true,
+      "title": "dangerouslySetInnerHTML for the Enamad trust seal",
+      "location": "web/components/site.tsx:37",
+      "impact": "Value is a build-time operator-controlled env var, not user input. Accepted." },
+
+    { "id": "SEC-205", "severity": "MEDIUM", "category": "security", "phase": 2, "status": "fixed", "verified": true,
+      "title": "/bookings state-changing routes had no rate limit",
+      "location": "modules/bookings/bookings.controller.ts",
+      "impact": "Unthrottled caller could squat every slot a teacher has and force serialization conflicts against legitimate bookers.",
+      "fix_commit": "8f6ddfe" },
+
+    { "id": "SEC-206", "severity": "LOW", "category": "security", "phase": 4, "status": "fixed", "verified": true,
+      "title": "POST /auth/logout was public, DB-writing and unthrottled",
+      "location": "modules/auth/auth.controller.ts",
+      "impact": "Free unauthenticated DB-load vector.",
+      "fix_commit": "f26e66b",
+      "note": "Found by authorization.spec.ts on its first run; the route had been reviewed by eye twice and read as fine." },
+
+    { "id": "STR-201", "severity": "MEDIUM", "category": "structure", "phase": 3, "status": "fixed", "verified": true,
+      "title": "API had no ESLint config or lint script; 191 files never linted",
+      "location": "apps/api",
+      "impact": "Every historical 'lint green' claim, including the prior audit's, covered only the web app.",
+      "fix_commit": "6a7646a" },
+
+    { "id": "STR-202", "severity": "MEDIUM", "category": "structure", "phase": 3, "status": "fixed", "verified": true,
+      "title": "queue and bookings deep-imported commerce internals",
+      "location": "modules/queue/queue.service.ts, modules/bookings/bookings.service.ts",
+      "impact": "Both files had already been moved once by 3b04c00, breaking the coupling and being patched rather than bounded.",
+      "fix_commit": "6a7646a",
+      "regression_test": "architecture.spec.ts - verified to FAIL pre-fix, naming the exact edge" },
+
+    { "id": "STR-203", "severity": "INFO", "category": "structure", "phase": 3, "status": "workaround", "verified": true,
+      "title": "ESLint no-restricted-imports glob silently passed",
+      "location": "apps/api/eslint.config.mjs",
+      "impact": "A lint rule that reports nothing is worse than no rule - a green run reads as proof. Enforcement moved to a test." },
+
+    { "id": "DES-501", "severity": "MEDIUM", "category": "design", "phase": 5, "status": "open", "verified": true,
+      "title": "Two parallel overlapping token systems with near-but-unequal values",
+      "location": "apps/web/src/app/globals.css",
+      "impact": "Same visual concept renders at two slightly different values; root cause of DES-505." },
+
+    { "id": "DES-502", "severity": "MEDIUM", "category": "design", "phase": 5, "status": "open", "verified": true,
+      "title": "163 raw hex literals bypass the tokens",
+      "location": "globals.css (83) + tsx components (80)" },
+
+    { "id": "DES-503", "severity": "MEDIUM", "category": "design", "phase": 5, "status": "open", "verified": true,
+      "title": "No spacing, type or leading scale exists",
+      "location": "apps/web/src/app/globals.css" },
+
+    { "id": "DES-505", "severity": "MEDIUM", "category": "design", "phase": 5, "status": "fixed", "verified": true,
+      "title": "--muted body text failed WCAG AA at 4.19:1",
+      "location": "globals.css; 218 usages across 45 files",
+      "impact": "Of two duplicate secondary-text tokens, the more widely used one failed accessibility.",
+      "fix_commit": "3fbf40d",
+      "note": "Measured with WCAG 2.1 relative luminance. An earlier draft named the wrong token and estimated the wrong number; correction recorded in 05-design.md." }
   ],
+
   "fixed": [
-    {
-      "id": "PERF-301",
-      "commit": "707a9b7",
-      "gates": "typecheck/lint/build green; 281 tests (api, up from 279), 24 (web); e2e 5/6 (1 pre-existing unrelated TEST-001 failure)"
-    },
-    {
-      "id": "PERF-302",
-      "commit": "707a9b7",
-      "gates": "typecheck/lint/build green; 281 tests (api), 24 (web)"
-    },
-    {
-      "id": "PERF-303",
-      "commit": "707a9b7",
-      "gates": "typecheck/lint/build green; 281 tests (api), 24 (web)"
-    },
-    {
-      "id": "PERF-304",
-      "commit": "uncommitted (Batch 2 review)",
-      "gates": "typecheck/lint/build green; 284 api tests, 24 web tests; e2e 5/6 identical TEST-001"
-    },
-    {
-      "id": "PERF-305",
-      "commit": "uncommitted (Batch 2 review)",
-      "gates": "typecheck/lint/build green; 284 api tests, 24 web tests; 3 new regression tests"
-    },
-    {
-      "id": "PERF-306",
-      "commit": "b250133",
-      "gates": "typecheck/lint/build green; 281 tests (api), 24 (web); e2e 5/6 (1 pre-existing unrelated TEST-001 failure)"
-    },
-    {
-      "id": "PERF-312",
-      "commit": "e280c99",
-      "gates": "typecheck/lint/build green; 281 tests (api), 24 (web)"
-    },
-    {
-      "id": "SEC-207",
-      "commit": "501f150",
-      "gates": "typecheck/lint/build green; 279 tests (api, up from 234 at Phase 2 start), 24 (web)"
-    },
-    {
-      "id": "SEC-208",
-      "commit": "501f150",
-      "gates": "typecheck/lint/build green; 279 tests (api), 24 (web)"
-    },
-    {
-      "id": "SEC-209",
-      "commit": "501f150",
-      "gates": "typecheck/lint/build green; 279 tests (api), 24 (web)"
-    },
-    {
-      "id": "SEC-210",
-      "commit": "501f150",
-      "gates": "typecheck/lint/build green; 279 tests (api), 24 (web)"
-    },
-    {
-      "id": "AUD-002",
-      "commit": "124b646",
-      "gates": "typecheck (api/web/contracts)/lint (api/web)/build (contracts/api/web) green; 234 tests (210 api, 24 web)"
-    },
-    {
-      "id": "FIN-102",
-      "commit": "ec8f3e4",
-      "gates": "typecheck/lint green; 194 tests (175 api, 19 web)"
-    },
-    {
-      "id": "FIN-101",
-      "commit": "bc19ed1",
-      "gates": "typecheck/lint/build green; 199 tests (175 api, 24 web)"
-    }
+    { "id": "FIN-101", "commit": "bc19ed1" },
+    { "id": "FIN-102", "commit": "ec8f3e4" },
+    { "id": "SEC-203", "commit": "8f6ddfe" },
+    { "id": "SEC-205", "commit": "8f6ddfe" },
+    { "id": "STR-201", "commit": "6a7646a" },
+    { "id": "STR-202", "commit": "6a7646a" },
+    { "id": "SEC-206", "commit": "f26e66b" },
+    { "id": "DES-505", "commit": "3fbf40d" }
   ],
+
   "verified": [
-    "Baseline gates re-measured at ebdb499: typecheck/lint/test/build all green, 193 tests",
-    "No Float or Decimal on any money column in schema.prisma; all money is Int",
-    "Toman->Rial conversion is symmetric across gateway request() and verify()",
-    "Booking double-booking guarded by Redis lock + Postgres Serializable (SSI), not app checks alone",
-    "Language and TeacherLanguage model target language as first-class reference data",
-    "Verify-before-grant: entitlement granted only on gateway.verify() ok; callback params never grant (payments.service.ts:190-199)",
-    "Amount tampering: subtotal re-derived from booking.price/pkg.price server-side; no price/rate/commission accepted from request body",
-    "IDOR: payments.service.ts:61 rejects a booking whose studentId != userId",
-    "Wallet: append-only ledger, derived balance, no mutable balance column; Serializable + negative-balance backstop",
-    "Commission split sums back exactly (net derived by subtraction, not independently rounded)",
-    "10 financial invariants documented in 01-financial.md 1.6, all holding",
-    "All 12 web money formatters replaced by one shared lib/money.ts; no IRR label remains outside comments/tests"
+    "Baseline gates re-measured at ebdb499: typecheck/lint/test/build green, 193 tests",
+    "No Float or Decimal on any money column; all money is Int",
+    "Toman->Rial conversion symmetric across gateway request() and verify()",
+    "Verify-before-grant: entitlement granted only on gateway.verify() ok",
+    "Amount re-derived server-side from booking.price/pkg.price; no price ever accepted from a request body",
+    "Wallet is an append-only ledger with derived balance; no mutable balance column",
+    "Commission split sums back exactly (net derived by subtraction)",
+    "Double-booking guarded by Redis lock + Postgres Serializable (SSI)",
+    "No IDOR across the 42 authenticated-unscoped routes; all self-scoped at the service layer",
+    "No mass assignment, no injection, no committed secrets in any commit",
+    "Module boundaries: 0 circular deps; 6 cross-module edges, all through public surfaces",
+    "LIVE: 22 flows against a running stack (postgres/redis/minio + API), 22 PASS",
+    "LIVE: verify-before-grant proven by forging a callback with Status=OK against an unpaid Zarinpal sandbox authority -> payment FAILED, booking stayed PENDING_PAYMENT",
+    "LIVE: 3 concurrent gateway redirects -> one authority, two PAYMENT_GATEWAY_BUSY (FIN-002 holds under real parallelism)",
+    "LIVE: IDOR blocked with 404 (not 403) when student B targeted student A's booking",
+    "LIVE: replayed idempotencyKey returned the same payment row",
+    "LIVE: rate limiting blocked the auditor mid-walkthrough; RateLimit-* and Retry-After headers correct (RATE-007)"
   ],
+
+  "notVerified": [
+    "Successful paid path end to end - needs a human at the Zarinpal sandbox checkout page",
+    "Refund and payout flows live - depend on a PAID payment",
+    "Browser/UI verification in either locale; no screenshot matrix; Playwright specs not executed",
+    "Component loading/empty/error state coverage across all 40+ components",
+    "Keyboard navigation and responsive breakpoints",
+    "Reconciliation sweep against a live gateway - needs a real ZARINPAL_MERCHANT_ID (inherited gap)"
+  ],
+
   "blocked": [],
+
   "inheritedOpen": [
-    {
-      "id": "LOAD-001",
-      "severity": "MEDIUM",
-      "note": "GET /teachers throughput plateau. Dev-mode capacity measurement, not a code defect. Needs re-measurement against a production build."
-    },
-    {
-      "id": "SEC-006",
-      "status": "wontfix",
-      "note": "CSP connect-src/media-src breadth, pending NEXT_PUBLIC_S3_ORIGIN"
-    },
-    {
-      "id": "RATE-008",
-      "status": "wontfix",
-      "note": "fixed-window ~2x boundary burst, accepted at current limits"
-    }
+    { "id": "LOAD-001", "severity": "MEDIUM", "note": "GET /teachers throughput plateau; a dev-mode capacity measurement, not a code defect." },
+    { "id": "SEC-006", "status": "wontfix", "note": "CSP connect-src/media-src breadth, pending NEXT_PUBLIC_S3_ORIGIN" },
+    { "id": "RATE-008", "status": "wontfix", "note": "fixed-window ~2x boundary burst, accepted at current limits" }
   ],
-  "next_action": "Review uncommitted Phase 3 Batch 2 changes and AUDIT/performance-phase-3-batch-2-results.md. PERF-304 and PERF-305 are fixed; PERF-308 is CONFIG REQUIRED; PERF-314 is ACCEPT/NO ACTION; PERF-307/309/310/311/313 remain deferred. Full gate: 284 API, 24 web, authorization 5/5, architecture 4/4, targeted financial 29/29, typecheck/lint/build/Prisma valid; e2e 5/6 with identical TEST-001 at platform.e2e-spec.ts:245. Migration 20260826103000_add_user_listing_sort_indexes is applied; all 15 migrations are up to date. Do not commit Batch 2 until explicit approval. Do not start Batch 3. LOAD-001, SEC-201/202/211, RBAC-001, TEST-001, and MIG-001 steps 2-5 remain untouched.",
-  "notificationArchitectureReview": {
-    "date": "2026-08-26",
-    "decision": "B — BUILD NARROW MESSAGING INFRASTRUCTURE",
-    "status": "implemented and verified",
-    "review": "AUDIT/notification-architecture-review.md",
-    "implementation": "AUDIT/notification-module-implementation.md",
-    "scope": "Provider-neutral SMS contract and Kavenegar adapter only; Auth OTP ownership and every existing domain transaction/retry/failure semantic preserved.",
-    "deferred": "Central NotificationModule, template registry, email, push, events/outbox, queue changes, persistence changes, preference redesign, and async OTP.",
-    "phase3Isolation": "Existing uncommitted Performance Phase 3 Batch 2 work was preserved; Batch 3 was not started.",
-    "gates": "API typecheck, lint, production build, and all 44 unit/architecture/authorization suites green (291/291 tests)."
-  },
+
   "approvedChanges": [
     {
       "id": "MIG-001",
       "what": "Migrate canonical money storage from Toman to Rial",
-      "approvedBy": "user 2026-08-08 (against audit recommendation to keep Toman)",
+      "approvedBy": "user 2026-08-08, against the audit's recommendation to keep Toman",
       "plan": "AUDIT/01-financial.md section 1.7",
       "status": "step 1 of 5 done (bc19ed1); steps 2-5 pending",
-      "scope": "28 money columns of 70 Int columns; Discount.value/DiscountRule.value conditional on type<>'percent'; CreditEntry.amount and all counts/percentages excluded",
-      "stepsDone": [
-        "1. centralise formatter on current unit (Toman) - closes FIN-101"
-      ],
+      "scope": "28 money columns of 70 Int columns. Discount.value/DiscountRule.value are conditional on type<>'percent'; CreditEntry.amount is a lesson-credit count and all counts/percentages/durations are excluded.",
+      "stepsDone": ["1. centralise the formatter on the current unit (Toman) - closed FIN-101 independently"],
       "stepsPending": [
         "2. scale money literals, delete toRial()",
-        "3. data migration (irreversible; needs verified backup)",
-        "4. flip formatter to divide by 10",
+        "3. data migration (irreversible; needs a verified backup)",
+        "4. flip the formatter to divide by 10",
         "5. fixtures + migration tests"
-      ]
+      ],
+      "auditNote": "This migration fixes no defect that currently exists. The Toman design is internally consistent and the only real bug (FIN-101) was a display label, already closed by step 1."
     }
-  ]
+  ],
+
+  "deliverables": {
+    "AUDIT": ["00-baseline.md", "01-financial.md", "02-security.md", "02-route-matrix.md",
+              "03-isolation.md", "04-testing.md", "05-design.md", "06-live-verification.md", "REPORT.md"],
+    "docs/fa": ["00-خلاصه-مدیریتی.md", "01-معماری.md", "02-مالی.md", "03-امنیت.md",
+                "04-تست.md", "05-طراحی.md", "06-راه‌اندازی-و-عملیات.md", "07-کارهای-باقی‌مانده.md"]
+  },
+
+  "next_action": "Priority 1 backlog: Next.js major bump (SEC-201); human-driven live verification of the successful paid path; monitoring for stuck payments. See docs/fa/07-کارهای-باقی‌مانده.md."
 }
