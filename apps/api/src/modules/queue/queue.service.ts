@@ -2,7 +2,7 @@ import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { Queue, Worker } from 'bullmq';
 import { PrismaService } from '../../prisma.service';
 import { config } from '../../config';
-import { releaseDiscount } from '../commerce/discounts/discount-reservation';
+import { releaseDiscount } from '../commerce';
 
 /**
  * Formats a lesson start time for a Kavenegar lookup token.

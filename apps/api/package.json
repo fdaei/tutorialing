@@ -7,6 +7,7 @@
     "start": "node dist/src/main.js",
     "typecheck": "tsc --noEmit",
     "test": "jest --runInBand",
+    "lint": "eslint src --max-warnings=0",
     "test:e2e": "jest --config test/jest-e2e.json --runInBand",
     "db:format": "prisma format",
     "db:validate": "prisma validate",
