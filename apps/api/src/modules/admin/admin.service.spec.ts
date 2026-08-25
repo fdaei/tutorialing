@@ -1,4 +1,5 @@
 import { AdminService } from './admin.service';
+import { RoleManagementPolicy } from './role-management.policy';
 
 const ACTOR = 'actor-1';
 const OTHER = 'user-2';
@@ -27,7 +28,23 @@ function service(overrides: Record<string, unknown> = {}) {
     ...overrides,
   };
   const revocation = { revokeUser: jest.fn().mockResolvedValue(undefined) };
-  return { svc: new AdminService(db as never, {} as never, revocation as never, {} as never), db, revocation };
+  const policy = new RoleManagementPolicy(db as never);
+  return {
+    svc: new AdminService(db as never, {} as never, revocation as never, {} as never, policy),
+    db,
+    revocation,
+  };
+}
+
+/** `userRole.findUnique` mock that reports `actorId` as holding `role`. */
+function actorHolds(role: string) {
+  return jest.fn().mockImplementation(({ where }: { where: { userId_role: { userId: string; role: string } } }) =>
+    Promise.resolve(
+      where.userId_role.userId === ACTOR && where.userId_role.role === role
+        ? { userId: ACTOR, role }
+        : null,
+    ),
+  );
 }
 
 describe('AdminService privilege self-escalation', () => {
@@ -134,6 +151,78 @@ describe('AdminService admin-grant requires an existing admin (SEC-001/SEC-003)'
     });
     await expect(svc.assignRole(ACTOR, OTHER, 'ADMIN')).resolves.toBeDefined();
     expect(db.userRole.upsert).toHaveBeenCalled();
+  });
+});
+
+/**
+ * SEC-207. `roles.manage` is delegable to non-ADMIN staff, but it must never
+ * be enough, by itself, to grant FINANCE-equivalent capability. See
+ * ROLE_MANAGEMENT_POLICY.md for the tier-1/2/3 hierarchy these tests pin.
+ */
+describe('AdminService role-management hierarchy (SEC-207)', () => {
+  it('1. STAFF cannot grant FINANCE', async () => {
+    // Default service(): actor holds no ADMIN row, i.e. an ordinary STAFF
+    // actor delegated `roles.manage` (the AuthorizationGuard permission
+    // check on the route is what lets a STAFF actor reach this method at
+    // all; the service must not also let them mint a FINANCE account).
+    const { svc, db } = service();
+    await expect(svc.assignRole(ACTOR, OTHER, 'FINANCE')).rejects.toMatchObject({
+      response: { code: 'PRIVILEGED_ROLE_GRANT_REQUIRES_ADMIN' },
+    });
+    expect(db.userRole.upsert).not.toHaveBeenCalled();
+  });
+
+  it('2. SUPPORT cannot grant PAYMENTS permissions', async () => {
+    const { svc, db } = service();
+    // role: 'SUPPORT' is not itself privileged, isolating the assertion to
+    // the permission-tier check rather than the role-tier check.
+    await expect(svc.grantPermission(ACTOR, OTHER, 'SUPPORT', 'payments.refund')).rejects.toMatchObject({
+      response: { code: 'ELEVATED_PERMISSION_GRANT_REQUIRES_ADMIN' },
+    });
+    expect(db.rolePermission.upsert).not.toHaveBeenCalled();
+  });
+
+  it('3. FINANCE cannot grant roles.manage', async () => {
+    const { svc, db } = service({
+      userRole: { upsert: jest.fn().mockResolvedValue({}), count: jest.fn().mockResolvedValue(2), findUnique: actorHolds('FINANCE') },
+    });
+    // role: 'STAFF' is not itself privileged, isolating the assertion to the
+    // permission-tier check: holding FINANCE (a real, non-ADMIN privilege)
+    // still must not unlock a security-sensitive permission grant.
+    await expect(svc.grantPermission(ACTOR, OTHER, 'STAFF', 'roles.manage')).rejects.toMatchObject({
+      response: { code: 'ELEVATED_PERMISSION_GRANT_REQUIRES_ADMIN' },
+    });
+    expect(db.rolePermission.upsert).not.toHaveBeenCalled();
+  });
+
+  it('4. ADMIN can perform allowed operations', async () => {
+    const { svc, db } = service({
+      userRole: { upsert: jest.fn().mockResolvedValue({}), count: jest.fn().mockResolvedValue(2), findUnique: actorHolds('ADMIN') },
+    });
+    await expect(svc.assignRole(ACTOR, OTHER, 'FINANCE')).resolves.toBeDefined();
+    await expect(svc.grantPermission(ACTOR, OTHER, 'FINANCE', 'payments.refund')).resolves.toBeDefined();
+    await expect(svc.grantPermission(ACTOR, OTHER, 'STAFF', 'roles.manage')).resolves.toBeDefined();
+    expect(db.userRole.upsert).toHaveBeenCalled();
+    expect(db.rolePermission.upsert).toHaveBeenCalled();
+  });
+
+  it('still allows a non-admin roles.manage holder to delegate a standard (tier-3) role and permission', async () => {
+    // Unchanged behaviour: this is the legitimate ops-delegation use case
+    // roles.manage exists for, and must not regress.
+    const { svc, db } = service();
+    await expect(svc.assignRole(ACTOR, OTHER, 'SUPPORT')).resolves.toBeDefined();
+    await expect(svc.grantPermission(ACTOR, OTHER, 'SUPPORT', 'tickets.manage')).resolves.toBeDefined();
+    expect(db.userRole.upsert).toHaveBeenCalled();
+    expect(db.rolePermission.upsert).toHaveBeenCalled();
+  });
+
+  it('closes the full SEC-207 exploit chain: a STAFF actor cannot mint an accomplice into FINANCE with payments.refund', async () => {
+    const { svc } = service();
+    await expect(svc.assignRole(ACTOR, OTHER, 'FINANCE')).rejects.toMatchObject({
+      response: { code: 'PRIVILEGED_ROLE_GRANT_REQUIRES_ADMIN' },
+    });
+    await expect(svc.grantPermission(ACTOR, OTHER, 'FINANCE', 'payments.refund')).rejects.toThrow();
+    await expect(svc.grantPermission(ACTOR, OTHER, 'FINANCE', 'payouts.manage')).rejects.toThrow();
   });
 });
 

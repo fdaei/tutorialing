@@ -13,6 +13,18 @@ export const API_ERROR_MESSAGES: Record<string, Record<ApiLocale, string>> = {
     fa: 'فقط یک مدیر کل می‌تواند نقش مدیر کل را اعطا کند.',
     en: 'Only an existing ADMIN can grant the ADMIN role.',
   },
+  PRIVILEGED_ROLE_GRANT_REQUIRES_ADMIN: {
+    fa: 'فقط یک مدیر کل می‌تواند این نقش را اعطا کند.',
+    en: 'Only an existing ADMIN can grant this role.',
+  },
+  ELEVATED_PERMISSION_GRANT_REQUIRES_ADMIN: {
+    fa: 'فقط یک مدیر کل می‌تواند این دسترسی را اعطا کند.',
+    en: 'Only an existing ADMIN can grant this permission.',
+  },
+  SEARCH_PERMISSION_REQUIRED: {
+    fa: 'شما دسترسی لازم برای جست‌وجوی این بخش را ندارید.',
+    en: 'You do not have the required permission to search this entity.',
+  },
   OTP_RESEND_TOO_SOON: {
     fa: '{0} ثانیه دیگر می‌توانید کد جدید بخواهید.',
     en: 'You can request a new code in {0} seconds.',
