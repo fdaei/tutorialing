@@ -5,17 +5,9 @@ import { forbidden, TokenRevocationService } from '../../common';
 import { AdminRepository } from './admin.repository';
 import { CmsPageDto } from './dto/request/cms-page.dto';
 import { DashboardStatsService } from './dashboard-stats.service';
+import { RoleManagementPolicy } from './role-management.policy';
 
-/**
- * `roles.manage` is a delegable permission, so its holder is not necessarily an
- * ADMIN. Without this guard a STAFF user granted `roles.manage` could simply
- * assign themselves the ADMIN role (which auto-grants every permission) and
- * escalate out of their delegated scope. Privilege changes must always be
- * applied by a second person, so self-targeted grants are refused outright.
- */
 const selfElevation = () => forbidden('SELF_PRIVILEGE_CHANGE');
-
-const adminGrantRequiresAdmin = () => forbidden('ADMIN_GRANT_REQUIRES_ADMIN');
 
 @Injectable()
 export class AdminService {
@@ -24,23 +16,8 @@ export class AdminService {
     private repo: AdminRepository,
     private revocation: TokenRevocationService,
     private dashboardStats: DashboardStatsService,
+    private policy: RoleManagementPolicy,
   ) {}
-
-  /**
-   * `roles.manage`/`permissions.manage` are delegable to STAFF without full
-   * ADMIN (see the comment on `selfElevation`). `userId === actorId` alone
-   * doesn't stop a STAFF holder from creating a fresh account with `roles:
-   * ['ADMIN']`, or from using a second, proxy account to grant ADMIN to a
-   * first one — neither targets the actor's own row. Any call that would
-   * result in a user newly holding ADMIN must itself be made by an existing
-   * ADMIN.
-   */
-  private async assertActorIsAdminToGrantAdmin(actorId: string) {
-    const actorIsAdmin = await this.db.userRole.findUnique({
-      where: { userId_role: { userId: actorId, role: 'ADMIN' } },
-    });
-    if (!actorIsAdmin) throw adminGrantRequiresAdmin();
-  }
 
   async dashboard() {
     return this.dashboardStats.dashboard();
@@ -133,7 +110,7 @@ export class AdminService {
     d: { phone: string; name: string; email?: string; locale?: string; roles?: Role[] },
   ) {
     const roles: Role[] = d.roles?.length ? d.roles : ['STUDENT'];
-    if (roles.includes('ADMIN')) await this.assertActorIsAdminToGrantAdmin(actorId);
+    for (const role of roles) await this.policy.assertMayGrantRole(actorId, role);
     const user = await this.db.user.create({
       data: {
         phone: d.phone,
@@ -185,7 +162,9 @@ export class AdminService {
     if (userId === actorId && before.includes('ADMIN') && !normalized.includes('ADMIN'))
       throw new BadRequestException({ code: 'SELF_ADMIN_ROLE_REMOVE' });
     if (userId === actorId && normalized.some((role) => !before.includes(role))) throw selfElevation();
-    if (normalized.includes('ADMIN') && !before.includes('ADMIN')) await this.assertActorIsAdminToGrantAdmin(actorId);
+    for (const role of normalized.filter((role) => !before.includes(role))) {
+      await this.policy.assertMayGrantRole(actorId, role);
+    }
     if (before.includes('ADMIN') && !normalized.includes('ADMIN')) {
       const admins = await this.db.userRole.count({ where: { role: 'ADMIN' } });
       if (admins <= 1) throw new BadRequestException({ code: 'LAST_ADMIN_ROLE_REMOVE' });
@@ -240,7 +219,7 @@ export class AdminService {
 
   async assignRole(actorId: string, userId: string, role: Role) {
     if (userId === actorId) throw selfElevation();
-    if (role === 'ADMIN') await this.assertActorIsAdminToGrantAdmin(actorId);
+    await this.policy.assertMayGrantRole(actorId, role);
     const user = await this.db.user.findUnique({ where: { id: userId } });
     if (!user) throw new NotFoundException({ code: 'USER_NOT_FOUND' });
     const out = await this.db.userRole.upsert({
@@ -281,7 +260,8 @@ export class AdminService {
 
   async grantPermission(actorId: string, userId: string, role: Role, permissionKey: string) {
     if (userId === actorId) throw selfElevation();
-    if (role === 'ADMIN') await this.assertActorIsAdminToGrantAdmin(actorId);
+    await this.policy.assertMayGrantRole(actorId, role);
+    await this.policy.assertMayGrantPermission(actorId, permissionKey);
     const permission = await this.db.permission.findUnique({ where: { key: permissionKey } });
     if (!permission) throw new NotFoundException({ code: 'PERMISSION_NOT_FOUND' });
     await this.db.userRole.upsert({ where: { userId_role: { userId, role } }, create: { userId, role }, update: {} });

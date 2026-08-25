@@ -70,3 +70,36 @@ describe('SupportService status and assignment history', () => {
     });
   });
 });
+
+describe('SupportService.detail (SEC-210)', () => {
+  const TICKET = { id: 'ticket-1', userId: 'user-a', subject: 'Help', replies: [], statusHistory: [], assignmentHistory: [] };
+
+  /** Mirrors `detail()`'s real `where` shape (`id` plus, for a non-staff
+   * caller, `userId`) closely enough that a different authenticated user
+   * genuinely gets no match. */
+  function harness() {
+    const findFirst = jest.fn().mockImplementation(({ where }: { where: { id: string; userId?: string } }) => {
+      const matches = where.id === TICKET.id && (where.userId === undefined || where.userId === TICKET.userId);
+      return Promise.resolve(matches ? TICKET : null);
+    });
+    const service = new SupportService({ ticket: { findFirst } } as any);
+    return { service, findFirst };
+  }
+
+  it('rejects a different (non-staff) user requesting another user’s ticket', async () => {
+    const { service } = harness();
+    await expect(service.detail('user-b', ['STUDENT'], TICKET.id)).rejects.toMatchObject({
+      response: { code: 'TICKET_NOT_FOUND' },
+    });
+  });
+
+  it('still lets the owning user read their own ticket', async () => {
+    const { service } = harness();
+    await expect(service.detail('user-a', ['STUDENT'], TICKET.id)).resolves.toMatchObject({ id: TICKET.id });
+  });
+
+  it('lets staff read a ticket they do not own', async () => {
+    const { service } = harness();
+    await expect(service.detail('support-1', ['SUPPORT'], TICKET.id)).resolves.toMatchObject({ id: TICKET.id });
+  });
+});

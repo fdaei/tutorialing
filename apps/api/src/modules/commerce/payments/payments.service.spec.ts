@@ -341,7 +341,16 @@ function gatewayRedirectHarness(
 ) {
   const db = {
     payment: {
-      findFirstOrThrow: jest.fn().mockResolvedValue(payment),
+      // Mirrors real Prisma `findFirstOrThrow` semantics: the row is only
+      // returned when the caller's `where` clause actually matches it,
+      // rather than blanket-returning `payment` regardless of args — the
+      // realism a SEC-210 ownership test depends on.
+      findFirstOrThrow: jest.fn().mockImplementation(({ where }: { where: { id: string; userId: string } }) => {
+        if (where.id === payment.id && where.userId === (payment.userId ?? 'user-1')) {
+          return Promise.resolve(payment);
+        }
+        return Promise.reject(Object.assign(new Error('No Payment found'), { code: 'P2025' }));
+      }),
       update: jest.fn().mockResolvedValue({}),
     },
   };
@@ -391,5 +400,19 @@ describe('PaymentsService.gatewayRedirect', () => {
     h.gateway.request.mockRejectedValue(new Error('zarinpal down'));
     await expect(h.svc.gatewayRedirect('user-1', 'payment-1')).rejects.toThrow('zarinpal down');
     expect(release).toHaveBeenCalledTimes(1);
+  });
+
+  /** SEC-210. User A owns the payment; User B (a different authenticated
+   * user, not a role/permission gap) requests the same payment id. */
+  it('rejects a different user requesting another user’s payment (IDOR)', async () => {
+    const h = gatewayRedirectHarness({ id: 'payment-1', userId: 'user-a', authority: 'existing-authority' });
+    await expect(h.svc.gatewayRedirect('user-b', 'payment-1')).rejects.toThrow();
+    expect(h.gateway.request).not.toHaveBeenCalled();
+  });
+
+  it('still lets the owning user reach their own payment', async () => {
+    const h = gatewayRedirectHarness({ id: 'payment-1', userId: 'user-a', authority: 'existing-authority' });
+    const result = await h.svc.gatewayRedirect('user-a', 'payment-1');
+    expect(result).toEqual({ authority: 'existing-authority', url: 'https://gateway.example/existing-authority' });
   });
 });

@@ -10,6 +10,20 @@ import { SmsService } from './sms.service';
 const hash = (s: string) => createHash('sha256').update(s).digest('hex');
 
 /**
+ * Constant-time equality for secret material (hash digests, OTP codes). A
+ * plain `!==`/`===` comparison short-circuits at the first differing byte,
+ * leaking timing information proportional to how much of the two values
+ * match. `timingSafeEqual` requires equal-length buffers and throws
+ * otherwise, so a length mismatch is treated as unequal up front rather than
+ * letting that throw escape as an unhandled error. (SEC-209)
+ */
+const constantTimeEqual = (a: string, b: string): boolean => {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  return bufA.length === bufB.length && timingSafeEqual(bufA, bufB);
+};
+
+/**
  * A refresh secret is 32 random bytes, so a plain digest of it is not
  * precomputable. An OTP is one of 900,000 six-digit codes, and a plain SHA-256
  * of that space is a rainbow table anyone can build in seconds — so a leak of
@@ -94,10 +108,7 @@ export class AuthService {
     if (challenge.attempts >= this.settings.otpAttemptLimit) throw tooManyRequests('OTP_ATTEMPTS_EXCEEDED');
 
     const candidate = otpHash(code);
-    const valid =
-      challenge.codeHash.length === candidate.length &&
-      timingSafeEqual(Buffer.from(challenge.codeHash), Buffer.from(candidate));
-    if (!valid) {
+    if (!constantTimeEqual(challenge.codeHash, candidate)) {
       await this.db.otpChallenge.update({ where: { id: challenge.id }, data: { attempts: { increment: 1 } } });
       throw badRequest('OTP_INCORRECT');
     }
@@ -150,7 +161,7 @@ export class AuthService {
     const [id, secret] = token.split('.');
     if (!id || !secret) throw unauthorized('REFRESH_TOKEN_INVALID');
     const session = await this.db.refreshSession.findUnique({ where: { id } });
-    if (!session || session.revokedAt || session.expiresAt < new Date() || hash(secret) !== session.tokenHash) {
+    if (!session || session.revokedAt || session.expiresAt < new Date() || !constantTimeEqual(hash(secret), session.tokenHash)) {
       if (session) await this.revokeFamily(session.familyId);
       throw unauthorized('REFRESH_TOKEN_EXPIRED_OR_REUSED');
     }
