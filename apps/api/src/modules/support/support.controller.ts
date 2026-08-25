@@ -1,11 +1,5 @@
 import { Body, Controller, Get, Param, Patch, Post, Put, Query } from '@nestjs/common';
-<<<<<<< Updated upstream
-import { CurrentUser, Permissions, Public, Roles, type AuthUser } from '../../common';
-||||||| Stash base
-import { CurrentUser, Permissions, Public, Roles, type AuthUser } from '../../common/auth';
-=======
-import { Authorize, CurrentUser, Public, type AuthUser } from '../../common/auth';
->>>>>>> Stashed changes
+import { Authorize, CurrentUser, Public, type AuthUser } from '../../common';
 import { SupportService } from './support.service';
 import { TicketDto } from './dto/request/ticket.dto';
 import { ReplyDto } from './dto/request/reply.dto';

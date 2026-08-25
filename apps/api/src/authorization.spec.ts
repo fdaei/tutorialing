@@ -61,9 +61,14 @@ function parseRoutes(): Route[] {
       // and this @Controller.
       const pre = src.slice(prevEnd, ctrl.index ?? 0);
       const classDecorators = pre.includes('}') ? pre.slice(pre.lastIndexOf('}') + 1) : pre;
-      const classRoles = /@Roles\(/.test(classDecorators);
-      const classPerms = /@Permissions\(/.test(classDecorators);
-      const classPublic = /@Public\(\)/.test(classDecorators);
+      // `@Authorize(roles, permissions)` and `@PublicRateLimit(options)` are
+      // composed decorators (see common/decorators/*) that bundle the same
+      // metadata `@Roles`/`@Permissions` and `@Public`/`@RateLimit` set
+      // individually — recognise them as equivalent so a route using the
+      // composed form isn't misread as having no access decision.
+      const classRoles = /@Roles\(|@Authorize\(/.test(classDecorators);
+      const classPerms = /@Permissions\(|@Authorize\(/.test(classDecorators);
+      const classPublic = /@Public\(\)|@PublicRateLimit\(/.test(classDecorators);
 
       const body = src.slice(bodyStart, bodyEnd);
       const hits = [...body.matchAll(HTTP)];
@@ -75,10 +80,10 @@ function parseRoutes(): Route[] {
           method: hit[1] ?? '',
           path: `${base.replace(/\/$/, '')}/${sub.replace(/^\//, '')}`.replace(/\/$/, '') || '/',
           file: relative(SRC, file),
-          public: classPublic || /@Public\(\)/.test(seg),
-          roles: classRoles || /@Roles\(/.test(seg),
-          permissions: classPerms || /@Permissions\(/.test(seg),
-          rateLimited: /@RateLimit\(/.test(seg),
+          public: classPublic || /@Public\(\)|@PublicRateLimit\(/.test(seg),
+          roles: classRoles || /@Roles\(|@Authorize\(/.test(seg),
+          permissions: classPerms || /@Permissions\(|@Authorize\(/.test(seg),
+          rateLimited: /@RateLimit\(|@PublicRateLimit\(/.test(seg),
         });
       });
     });

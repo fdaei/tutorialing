@@ -1,12 +1,6 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { ReviewStatus } from '@prisma/client';
-<<<<<<< Updated upstream
-import { CurrentUser, Permissions, Roles, type AuthUser } from '../../common';
-||||||| Stash base
-import { CurrentUser, Permissions, Roles, type AuthUser } from '../../common/auth';
-=======
-import { Authorize, CurrentUser, Roles, type AuthUser } from '../../common/auth';
->>>>>>> Stashed changes
+import { Authorize, CurrentUser, Roles, type AuthUser } from '../../common';
 import { ReviewsService } from './reviews.service';
 import { CreateReviewDto } from './dto/request/create-review.dto';
 import { ModerateReviewDto } from './dto/request/moderate-review.dto';

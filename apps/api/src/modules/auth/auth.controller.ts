@@ -1,12 +1,6 @@
 import { Body, Controller, Ip, Post, Req, Res } from '@nestjs/common';
 import type { Request, Response } from 'express';
-<<<<<<< Updated upstream
-import { Public, RateLimit } from '../../common';
-||||||| Stash base
-import { Public, RateLimit } from '../../common/auth';
-=======
-import { Public, PublicRateLimit } from '../../common/auth';
->>>>>>> Stashed changes
+import { Public, RateLimit, PublicRateLimit } from '../../common';
 import { AuthService } from './auth.service';
 import { RequestOtpDto } from './dto/request/request-otp.dto';
 import { VerifyOtpDto } from './dto/request/verify-otp.dto';
