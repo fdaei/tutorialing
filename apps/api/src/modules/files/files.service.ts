@@ -4,7 +4,14 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomUUID } from 'crypto';
 import type { Readable } from 'stream';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
+<<<<<<< Updated upstream
 import { badRequest, notFound } from '../../common';
+||||||| Stash base
+import { badRequest, notFound } from '../../common/errors';
+=======
+import { badRequest, notFound } from '../../common/errors';
+import { assertDomain, requireValue } from '../../common/utils';
+>>>>>>> Stashed changes
 import { filesConfig } from '../../config/files.config';
 
 const allowed = new Set([
@@ -41,15 +48,9 @@ export class FilesService {
     ownerId: string,
     data: { originalName: string; mimeType: string; size: number; checksum: string; purpose: string },
   ) {
-    if (!allowed.has(data.mimeType)) {
-      throw badRequest('FILE_TYPE_NOT_ALLOWED');
-    }
-    if (data.size <= 0 || data.size > this.cfg.maxUploadBytes) {
-      throw badRequest('FILE_SIZE_INVALID');
-    }
-    if (!/^[a-f0-9]{64}$/i.test(data.checksum)) {
-      throw badRequest('FILE_CHECKSUM_INVALID');
-    }
+    assertDomain(allowed.has(data.mimeType), () => badRequest('FILE_TYPE_NOT_ALLOWED'));
+    assertDomain(data.size > 0 && data.size <= this.cfg.maxUploadBytes, () => badRequest('FILE_SIZE_INVALID'));
+    assertDomain(/^[a-f0-9]{64}$/i.test(data.checksum), () => badRequest('FILE_CHECKSUM_INVALID'));
     const ext =
       data.originalName
         .split('.')
@@ -73,11 +74,10 @@ export class FilesService {
   }
 
   async uploadContent(ownerId: string, id: string, checksum: string, body: Readable) {
-    const file = await this.db.storedFile.findFirst({ where: { id, ownerId, status: 'PENDING' } });
-    if (!file) throw notFound('UPLOAD_NOT_FOUND');
-    if (!checksum || checksum !== file.checksum) {
-      throw badRequest('UPLOAD_CHECKSUM_MISMATCH');
-    }
+    const file = requireValue(await this.db.storedFile.findFirst({ where: { id, ownerId, status: 'PENDING' } }), () =>
+      notFound('UPLOAD_NOT_FOUND'),
+    );
+    assertDomain(checksum && checksum === file.checksum, () => badRequest('UPLOAD_CHECKSUM_MISMATCH'));
     await this.s3.send(
       new PutObjectCommand({
         Bucket: this.cfg.bucket,
@@ -92,8 +92,9 @@ export class FilesService {
   }
 
   async complete(ownerId: string, id: string) {
-    const file = await this.db.storedFile.findFirst({ where: { id, ownerId } });
-    if (!file) throw notFound('UPLOAD_NOT_FOUND');
+    const file = requireValue(await this.db.storedFile.findFirst({ where: { id, ownerId } }), () =>
+      notFound('UPLOAD_NOT_FOUND'),
+    );
     let head;
     try {
       head = await this.s3.send(new HeadObjectCommand({ Bucket: this.cfg.bucket, Key: file.key }));
@@ -113,22 +114,24 @@ export class FilesService {
 
   async download(requesterId: string, roles: string[], id: string) {
     const reviewer = roles.some((role) => ['ADMIN', 'STAFF', 'EXAMINER'].includes(role));
-    const file = await this.db.storedFile.findFirst({
-      where: {
-        id,
-        status: 'SAFE',
-        OR: [
-          { ownerId: requesterId },
-          ...(reviewer
-            ? [
-                { verificationItems: { some: {} } },
-                { testAnswers: { some: { attempt: { status: 'UNDER_REVIEW' as const } } } },
-              ]
-            : []),
-        ],
-      },
-    });
-    if (!file) throw notFound('FILE_NOT_FOUND');
+    const file = requireValue(
+      await this.db.storedFile.findFirst({
+        where: {
+          id,
+          status: 'SAFE',
+          OR: [
+            { ownerId: requesterId },
+            ...(reviewer
+              ? [
+                  { verificationItems: { some: {} } },
+                  { testAnswers: { some: { attempt: { status: 'UNDER_REVIEW' as const } } } },
+                ]
+              : []),
+          ],
+        },
+      }),
+      () => notFound('FILE_NOT_FOUND'),
+    );
     return {
       url: await getSignedUrl(this.s3, new GetObjectCommand({ Bucket: this.cfg.bucket, Key: file.key }), {
         expiresIn: this.cfg.downloadUrlTtlSeconds,

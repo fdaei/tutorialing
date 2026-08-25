@@ -1,5 +1,11 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+<<<<<<< Updated upstream:apps/api/src/modules/commerce/payments/payments.controller.ts
 import { CurrentUser, Permissions, Public, RateLimit, RATE_LIMIT_TIERS, Roles, type AuthUser } from '../../../common';
+||||||| Stash base:apps/api/src/modules/commerce/commerce.controller.ts
+import { CurrentUser, Permissions, Public, RateLimit, RATE_LIMIT_TIERS, Roles, type AuthUser } from '../../common/auth';
+=======
+import { Authorize, CurrentUser, PublicRateLimit, RateLimit, RATE_LIMIT_TIERS, type AuthUser } from '../../common/auth';
+>>>>>>> Stashed changes:apps/api/src/modules/commerce/commerce.controller.ts
 import { PaymentsService } from './payments.service';
 import { WalletService } from './wallet.service';
 import { RefundsService } from './refunds.service';
@@ -25,8 +31,7 @@ export class PaymentsController {
     return this.s.gatewayRedirect(u.id, id);
   }
 
-  @Public()
-  @RateLimit(RATE_LIMIT_TIERS.paymentCallback)
+  @PublicRateLimit(RATE_LIMIT_TIERS.paymentCallback)
   @Get('callback')
   callback(@Query('Authority') a: string, @Query('Status') status: string) {
     return this.s.callback(a, status);
@@ -47,8 +52,7 @@ export class PaymentsController {
     return this.walletSvc.invoices(u.id);
   }
 
-  @Roles('ADMIN', 'FINANCE')
-  @Permissions('payments.refund')
+  @Authorize(['ADMIN', 'FINANCE'], ['payments.refund'])
   @RateLimit(RATE_LIMIT_TIERS.moneyAdjacent)
   @Post(':id/refunds')
   refund(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() d: RefundDto) {

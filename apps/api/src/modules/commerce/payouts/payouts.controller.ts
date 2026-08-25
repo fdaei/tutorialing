@@ -1,11 +1,16 @@
 import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+<<<<<<< Updated upstream:apps/api/src/modules/commerce/payouts/payouts.controller.ts
 import { CurrentUser, Permissions, RateLimit, RATE_LIMIT_TIERS, Roles, type AuthUser } from '../../../common';
+||||||| Stash base:apps/api/src/modules/commerce/payouts.controller.ts
+import { CurrentUser, Permissions, RateLimit, RATE_LIMIT_TIERS, Roles, type AuthUser } from '../../common/auth';
+=======
+import { Authorize, CurrentUser, RateLimit, RATE_LIMIT_TIERS, type AuthUser } from '../../common/auth';
+>>>>>>> Stashed changes:apps/api/src/modules/commerce/payouts.controller.ts
 import { PayoutsService } from './payouts.service';
 import { DiscountsService } from '../discounts/discounts.service';
 import { DiscountDto, PayoutApprovalDto, PayoutWindowDto } from '../dto/request/payouts.dto';
 
-@Roles('ADMIN', 'FINANCE')
-@Permissions('payouts.manage')
+@Authorize(['ADMIN', 'FINANCE'], ['payouts.manage'])
 @RateLimit(RATE_LIMIT_TIERS.moneyAdjacent)
 @Controller('payouts')
 export class PayoutsController {

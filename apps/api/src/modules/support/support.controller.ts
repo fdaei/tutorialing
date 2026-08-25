@@ -1,5 +1,11 @@
 import { Body, Controller, Get, Param, Patch, Post, Put, Query } from '@nestjs/common';
+<<<<<<< Updated upstream
 import { CurrentUser, Permissions, Public, Roles, type AuthUser } from '../../common';
+||||||| Stash base
+import { CurrentUser, Permissions, Public, Roles, type AuthUser } from '../../common/auth';
+=======
+import { Authorize, CurrentUser, Public, type AuthUser } from '../../common/auth';
+>>>>>>> Stashed changes
 import { SupportService } from './support.service';
 import { TicketDto } from './dto/request/ticket.dto';
 import { ReplyDto } from './dto/request/reply.dto';
@@ -27,14 +33,14 @@ export class SupportController {
   @Post('tickets/:id/replies') reply(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() d: ReplyDto) {
     return this.s.reply(u.id, u.roles, id, d);
   }
-  @Roles('ADMIN', 'STAFF', 'SUPPORT') @Permissions('tickets.manage') @Patch('tickets/:id/status') status(
+  @Authorize(['ADMIN', 'STAFF', 'SUPPORT'], ['tickets.manage']) @Patch('tickets/:id/status') status(
     @CurrentUser() u: AuthUser,
     @Param('id') id: string,
     @Body() d: StatusDto,
   ) {
     return this.s.changeStatus(u.id, u.roles, id, d.status, d.note);
   }
-  @Roles('ADMIN', 'STAFF', 'SUPPORT') @Permissions('tickets.manage') @Patch('tickets/:id/assignment') assign(
+  @Authorize(['ADMIN', 'STAFF', 'SUPPORT'], ['tickets.manage']) @Patch('tickets/:id/assignment') assign(
     @CurrentUser() u: AuthUser,
     @Param('id') id: string,
     @Body() d: AssignmentDto,

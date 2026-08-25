@@ -5,12 +5,6 @@ import { RATE_LIMIT_KEY, type RateLimitOptions } from '../decorators/rate-limit.
 import { tooManyRequests } from '../exceptions/domain.exception';
 import { RedisService } from '../../../infrastructure/cache/redis.service';
 
-/**
- * Per-IP fixed-window limiter for routes annotated with `@RateLimit()`.
- *
- * Registered ahead of the auth guards so that anonymous floods (OTP requests,
- * refresh-token guessing) are rejected before any database or JWT work happens.
- */
 @Injectable()
 export class RateLimitGuard implements CanActivate {
   private readonly log = new Logger(RateLimitGuard.name);
@@ -37,9 +31,7 @@ export class RateLimitGuard implements CanActivate {
     try {
       ({ count, retryAfter } = await this.redis.consume(key, options.windowSeconds));
     } catch (error) {
-      // Fail closed. Redis is required infrastructure here (locks, queues), and
-      // silently dropping the limiter during an outage would turn a degraded
-      // cache into an open door for OTP and refresh-token flooding.
+
       this.log.error({ err: error, bucket, requestId: request.headers?.['x-request-id'] }, 'Rate limiter unavailable');
       throw new ServiceUnavailableException('Rate limiter unavailable');
     }
@@ -58,8 +50,5 @@ export class RateLimitGuard implements CanActivate {
 }
 
 function clientIp(request: Request) {
-  // `request.ip` honours Express's `trust proxy` setting, which main.ts derives
-  // from TRUST_PROXY. Left off, every request behind a reverse proxy would share
-  // the proxy's address and one client could exhaust everyone's budget.
   return request.ip ?? request.socket.remoteAddress ?? 'unknown';
 }

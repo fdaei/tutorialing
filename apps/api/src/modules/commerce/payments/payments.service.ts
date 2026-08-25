@@ -1,11 +1,28 @@
-import { Injectable, BadRequestException, NotFoundException, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { Prisma, type Payment, type PaymentStatus } from '@prisma/client';
+<<<<<<< Updated upstream:apps/api/src/modules/commerce/payments/payments.service.ts
 import { PrismaService, Tx } from '../../../infrastructure/database/prisma.service';
 import { RedisService } from '../../../infrastructure/cache/redis.service';
 import { badRequest, conflict, isPrismaKnownError } from '../../../common';
 import { config } from '../../../config';
 import { paymentConfig } from '../../../config/payment.config';
 import { QueueService } from '../../queue/queue.service';
+||||||| Stash base:apps/api/src/modules/commerce/payments.service.ts
+import { PrismaService, Tx } from '../../infrastructure/database/prisma.service';
+import { RedisService } from '../../infrastructure/cache/redis.service';
+import { badRequest, conflict, isPrismaKnownError } from '../../common/errors';
+import { config } from '../../config';
+import { paymentConfig } from '../../config/payment.config';
+import { QueueService } from '../queue/queue.service';
+=======
+import { PrismaService, Tx } from '../../infrastructure/database/prisma.service';
+import { RedisService } from '../../infrastructure/cache/redis.service';
+import { badRequest, conflict, isPrismaKnownError, notFound } from '../../common/errors';
+import { runtimeEnvironment } from '../../common/utils';
+import { config } from '../../config';
+import { paymentConfig } from '../../config/payment.config';
+import { QueueService } from '../queue/queue.service';
+>>>>>>> Stashed changes:apps/api/src/modules/commerce/payments.service.ts
 import { GatewayService } from './gateway.service';
 import { WalletService } from './wallet.service';
 import { PayDto } from '../dto/request/payments.dto';
@@ -25,7 +42,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   onModuleInit() {
-    if (config().NODE_ENV === 'test') return;
+    if (runtimeEnvironment(config().NODE_ENV).isTest) return;
     this.reconciliationTimer = setInterval(
       () => void this.reconcilePending(),
       paymentConfig().reconciliationIntervalMs,
@@ -112,7 +129,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
         if (d.purpose === 'booking') {
           const booking = await tx.booking.findUnique({ where: { id: d.referenceId } });
           if (!booking || booking.studentId !== userId || booking.status !== 'PENDING_PAYMENT')
-            throw new NotFoundException({ code: 'BOOKING_NOT_FOUND' });
+            throw notFound('BOOKING_NOT_FOUND');
           bookingId = booking.id;
           // Charge the price snapshotted onto the booking, not the teacher's live
           // rate. `booking.price` is the admin-approved price captured at booking
@@ -124,7 +141,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
           await this.clearBookingPaymentSlot(tx, booking.id);
         } else {
           const pkg = await tx.package.findUnique({ where: { id: d.referenceId, approvalStatus: 'APPROVED' } });
-          if (!pkg) throw new NotFoundException({ code: 'PACKAGE_NOT_FOUND' });
+          if (!pkg) throw notFound('PACKAGE_NOT_FOUND');
           subtotal = pkg.price;
         }
         let discountAmount = 0,
@@ -266,7 +283,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
 
   async callback(authority: string, status: string) {
     const payment = await this.db.payment.findUnique({ where: { authority } });
-    if (!payment) throw new NotFoundException({ code: 'PAYMENT_NOT_FOUND' });
+    if (!payment) throw notFound('PAYMENT_NOT_FOUND');
     if (payment.status === 'PAID') return payment;
     if (!PaymentsService.SETTLEABLE.includes(payment.status)) return payment;
     if (status !== 'OK') return this.failPayment(payment.id, { authority, status });

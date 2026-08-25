@@ -30,20 +30,27 @@ export class PayoutsService {
     });
     if (!earnings.length) {
       const [completed, waiting, paid] = await this.db.$transaction([
-        this.db.booking.count({
+        this.db.booking.aggregate({
           where: { status: 'COMPLETED', endsAt: { gte: weekStart, lte: weekEnd }, attendanceTeacher: true },
+          _sum: { price: true },
         }),
-        this.db.booking.count({
+        this.db.booking.aggregate({
           where: { status: { in: ['PENDING_PAYMENT', 'CONFIRMED'] }, startsAt: { gte: weekStart, lte: weekEnd } },
+          _sum: { price: true },
         }),
-        this.db.earning.count({
+        this.db.earning.aggregate({
           where: {
             createdAt: { gte: weekStart, lte: weekEnd },
             OR: [{ status: 'PAID' }, { payoutItem: { isNot: null } }],
           },
+          _sum: { netAmount: true },
         }),
       ]);
-      throw badRequest('NO_ELIGIBLE_TEACHER_EARNINGS');
+      throw badRequest('NO_ELIGIBLE_TEACHER_EARNINGS', {
+        completedAmount: String(completed._sum.price ?? 0),
+        waitingAmount: String(waiting._sum.price ?? 0),
+        paidAmount: String(paid._sum.netAmount ?? 0),
+      });
     }
     return this.db.$transaction(async (tx) => {
       const batch = await tx.payoutBatch.create({

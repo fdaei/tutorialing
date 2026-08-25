@@ -1,7 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { LanguageDirection, Prisma, ProficiencySystem } from '@prisma/client';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
+<<<<<<< Updated upstream
 import { badRequest, conflict, notFound } from '../../common';
+||||||| Stash base
+import { badRequest, conflict, notFound } from '../../common/errors';
+=======
+import { badRequest, conflict, notFound } from '../../common/errors';
+import { assertDomain, requireValue } from '../../common/utils';
+>>>>>>> Stashed changes
 
 export type LanguageInput = {
   code: string;
@@ -64,13 +71,12 @@ export class LanguagesService {
 
   private normalize(input: LanguageInput) {
     const code = input.code.trim().toLowerCase();
-    if (!/^[a-z]{2,8}(?:-[a-z0-9]{2,8})?$/.test(code)) {
-      throw badRequest('LANGUAGE_CODE_INVALID');
-    }
+    assertDomain(/^[a-z]{2,8}(?:-[a-z0-9]{2,8})?$/.test(code), () => badRequest('LANGUAGE_CODE_INVALID'));
     const required = [input.nameFa, input.nameEn, input.nativeName];
-    if (required.some((value) => !value?.trim())) {
-      throw badRequest('LANGUAGE_NAME_REQUIRED');
-    }
+    assertDomain(
+      required.every((value) => value?.trim()),
+      () => badRequest('LANGUAGE_NAME_REQUIRED'),
+    );
     return {
       code,
       nameFa: input.nameFa.trim(),
@@ -87,7 +93,7 @@ export class LanguagesService {
   async create(actorId: string, input: LanguageInput) {
     const data = this.normalize(input);
     const exists = await this.db.language.findUnique({ where: { code: data.code } });
-    if (exists) throw conflict('LANGUAGE_CODE_EXISTS');
+    assertDomain(!exists, () => conflict('LANGUAGE_CODE_EXISTS'));
     return this.db.$transaction(async (tx) => {
       const language = await tx.language.create({ data });
       await tx.auditLog.create({
@@ -98,8 +104,9 @@ export class LanguagesService {
   }
 
   async update(actorId: string, id: string, input: Partial<LanguageInput>) {
-    const before = await this.db.language.findUnique({ where: { id } });
-    if (!before) throw notFound('LANGUAGE_NOT_FOUND');
+    const before = requireValue(await this.db.language.findUnique({ where: { id } }), () =>
+      notFound('LANGUAGE_NOT_FOUND'),
+    );
     const merged = this.normalize({
       code: input.code ?? before.code,
       nameFa: input.nameFa ?? before.nameFa,
@@ -112,7 +119,7 @@ export class LanguagesService {
       proficiencySystem: input.proficiencySystem ?? before.proficiencySystem,
     });
     const duplicate = await this.db.language.findFirst({ where: { code: merged.code, id: { not: id } } });
-    if (duplicate) throw conflict('LANGUAGE_CODE_EXISTS');
+    assertDomain(!duplicate, () => conflict('LANGUAGE_CODE_EXISTS'));
     return this.db.$transaction(async (tx) => {
       const language = await tx.language.update({ where: { id }, data: merged });
       await tx.auditLog.create({
@@ -123,15 +130,15 @@ export class LanguagesService {
   }
 
   async remove(actorId: string, id: string) {
-    const language = await this.db.language.findUnique({
-      where: { id },
-      include: { _count: { select: { teachers: true, tests: true, matchingSessions: true } } },
-    });
-    if (!language) throw notFound('LANGUAGE_NOT_FOUND');
+    const language = requireValue(
+      await this.db.language.findUnique({
+        where: { id },
+        include: { _count: { select: { teachers: true, tests: true, matchingSessions: true } } },
+      }),
+      () => notFound('LANGUAGE_NOT_FOUND'),
+    );
     const usages = language._count.teachers + language._count.tests + language._count.matchingSessions;
-    if (usages > 0) {
-      throw conflict('LANGUAGE_IN_USE');
-    }
+    assertDomain(usages === 0, () => conflict('LANGUAGE_IN_USE'));
     await this.db.$transaction(async (tx) => {
       await tx.language.delete({ where: { id } });
       await tx.auditLog.create({
