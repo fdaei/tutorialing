@@ -1,8 +1,10 @@
 import type { SignOptions } from 'jsonwebtoken';
 import { config } from './index';
+import { runtimeEnvironment } from '../common/utils';
 
 export function authConfig() {
   const env = config();
+  const runtime = runtimeEnvironment(env.NODE_ENV);
   return {
     accessSecret: env.JWT_ACCESS_SECRET,
     refreshSecret: env.JWT_REFRESH_SECRET,
@@ -16,6 +18,6 @@ export function authConfig() {
     otpHourlyLimit: env.AUTH_OTP_HOURLY_LIMIT,
     otpAttemptLimit: env.AUTH_OTP_ATTEMPT_LIMIT,
     developmentOtp: env.AUTH_DEV_OTP,
-    secureCookie: env.NODE_ENV === 'production',
+    secureCookie: runtime.isProduction,
   };
 }

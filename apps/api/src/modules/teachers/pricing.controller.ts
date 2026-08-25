@@ -1,6 +1,12 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { PriceStatus } from '@prisma/client';
+<<<<<<< Updated upstream
 import { CurrentUser, Permissions, Roles, type AuthUser } from '../../common';
+||||||| Stash base
+import { CurrentUser, Permissions, Roles, type AuthUser } from '../../common/auth';
+=======
+import { Authorize, CurrentUser, Roles, type AuthUser } from '../../common/auth';
+>>>>>>> Stashed changes
 import { PricingService } from './pricing.service';
 import { ProposalDto } from './dto/request/proposal.dto';
 import { PriceReviewDto } from './dto/request/price-review.dto';
@@ -20,8 +26,7 @@ export class TeacherPricingController {
   }
 }
 
-@Roles('ADMIN', 'STAFF', 'FINANCE')
-@Permissions('teacher-prices.manage')
+@Authorize(['ADMIN', 'STAFF', 'FINANCE'], ['teacher-prices.manage'])
 @Controller('admin/teacher-prices')
 export class AdminPricingController {
   constructor(private readonly service: PricingService) {}

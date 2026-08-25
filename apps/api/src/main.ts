@@ -11,9 +11,11 @@ import { AppModule } from './app.module';
 import { ApiExceptionFilter } from './common';
 import { validationResponse } from './common';
 import { config } from './config';
+import { runtimeEnvironment } from './common/utils';
 
 async function bootstrap() {
   const cfg = config();
+  const runtime = runtimeEnvironment(cfg.NODE_ENV);
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: true });
   const logger = app.get(Logger);
   app.useLogger(logger);
@@ -36,7 +38,7 @@ async function bootstrap() {
   // `/docs` enumerates every route, its DTO shape, and its auth requirements —
   // a ready-made map of the attack surface. It stays off in production, where
   // the schema should be published deliberately rather than served anonymously.
-  if (cfg.NODE_ENV !== 'production') {
+  if (!runtime.isProduction) {
     const swaggerConfig = new DocumentBuilder()
       .setTitle('LingoSpeak API')
       .setDescription('Bilingual IELTS teacher marketplace')

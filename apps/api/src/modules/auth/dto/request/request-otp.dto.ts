@@ -1,7 +1,6 @@
-import { IsString, Matches } from 'class-validator';
+import { IsIranianPhone } from '../../../../common/validators/is-iranian-phone.decorator';
 
 export class RequestOtpDto {
-  @IsString()
-  @Matches(/^09\d{9}$/)
+  @IsIranianPhone()
   phone!: string;
 }

@@ -3,7 +3,14 @@ import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
 import { ROLES_KEY, PERMISSIONS_KEY } from '../constants/auth.constants';
 import { AuthUser } from '../types/authenticated-user.type';
+<<<<<<< Updated upstream:apps/api/src/common/core/guards/authorization.guard.ts
 import { forbidden } from '../exceptions/domain.exception';
+||||||| Stash base:apps/api/src/common/guards/authorization.guard.ts
+import { forbidden } from '../errors';
+=======
+import { forbidden } from '../errors';
+import { assertDomain } from '../utils';
+>>>>>>> Stashed changes:apps/api/src/common/guards/authorization.guard.ts
 
 @Injectable()
 export class AuthorizationGuard implements CanActivate {
@@ -13,9 +20,12 @@ export class AuthorizationGuard implements CanActivate {
     const req = ctx.switchToHttp().getRequest<Request & { user: AuthUser }>();
     const roles = this.reflector.getAllAndOverride<string[]>(ROLES_KEY, [ctx.getHandler(), ctx.getClass()]) ?? [];
     const perms = this.reflector.getAllAndOverride<string[]>(PERMISSIONS_KEY, [ctx.getHandler(), ctx.getClass()]) ?? [];
-    if (roles.length && !roles.some((r) => req.user.roles.includes(r))) throw forbidden('ROLE_NOT_PERMITTED');
-    if (perms.length && !perms.every((p) => req.user.permissions.includes(p)))
-      throw forbidden('PERMISSION_NOT_GRANTED');
+    assertDomain(!roles.length || roles.some((role) => req.user.roles.includes(role)), () =>
+      forbidden('ROLE_NOT_PERMITTED'),
+    );
+    assertDomain(!perms.length || perms.every((permission) => req.user.permissions.includes(permission)), () =>
+      forbidden('PERMISSION_NOT_GRANTED'),
+    );
     return true;
   }
 }

@@ -1,10 +1,17 @@
 import { Body, Controller, Ip, Post, Req, Res } from '@nestjs/common';
 import type { Request, Response } from 'express';
+<<<<<<< Updated upstream
 import { Public, RateLimit } from '../../common';
+||||||| Stash base
+import { Public, RateLimit } from '../../common/auth';
+=======
+import { Public, PublicRateLimit } from '../../common/auth';
+>>>>>>> Stashed changes
 import { AuthService } from './auth.service';
 import { RequestOtpDto } from './dto/request/request-otp.dto';
 import { VerifyOtpDto } from './dto/request/verify-otp.dto';
 import { authConfig } from '../../config/auth.config';
+import { SessionMapper } from './mappers/session.mapper';
 
 // Per-IP budgets layered on top of the per-phone limits already enforced in
 // AuthService: those stop one number being spammed, these stop a single host
@@ -34,20 +41,17 @@ export class AuthController {
       maxAge: this.settings.refreshTokenTtlSeconds * 1000,
     });
   }
-  @Public()
-  @RateLimit(OTP_SEND_LIMIT)
+  @PublicRateLimit(OTP_SEND_LIMIT)
   @Post('otp/request')
   request(@Body() d: RequestOtpDto, @Ip() ip: string) {
     return this.auth.requestOtp(d.phone, ip);
   }
-  @Public()
-  @RateLimit(OTP_SEND_LIMIT)
+  @PublicRateLimit(OTP_SEND_LIMIT)
   @Post('otp/resend')
   resend(@Body() d: RequestOtpDto, @Ip() ip: string) {
     return this.auth.requestOtp(d.phone, ip);
   }
-  @Public()
-  @RateLimit(OTP_VERIFY_LIMIT)
+  @PublicRateLimit(OTP_VERIFY_LIMIT)
   @Post('otp/verify')
   async verify(@Body() d: VerifyOtpDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const out = await this.auth.verifyOtp(d.challengeId, d.phone, d.code, {
@@ -55,11 +59,9 @@ export class AuthController {
       userAgent: req.headers['user-agent'],
     });
     this.set(res, out.refreshToken);
-    const { refreshToken, ...safe } = out;
-    return safe;
+    return SessionMapper.toResponse(out);
   }
-  @Public()
-  @RateLimit(REFRESH_LIMIT)
+  @PublicRateLimit(REFRESH_LIMIT)
   @Post('refresh')
   async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const out = await this.auth.refresh(req.cookies?.refresh_token, {
@@ -67,8 +69,7 @@ export class AuthController {
       userAgent: req.headers['user-agent'],
     });
     this.set(res, out.refreshToken);
-    const { refreshToken, ...safe } = out;
-    return safe;
+    return SessionMapper.toResponse(out);
   }
   @Public()
   @RateLimit(LOGOUT_LIMIT)

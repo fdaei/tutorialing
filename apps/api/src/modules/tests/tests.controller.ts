@@ -1,5 +1,11 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
+<<<<<<< Updated upstream
 import { CurrentUser, Permissions, Public, RateLimit, RATE_LIMIT_TIERS, Roles, type AuthUser } from '../../common';
+||||||| Stash base
+import { CurrentUser, Permissions, Public, RateLimit, RATE_LIMIT_TIERS, Roles, type AuthUser } from '../../common/auth';
+=======
+import { Authorize, CurrentUser, Public, RateLimit, RATE_LIMIT_TIERS, Roles, type AuthUser } from '../../common/auth';
+>>>>>>> Stashed changes
 import { TestsService } from './tests.service';
 import { StartDto } from './dto/request/start.dto';
 import { SaveDto } from './dto/request/save.dto';
@@ -63,8 +69,7 @@ export class ExaminerController {
   }
 }
 
-@Roles('ADMIN', 'STAFF')
-@Permissions('tests.manage')
+@Authorize(['ADMIN', 'STAFF'], ['tests.manage'])
 @RateLimit(RATE_LIMIT_TIERS.adminWrite)
 @Controller('admin/tests')
 // Bodies here are typed `unknown` on purpose. ValidationPipe cannot validate an
