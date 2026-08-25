@@ -1254,6 +1254,27 @@ model AuditLog {
   @@index([actorId, createdAt])
 }
 
+/// Singleton projection used by the admin dashboard. PostgreSQL triggers keep
+/// it transactionally aligned with source tables; reconciliation repairs any
+/// drift caused by disabled triggers or historical/manual data changes.
+model DashboardStat {
+  id              String   @id @default("platform")
+  activeUsers     BigInt   @default(0)
+  activeTeachers  BigInt   @default(0)
+  pendingTeachers BigInt   @default(0)
+  testAttempts    BigInt   @default(0)
+  pendingReviews  BigInt   @default(0)
+  bookings        BigInt   @default(0)
+  payments        BigInt   @default(0)
+  payouts         BigInt   @default(0)
+  openTickets     BigInt   @default(0)
+  revenue         BigInt   @default(0)
+  walletCredits   BigInt   @default(0)
+  walletDebits    BigInt   @default(0)
+  reconciledAt    DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
 /// Scalable translations for editable fields and additional locales. Existing
 /// fa/en columns remain the migration-safe fast path for core public content.
 model LocalizedContent {

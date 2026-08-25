@@ -20,12 +20,20 @@ async function hammerOtpRequest(n) {
   console.log(`  sequence: ${results.map((r) => r.status).join(',')}`);
   const firstLimited = results.find((r) => r.status === 429);
   if (firstLimited) {
-    console.log(`  first 429 at request #${firstLimited.i}, Retry-After header: ${firstLimited.retryAfter ?? '(none)'}`);
-    if (!firstLimited.retryAfter) console.log('  NOTE: no Retry-After header on the 429 — unexpected, check rate-limit.guard.ts');
+    console.log(
+      `  first 429 at request #${firstLimited.i}, Retry-After header: ${firstLimited.retryAfter ?? '(none)'}`,
+    );
+    if (!firstLimited.retryAfter)
+      console.log('  NOTE: no Retry-After header on the 429 — unexpected, check rate-limit.guard.ts');
   } else {
-    console.log(`  WARNING: never hit 429 across ${n} requests — either the window budget was already fresh and large, or the limiter did not trigger`);
+    console.log(
+      `  WARNING: never hit 429 across ${n} requests — either the window budget was already fresh and large, or the limiter did not trigger`,
+    );
   }
-  if (serverErrors > 0) console.log(`  WARNING: ${serverErrors} requests returned 5xx instead of a clean 429/200 — check fail-mode (RATE-002)`);
+  if (serverErrors > 0)
+    console.log(
+      `  WARNING: ${serverErrors} requests returned 5xx instead of a clean 429/200 — check fail-mode (RATE-002)`,
+    );
   return results;
 }
 
@@ -39,9 +47,13 @@ async function burstUnprotectedRoute(n) {
   const limited = statuses.filter((s) => s === 429).length;
   console.log(`  ${n} concurrent requests in ${elapsed}ms: ${ok} ok, ${limited} rate-limited`);
   if (limited === 0) {
-    console.log('  CONFIRMS RATE-001: an unauthenticated, high-volume-capable read route absorbed a full burst with zero throttling.');
+    console.log(
+      '  CONFIRMS RATE-001: an unauthenticated, high-volume-capable read route absorbed a full burst with zero throttling.',
+    );
   } else {
-    console.log('  Unexpected: this route returned 429s — a limiter must have been added since the audit; re-check AUDIT/04-ratelimit.md.');
+    console.log(
+      '  Unexpected: this route returned 429s — a limiter must have been added since the audit; re-check AUDIT/04-ratelimit.md.',
+    );
   }
 }
 
@@ -51,4 +63,7 @@ async function main() {
   console.log('\nratelimit.js complete.');
 }
 
-main().catch((err) => { console.error(err); process.exit(1); });
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

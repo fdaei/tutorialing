@@ -23,7 +23,9 @@ describe('api access-token refresh', () => {
     // like replay to the API and revokes the whole family, so N parallel 401s
     // must still produce exactly one refresh call.
     let refreshResolve!: (value: Response) => void;
-    const refreshPending = new Promise<Response>((resolve) => { refreshResolve = resolve; });
+    const refreshPending = new Promise<Response>((resolve) => {
+      refreshResolve = resolve;
+    });
 
     fetchMock.mockImplementation((url: string, init?: RequestInit) => {
       if (String(url).endsWith('/auth/refresh')) return refreshPending;
@@ -57,7 +59,8 @@ describe('api access-token refresh', () => {
 
   it('starts a new refresh for a later 401 rather than reusing the settled one', async () => {
     fetchMock.mockImplementation((url: string, init?: RequestInit) => {
-      if (String(url).endsWith('/auth/refresh')) return Promise.resolve(jsonResponse(200, { accessToken: 'fresh-token' }));
+      if (String(url).endsWith('/auth/refresh'))
+        return Promise.resolve(jsonResponse(200, { accessToken: 'fresh-token' }));
       const auth = (init?.headers as Record<string, string> | undefined)?.authorization;
       return Promise.resolve(auth === 'Bearer fresh-token' ? jsonResponse(200, { ok: true }) : jsonResponse(401, {}));
     });

@@ -3,10 +3,42 @@ import { MatchingService } from './matching.service';
 describe('MatchingService', () => {
   it('persists only the best three compatible recommendations', async () => {
     const teachers = [
-      { id: 'a', specialties: ['writing'], approvedTrialPrice: 200, approvedRegularPrice: 300, rating: 5, languageLinks: [{ specialties: ['writing'], levels: ['B2'] }], availabilityRules: [{ weekday: 1 }] },
-      { id: 'b', specialties: ['reading'], approvedTrialPrice: 200, approvedRegularPrice: 300, rating: 4, languageLinks: [{ specialties: ['reading'], levels: ['B2'] }], availabilityRules: [{ weekday: 1 }] },
-      { id: 'c', specialties: ['speaking'], approvedTrialPrice: 250, approvedRegularPrice: 350, rating: 4, languageLinks: [{ specialties: ['speaking'], levels: ['C1'] }], availabilityRules: [{ weekday: 1 }] },
-      { id: 'd', specialties: [], approvedTrialPrice: 250, approvedRegularPrice: 350, rating: 3, languageLinks: [{ specialties: [], levels: ['A2'] }], availabilityRules: [{ weekday: 1 }] },
+      {
+        id: 'a',
+        specialties: ['writing'],
+        approvedTrialPrice: 200,
+        approvedRegularPrice: 300,
+        rating: 5,
+        languageLinks: [{ specialties: ['writing'], levels: ['B2'] }],
+        availabilityRules: [{ weekday: 1 }],
+      },
+      {
+        id: 'b',
+        specialties: ['reading'],
+        approvedTrialPrice: 200,
+        approvedRegularPrice: 300,
+        rating: 4,
+        languageLinks: [{ specialties: ['reading'], levels: ['B2'] }],
+        availabilityRules: [{ weekday: 1 }],
+      },
+      {
+        id: 'c',
+        specialties: ['speaking'],
+        approvedTrialPrice: 250,
+        approvedRegularPrice: 350,
+        rating: 4,
+        languageLinks: [{ specialties: ['speaking'], levels: ['C1'] }],
+        availabilityRules: [{ weekday: 1 }],
+      },
+      {
+        id: 'd',
+        specialties: [],
+        approvedTrialPrice: 250,
+        approvedRegularPrice: 350,
+        rating: 3,
+        languageLinks: [{ specialties: [], levels: ['A2'] }],
+        availabilityRules: [{ weekday: 1 }],
+      },
     ];
     const create = jest.fn(({ data }) => data);
     const db = {

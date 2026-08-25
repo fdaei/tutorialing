@@ -1,11 +1,12 @@
 import { RequestIdMiddleware } from './request-id.middleware';
 
 describe('RequestIdMiddleware (SEC-009)', () => {
-  const run = (headerValue: unknown) => {
+  const run = (headerValue: unknown, loggerAssignedValue?: unknown) => {
     const headers: Record<string, unknown> = { 'accept-language': 'en' };
     if (headerValue !== undefined) headers['x-request-id'] = headerValue;
     const setHeader = jest.fn();
-    new RequestIdMiddleware().use({ headers } as never, { setHeader } as never, jest.fn());
+    const getHeader = () => loggerAssignedValue;
+    new RequestIdMiddleware().use({ headers } as never, { setHeader, getHeader } as never, jest.fn());
     return setHeader.mock.calls.find((call) => call[0] === 'x-request-id')?.[1] as string;
   };
 
@@ -25,5 +26,9 @@ describe('RequestIdMiddleware (SEC-009)', () => {
 
   it('generates one when the client sends none', () => {
     expect(run(undefined)).toMatch(/^[0-9a-f-]{36}$/);
+  });
+
+  it('keeps the request id already assigned by the HTTP logger', () => {
+    expect(run(undefined, 'logger-generated-id')).toBe('logger-generated-id');
   });
 });

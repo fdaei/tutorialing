@@ -23,14 +23,25 @@ async function main() {
 
   const booking = await call('/bookings', {
     method: 'POST',
-    body: JSON.stringify({ teacherId: teacher.body.id, startsAt: slot.startsAt, type: 'trial', policyAccepted: true, timezone: 'Asia/Tehran' }),
+    body: JSON.stringify({
+      teacherId: teacher.body.id,
+      startsAt: slot.startsAt,
+      type: 'trial',
+      policyAccepted: true,
+      timezone: 'Asia/Tehran',
+    }),
   });
   assert(booking.status === 201, `booking create: ${booking.status} ${JSON.stringify(booking.body)}`);
   console.log(`booked ${slot.startsAt}, booking ${booking.body.id}, status ${booking.body.status}`);
 
   const payment = await call('/payments', {
     method: 'POST',
-    body: JSON.stringify({ purpose: 'booking', referenceId: booking.body.id, walletAmount: 0, idempotencyKey: crypto.randomUUID() }),
+    body: JSON.stringify({
+      purpose: 'booking',
+      referenceId: booking.body.id,
+      walletAmount: 0,
+      idempotencyKey: crypto.randomUUID(),
+    }),
   });
   assert(payment.status === 201, `payment create: ${payment.status} ${JSON.stringify(payment.body)}`);
   console.log(`payment ${payment.body.id}, status ${payment.body.status}, amount ${payment.body.gatewayAmount}`);
@@ -50,4 +61,7 @@ async function main() {
   console.log('SMOKE PASS: booking confirmed end-to-end via dev-gateway happy path');
 }
 
-main().catch((err) => { console.error(err); process.exit(1); });
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

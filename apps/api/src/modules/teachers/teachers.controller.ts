@@ -1,5 +1,5 @@
 import { Body, Controller, Get, NotFoundException, Param, Patch, Post, Query } from '@nestjs/common';
-import { CurrentUser, Public, Roles, type AuthUser } from '../../common';
+import { CurrentUser, Public, RateLimit, RATE_LIMIT_TIERS, Roles, type AuthUser } from '../../common';
 import { TeachersService } from './teachers.service';
 import { ApplicationDto } from './dto/request/application.dto';
 
@@ -7,7 +7,9 @@ import { ApplicationDto } from './dto/request/application.dto';
 export class TeachersController {
   constructor(private readonly service: TeachersService) {}
 
-  @Public() @Get()
+  @Public()
+  @RateLimit(RATE_LIMIT_TIERS.publicRead)
+  @Get()
   list(
     @Query('page') page = '1',
     @Query('limit') limit = '12',
@@ -30,10 +32,12 @@ export class TeachersController {
     });
   }
 
-  @Public() @Get(':slug')
+  @Public()
+  @RateLimit(RATE_LIMIT_TIERS.publicRead)
+  @Get(':slug')
   async profile(@Param('slug') slug: string) {
     const teacher = await this.service.profile(slug);
-    if (!teacher) throw new NotFoundException();
+    if (!teacher) throw new NotFoundException({ code: 'TEACHER_NOT_FOUND' });
     return teacher;
   }
 }
@@ -42,8 +46,16 @@ export class TeachersController {
 @Roles('TEACHER', 'STUDENT')
 export class TeacherApplicationController {
   constructor(private readonly service: TeachersService) {}
-  @Get() mine(@CurrentUser() user: AuthUser) { return this.service.mine(user.id); }
-  @Post() create(@CurrentUser() user: AuthUser, @Body() body: ApplicationDto) { return this.service.application(user.id, body); }
-  @Patch() update(@CurrentUser() user: AuthUser, @Body() body: ApplicationDto) { return this.service.application(user.id, body); }
-  @Post('submit') submit(@CurrentUser() user: AuthUser) { return this.service.submit(user.id); }
+  @Get() mine(@CurrentUser() user: AuthUser) {
+    return this.service.mine(user.id);
+  }
+  @Post() create(@CurrentUser() user: AuthUser, @Body() body: ApplicationDto) {
+    return this.service.application(user.id, body);
+  }
+  @Patch() update(@CurrentUser() user: AuthUser, @Body() body: ApplicationDto) {
+    return this.service.application(user.id, body);
+  }
+  @Post('submit') submit(@CurrentUser() user: AuthUser) {
+    return this.service.submit(user.id);
+  }
 }

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../../../prisma.service';
+import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { PACKAGE_TIERS, type PackageTier } from '@lingospeak/contracts';
-import { badRequest, conflict, notFound } from '../../../common';
+import { badRequest, domainError, DOMAIN_ERRORS, notFound } from '../../../common';
 
 export type PackageInput = {
   titleFa: string;
@@ -30,24 +30,15 @@ export class PackagesService {
    */
   async createPackage(userId: string, data: PackageInput) {
     const teacher = await this.db.teacher.findUnique({ where: { userId } });
-    if (!teacher) throw notFound('TEACHER_PROFILE_NOT_FOUND', 'پروفایل مدرس پیدا نشد.', 'Teacher profile was not found.');
+    if (!teacher) throw notFound('TEACHER_PROFILE_NOT_FOUND');
     if (!PACKAGE_TIERS.includes(data.credits as PackageTier)) {
-      throw badRequest(
-        'PACKAGE_TIER_INVALID',
-        `تعداد جلسات بسته باید یکی از مقادیر ${PACKAGE_TIERS.join('، ')} باشد.`,
-        `Package session count must be one of ${PACKAGE_TIERS.join(', ')}.`,
-        { credits: { fa: 'یکی از بسته‌های مجاز را انتخاب کنید.', en: 'Choose one of the allowed tiers.' } },
-      );
+      throw badRequest('PACKAGE_TIER_INVALID');
     }
     if (teacher.approvedRegularPrice == null || teacher.approvedRegularPrice <= 0) {
-      throw conflict(
-        'TEACHER_PRICE_NOT_APPROVED',
-        'تا زمانی که قیمت جلسه عادی شما تأیید نشده باشد، امکان ساخت بسته وجود ندارد.',
-        'You cannot create a package until your regular lesson price has been approved.',
-      );
+      throw domainError(DOMAIN_ERRORS.TEACHER_PRICE_NOT_APPROVED);
     }
     const listPrice = teacher.approvedRegularPrice * data.credits;
-    const price = listPrice - Math.round(listPrice * data.discountPercent / 100);
+    const price = listPrice - Math.round((listPrice * data.discountPercent) / 100);
     return this.db.package.create({
       data: {
         teacherId: teacher.id,
@@ -67,7 +58,7 @@ export class PackagesService {
   /** A teacher's own packages, including the unapproved ones. */
   async mine(userId: string) {
     const teacher = await this.db.teacher.findUnique({ where: { userId } });
-    if (!teacher) throw notFound('TEACHER_PROFILE_NOT_FOUND', 'پروفایل مدرس پیدا نشد.', 'Teacher profile was not found.');
+    if (!teacher) throw notFound('TEACHER_PROFILE_NOT_FOUND');
     return this.db.package.findMany({ where: { teacherId: teacher.id }, orderBy: [{ credits: 'asc' }] });
   }
 
@@ -76,12 +67,27 @@ export class PackagesService {
     return this.db.package.findMany({
       where: { teacherId, active: true, approvalStatus: 'APPROVED' },
       orderBy: [{ credits: 'asc' }],
-      select: { id: true, titleFa: true, titleEn: true, descriptionFa: true, descriptionEn: true, credits: true, lessonMinutes: true, listPrice: true, discountPercent: true, price: true },
+      select: {
+        id: true,
+        titleFa: true,
+        titleEn: true,
+        descriptionFa: true,
+        descriptionEn: true,
+        credits: true,
+        lessonMinutes: true,
+        listPrice: true,
+        discountPercent: true,
+        price: true,
+      },
     });
   }
 
   enrollments(userId: string) {
-    return this.db.enrollment.findMany({ where: { studentId: userId }, include: { package: { include: { teacher: true } }, creditEntries: true }, orderBy: { createdAt: 'desc' } });
+    return this.db.enrollment.findMany({
+      where: { studentId: userId },
+      include: { package: { include: { teacher: true } }, creditEntries: true },
+      orderBy: { createdAt: 'desc' },
+    });
   }
 
   approvePackage(id: string, actorId: string, status: 'APPROVED' | 'REJECTED') {

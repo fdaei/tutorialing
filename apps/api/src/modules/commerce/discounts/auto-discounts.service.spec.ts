@@ -1,6 +1,14 @@
 import { AutoDiscountsService } from './auto-discounts.service';
 
-const RULE = { id: 'rule-1', trigger: 'BIRTHDAY', type: 'percent', value: 20, maxAmount: 200_000, windowDays: 7, active: true };
+const RULE = {
+  id: 'rule-1',
+  trigger: 'BIRTHDAY',
+  type: 'percent',
+  value: 20,
+  maxAmount: 200_000,
+  windowDays: 7,
+  active: true,
+};
 
 /** A birth date is stored date-only at UTC midnight. */
 const birth = (month: number, day: number) => new Date(Date.UTC(1995, month - 1, day));
@@ -8,11 +16,13 @@ const birth = (month: number, day: number) => new Date(Date.UTC(1995, month - 1,
 function harness(options: { birthDate?: Date | null; timezone?: string; rules?: Record<string, unknown>[] } = {}) {
   const tx = {
     user: {
-      findUnique: jest.fn().mockResolvedValue(
-        options.birthDate === null
-          ? { birthDate: null, timezone: options.timezone ?? 'Asia/Tehran' }
-          : { birthDate: options.birthDate ?? birth(3, 21), timezone: options.timezone ?? 'Asia/Tehran' },
-      ),
+      findUnique: jest
+        .fn()
+        .mockResolvedValue(
+          options.birthDate === null
+            ? { birthDate: null, timezone: options.timezone ?? 'Asia/Tehran' }
+            : { birthDate: options.birthDate ?? birth(3, 21), timezone: options.timezone ?? 'Asia/Tehran' },
+        ),
     },
     discountRule: { findMany: jest.fn().mockResolvedValue(options.rules ?? [RULE]) },
   };
@@ -29,7 +39,10 @@ describe('AutoDiscountsService.evaluate', () => {
   it('applies the discount on the birthday itself', async () => {
     at('2026-03-21T09:00:00Z');
     const h = harness();
-    await expect(h.svc.evaluate(h.tx as never, 'user-1', 500_000)).resolves.toMatchObject({ ruleId: 'rule-1', amount: 100_000 });
+    await expect(h.svc.evaluate(h.tx as never, 'user-1', 500_000)).resolves.toMatchObject({
+      ruleId: 'rule-1',
+      amount: 100_000,
+    });
   });
 
   it('applies within the configured window on either side', async () => {
@@ -82,7 +95,10 @@ describe('AutoDiscountsService.evaluate', () => {
   it('picks the most valuable applicable rule', async () => {
     at('2026-03-21T09:00:00Z');
     const h = harness({ rules: [RULE, { ...RULE, id: 'rule-2', value: 40, maxAmount: null }] });
-    await expect(h.svc.evaluate(h.tx as never, 'user-1', 500_000)).resolves.toMatchObject({ ruleId: 'rule-2', amount: 200_000 });
+    await expect(h.svc.evaluate(h.tx as never, 'user-1', 500_000)).resolves.toMatchObject({
+      ruleId: 'rule-2',
+      amount: 200_000,
+    });
   });
 
   it('falls back to the platform timezone when the stored one is malformed', async () => {

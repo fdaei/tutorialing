@@ -9,13 +9,10 @@ describe('prismaToDomain', () => {
     ['P2025', HttpStatus.NOT_FOUND, 'RESOURCE_NOT_FOUND'],
     ['P2003', HttpStatus.BAD_REQUEST, 'RELATED_RECORD_MISSING'],
     ['P2014', HttpStatus.CONFLICT, 'RELATED_RECORD_IN_USE'],
-  ])('maps %s to a bilingual %i', (code, status, expected) => {
+  ])('maps %s to code-only domain error %i', (code, status, expected) => {
     const mapped = prismaToDomain(prismaError(code));
     expect(mapped?.getStatus()).toBe(status);
-    const body = mapped?.getResponse() as { code: string; messageFa: string; messageEn: string };
-    expect(body.code).toBe(expected);
-    expect(body.messageFa).toBeTruthy();
-    expect(body.messageEn).toBeTruthy();
+    expect(mapped?.getResponse()).toEqual({ code: expected, fieldErrors: {} });
   });
 
   it('leaves unrecognised Prisma codes as server faults rather than disguising them', () => {

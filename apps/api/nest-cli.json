@@ -1,1 +1,5 @@
-{"collection":"@nestjs/schematics","sourceRoot":"src"}
+{
+  "collection": "@nestjs/schematics",
+  "sourceRoot": "src",
+  "entryFile": "apps/api/src/main"
+}

@@ -9,8 +9,11 @@ function harness(options: { commission?: unknown; holdDays?: unknown } = {}) {
   };
   const tx = {
     earning: {
-      upsert: jest.fn().mockImplementation(({ create }: { create: Record<string, unknown> }) =>
-        Promise.resolve({ id: 'earning-1', ...create })),
+      upsert: jest
+        .fn()
+        .mockImplementation(({ create }: { create: Record<string, unknown> }) =>
+          Promise.resolve({ id: 'earning-1', ...create }),
+        ),
     },
     teacher: { findUniqueOrThrow: jest.fn().mockResolvedValue({ userId: 'teacher-user-1' }) },
     walletEntry: { upsert: jest.fn().mockResolvedValue({}) },
@@ -20,11 +23,15 @@ function harness(options: { commission?: unknown; holdDays?: unknown } = {}) {
   const settingsService = {
     numeric: jest.fn().mockImplementation((key: string, fallback: number, max: number) => {
       const raw = settings[key];
-      const value = typeof raw === 'number'
-        ? raw
-        : typeof raw === 'object' && raw !== null && !Array.isArray(raw) && typeof (raw as Record<string, unknown>).value === 'number'
-          ? (raw as { value: number }).value
-          : undefined;
+      const value =
+        typeof raw === 'number'
+          ? raw
+          : typeof raw === 'object' &&
+              raw !== null &&
+              !Array.isArray(raw) &&
+              typeof (raw as Record<string, unknown>).value === 'number'
+            ? (raw as { value: number }).value
+            : undefined;
       if (value === undefined || !Number.isFinite(value) || value < 0 || value > max) return Promise.resolve(fallback);
       return Promise.resolve(value);
     }),
@@ -66,24 +73,28 @@ describe('EarningsService.accrue', () => {
     // balance stayed at zero no matter how many lessons they taught.
     const h = harness();
     await h.svc.accrue(h.tx as never, BOOKING);
-    expect(h.tx.walletEntry.upsert).toHaveBeenCalledWith(expect.objectContaining({
-      where: { idempotencyKey: 'earning-credit:earning-1' },
-      create: expect.objectContaining({
-        userId: 'teacher-user-1',
-        account: 'user_wallet',
-        direction: 'CREDIT',
-        amount: 400_000,
+    expect(h.tx.walletEntry.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { idempotencyKey: 'earning-credit:earning-1' },
+        create: expect.objectContaining({
+          userId: 'teacher-user-1',
+          account: 'user_wallet',
+          direction: 'CREDIT',
+          amount: 400_000,
+        }),
       }),
-    }));
+    );
   });
 
   it('keys both writes on the booking so replaying a completion cannot pay twice', async () => {
     const h = harness();
     await h.svc.accrue(h.tx as never, BOOKING);
-    expect(h.tx.earning.upsert).toHaveBeenCalledWith(expect.objectContaining({
-      where: { bookingId: BOOKING.id },
-      update: {},
-    }));
+    expect(h.tx.earning.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { bookingId: BOOKING.id },
+        update: {},
+      }),
+    );
     expect(h.tx.walletEntry.upsert).toHaveBeenCalledWith(expect.objectContaining({ update: {} }));
   });
 

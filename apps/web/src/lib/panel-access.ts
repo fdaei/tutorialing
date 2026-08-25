@@ -1,13 +1,10 @@
 export type PanelIdentity = { roles?: string[]; permissions?: string[] };
 
 const rolesOf = (identity: PanelIdentity) => (Array.isArray(identity.roles) ? identity.roles : []);
-const permissionsOf = (identity: PanelIdentity) =>
-  Array.isArray(identity.permissions) ? identity.permissions : [];
+const permissionsOf = (identity: PanelIdentity) => (Array.isArray(identity.permissions) ? identity.permissions : []);
 
-const hasRole = (identity: PanelIdentity, ...roles: string[]) =>
-  rolesOf(identity).some((role) => roles.includes(role));
-const hasPermission = (identity: PanelIdentity, permission: string) =>
-  permissionsOf(identity).includes(permission);
+const hasRole = (identity: PanelIdentity, ...roles: string[]) => rolesOf(identity).some((role) => roles.includes(role));
+const hasPermission = (identity: PanelIdentity, permission: string) => permissionsOf(identity).includes(permission);
 /** ADMIN and STAFF reach every admin section, so every admin rule starts here. */
 const isAdmin = (identity: PanelIdentity) => hasRole(identity, 'ADMIN', 'STAFF');
 
@@ -34,10 +31,22 @@ export function panelHome(identity: PanelIdentity) {
  * `/admin` rule that only admins satisfy.
  */
 const ROUTE_RULES: ReadonlyArray<{ pattern: RegExp; allow: (identity: PanelIdentity) => boolean }> = [
-  { pattern: /^\/admin\/tickets(?:\/|$)/, allow: (i) => isAdmin(i) || (hasRole(i, 'SUPPORT') && hasPermission(i, 'tickets.read')) },
-  { pattern: /^\/admin\/teacher-prices(?:\/|$)/, allow: (i) => isAdmin(i) || (hasRole(i, 'FINANCE') && hasPermission(i, 'teacher-prices.manage')) },
-  { pattern: /^\/admin\/payouts(?:\/|$)/, allow: (i) => isAdmin(i) || (hasRole(i, 'FINANCE') && hasPermission(i, 'payouts.manage')) },
-  { pattern: /^\/admin\/refunds(?:\/|$)/, allow: (i) => isAdmin(i) || (hasRole(i, 'FINANCE') && hasPermission(i, 'payments.refund')) },
+  {
+    pattern: /^\/admin\/tickets(?:\/|$)/,
+    allow: (i) => isAdmin(i) || (hasRole(i, 'SUPPORT') && hasPermission(i, 'tickets.read')),
+  },
+  {
+    pattern: /^\/admin\/teacher-prices(?:\/|$)/,
+    allow: (i) => isAdmin(i) || (hasRole(i, 'FINANCE') && hasPermission(i, 'teacher-prices.manage')),
+  },
+  {
+    pattern: /^\/admin\/payouts(?:\/|$)/,
+    allow: (i) => isAdmin(i) || (hasRole(i, 'FINANCE') && hasPermission(i, 'payouts.manage')),
+  },
+  {
+    pattern: /^\/admin\/refunds(?:\/|$)/,
+    allow: (i) => isAdmin(i) || (hasRole(i, 'FINANCE') && hasPermission(i, 'payments.refund')),
+  },
   { pattern: /^\/admin\/test-reviews(?:\/|$)/, allow: (i) => isAdmin(i) || hasRole(i, 'EXAMINER') },
   { pattern: /^\/admin(?:\/|$)/, allow: isAdmin },
   { pattern: /^\/teacher-panel(?:\/|$)/, allow: (i) => hasRole(i, 'TEACHER', 'ADMIN') },

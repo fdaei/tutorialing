@@ -9,7 +9,15 @@ import { ReviewsService } from './reviews.service';
 import { AdminReviewsController, ReviewsController } from './reviews.controller';
 
 @Module({
-  controllers: [TeachersController, TeacherApplicationController, VerificationController, TeacherPricingController, AdminPricingController, ReviewsController, AdminReviewsController],
+  controllers: [
+    TeachersController,
+    TeacherApplicationController,
+    VerificationController,
+    TeacherPricingController,
+    AdminPricingController,
+    ReviewsController,
+    AdminReviewsController,
+  ],
   providers: [TeachersService, VerificationService, PricingService, ReviewsService],
   exports: [TeachersService, PricingService, ReviewsService],
 })

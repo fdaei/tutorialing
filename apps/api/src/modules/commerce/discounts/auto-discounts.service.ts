@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { DiscountRule } from '@prisma/client';
-import { PrismaService, Tx } from '../../../prisma.service';
+import { PrismaService, Tx } from '../../../infrastructure/database/prisma.service';
 
 const DAY_MS = 86_400_000;
 
@@ -29,15 +29,24 @@ export class AutoDiscountsService {
    */
   private daysFromBirthday(birthDate: Date, timezone: string, now = new Date()) {
     const localParts = (zone: string) => {
-      const parts = new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(now);
-      const value = (kind: Intl.DateTimeFormatPartTypes) => Number(parts.find((part) => part.type === kind)?.value ?? '0');
+      const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: zone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).formatToParts(now);
+      const value = (kind: Intl.DateTimeFormatPartTypes) =>
+        Number(parts.find((part) => part.type === kind)?.value ?? '0');
       return { year: value('year'), month: value('month'), day: value('day') };
     };
     // A stored timezone can be stale or malformed; a bad one must not cost the
     // student their discount, so it degrades to the platform default.
     let today;
-    try { today = localParts(timezone); }
-    catch { today = localParts('Asia/Tehran'); }
+    try {
+      today = localParts(timezone);
+    } catch {
+      today = localParts('Asia/Tehran');
+    }
     // The birth date is a date-only value stored at UTC midnight, so its
     // month/day must be read in UTC — reading it in a negative-offset zone would
     // shift it to the previous day.
@@ -50,7 +59,7 @@ export class AutoDiscountsService {
   }
 
   private amountFor(rule: DiscountRule, subtotal: number) {
-    const raw = rule.type === 'percent' ? Math.round(subtotal * rule.value / 100) : rule.value;
+    const raw = rule.type === 'percent' ? Math.round((subtotal * rule.value) / 100) : rule.value;
     const capped = rule.maxAmount != null ? Math.min(raw, rule.maxAmount) : raw;
     return Math.max(0, Math.min(subtotal, capped));
   }

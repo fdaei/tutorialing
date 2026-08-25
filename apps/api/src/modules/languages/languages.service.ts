@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { LanguageDirection, Prisma, ProficiencySystem } from '@prisma/client';
-import { PrismaService } from '../../prisma.service';
+import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { badRequest, conflict, notFound } from '../../common';
 
 export type LanguageInput = {
@@ -51,7 +51,12 @@ export class LanguagesService {
       }),
     };
     const [data, total] = await this.db.$transaction([
-      this.db.language.findMany({ where, skip: (page - 1) * limit, take: limit, orderBy: [{ order: 'asc' }, { nameEn: 'asc' }] }),
+      this.db.language.findMany({
+        where,
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: [{ order: 'asc' }, { nameEn: 'asc' }],
+      }),
       this.db.language.count({ where }),
     ]);
     return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
@@ -60,20 +65,11 @@ export class LanguagesService {
   private normalize(input: LanguageInput) {
     const code = input.code.trim().toLowerCase();
     if (!/^[a-z]{2,8}(?:-[a-z0-9]{2,8})?$/.test(code)) {
-      throw badRequest(
-        'LANGUAGE_CODE_INVALID',
-        'کد زبان باید کوتاه و استاندارد باشد؛ مانند en، de یا pt-BR.',
-        'The language code must be a short standard code such as en, de, or pt-BR.',
-        { code: { fa: 'از حروف انگلیسی کوچک استفاده کنید؛ نمونه: en یا de.', en: 'Use lowercase Latin letters, for example en or de.' } },
-      );
+      throw badRequest('LANGUAGE_CODE_INVALID');
     }
     const required = [input.nameFa, input.nameEn, input.nativeName];
     if (required.some((value) => !value?.trim())) {
-      throw badRequest(
-        'LANGUAGE_NAME_REQUIRED',
-        'نام فارسی، نام انگلیسی و نام بومی زبان باید تکمیل شوند.',
-        'Persian, English, and native language names are required.',
-      );
+      throw badRequest('LANGUAGE_NAME_REQUIRED');
     }
     return {
       code,
@@ -91,19 +87,19 @@ export class LanguagesService {
   async create(actorId: string, input: LanguageInput) {
     const data = this.normalize(input);
     const exists = await this.db.language.findUnique({ where: { code: data.code } });
-    if (exists) throw conflict('LANGUAGE_CODE_EXISTS', 'این کد زبان قبلاً ثبت شده است.', 'This language code already exists.', {
-      code: { fa: 'یک کد یکتا انتخاب کنید یا زبان موجود را ویرایش کنید.', en: 'Choose a unique code or edit the existing language.' },
-    });
+    if (exists) throw conflict('LANGUAGE_CODE_EXISTS');
     return this.db.$transaction(async (tx) => {
       const language = await tx.language.create({ data });
-      await tx.auditLog.create({ data: { actorId, action: 'language.created', entity: 'Language', entityId: language.id, after: data } });
+      await tx.auditLog.create({
+        data: { actorId, action: 'language.created', entity: 'Language', entityId: language.id, after: data },
+      });
       return language;
     });
   }
 
   async update(actorId: string, id: string, input: Partial<LanguageInput>) {
     const before = await this.db.language.findUnique({ where: { id } });
-    if (!before) throw notFound('LANGUAGE_NOT_FOUND', 'زبان پیدا نشد.', 'Language not found.');
+    if (!before) throw notFound('LANGUAGE_NOT_FOUND');
     const merged = this.normalize({
       code: input.code ?? before.code,
       nameFa: input.nameFa ?? before.nameFa,
@@ -116,28 +112,31 @@ export class LanguagesService {
       proficiencySystem: input.proficiencySystem ?? before.proficiencySystem,
     });
     const duplicate = await this.db.language.findFirst({ where: { code: merged.code, id: { not: id } } });
-    if (duplicate) throw conflict('LANGUAGE_CODE_EXISTS', 'این کد زبان قبلاً ثبت شده است.', 'This language code already exists.');
+    if (duplicate) throw conflict('LANGUAGE_CODE_EXISTS');
     return this.db.$transaction(async (tx) => {
       const language = await tx.language.update({ where: { id }, data: merged });
-      await tx.auditLog.create({ data: { actorId, action: 'language.updated', entity: 'Language', entityId: id, before, after: merged } });
+      await tx.auditLog.create({
+        data: { actorId, action: 'language.updated', entity: 'Language', entityId: id, before, after: merged },
+      });
       return language;
     });
   }
 
   async remove(actorId: string, id: string) {
-    const language = await this.db.language.findUnique({ where: { id }, include: { _count: { select: { teachers: true, tests: true, matchingSessions: true } } } });
-    if (!language) throw notFound('LANGUAGE_NOT_FOUND', 'زبان پیدا نشد.', 'Language not found.');
+    const language = await this.db.language.findUnique({
+      where: { id },
+      include: { _count: { select: { teachers: true, tests: true, matchingSessions: true } } },
+    });
+    if (!language) throw notFound('LANGUAGE_NOT_FOUND');
     const usages = language._count.teachers + language._count.tests + language._count.matchingSessions;
     if (usages > 0) {
-      throw conflict(
-        'LANGUAGE_IN_USE',
-        'این زبان در مدرس‌ها، آزمون‌ها یا تطبیق‌های قبلی استفاده شده و قابل حذف نیست. آن را غیرفعال کنید.',
-        'This language is used by teachers, tests, or matching history and cannot be deleted. Deactivate it instead.',
-      );
+      throw conflict('LANGUAGE_IN_USE');
     }
     await this.db.$transaction(async (tx) => {
       await tx.language.delete({ where: { id } });
-      await tx.auditLog.create({ data: { actorId, action: 'language.deleted', entity: 'Language', entityId: id, before: language } });
+      await tx.auditLog.create({
+        data: { actorId, action: 'language.deleted', entity: 'Language', entityId: id, before: language },
+      });
     });
     return { ok: true };
   }

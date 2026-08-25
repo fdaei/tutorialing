@@ -1,9 +1,10 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { Prisma, type Payment, type PaymentStatus } from '@prisma/client';
-import { PrismaService, Tx } from '../../../prisma.service';
-import { RedisService } from '../../../common';
+import { PrismaService, Tx } from '../../../infrastructure/database/prisma.service';
+import { RedisService } from '../../../infrastructure/cache/redis.service';
 import { badRequest, conflict, isPrismaKnownError } from '../../../common';
 import { config } from '../../../config';
+import { paymentConfig } from '../../../config/payment.config';
 import { QueueService } from '../../queue/queue.service';
 import { GatewayService } from './gateway.service';
 import { WalletService } from './wallet.service';
@@ -12,7 +13,8 @@ import { releaseDiscount } from '../discounts/discount-reservation';
 import { AutoDiscountsService } from '../discounts/auto-discounts.service';
 
 @Injectable()
-export class PaymentsService {
+export class PaymentsService implements OnModuleInit, OnModuleDestroy {
+  private reconciliationTimer?: NodeJS.Timeout;
   constructor(
     private db: PrismaService,
     private queue: QueueService,
@@ -21,6 +23,55 @@ export class PaymentsService {
     private autoDiscounts: AutoDiscountsService,
     private redis: RedisService,
   ) {}
+
+  onModuleInit() {
+    if (config().NODE_ENV === 'test') return;
+    this.reconciliationTimer = setInterval(
+      () => void this.reconcilePending(),
+      paymentConfig().reconciliationIntervalMs,
+    );
+    this.reconciliationTimer.unref();
+  }
+
+  onModuleDestroy() {
+    if (this.reconciliationTimer) clearInterval(this.reconciliationTimer);
+  }
+
+  /**
+   * Replays old gateway sessions so a capture is repaired even when the
+   * original callback process died after provider verification and before the
+   * database transaction committed. A distributed lock keeps multiple API
+   * replicas from polling the same batch at once.
+   */
+  async reconcilePending() {
+    const reconciliation = paymentConfig();
+    const lock = await this.redis.lock('payments-reconciliation');
+    if (!lock) return { checked: 0 };
+    try {
+      const payments = await this.db.payment.findMany({
+        where: {
+          status: 'PENDING',
+          authority: { not: null },
+          createdAt: { lte: new Date(Date.now() - reconciliation.reconciliationMinimumAgeMs) },
+          reconciliations: {
+            none: { createdAt: { gte: new Date(Date.now() - reconciliation.reconciliationRetryAfterMs) } },
+          },
+        },
+        orderBy: { createdAt: 'asc' },
+        take: reconciliation.reconciliationBatchSize,
+      });
+      for (const payment of payments) {
+        try {
+          await this.callback(payment.authority!, 'OK');
+        } catch {
+          /* A later run retries transient provider/database failures. */
+        }
+      }
+      return { checked: payments.length };
+    } finally {
+      await lock.release();
+    }
+  }
 
   async createPayment(userId: string, d: PayDto) {
     // Replaying an idempotency key must return the original payment rather than
@@ -49,87 +100,117 @@ export class PaymentsService {
   private assertOwned<T extends { userId: string }>(payment: T, userId: string) {
     // An idempotency key is client-chosen, so a guessed key must not disclose or
     // resume another user's payment.
-    if (payment.userId !== userId) throw conflict('PAYMENT_KEY_CONFLICT', 'این کلید پرداخت قبلاً استفاده شده است.', 'This payment key has already been used.');
+    if (payment.userId !== userId) throw conflict('PAYMENT_KEY_CONFLICT');
     return payment;
   }
 
   private async createPaymentRecord(userId: string, d: PayDto) {
-    return this.db.$transaction(async tx => {
-      let subtotal = 0, bookingId;
-      if (d.purpose === 'booking') {
-        const booking = await tx.booking.findUnique({ where: { id: d.referenceId } });
-        if (!booking || booking.studentId !== userId || booking.status !== 'PENDING_PAYMENT') throw new NotFoundException();
-        bookingId = booking.id;
-        // Charge the price snapshotted onto the booking, not the teacher's live
-        // rate. `booking.price` is the admin-approved price captured at booking
-        // time; reading `teacher.trialPrice`/`regularPrice` here both re-quoted
-        // the student if the teacher edited their rate in between and used the
-        // unapproved draft price. It is also the figure the teacher's earning is
-        // computed from on completion, so the two must agree.
-        subtotal = booking.price;
-        await this.clearBookingPaymentSlot(tx, booking.id);
-      } else {
-        const pkg = await tx.package.findUnique({ where: { id: d.referenceId, approvalStatus: 'APPROVED' } });
-        if (!pkg) throw new NotFoundException();
-        subtotal = pkg.price;
-      }
-      let discountAmount = 0, discountId, discountRuleId;
-      let codeDiscount: { id: string; amount: number } | undefined;
-      if (d.discountCode) {
-        const discount = await tx.discount.findFirst({
-          where: { code: d.discountCode, active: true, OR: [{ startsAt: null }, { startsAt: { lte: new Date() } }], AND: [{ OR: [{ endsAt: null }, { endsAt: { gte: new Date() } }] }] }
+    return this.db.$transaction(
+      async (tx) => {
+        let subtotal = 0,
+          bookingId;
+        if (d.purpose === 'booking') {
+          const booking = await tx.booking.findUnique({ where: { id: d.referenceId } });
+          if (!booking || booking.studentId !== userId || booking.status !== 'PENDING_PAYMENT')
+            throw new NotFoundException({ code: 'BOOKING_NOT_FOUND' });
+          bookingId = booking.id;
+          // Charge the price snapshotted onto the booking, not the teacher's live
+          // rate. `booking.price` is the admin-approved price captured at booking
+          // time; reading `teacher.trialPrice`/`regularPrice` here both re-quoted
+          // the student if the teacher edited their rate in between and used the
+          // unapproved draft price. It is also the figure the teacher's earning is
+          // computed from on completion, so the two must agree.
+          subtotal = booking.price;
+          await this.clearBookingPaymentSlot(tx, booking.id);
+        } else {
+          const pkg = await tx.package.findUnique({ where: { id: d.referenceId, approvalStatus: 'APPROVED' } });
+          if (!pkg) throw new NotFoundException({ code: 'PACKAGE_NOT_FOUND' });
+          subtotal = pkg.price;
+        }
+        let discountAmount = 0,
+          discountId,
+          discountRuleId;
+        let codeDiscount: { id: string; amount: number } | undefined;
+        if (d.discountCode) {
+          const discount = await tx.discount.findFirst({
+            where: {
+              code: d.discountCode,
+              active: true,
+              OR: [{ startsAt: null }, { startsAt: { lte: new Date() } }],
+              AND: [{ OR: [{ endsAt: null }, { endsAt: { gte: new Date() } }] }],
+            },
+          });
+          if (!discount) throw badRequest('DISCOUNT_INVALID');
+          if (discount.maxUses != null && discount.usedCount >= discount.maxUses)
+            throw badRequest('DISCOUNT_LIMIT_REACHED');
+          codeDiscount = {
+            id: discount.id,
+            amount: Math.min(
+              subtotal,
+              discount.type === 'percent' ? Math.round((subtotal * discount.value) / 100) : discount.value,
+            ),
+          };
+        }
+        // Automatic rules (currently the birthday discount) are evaluated even when
+        // a code was supplied, and the student keeps whichever is worth more. They
+        // never stack: `Payment` records exactly one of the two.
+        const autoDiscount = await this.autoDiscounts.evaluate(tx, userId, subtotal);
+        if (autoDiscount && autoDiscount.amount > (codeDiscount?.amount ?? 0)) {
+          discountAmount = autoDiscount.amount;
+          discountRuleId = autoDiscount.ruleId;
+        } else if (codeDiscount) {
+          discountAmount = codeDiscount.amount;
+          discountId = codeDiscount.id;
+          // Reserve the use now so concurrent checkouts cannot oversell a limited
+          // code; `releaseDiscount` gives it back if this payment never completes.
+          await tx.discount.update({ where: { id: codeDiscount.id }, data: { usedCount: { increment: 1 } } });
+        }
+        const amount = subtotal - discountAmount;
+        const balance = await this.wallet.walletBalance(userId, tx);
+        if (d.walletAmount < 0 || d.walletAmount > balance || d.walletAmount > amount)
+          throw badRequest('WALLET_AMOUNT_INVALID');
+        const gatewayAmount = amount - d.walletAmount;
+        const payment = await tx.payment.create({
+          data: {
+            userId,
+            purpose: d.purpose,
+            referenceId: d.referenceId,
+            bookingId,
+            subtotal,
+            discountAmount,
+            discountId,
+            discountRuleId,
+            walletAmount: d.walletAmount,
+            gatewayAmount,
+            amount,
+            status: gatewayAmount === 0 ? 'PAID' : 'PENDING',
+            idempotencyKey: d.idempotencyKey,
+          },
         });
-        if (!discount) throw badRequest('DISCOUNT_INVALID', 'کد تخفیف معتبر نیست یا منقضی شده است.', 'The discount code is invalid or has expired.', {
-          discountCode: { fa: 'کد را بررسی کنید یا بدون کد ادامه دهید.', en: 'Check the code or continue without one.' },
-        });
-        if (discount.maxUses != null && discount.usedCount >= discount.maxUses) throw badRequest('DISCOUNT_LIMIT_REACHED', 'ظرفیت استفاده از این کد تخفیف تکمیل شده است.', 'This discount code has reached its usage limit.', {
-          discountCode: { fa: 'کد دیگری وارد کنید یا بدون کد ادامه دهید.', en: 'Try another code or continue without one.' },
-        });
-        codeDiscount = { id: discount.id, amount: Math.min(subtotal, discount.type === 'percent' ? Math.round(subtotal * discount.value / 100) : discount.value) };
-      }
-      // Automatic rules (currently the birthday discount) are evaluated even when
-      // a code was supplied, and the student keeps whichever is worth more. They
-      // never stack: `Payment` records exactly one of the two.
-      const autoDiscount = await this.autoDiscounts.evaluate(tx, userId, subtotal);
-      if (autoDiscount && autoDiscount.amount > (codeDiscount?.amount ?? 0)) {
-        discountAmount = autoDiscount.amount;
-        discountRuleId = autoDiscount.ruleId;
-      } else if (codeDiscount) {
-        discountAmount = codeDiscount.amount;
-        discountId = codeDiscount.id;
-        // Reserve the use now so concurrent checkouts cannot oversell a limited
-        // code; `releaseDiscount` gives it back if this payment never completes.
-        await tx.discount.update({ where: { id: codeDiscount.id }, data: { usedCount: { increment: 1 } } });
-      }
-      const amount = subtotal - discountAmount;
-      const balance = await this.wallet.walletBalance(userId, tx);
-      if (d.walletAmount < 0 || d.walletAmount > balance || d.walletAmount > amount) throw badRequest(
-        'WALLET_AMOUNT_INVALID',
-        'مبلغ انتخاب‌شده از کیف پول بیشتر از موجودی یا مبلغ قابل پرداخت است.',
-        'The selected wallet amount exceeds your balance or the payable amount.',
-        { walletAmount: { fa: `حداکثر مبلغ قابل استفاده از کیف پول ${Math.min(balance, amount)} است.`, en: `At most ${Math.min(balance, amount)} can be paid from the wallet.` } },
-      );
-      const gatewayAmount = amount - d.walletAmount;
-      const payment = await tx.payment.create({
-        data: { userId, purpose: d.purpose, referenceId: d.referenceId, bookingId, subtotal, discountAmount, discountId, discountRuleId, walletAmount: d.walletAmount, gatewayAmount, amount, status: gatewayAmount === 0 ? 'PAID' : 'PENDING', idempotencyKey: d.idempotencyKey }
-      });
-      if (d.walletAmount) {
-        await this.wallet.ledger(tx, userId, 'DEBIT', d.walletAmount, 'wallet-payment', 'Payment', payment.id, `wallet:${payment.id}`);
-        // The balance read above and the debit below are two statements, so two
-        // concurrent checkouts could both see the same funds and both spend
-        // them. Serializable isolation makes the pair conflict, and this
-        // re-read is the backstop that refuses to leave the ledger negative
-        // even if the isolation level is ever weakened.
-        const settled = await this.wallet.walletBalance(userId, tx);
-        if (settled < 0) throw conflict(
-          'WALLET_BALANCE_CONFLICT',
-          'موجودی کیف پول شما هم‌زمان در پرداخت دیگری استفاده شد. صفحه را دوباره بارگذاری کنید.',
-          'Your wallet balance was spent by another payment at the same time. Reload and try again.',
-        );
-      }
-      if (gatewayAmount === 0) await this.fulfill(tx, payment.id, 'PENDING');
-      return payment;
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+        if (d.walletAmount) {
+          await this.wallet.ledger(
+            tx,
+            userId,
+            'DEBIT',
+            d.walletAmount,
+            'wallet-payment',
+            'Payment',
+            payment.id,
+            `wallet:${payment.id}`,
+          );
+          // The balance read above and the debit below are two statements, so two
+          // concurrent checkouts could both see the same funds and both spend
+          // them. Serializable isolation makes the pair conflict, and this
+          // re-read is the backstop that refuses to leave the ledger negative
+          // even if the isolation level is ever weakened.
+          const settled = await this.wallet.walletBalance(userId, tx);
+          if (settled < 0) throw conflict('WALLET_BALANCE_CONFLICT');
+        }
+        if (gatewayAmount === 0) await this.fulfill(tx, payment.id, 'PENDING');
+        return payment;
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
   }
 
   /**
@@ -146,11 +227,7 @@ export class PaymentsService {
     const held = await tx.payment.findUnique({ where: { bookingId } });
     if (!held) return;
     if (held.status !== 'FAILED') {
-      throw conflict(
-        'BOOKING_PAYMENT_EXISTS',
-        'برای این جلسه پرداخت دیگری در جریان است یا تکمیل شده است.',
-        'Another payment for this booking is already in progress or completed.',
-      );
+      throw conflict('BOOKING_PAYMENT_EXISTS');
     }
     await tx.payment.update({ where: { id: held.id }, data: { bookingId: null } });
   }
@@ -161,15 +238,15 @@ export class PaymentsService {
   // session that may still be the one the user actually completes.
   async gatewayRedirect(userId: string, paymentId: string) {
     const lock = await this.redis.lock(`payment-gateway:${paymentId}`);
-    if (!lock) throw conflict(
-      'PAYMENT_GATEWAY_BUSY',
-      'درخواست پرداخت قبلی هنوز در حال پردازش است. لطفاً چند لحظه صبر کنید.',
-      'A previous payment request is still being processed. Please wait a moment and try again.',
-    );
+    if (!lock) throw conflict('PAYMENT_GATEWAY_BUSY');
     try {
       const payment = await this.db.payment.findFirstOrThrow({ where: { id: paymentId, userId, status: 'PENDING' } });
       if (payment.authority) return { authority: payment.authority, url: this.gateway.resumeUrl(payment.authority) };
-      const result = await this.gateway.request(payment.gatewayAmount, `LingoSpeak ${payment.purpose}`, `${config().API_URL}/api/payments/callback`);
+      const result = await this.gateway.request(
+        payment.gatewayAmount,
+        `LingoSpeak ${payment.purpose}`,
+        `${config().API_URL}/api/payments/callback`,
+      );
       await this.db.payment.update({ where: { id: payment.id }, data: { authority: result.authority } });
       return result;
     } finally {
@@ -189,7 +266,7 @@ export class PaymentsService {
 
   async callback(authority: string, status: string) {
     const payment = await this.db.payment.findUnique({ where: { authority } });
-    if (!payment) throw new NotFoundException();
+    if (!payment) throw new NotFoundException({ code: 'PAYMENT_NOT_FOUND' });
     if (payment.status === 'PAID') return payment;
     if (!PaymentsService.SETTLEABLE.includes(payment.status)) return payment;
     if (status !== 'OK') return this.failPayment(payment.id, { authority, status });
@@ -241,10 +318,20 @@ export class PaymentsService {
   }
 
   private async failPayment(paymentId: string, payload: object) {
-    return this.db.$transaction(async tx => {
+    return this.db.$transaction(async (tx) => {
       const payment = await tx.payment.findUniqueOrThrow({ where: { id: paymentId } });
       if (payment.status !== 'PENDING') return payment;
-      if (payment.walletAmount > 0) await this.wallet.ledger(tx, payment.userId, 'CREDIT', payment.walletAmount, 'wallet payment rollback', 'Payment', payment.id, `wallet-rollback:${payment.id}`);
+      if (payment.walletAmount > 0)
+        await this.wallet.ledger(
+          tx,
+          payment.userId,
+          'CREDIT',
+          payment.walletAmount,
+          'wallet payment rollback',
+          'Payment',
+          payment.id,
+          `wallet-rollback:${payment.id}`,
+        );
       await releaseDiscount(tx, payment.discountId);
       return tx.payment.update({ where: { id: payment.id }, data: { status: 'FAILED', callbackPayload: payload } });
     });
@@ -269,8 +356,17 @@ export class PaymentsService {
       return;
     }
     const pkg = await tx.package.findUniqueOrThrow({ where: { id: payment.referenceId } });
-    const enrollment = await tx.enrollment.create({ data: { studentId: payment.userId, packageId: pkg.id, creditsPurchased: pkg.credits, paymentId: payment.id } });
-    await tx.creditEntry.create({ data: { enrollmentId: enrollment.id, type: 'PURCHASE', amount: pkg.credits, idempotencyKey: `purchase:${payment.id}` } });
+    const enrollment = await tx.enrollment.create({
+      data: { studentId: payment.userId, packageId: pkg.id, creditsPurchased: pkg.credits, paymentId: payment.id },
+    });
+    await tx.creditEntry.create({
+      data: {
+        enrollmentId: enrollment.id,
+        type: 'PURCHASE',
+        amount: pkg.credits,
+        idempotencyKey: `purchase:${payment.id}`,
+      },
+    });
   }
 
   /**
@@ -284,20 +380,40 @@ export class PaymentsService {
    * status that released it.
    */
   private async returnCapture(tx: Tx, payment: Payment, previousStatus: PaymentStatus, reason: string) {
-    const walletReturned = payment.walletAmount > 0
-      ? await tx.walletEntry.count({ where: { userId: payment.userId, referenceType: 'Payment', referenceId: payment.id, direction: 'CREDIT' } })
-      : 0;
+    const walletReturned =
+      payment.walletAmount > 0
+        ? await tx.walletEntry.count({
+            where: { userId: payment.userId, referenceType: 'Payment', referenceId: payment.id, direction: 'CREDIT' },
+          })
+        : 0;
     const amount = payment.gatewayAmount + (walletReturned ? 0 : payment.walletAmount);
     const refund = await tx.refund.upsert({
       where: { idempotencyKey: `late-capture:${payment.id}` },
-      create: { paymentId: payment.id, amount, reason, status: 'completed', idempotencyKey: `late-capture:${payment.id}` },
+      create: {
+        paymentId: payment.id,
+        amount,
+        reason,
+        status: 'completed',
+        idempotencyKey: `late-capture:${payment.id}`,
+      },
       update: {},
     });
-    if (amount > 0) await tx.walletEntry.upsert({
-      where: { idempotencyKey: `late-capture-ledger:${refund.id}` },
-      create: { userId: payment.userId, transactionId: `tx_${refund.id}`, account: 'user_wallet', direction: 'CREDIT', amount, description: `late gateway capture returned: ${reason}`, referenceType: 'Refund', referenceId: refund.id, idempotencyKey: `late-capture-ledger:${refund.id}` },
-      update: {},
-    });
+    if (amount > 0)
+      await tx.walletEntry.upsert({
+        where: { idempotencyKey: `late-capture-ledger:${refund.id}` },
+        create: {
+          userId: payment.userId,
+          transactionId: `tx_${refund.id}`,
+          account: 'user_wallet',
+          direction: 'CREDIT',
+          amount,
+          description: `late gateway capture returned: ${reason}`,
+          referenceType: 'Refund',
+          referenceId: refund.id,
+          idempotencyKey: `late-capture-ledger:${refund.id}`,
+        },
+        update: {},
+      });
     if (previousStatus === 'PENDING') await releaseDiscount(tx, payment.discountId);
     await tx.payment.update({ where: { id: payment.id }, data: { status: 'REFUNDED' } });
     await tx.notification.create({
@@ -306,8 +422,10 @@ export class PaymentsService {
         type: 'PAYMENT_RETURNED_TO_WALLET',
         titleFa: 'مبلغ پرداختی به کیف پول شما برگشت',
         titleEn: 'Your payment was returned to your wallet',
-        bodyFa: 'زمان پرداخت این رزرو به پایان رسیده بود و نوبت آزاد شد. مبلغ پرداخت‌شده به کیف پول شما بازگشت و می‌توانید نوبت دیگری رزرو کنید.',
-        bodyEn: 'The payment window for this booking had closed and the slot was released. The amount has been returned to your wallet and you can book another slot.',
+        bodyFa:
+          'زمان پرداخت این رزرو به پایان رسیده بود و نوبت آزاد شد. مبلغ پرداخت‌شده به کیف پول شما بازگشت و می‌توانید نوبت دیگری رزرو کنید.',
+        bodyEn:
+          'The payment window for this booking had closed and the slot was released. The amount has been returned to your wallet and you can book another slot.',
         data: { paymentId: payment.id, refundId: refund.id, amount, reason },
       },
     });

@@ -16,7 +16,12 @@ export class FilesController {
 
   @RateLimit(RATE_LIMIT_TIERS.fileUpload)
   @Post('uploads/:id/content')
-  uploadContent(@CurrentUser() u: AuthUser, @Param('id') id: string, @Headers('x-content-checksum') checksum: string, @Req() request: Request) {
+  uploadContent(
+    @CurrentUser() u: AuthUser,
+    @Param('id') id: string,
+    @Headers('x-content-checksum') checksum: string,
+    @Req() request: Request,
+  ) {
     return this.s.uploadContent(u.id, id, checksum, request);
   }
 

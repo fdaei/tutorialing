@@ -2,7 +2,7 @@ import { UserProfileResponseDto } from '../dto/response/user-profile-response.dt
 import { plainToInstance } from 'class-transformer';
 
 export class UserProfileMapper {
-  static toResponse(entity: any): UserProfileResponseDto {
+  static toResponse(entity: unknown): UserProfileResponseDto {
     return plainToInstance(UserProfileResponseDto, entity, { excludeExtraneousValues: true });
   }
 }

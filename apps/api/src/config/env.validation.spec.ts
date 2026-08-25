@@ -68,3 +68,18 @@ describe('TRUST_PROXY', () => {
     expect(() => validate({ ...base, TRUST_PROXY: 'yes' })).toThrow(/Config validation error/);
   });
 });
+
+describe('structured logging', () => {
+  it('uses production-safe defaults', () => {
+    const env = validate(base);
+    expect(env.LOG_LEVEL).toBe('info');
+    expect(env.LOG_PRETTY).toBe(false);
+    expect(env.LOG_HTTP).toBe(true);
+    expect(env.LOG_HEALTH_REQUESTS).toBe(false);
+  });
+
+  it('rejects unknown log levels and malformed boolean switches', () => {
+    expect(() => validate({ ...base, LOG_LEVEL: 'verbose-ish' })).toThrow(/Config validation error/);
+    expect(() => validate({ ...base, LOG_PRETTY: 'yes' })).toThrow(/Config validation error/);
+  });
+});

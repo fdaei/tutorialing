@@ -1,2 +1,21 @@
-import {Module} from '@nestjs/common';import {JwtModule} from '@nestjs/jwt';import {AuthController} from './auth.controller';import {AuthService} from './auth.service';import {SmsService} from './sms.service';import {config} from '../../config';
-@Module({imports:[JwtModule.registerAsync({useFactory:()=>({secret:config().JWT_ACCESS_SECRET,signOptions:{expiresIn:'15m'}})})],controllers:[AuthController],providers:[AuthService,SmsService],exports:[AuthService]})export class AuthModule{}
+import { Module } from '@nestjs/common';
+import { JwtModule } from '@nestjs/jwt';
+import { authConfig } from '../../config/auth.config';
+import { AuthController } from './auth.controller';
+import { AuthService } from './auth.service';
+import { SmsService } from './sms.service';
+
+@Module({
+  imports: [
+    JwtModule.registerAsync({
+      useFactory: () => {
+        const cfg = authConfig();
+        return { secret: cfg.accessSecret, signOptions: { expiresIn: cfg.accessTokenTtl } };
+      },
+    }),
+  ],
+  controllers: [AuthController],
+  providers: [AuthService, SmsService],
+  exports: [AuthService],
+})
+export class AuthModule {}

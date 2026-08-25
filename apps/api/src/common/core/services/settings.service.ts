@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService, Tx } from '../../../prisma.service';
+import { PrismaService, Tx } from '../../../infrastructure/database/prisma.service';
 
 /**
  * Reads operational rules the admin panel owns out of the `Setting` table.
@@ -17,11 +17,15 @@ export class SettingsService {
   async numeric(key: string, fallback: number, max: number, tx: Tx = this.db) {
     const row = await tx.setting.findUnique({ where: { key } });
     const raw = row?.value;
-    const value = typeof raw === 'number'
-      ? raw
-      : typeof raw === 'object' && raw !== null && !Array.isArray(raw) && typeof (raw as Record<string, unknown>).value === 'number'
-        ? (raw as { value: number }).value
-        : undefined;
+    const value =
+      typeof raw === 'number'
+        ? raw
+        : typeof raw === 'object' &&
+            raw !== null &&
+            !Array.isArray(raw) &&
+            typeof (raw as Record<string, unknown>).value === 'number'
+          ? (raw as { value: number }).value
+          : undefined;
     if (value === undefined || !Number.isFinite(value) || value < 0 || value > max) return fallback;
     return value;
   }

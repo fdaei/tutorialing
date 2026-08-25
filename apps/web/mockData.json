@@ -9,9 +9,7 @@
       "timezone": "Asia/Tehran",
       "profileComplete": true,
       "status": "ACTIVE",
-      "roles": [
-        "STUDENT"
-      ],
+      "roles": ["STUDENT"],
       "permissions": []
     },
     {
@@ -23,9 +21,7 @@
       "timezone": "UTC",
       "profileComplete": false,
       "status": "PENDING",
-      "roles": [
-        "STUDENT"
-      ],
+      "roles": ["STUDENT"],
       "permissions": []
     }
   ],

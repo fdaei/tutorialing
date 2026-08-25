@@ -5,15 +5,29 @@ const OTHER = 'user-2';
 
 function service(overrides: Record<string, unknown> = {}) {
   const db = {
-    user: { findUnique: jest.fn().mockResolvedValue({ id: OTHER }), create: jest.fn().mockImplementation(({ data }: { data: Record<string, unknown> }) => Promise.resolve({ id: 'new-user', ...data })) },
-    userRole: { upsert: jest.fn().mockResolvedValue({}), count: jest.fn().mockResolvedValue(2), findUnique: jest.fn().mockResolvedValue(null) },
-    permission: { findUnique: jest.fn().mockResolvedValue({ id: 'perm-1', key: 'payments.refund' }), findMany: jest.fn().mockResolvedValue([]) },
+    user: {
+      findUnique: jest.fn().mockResolvedValue({ id: OTHER }),
+      create: jest
+        .fn()
+        .mockImplementation(({ data }: { data: Record<string, unknown> }) =>
+          Promise.resolve({ id: 'new-user', ...data }),
+        ),
+    },
+    userRole: {
+      upsert: jest.fn().mockResolvedValue({}),
+      count: jest.fn().mockResolvedValue(2),
+      findUnique: jest.fn().mockResolvedValue(null),
+    },
+    permission: {
+      findUnique: jest.fn().mockResolvedValue({ id: 'perm-1', key: 'payments.refund' }),
+      findMany: jest.fn().mockResolvedValue([]),
+    },
     rolePermission: { upsert: jest.fn().mockResolvedValue({}), createMany: jest.fn().mockResolvedValue({}) },
     auditLog: { create: jest.fn().mockResolvedValue({}) },
     ...overrides,
   };
   const revocation = { revokeUser: jest.fn().mockResolvedValue(undefined) };
-  return { svc: new AdminService(db as never, {} as never, revocation as never), db, revocation };
+  return { svc: new AdminService(db as never, {} as never, revocation as never, {} as never), db, revocation };
 }
 
 describe('AdminService privilege self-escalation', () => {
@@ -54,7 +68,9 @@ describe('AdminService privilege self-escalation', () => {
     const { svc } = service({
       user: { findUnique: jest.fn().mockResolvedValue({ id: ACTOR, roles: [{ role: 'ADMIN' }] }) },
     });
-    await expect(svc.setUserRoles(ACTOR, ACTOR, ['STUDENT'])).rejects.toThrow(/own admin role/);
+    await expect(svc.setUserRoles(ACTOR, ACTOR, ['STUDENT'])).rejects.toMatchObject({
+      response: { code: 'SELF_ADMIN_ROLE_REMOVE' },
+    });
   });
 });
 
@@ -72,7 +88,13 @@ describe('AdminService admin-grant requires an existing admin (SEC-001/SEC-003)'
   });
 
   it('allows an existing admin actor to create a new ADMIN account', async () => {
-    const { svc, db } = service({ userRole: { upsert: jest.fn().mockResolvedValue({}), count: jest.fn().mockResolvedValue(2), findUnique: jest.fn().mockResolvedValue({ userId: ACTOR, role: 'ADMIN' }) } });
+    const { svc, db } = service({
+      userRole: {
+        upsert: jest.fn().mockResolvedValue({}),
+        count: jest.fn().mockResolvedValue(2),
+        findUnique: jest.fn().mockResolvedValue({ userId: ACTOR, role: 'ADMIN' }),
+      },
+    });
     await expect(svc.createUser(ACTOR, { phone: '09120000099', name: 'x', roles: ['ADMIN'] })).resolves.toBeDefined();
     expect(db.user.create).toHaveBeenCalled();
   });
@@ -103,7 +125,13 @@ describe('AdminService admin-grant requires an existing admin (SEC-001/SEC-003)'
   });
 
   it('allows an existing admin actor to grant ADMIN to another user', async () => {
-    const { svc, db } = service({ userRole: { upsert: jest.fn().mockResolvedValue({}), count: jest.fn().mockResolvedValue(2), findUnique: jest.fn().mockResolvedValue({ userId: ACTOR, role: 'ADMIN' }) } });
+    const { svc, db } = service({
+      userRole: {
+        upsert: jest.fn().mockResolvedValue({}),
+        count: jest.fn().mockResolvedValue(2),
+        findUnique: jest.fn().mockResolvedValue({ userId: ACTOR, role: 'ADMIN' }),
+      },
+    });
     await expect(svc.assignRole(ACTOR, OTHER, 'ADMIN')).resolves.toBeDefined();
     expect(db.userRole.upsert).toHaveBeenCalled();
   });
@@ -154,7 +182,13 @@ describe('AdminService privilege changes revoke outstanding tokens', () => {
     const { svc, revocation } = service({
       ...adminActor,
       user: { findUnique: jest.fn().mockResolvedValue({ id: OTHER, roles: [{ role: 'FINANCE' }] }), findUniqueOrThrow: jest.fn().mockResolvedValue({ id: OTHER, roles: [] }) },
-      $transaction: jest.fn().mockImplementation((fn: (t: unknown) => unknown) => fn({ userRole: adminActor.userRole, auditLog: { create: jest.fn() } })),
+      $transaction: jest.fn().mockImplementation((fn: (t: unknown) => unknown) =>
+        fn({
+          userRole: adminActor.userRole,
+          auditLog: { create: jest.fn() },
+          refreshSession: { updateMany: jest.fn() },
+        }),
+      ),
     });
     await svc.setUserRoles(ACTOR, OTHER, ['STUDENT']);
     expect(revocation.revokeUser).toHaveBeenCalledWith(OTHER);

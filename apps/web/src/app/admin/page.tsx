@@ -14,24 +14,11 @@ import {
   ShieldCheck,
   UserRoundCheck,
 } from 'lucide-react';
-import { PanelShell, adminNav } from '@/components/panel-shell';
+import { PanelShell, adminNav } from '@/features/panel/components/panel-shell';
 import { api } from '@/lib/api';
-import { useTranslations } from '@/components/locale-provider';
+import { useTranslations } from '@/components/shared/locale-provider';
 import { localePath } from '@/lib/i18n';
-
-type Activity = { id: string; action: string; entity: string; createdAt: string };
-type DashboardData = {
-  users: number;
-  activeTeachers: number;
-  pendingTeachers: number;
-  testAttempts: number;
-  pendingReviews: number;
-  bookings: number;
-  payments: number;
-  openTickets: number;
-  revenue: number;
-  recentActivity: Activity[];
-};
+import type { AdminDashboard } from '@lingospeak/contracts';
 
 const clampPercent = (value: number) => Math.min(100, Math.max(0, Math.round(value)));
 
@@ -42,12 +29,11 @@ export default function Admin() {
   const Arrow = fa ? ArrowLeft : ArrowRight;
   const query = useQuery({
     queryKey: ['admin-dashboard'],
-    queryFn: () => api<DashboardData>('/admin/dashboard'),
+    queryFn: () => api<AdminDashboard>('/admin/dashboard'),
   });
   const data = query.data;
   const number = (value = 0) => value.toLocaleString(fa ? 'fa-IR' : 'en-US');
-  const money = (value = 0) =>
-    fa ? `${number(value)} تومان` : new Intl.NumberFormat('en-US').format(value);
+  const money = (value = 0) => (fa ? `${number(value)} تومان` : new Intl.NumberFormat('en-US').format(value));
 
   const cards = [
     {
@@ -82,14 +68,18 @@ export default function Admin() {
 
   const queue = [
     {
-      title: fa ? `بررسی ${number(data?.pendingTeachers)} درخواست مدرس` : `Review ${number(data?.pendingTeachers)} teacher applications`,
+      title: fa
+        ? `بررسی ${number(data?.pendingTeachers)} درخواست مدرس`
+        : `Review ${number(data?.pendingTeachers)} teacher applications`,
       detail: fa ? 'تأیید هویت، مدارک و پروفایل' : 'Verify identity, documents, and profile',
       action: fa ? 'بررسی' : 'Review',
       href: '/admin/teacher-applications',
       icon: ShieldCheck,
     },
     {
-      title: fa ? `ارزیابی ${number(data?.pendingReviews)} پاسخ آزمون` : `Evaluate ${number(data?.pendingReviews)} test answers`,
+      title: fa
+        ? `ارزیابی ${number(data?.pendingReviews)} پاسخ آزمون`
+        : `Evaluate ${number(data?.pendingReviews)} test answers`,
       detail: 'Writing & Speaking',
       action: fa ? 'ارزیابی' : 'Evaluate',
       href: '/admin/test-reviews',
@@ -125,17 +115,29 @@ export default function Admin() {
             {fa ? 'به‌روزرسانی داده‌ها' : 'Refresh data'}
           </button>
           <div className="order-1 text-start sm:order-2 sm:text-end">
-            <p className="text-xs font-bold text-blue">{fa ? 'نمای زنده سامانه' : 'Live platform overview'}</p>
+            <p className="text-xs font-bold text-blue">
+              {data?.statsUpdatedAt
+                ? fa
+                  ? `آخرین تغییر آمار: ${new Date(data.statsUpdatedAt).toLocaleString('fa-IR')}`
+                  : `Metrics updated: ${new Date(data.statsUpdatedAt).toLocaleString('en-US')}`
+                : fa
+                  ? 'نمای سامانه'
+                  : 'Platform overview'}
+            </p>
             <h1 className="mt-2 text-3xl font-black">{fa ? 'مرکز عملیات' : 'Operations center'}</h1>
             <p className="mt-2 text-sm text-muted">
-              {fa ? 'اولویت‌ها، وضعیت سامانه و تصمیم‌های امروز در یک نگاه' : 'Today’s priorities, platform health, and decisions at a glance'}
+              {fa
+                ? 'اولویت‌ها، وضعیت سامانه و تصمیم‌های امروز در یک نگاه'
+                : 'Today’s priorities, platform health, and decisions at a glance'}
             </p>
           </div>
         </header>
 
         {query.isError && (
           <div className="mt-5 rounded-2xl border border-red-100 bg-red-50 p-4 text-sm text-red-700">
-            {fa ? 'دریافت آمار ناموفق بود. اتصال API را بررسی کنید.' : 'Could not load dashboard metrics. Check the API connection.'}
+            {fa
+              ? 'دریافت آمار ناموفق بود. اتصال API را بررسی کنید.'
+              : 'Could not load dashboard metrics. Check the API connection.'}
           </div>
         )}
 
@@ -164,7 +166,9 @@ export default function Admin() {
               </Link>
               <div className="text-end">
                 <h2 className="text-xl font-black">{fa ? 'صف عملیات امروز' : 'Today’s action queue'}</h2>
-                <p className="mt-1 text-xs text-muted">{fa ? 'مهم‌ترین کارها بر اساس فوریت' : 'Prioritized by urgency'}</p>
+                <p className="mt-1 text-xs text-muted">
+                  {fa ? 'مهم‌ترین کارها بر اساس فوریت' : 'Prioritized by urgency'}
+                </p>
               </div>
             </div>
             <div className="mt-4 divide-y hairline">
@@ -211,7 +215,9 @@ export default function Admin() {
               <Arrow size={16} />
               <span className="text-end">
                 <strong className="block text-xs">{fa ? 'مرکز مالی و تسویه' : 'Finance & payouts'}</strong>
-                <small className="mt-1 block text-amber-700">{fa ? 'بررسی پرداخت‌ها و درخواست‌های تسویه' : 'Review payments and payout requests'}</small>
+                <small className="mt-1 block text-amber-700">
+                  {fa ? 'بررسی پرداخت‌ها و درخواست‌های تسویه' : 'Review payments and payout requests'}
+                </small>
               </span>
             </Link>
           </article>
@@ -221,17 +227,7 @@ export default function Admin() {
   );
 }
 
-function HealthBar({
-  label,
-  value,
-  color,
-  locale,
-}: {
-  label: string;
-  value: number;
-  color: string;
-  locale: string;
-}) {
+function HealthBar({ label, value, color, locale }: { label: string; value: number; color: string; locale: string }) {
   return (
     <div>
       <div className="mb-2 flex items-center justify-between text-xs">

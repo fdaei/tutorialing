@@ -1,3 +1,15 @@
-import{Module}from'@nestjs/common';import{BookingsController}from'./bookings.controller';
-import{AvailabilityController}from'./availability.controller';import{BookingsService}from'./bookings.service';
-import{BookingsRepository}from'./bookings.repository';import{AvailabilityService}from'./availability.service';import{QueueModule}from'../queue/queue.module';import{CommerceModule}from'../commerce/commerce.module';@Module({imports:[QueueModule,CommerceModule],controllers:[BookingsController,AvailabilityController],providers:[BookingsService,BookingsRepository,AvailabilityService],exports:[BookingsService,AvailabilityService]})export class BookingsModule{}
+import { Module } from '@nestjs/common';
+import { BookingsController } from './bookings.controller';
+import { AvailabilityController } from './availability.controller';
+import { BookingsService } from './bookings.service';
+import { BookingsRepository } from './bookings.repository';
+import { AvailabilityService } from './availability.service';
+import { QueueModule } from '../queue/queue.module';
+import { CommerceModule } from '../commerce/commerce.module';
+@Module({
+  imports: [QueueModule, CommerceModule],
+  controllers: [BookingsController, AvailabilityController],
+  providers: [BookingsService, BookingsRepository, AvailabilityService],
+  exports: [BookingsService, AvailabilityService],
+})
+export class BookingsModule {}
