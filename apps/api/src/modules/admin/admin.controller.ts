@@ -15,37 +15,54 @@ import { CmsPageDto } from './dto/request/cms-page.dto';
 @Roles('ADMIN', 'STAFF')
 @Controller('admin')
 export class AdminController {
-  constructor(private s: AdminService, private teachers: TeachersService) {}
+  constructor(
+    private s: AdminService,
+    private teachers: TeachersService,
+  ) {}
 
   @Get('dashboard')
-  dashboard() { return this.s.dashboard(); }
+  dashboard() {
+    return this.s.dashboard();
+  }
 
   @Permissions('users.read')
   @Get('users')
-  users(@Query('page') p = '1', @Query('search') search = '', @Query('status') status = '') { return this.s.users(+p, search, status); }
+  users(@Query('page') p = '1', @Query('search') search = '', @Query('status') status = '') {
+    return this.s.users(+p, search, status);
+  }
 
   @Permissions('users.read')
   @Get('users/:id')
-  user(@Param('id') id: string) { return this.s.userDetail(id); }
+  user(@Param('id') id: string) {
+    return this.s.userDetail(id);
+  }
 
   @Permissions('roles.manage')
   @RateLimit(RATE_LIMIT_TIERS.adminWrite)
   @Post('users')
-  createUser(@CurrentUser() u: AuthUser, @Body() d: CreateUserDto) { return this.s.createUser(u.id, d); }
+  createUser(@CurrentUser() u: AuthUser, @Body() d: CreateUserDto) {
+    return this.s.createUser(u.id, d);
+  }
 
   @Permissions('roles.manage')
   @RateLimit(RATE_LIMIT_TIERS.adminWrite)
   @Patch('users/:id/status')
-  userStatus(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() d: UserStatusDto) { return this.s.updateUserStatus(u.id, id, d.status); }
+  userStatus(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() d: UserStatusDto) {
+    return this.s.updateUserStatus(u.id, id, d.status);
+  }
 
   @Permissions('roles.manage')
   @RateLimit(RATE_LIMIT_TIERS.adminWrite)
   @Patch('users/:id/roles')
-  userRoles(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() d: UserRolesDto) { return this.s.setUserRoles(u.id, id, d.roles); }
+  userRoles(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() d: UserRolesDto) {
+    return this.s.setUserRoles(u.id, id, d.roles);
+  }
 
   @Permissions('teachers.verify')
   @Get('teacher-applications')
-  applications() { return this.s.applications(); }
+  applications() {
+    return this.s.applications();
+  }
 
   @Permissions('teachers.verify')
   @RateLimit(RATE_LIMIT_TIERS.adminWrite)
@@ -56,54 +73,78 @@ export class AdminController {
 
   @Permissions('bookings.read')
   @Get('bookings')
-  bookings() { return this.s.bookings(); }
+  bookings() {
+    return this.s.bookings();
+  }
 
   @Permissions('tickets.read')
   @Get('tickets')
-  tickets() { return this.s.tickets(); }
+  tickets() {
+    return this.s.tickets();
+  }
 
   @Permissions('notifications.read')
   @Get('notification-deliveries')
-  notificationDeliveries() { return this.s.notificationDeliveries(); }
+  notificationDeliveries() {
+    return this.s.notificationDeliveries();
+  }
 
   @Permissions('roles.manage')
   @Get('roles')
-  roles() { return this.s.roles(); }
+  roles() {
+    return this.s.roles();
+  }
 
   @Permissions('roles.manage')
   @Get('permissions')
-  permissions() { return this.s.permissions(); }
+  permissions() {
+    return this.s.permissions();
+  }
 
   @Permissions('roles.manage')
   @RateLimit(RATE_LIMIT_TIERS.adminWrite)
   @Post('roles')
-  assignRole(@CurrentUser() u: AuthUser, @Body() d: RoleDto) { return this.s.assignRole(u.id, d.userId, d.role); }
+  assignRole(@CurrentUser() u: AuthUser, @Body() d: RoleDto) {
+    return this.s.assignRole(u.id, d.userId, d.role);
+  }
 
   @Permissions('roles.manage')
   @RateLimit(RATE_LIMIT_TIERS.adminWrite)
   @Post('roles/revoke')
-  revokeRole(@CurrentUser() u: AuthUser, @Body() d: RoleDto) { return this.s.revokeRole(u.id, d.userId, d.role); }
+  revokeRole(@CurrentUser() u: AuthUser, @Body() d: RoleDto) {
+    return this.s.revokeRole(u.id, d.userId, d.role);
+  }
 
   @Permissions('roles.manage')
   @RateLimit(RATE_LIMIT_TIERS.adminWrite)
   @Post('permissions/grant')
-  grantPermission(@CurrentUser() u: AuthUser, @Body() d: PermissionDto) { return this.s.grantPermission(u.id, d.userId, d.role, d.permission); }
+  grantPermission(@CurrentUser() u: AuthUser, @Body() d: PermissionDto) {
+    return this.s.grantPermission(u.id, d.userId, d.role, d.permission);
+  }
 
   @Permissions('reports.read')
   @Get('reports')
-  reports() { return this.s.reports(); }
+  reports() {
+    return this.s.reports();
+  }
 
   @Permissions('audit.read')
   @Get('audit-logs')
-  audit() { return this.s.audit(); }
+  audit() {
+    return this.s.audit();
+  }
 
   @Permissions('payments.read')
   @Get('payments')
-  payments() { return this.s.payments(); }
+  payments() {
+    return this.s.payments();
+  }
 
   @Permissions('settings.manage')
   @Get('settings')
-  settings() { return this.s.settings(); }
+  settings() {
+    return this.s.settings();
+  }
 
   @Permissions('settings.manage')
   @RateLimit(RATE_LIMIT_TIERS.adminWrite)
@@ -114,10 +155,14 @@ export class AdminController {
 
   @Permissions('cms.manage')
   @Get('cms')
-  cms() { return this.s.cms(); }
+  cms() {
+    return this.s.cms();
+  }
 
   @Permissions('cms.manage')
   @RateLimit(RATE_LIMIT_TIERS.adminWrite)
   @Put('cms/:slug')
-  upsert(@Param('slug') slug: string, @Body() d: CmsPageDto) { return this.s.upsertCms(slug, d); }
+  upsert(@Param('slug') slug: string, @Body() d: CmsPageDto) {
+    return this.s.upsertCms(slug, d);
+  }
 }

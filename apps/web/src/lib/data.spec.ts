@@ -1,1 +1,7 @@
-import{money}from'./data';describe('money formatter',()=>{it('formats a persisted integer amount as Iranian toman',()=>{expect(money(290000)).toContain('تومان');expect(money(290000)).toMatch(/[۲٢2]/)})});
+import { money } from './data';
+describe('money formatter', () => {
+  it('formats a persisted integer amount as Iranian toman', () => {
+    expect(money(290000)).toContain('تومان');
+    expect(money(290000)).toMatch(/[۲٢2]/);
+  });
+});

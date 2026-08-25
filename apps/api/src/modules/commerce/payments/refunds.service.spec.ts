@@ -6,7 +6,11 @@ function harness(payment: Record<string, unknown>) {
     refund: {
       findUnique: jest.fn().mockResolvedValue(null),
       aggregate: jest.fn().mockResolvedValue({ _sum: { amount: 0 } }),
-      create: jest.fn().mockImplementation(({ data }: { data: Record<string, unknown> }) => Promise.resolve({ id: 'refund-1', ...data })),
+      create: jest
+        .fn()
+        .mockImplementation(({ data }: { data: Record<string, unknown> }) =>
+          Promise.resolve({ id: 'refund-1', ...data }),
+        ),
     },
     payment: {
       findUniqueOrThrow: jest.fn().mockResolvedValue(payment),

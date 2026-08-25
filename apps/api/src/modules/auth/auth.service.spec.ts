@@ -72,6 +72,8 @@ describe('OTP hashing', () => {
       id: 'challenge-1', phone: PHONE, userId: 'user-1', codeHash: stored,
       attempts: 0, verifiedAt: null, expiresAt: new Date(Date.now() + 60e3),
     });
-    await expect(h.svc.verifyOtp('challenge-1', PHONE, '000000', {})).rejects.toThrow('Incorrect OTP');
+    await expect(h.svc.verifyOtp('challenge-1', PHONE, '000000', {})).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'OTP_INCORRECT' }),
+    });
   });
 });

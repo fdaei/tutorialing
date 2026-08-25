@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma, TeacherStatus } from '@prisma/client';
-import { PrismaService } from '../../prisma.service';
-import { TeachersRepository } from './teachers.repository';
+import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { AuditService } from '../../common';
 import { badRequest, notFound } from '../../common';
 
@@ -22,7 +21,10 @@ export type TeacherApplicationInput = {
 
 @Injectable()
 export class TeachersService {
-  constructor(private readonly db: PrismaService, private readonly audit: AuditService) {}
+  constructor(
+    private readonly db: PrismaService,
+    private readonly audit: AuditService,
+  ) {}
 
   async directory(query: {
     page: number;
@@ -63,11 +65,12 @@ export class TeachersService {
       ...(query.minBand && { targetBands: { has: query.minBand } }),
       ...(query.maxPrice && { approvedTrialPrice: { lte: query.maxPrice } }),
     };
-    const orderBy: Prisma.TeacherOrderByWithRelationInput = query.sort === 'price_asc'
-      ? { approvedTrialPrice: 'asc' }
-      : query.sort === 'rating'
-        ? { rating: 'desc' }
-        : { approvedAt: 'desc' };
+    const orderBy: Prisma.TeacherOrderByWithRelationInput =
+      query.sort === 'price_asc'
+        ? { approvedTrialPrice: 'asc' }
+        : query.sort === 'rating'
+          ? { rating: 'desc' }
+          : { approvedAt: 'desc' };
     const [data, total] = await this.db.$transaction([
       this.db.teacher.findMany({
         where,
@@ -83,7 +86,12 @@ export class TeachersService {
 
   async profile(slug: string) {
     const teacher = await this.db.teacher.findFirst({
-      where: { OR: [{ slug }, { id: slug }], status: 'APPROVED', approvedTrialPrice: { not: null }, approvedRegularPrice: { not: null } },
+      where: {
+        OR: [{ slug }, { id: slug }],
+        status: 'APPROVED',
+        approvedTrialPrice: { not: null },
+        approvedRegularPrice: { not: null },
+      },
       select: {
         ...this.publicSelect(),
         experienceYears: true,
@@ -120,7 +128,12 @@ export class TeachersService {
         },
       }),
       this.db.booking.findMany({
-        where: { teacherId: teacher.id, status: 'COMPLETED', attendanceTeacher: true, attendanceStudent: { not: false } },
+        where: {
+          teacherId: teacher.id,
+          status: 'COMPLETED',
+          attendanceTeacher: true,
+          attendanceStudent: { not: false },
+        },
         distinct: ['studentId'],
         select: { studentId: true },
       }),
@@ -153,7 +166,18 @@ export class TeachersService {
         select: {
           levels: true,
           specialties: true,
-          language: { select: { id: true, code: true, nameFa: true, nameEn: true, nativeName: true, flag: true, direction: true, proficiencySystem: true } },
+          language: {
+            select: {
+              id: true,
+              code: true,
+              nameFa: true,
+              nameEn: true,
+              nativeName: true,
+              flag: true,
+              direction: true,
+              proficiencySystem: true,
+            },
+          },
         },
         orderBy: { language: { order: 'asc' as const } },
       },
@@ -163,13 +187,15 @@ export class TeachersService {
   async application(userId: string, input: TeacherApplicationInput) {
     const languageIds = [...new Set(input.languageIds)];
     if (!languageIds.length) {
-      throw badRequest('TEACHER_LANGUAGE_REQUIRED', 'حداقل یک زبان آموزشی انتخاب کنید.', 'Select at least one teaching language.', {
-        languageIds: { fa: 'زبان‌هایی را که تدریس می‌کنید از فهرست انتخاب کنید.', en: 'Choose the languages you teach from the list.' },
-      });
+      throw badRequest('TEACHER_LANGUAGE_REQUIRED');
     }
     const languages = await this.db.language.findMany({ where: { id: { in: languageIds }, active: true } });
-    if (languages.length !== languageIds.length) throw badRequest('TEACHER_LANGUAGE_INVALID', 'یک یا چند زبان انتخاب‌شده معتبر یا فعال نیست.', 'One or more selected languages are invalid or inactive.');
-    const slugBase = input.nameEn.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'teacher';
+    if (languages.length !== languageIds.length) throw badRequest('TEACHER_LANGUAGE_INVALID');
+    const slugBase =
+      input.nameEn
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '') || 'teacher';
     const slug = `${slugBase}-${userId.slice(-5)}`;
     return this.db.$transaction(async (tx) => {
       const teacher = await tx.teacher.upsert({
@@ -203,16 +229,28 @@ export class TeachersService {
           targetBands: [],
         },
       });
-      await tx.teacherLanguage.deleteMany({ where: { teacherId: teacher.id, languageId: { notIn: languageIds } } });
-      for (const languageId of languageIds) {
-        await tx.teacherLanguage.upsert({
-          where: { teacherId_languageId: { teacherId: teacher.id, languageId } },
-          create: { teacherId: teacher.id, languageId, levels: input.levels ?? [], specialties: input.specialties },
-          update: { active: true, levels: input.levels ?? [], specialties: input.specialties },
-        });
-      }
-      await tx.userRole.upsert({ where: { userId_role: { userId, role: 'TEACHER' } }, create: { userId, role: 'TEACHER' }, update: {} });
-      return tx.teacher.findUniqueOrThrow({ where: { id: teacher.id }, include: { languageLinks: { include: { language: true } }, verificationItems: true } });
+      // The application payload is a complete replacement. Rebuilding the
+      // small join set uses two statements regardless of the language count,
+      // instead of one upsert per item.
+      await tx.teacherLanguage.deleteMany({ where: { teacherId: teacher.id } });
+      await tx.teacherLanguage.createMany({
+        data: languageIds.map((languageId) => ({
+          teacherId: teacher.id,
+          languageId,
+          active: true,
+          levels: input.levels ?? [],
+          specialties: input.specialties,
+        })),
+      });
+      await tx.userRole.upsert({
+        where: { userId_role: { userId, role: 'TEACHER' } },
+        create: { userId, role: 'TEACHER' },
+        update: {},
+      });
+      return tx.teacher.findUniqueOrThrow({
+        where: { id: teacher.id },
+        include: { languageLinks: { include: { language: true } }, verificationItems: true },
+      });
     });
   }
 
@@ -227,32 +265,38 @@ export class TeachersService {
       },
     });
     if (!teacher?.introVideoKey) return teacher;
-    const file = await this.db.storedFile.findFirst({ where: { ownerId: userId, key: teacher.introVideoKey, status: 'SAFE' }, select: { id: true } });
+    const file = await this.db.storedFile.findFirst({
+      where: { ownerId: userId, key: teacher.introVideoKey, status: 'SAFE' },
+      select: { id: true },
+    });
     return { ...teacher, introVideoFileId: file?.id };
   }
 
   async submit(userId: string) {
-    const teacher = await this.db.teacher.findUnique({ where: { userId }, include: { verificationItems: true, languageLinks: true } });
-    if (!teacher) throw notFound('TEACHER_APPLICATION_NOT_FOUND', 'درخواست مدرس پیدا نشد.', 'Teacher application not found.');
+    const teacher = await this.db.teacher.findUnique({
+      where: { userId },
+      include: { verificationItems: true, languageLinks: true },
+    });
+    if (!teacher) throw notFound('TEACHER_APPLICATION_NOT_FOUND');
     if (!['DRAFT', 'REJECTED'].includes(teacher.status)) {
-      throw badRequest('TEACHER_APPLICATION_NOT_SUBMITTABLE', 'این درخواست در وضعیت فعلی قابل ارسال نیست.', 'The application cannot be submitted in its current state.');
+      throw badRequest('TEACHER_APPLICATION_NOT_SUBMITTABLE');
     }
-    const approvedKinds = new Set(teacher.verificationItems.filter((item) => ['SUBMITTED', 'UNDER_REVIEW', 'APPROVED'].includes(item.status)).map((item) => item.kind.toLowerCase()));
+    const approvedKinds = new Set(
+      teacher.verificationItems
+        .filter((item) => ['SUBMITTED', 'UNDER_REVIEW', 'APPROVED'].includes(item.status))
+        .map((item) => item.kind.toLowerCase()),
+    );
     if (!approvedKinds.has('identity') || !approvedKinds.has('certificate')) {
-      throw badRequest(
-        'TEACHER_DOCUMENTS_REQUIRED',
-        'مدرک هویتی و مدرک آموزشی را بارگذاری و ارسال کنید.',
-        'Upload and submit both identity and teaching certificate documents.',
-      );
+      throw badRequest('TEACHER_DOCUMENTS_REQUIRED');
     }
-    if (!teacher.languageLinks.length) throw badRequest('TEACHER_LANGUAGE_REQUIRED', 'حداقل یک زبان آموزشی انتخاب کنید.', 'Select at least one teaching language.');
+    if (!teacher.languageLinks.length) throw badRequest('TEACHER_LANGUAGE_REQUIRED');
     return this.transition(teacher.id, 'SUBMITTED', userId);
   }
 
   async transition(id: string, to: TeacherStatus, actorId: string, note?: string) {
     return this.db.$transaction(async (tx) => {
       const teacher = await tx.teacher.findUnique({ where: { id } });
-      if (!teacher) throw notFound('TEACHER_NOT_FOUND', 'مدرس پیدا نشد.', 'Teacher not found.');
+      if (!teacher) throw notFound('TEACHER_NOT_FOUND');
       const valid: Record<TeacherStatus, TeacherStatus[]> = {
         DRAFT: ['SUBMITTED'],
         REJECTED: ['SUBMITTED'],
@@ -263,11 +307,7 @@ export class TeachersService {
         APPROVED: [],
       };
       if (!valid[teacher.status].includes(to)) {
-        throw badRequest(
-          'TEACHER_STATUS_TRANSITION_INVALID',
-          `تغییر وضعیت از ${teacher.status} به ${to} مجاز نیست.`,
-          `Changing teacher status from ${teacher.status} to ${to} is not allowed.`,
-        );
+        throw badRequest('TEACHER_STATUS_TRANSITION_INVALID');
       }
       const output = await tx.teacher.update({
         where: { id },
@@ -277,8 +317,19 @@ export class TeachersService {
           ...(to === 'APPROVED' && { approvedAt: new Date() }),
         },
       });
-      await tx.verificationHistory.create({ data: { teacherId: id, fromStatus: teacher.status, toStatus: to, actorId, note } });
-      await tx.auditLog.create({ data: { actorId, action: 'teacher.status.changed', entity: 'Teacher', entityId: id, before: { status: teacher.status }, after: { status: to, note } } });
+      await tx.verificationHistory.create({
+        data: { teacherId: id, fromStatus: teacher.status, toStatus: to, actorId, note },
+      });
+      await tx.auditLog.create({
+        data: {
+          actorId,
+          action: 'teacher.status.changed',
+          entity: 'Teacher',
+          entityId: id,
+          before: { status: teacher.status },
+          after: { status: to, note },
+        },
+      });
       return output;
     });
   }

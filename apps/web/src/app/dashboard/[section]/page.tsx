@@ -1,36 +1,50 @@
-import { PanelActions } from '@/components/panel-actions';
-import { PanelShell, studentNav } from '@/components/panel-shell';
-import { ResourceView } from '@/components/resource-view';
-import { MyTicketManager } from '@/components/my-ticket-manager';
-import {requestLocale} from '@/lib/server-locale';
-import {StudentTests} from '@/components/student-tests';
-import {StudentMatches} from '@/components/student-matches';
-import {StudentProfile} from '@/components/student-profile';
-import {StudentWallet} from '@/components/student-wallet';
-import {TeacherPlannerCalendar} from '@/components/teacher-planner-calendar';
+import { PanelActions } from '@/features/panel/components/panel-actions';
+import { PanelShell, studentNav } from '@/features/panel/components/panel-shell';
+import { ResourceView } from '@/features/panel/components/resource-view';
+import { MyTicketManager } from '@/features/support/components/my-ticket-manager';
+import { requestLocale } from '@/lib/server-locale';
+import { StudentTests } from '@/features/student/components/student-tests';
+import { StudentMatches } from '@/features/student/components/student-matches';
+import { StudentProfile } from '@/features/student/components/student-profile';
+import { StudentWallet } from '@/features/student/components/student-wallet';
+import { TeacherPlannerCalendar } from '@/features/scheduling/components/teacher-planner-calendar';
 
-const map: Record<string, [string,string, string]> = {
-  classes: ['کلاس‌ها و تقویم','Classes and calendar', '/bookings/me'],
-  tests: ['آزمون‌ها و نتایج','Tests and results', '/tests/attempts/history'],
-  matches: ['مدرس‌های پیشنهادی','Recommended teachers', '/matching/history'],
-  plan: ['برنامه یادگیری و تکلیف‌ها','Learning plan and assignments', '/learning/plans'],
-  wallet: ['کیف پول و پرداخت‌ها','Wallet and payments', '/payments/wallet'],
-  notifications: ['اعلان‌ها','Notifications', '/notifications'],
-  tickets: ['تیکت‌های پشتیبانی','Support tickets', '/support/tickets'],
-  profile: ['پروفایل و تنظیمات','Profile and settings', '/users/me'],
+const map: Record<string, [string, string, string]> = {
+  classes: ['کلاس‌ها و تقویم', 'Classes and calendar', '/bookings/me'],
+  tests: ['آزمون‌ها و نتایج', 'Tests and results', '/tests/attempts/history'],
+  matches: ['مدرس‌های پیشنهادی', 'Recommended teachers', '/matching/history'],
+  plan: ['برنامه یادگیری و تکلیف‌ها', 'Learning plan and assignments', '/learning/plans'],
+  wallet: ['کیف پول و پرداخت‌ها', 'Wallet and payments', '/payments/wallet'],
+  notifications: ['اعلان‌ها', 'Notifications', '/notifications'],
+  tickets: ['تیکت‌های پشتیبانی', 'Support tickets', '/support/tickets'],
+  profile: ['پروفایل و تنظیمات', 'Profile and settings', '/users/me'],
 };
 
 export default async function Section({ params }: { params: Promise<{ section: string }> }) {
   const { section } = await params;
-  const locale=await requestLocale(),fa=locale==='fa';
-  const [titleFa,titleEn, endpoint] = map[section] ?? ['بخش موردنظر','Section', '/users/me'];
-  return <PanelShell title="پنل زبان‌آموز" items={studentNav}>
-    {section === 'tests' ? <StudentTests />
-      : section === 'classes' ? <TeacherPlannerCalendar mode="student" />
-      : section === 'matches' ? <StudentMatches />
-      : section === 'profile' ? <StudentProfile />
-      : section === 'wallet' ? <StudentWallet />
-      : section === 'tickets' ? <MyTicketManager />
-      : <><PanelActions role="student" section={section} endpoint={endpoint} /><ResourceView title={fa?titleFa:titleEn} endpoint={endpoint} /></>}
-  </PanelShell>;
+  const locale = await requestLocale(),
+    fa = locale === 'fa';
+  const [titleFa, titleEn, endpoint] = map[section] ?? ['بخش موردنظر', 'Section', '/users/me'];
+  return (
+    <PanelShell title="پنل زبان‌آموز" items={studentNav}>
+      {section === 'tests' ? (
+        <StudentTests />
+      ) : section === 'classes' ? (
+        <TeacherPlannerCalendar mode="student" />
+      ) : section === 'matches' ? (
+        <StudentMatches />
+      ) : section === 'profile' ? (
+        <StudentProfile />
+      ) : section === 'wallet' ? (
+        <StudentWallet />
+      ) : section === 'tickets' ? (
+        <MyTicketManager />
+      ) : (
+        <>
+          <PanelActions role="student" section={section} endpoint={endpoint} />
+          <ResourceView title={fa ? titleFa : titleEn} endpoint={endpoint} />
+        </>
+      )}
+    </PanelShell>
+  );
 }

@@ -22,7 +22,13 @@ describe('TestsService.resume (SEC-002)', () => {
 
     // Fields the student-facing UI legitimately needs must still be present.
     expect(questionsClause.select).toMatchObject({
-      id: true, prompt: true, type: true, choices: true, audioFile: true, points: true, order: true,
+      id: true,
+      prompt: true,
+      type: true,
+      choices: true,
+      audioFile: true,
+      points: true,
+      order: true,
     });
   });
 });

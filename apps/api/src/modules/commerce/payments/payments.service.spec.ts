@@ -2,11 +2,20 @@ import { Prisma } from '@prisma/client';
 import { PaymentsService } from './payments.service';
 
 const USER = 'student-1';
-const BOOKING = { id: 'booking-1', studentId: USER, status: 'PENDING_PAYMENT', type: 'trial', price: 250_000, startsAt: new Date('2026-08-01T10:00:00Z') };
+const BOOKING = {
+  id: 'booking-1',
+  studentId: USER,
+  status: 'PENDING_PAYMENT',
+  type: 'trial',
+  price: 250_000,
+  startsAt: new Date('2026-08-01T10:00:00Z'),
+};
 
 type Harness = ReturnType<typeof harness>;
 
-function harness(options: { heldPayment?: Record<string, unknown> | null; existingByKey?: Record<string, unknown> | null } = {}) {
+function harness(
+  options: { heldPayment?: Record<string, unknown> | null; existingByKey?: Record<string, unknown> | null } = {},
+) {
   const created: Record<string, unknown>[] = [];
   const tx = {
     booking: { findUnique: jest.fn().mockResolvedValue(BOOKING) },
@@ -29,7 +38,14 @@ function harness(options: { heldPayment?: Record<string, unknown> | null; existi
   const queue = { scheduleBooking: jest.fn() };
   const autoDiscounts = { evaluate: jest.fn().mockResolvedValue(null) };
   const redis = { lock: jest.fn().mockResolvedValue({ token: 't', release: jest.fn() }) };
-  const svc = new PaymentsService(db as never, queue as never, {} as never, wallet as never, autoDiscounts as never, redis as never);
+  const svc = new PaymentsService(
+    db as never,
+    queue as never,
+    {} as never,
+    wallet as never,
+    autoDiscounts as never,
+    redis as never,
+  );
   return { svc, db, tx, queue, wallet, autoDiscounts, redis, created };
 }
 
@@ -92,9 +108,18 @@ describe('PaymentsService.createPayment', () => {
 
   it('records which discount it reserved so the use can be released later', async () => {
     const h = harness();
-    h.tx.discount.findFirst.mockResolvedValue({ id: 'discount-1', type: 'percent', value: 10, maxUses: 5, usedCount: 0 });
+    h.tx.discount.findFirst.mockResolvedValue({
+      id: 'discount-1',
+      type: 'percent',
+      value: 10,
+      maxUses: 5,
+      usedCount: 0,
+    });
     await h.svc.createPayment(USER, pay({ discountCode: 'WELCOME' }));
-    expect(h.tx.discount.update).toHaveBeenCalledWith({ where: { id: 'discount-1' }, data: { usedCount: { increment: 1 } } });
+    expect(h.tx.discount.update).toHaveBeenCalledWith({
+      where: { id: 'discount-1' },
+      data: { usedCount: { increment: 1 } },
+    });
     expect(lastCreated(h)).toMatchObject({ discountId: 'discount-1', discountAmount: 25_000, amount: 225_000 });
   });
 
@@ -127,7 +152,14 @@ describe('PaymentsService.createPayment', () => {
  * had already returned the wallet portion, let the student keep both the refund
  * and the class.
  */
-function callbackHarness(options: { paymentStatus?: string; bookingStatus?: string | null; walletAmount?: number; walletCreditsSeen?: number } = {}) {
+function callbackHarness(
+  options: {
+    paymentStatus?: string;
+    bookingStatus?: string | null;
+    walletAmount?: number;
+    walletCreditsSeen?: number;
+  } = {},
+) {
   const payment = {
     id: 'payment-1',
     userId: USER,
@@ -140,7 +172,8 @@ function callbackHarness(options: { paymentStatus?: string; bookingStatus?: stri
     walletAmount: options.walletAmount ?? 0,
     discountId: null,
   };
-  const booking = options.bookingStatus === null ? null : { ...BOOKING, status: options.bookingStatus ?? 'PENDING_PAYMENT' };
+  const booking =
+    options.bookingStatus === null ? null : { ...BOOKING, status: options.bookingStatus ?? 'PENDING_PAYMENT' };
   const tx = {
     payment: {
       findUniqueOrThrow: jest.fn().mockImplementation(() => Promise.resolve({ ...payment })),
@@ -157,7 +190,10 @@ function callbackHarness(options: { paymentStatus?: string; bookingStatus?: stri
         return Promise.resolve(booking);
       }),
     },
-    walletEntry: { count: jest.fn().mockResolvedValue(options.walletCreditsSeen ?? 0), upsert: jest.fn().mockResolvedValue({}) },
+    walletEntry: {
+      count: jest.fn().mockResolvedValue(options.walletCreditsSeen ?? 0),
+      upsert: jest.fn().mockResolvedValue({}),
+    },
     refund: { upsert: jest.fn().mockResolvedValue({ id: 'refund-1' }) },
     notification: { create: jest.fn().mockResolvedValue({}) },
     discount: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
@@ -170,7 +206,14 @@ function callbackHarness(options: { paymentStatus?: string; bookingStatus?: stri
   const gateway = { verify: jest.fn().mockResolvedValue({ ok: true, reference: 'REF-1' }) };
   const queue = { scheduleBooking: jest.fn() };
   const redis = { lock: jest.fn().mockResolvedValue({ token: 't', release: jest.fn() }) };
-  const svc = new PaymentsService(db as never, queue as never, gateway as never, { ledger: jest.fn() } as never, { evaluate: jest.fn().mockResolvedValue(null) } as never, redis as never);
+  const svc = new PaymentsService(
+    db as never,
+    queue as never,
+    gateway as never,
+    { ledger: jest.fn() } as never,
+    { evaluate: jest.fn().mockResolvedValue(null) } as never,
+    redis as never,
+  );
   return { svc, db, tx, gateway, queue, payment };
 }
 
@@ -191,32 +234,50 @@ describe('PaymentsService.callback', () => {
   it('returns a late capture to the student wallet instead of the class', async () => {
     const h = callbackHarness({ paymentStatus: 'EXPIRED', bookingStatus: 'CANCELLED' });
     await h.svc.callback('auth-1', 'OK');
-    expect(h.tx.refund.upsert).toHaveBeenCalledWith(expect.objectContaining({
-      where: { idempotencyKey: 'late-capture:payment-1' },
-      create: expect.objectContaining({ amount: 250_000, status: 'completed' }),
-    }));
-    expect(h.tx.walletEntry.upsert).toHaveBeenCalledWith(expect.objectContaining({
-      create: expect.objectContaining({ direction: 'CREDIT', amount: 250_000 }),
-    }));
+    expect(h.tx.refund.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { idempotencyKey: 'late-capture:payment-1' },
+        create: expect.objectContaining({ amount: 250_000, status: 'completed' }),
+      }),
+    );
+    expect(h.tx.walletEntry.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({ direction: 'CREDIT', amount: 250_000 }),
+      }),
+    );
     expect(h.payment.status).toBe('REFUNDED');
   });
 
   it('does not return the wallet portion twice when expiry already credited it', async () => {
     // expireBooking credits `walletAmount` back when it cancels the booking, so
     // only the gateway capture is outstanding by the time this callback lands.
-    const h = callbackHarness({ paymentStatus: 'EXPIRED', bookingStatus: 'CANCELLED', walletAmount: 100_000, walletCreditsSeen: 1 });
+    const h = callbackHarness({
+      paymentStatus: 'EXPIRED',
+      bookingStatus: 'CANCELLED',
+      walletAmount: 100_000,
+      walletCreditsSeen: 1,
+    });
     await h.svc.callback('auth-1', 'OK');
-    expect(h.tx.refund.upsert).toHaveBeenCalledWith(expect.objectContaining({
-      create: expect.objectContaining({ amount: 150_000 }),
-    }));
+    expect(h.tx.refund.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({ amount: 150_000 }),
+      }),
+    );
   });
 
   it('returns both portions when nothing has been credited back yet', async () => {
-    const h = callbackHarness({ paymentStatus: 'PENDING', bookingStatus: 'CANCELLED', walletAmount: 100_000, walletCreditsSeen: 0 });
+    const h = callbackHarness({
+      paymentStatus: 'PENDING',
+      bookingStatus: 'CANCELLED',
+      walletAmount: 100_000,
+      walletCreditsSeen: 0,
+    });
     await h.svc.callback('auth-1', 'OK');
-    expect(h.tx.refund.upsert).toHaveBeenCalledWith(expect.objectContaining({
-      create: expect.objectContaining({ amount: 250_000 }),
-    }));
+    expect(h.tx.refund.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({ amount: 250_000 }),
+      }),
+    );
   });
 
   it('schedules reminders only for a booking it actually confirmed', async () => {
@@ -274,7 +335,10 @@ describe('PaymentsService.callback', () => {
   });
 });
 
-function gatewayRedirectHarness(payment: Record<string, unknown>, lockResult: unknown = { token: 't', release: jest.fn() }) {
+function gatewayRedirectHarness(
+  payment: Record<string, unknown>,
+  lockResult: unknown = { token: 't', release: jest.fn() },
+) {
   const db = {
     payment: {
       findFirstOrThrow: jest.fn().mockResolvedValue(payment),
@@ -303,7 +367,10 @@ describe('PaymentsService.gatewayRedirect', () => {
     const h = gatewayRedirectHarness({ id: 'payment-1', authority: null, gatewayAmount: 100_000, purpose: 'booking' });
     const result = await h.svc.gatewayRedirect('user-1', 'payment-1');
     expect(h.gateway.request).toHaveBeenCalledTimes(1);
-    expect(h.db.payment.update).toHaveBeenCalledWith({ where: { id: 'payment-1' }, data: { authority: 'new-authority' } });
+    expect(h.db.payment.update).toHaveBeenCalledWith({
+      where: { id: 'payment-1' },
+      data: { authority: 'new-authority' },
+    });
     expect(result).toEqual({ authority: 'new-authority', url: 'https://gateway.example/new-authority' });
   });
 
@@ -317,7 +384,10 @@ describe('PaymentsService.gatewayRedirect', () => {
 
   it('always releases the lock, even when the gateway call fails', async () => {
     const release = jest.fn();
-    const h = gatewayRedirectHarness({ id: 'payment-1', authority: null, gatewayAmount: 100_000, purpose: 'booking' }, { token: 't', release });
+    const h = gatewayRedirectHarness(
+      { id: 'payment-1', authority: null, gatewayAmount: 100_000, purpose: 'booking' },
+      { token: 't', release },
+    );
     h.gateway.request.mockRejectedValue(new Error('zarinpal down'));
     await expect(h.svc.gatewayRedirect('user-1', 'payment-1')).rejects.toThrow('zarinpal down');
     expect(release).toHaveBeenCalledTimes(1);

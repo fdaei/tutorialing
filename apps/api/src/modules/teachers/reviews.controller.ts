@@ -9,8 +9,16 @@ import { ReplyReviewDto } from './dto/request/reply-review.dto';
 @Controller('reviews')
 export class ReviewsController {
   constructor(private readonly service: ReviewsService) {}
-  @Post() create(@CurrentUser() user: AuthUser, @Body() body: CreateReviewDto) { return this.service.create(user.id, body.bookingId, body.rating, body.comment); }
-  @Roles('TEACHER') @Post(':id/reply') reply(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: ReplyReviewDto) { return this.service.reply(user.id, id, body.response); }
+  @Post() create(@CurrentUser() user: AuthUser, @Body() body: CreateReviewDto) {
+    return this.service.create(user.id, body.bookingId, body.rating, body.comment);
+  }
+  @Roles('TEACHER') @Post(':id/reply') reply(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() body: ReplyReviewDto,
+  ) {
+    return this.service.reply(user.id, id, body.response);
+  }
 }
 
 @Roles('ADMIN', 'STAFF')
@@ -18,8 +26,19 @@ export class ReviewsController {
 @Controller('admin/reviews')
 export class AdminReviewsController {
   constructor(private readonly service: ReviewsService) {}
-  @Get() list(@Query('page') page = '1', @Query('limit') limit = '20', @Query('status') status?: ReviewStatus, @Query('search') search = '') {
+  @Get() list(
+    @Query('page') page = '1',
+    @Query('limit') limit = '20',
+    @Query('status') status?: ReviewStatus,
+    @Query('search') search = '',
+  ) {
     return this.service.adminList(Math.max(1, Number(page)), Math.min(100, Math.max(1, Number(limit))), status, search);
   }
-  @Post(':id/moderate') moderate(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: ModerateReviewDto) { return this.service.moderate(user.id, id, body.status, body.note); }
+  @Post(':id/moderate') moderate(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() body: ModerateReviewDto,
+  ) {
+    return this.service.moderate(user.id, id, body.status, body.note);
+  }
 }

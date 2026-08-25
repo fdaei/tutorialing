@@ -1,4 +1,4 @@
-import type { Tx } from '../../../prisma.service';
+import type { Tx } from '../../../infrastructure/database/prisma.service';
 
 /**
  * Gives back the discount use that `createPayment` reserved when the payment

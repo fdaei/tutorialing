@@ -22,6 +22,8 @@ describe('AuthorizationGuard', () => {
 
   it('denies a missing role', () => {
     const guard = new AuthorizationGuard(reflector() as never);
-    expect(() => guard.canActivate(context('STUDENT'))).toThrow('Role not permitted');
+    expect(() => guard.canActivate(context('STUDENT'))).toThrow(
+      expect.objectContaining({ response: { code: 'ROLE_NOT_PERMITTED', fieldErrors: {} } }),
+    );
   });
 });

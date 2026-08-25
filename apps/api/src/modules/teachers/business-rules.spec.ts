@@ -51,19 +51,26 @@ describe('automatic deactivation after repeated one-star reviews', () => {
     const tx = {
       review: {
         findUnique: jest.fn().mockResolvedValue({ id: 'review-1', moderationStatus: 'PENDING' }),
-        update: jest.fn().mockResolvedValue({ id: 'review-1', teacherId: 'teacher-1', studentId: 'student-1', rating: 1 }),
+        update: jest
+          .fn()
+          .mockResolvedValue({ id: 'review-1', teacherId: 'teacher-1', studentId: 'student-1', rating: 1 }),
         aggregate: jest.fn().mockResolvedValue({ _avg: { rating: 1 }, _count: { _all: options.oneStars } }),
         count: jest.fn().mockResolvedValue(options.oneStars),
       },
       teacher: {
-        findUnique: jest.fn().mockResolvedValue({ id: 'teacher-1', userId: 'teacher-user', status: options.status ?? 'APPROVED' }),
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({ id: 'teacher-1', userId: 'teacher-user', status: options.status ?? 'APPROVED' }),
         update: jest.fn().mockResolvedValue({}),
       },
       notification: { create: jest.fn() },
       auditLog: { create: jest.fn() },
     };
     const settings = settingsStub(options.threshold ? { 'reviews.autoDeactivateOneStarCount': options.threshold } : {});
-    const svc = new ReviewsService({ $transaction: jest.fn((cb: (t: unknown) => unknown) => cb(tx)) } as never, settings as never);
+    const svc = new ReviewsService(
+      { $transaction: jest.fn((cb: (t: unknown) => unknown) => cb(tx)) } as never,
+      settings as never,
+    );
     return { svc, tx };
   }
 
@@ -82,15 +89,19 @@ describe('automatic deactivation after repeated one-star reviews', () => {
   it('records the reason in the audit log and tells the teacher', async () => {
     const h = harness({ oneStars: 6 });
     await h.svc.moderate('admin-1', 'review-1', 'APPROVED');
-    expect(h.tx.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({
-        action: 'teacher.auto_deactivated',
-        after: expect.objectContaining({ reason: 'one_star_review_threshold', oneStarCount: 6 }),
+    expect(h.tx.auditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          action: 'teacher.auto_deactivated',
+          after: expect.objectContaining({ reason: 'one_star_review_threshold', oneStarCount: 6 }),
+        }),
       }),
-    }));
-    expect(h.tx.notification.create).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ type: 'TEACHER_AUTO_DEACTIVATED', userId: 'teacher-user' }),
-    }));
+    );
+    expect(h.tx.notification.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ type: 'TEACHER_AUTO_DEACTIVATED', userId: 'teacher-user' }),
+      }),
+    );
   });
 
   it('honours a threshold configured by support', async () => {
@@ -103,9 +114,11 @@ describe('automatic deactivation after repeated one-star reviews', () => {
     const h = harness({ oneStars: 9, status: 'REJECTED' });
     await h.svc.moderate('admin-1', 'review-1', 'APPROVED');
     expect(h.tx.teacher.update).not.toHaveBeenCalledWith(DEACTIVATION);
-    expect(h.tx.auditLog.create).not.toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ action: 'teacher.auto_deactivated' }),
-    }));
+    expect(h.tx.auditLog.create).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ action: 'teacher.auto_deactivated' }),
+      }),
+    );
   });
 
   it('ignores a rejected one-star review, so the rule cannot be gamed', async () => {

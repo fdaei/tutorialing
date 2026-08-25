@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { RedisService } from './redis.service';
+import { RedisService } from '../../../infrastructure/cache/redis.service';
 
 /**
  * Invalidates already-issued access tokens.

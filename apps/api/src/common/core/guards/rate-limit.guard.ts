@@ -1,15 +1,9 @@
-import {
-  CanActivate,
-  ExecutionContext,
-  Injectable,
-  Logger,
-  ServiceUnavailableException,
-} from '@nestjs/common';
+import { CanActivate, ExecutionContext, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { Request, Response } from 'express';
 import { RATE_LIMIT_KEY, type RateLimitOptions } from '../decorators/rate-limit.decorator';
 import { tooManyRequests } from '../exceptions/domain.exception';
-import { RedisService } from '../services/redis.service';
+import { RedisService } from '../../../infrastructure/cache/redis.service';
 
 /**
  * Per-IP fixed-window limiter for routes annotated with `@RateLimit()`.
@@ -46,7 +40,7 @@ export class RateLimitGuard implements CanActivate {
       // Fail closed. Redis is required infrastructure here (locks, queues), and
       // silently dropping the limiter during an outage would turn a degraded
       // cache into an open door for OTP and refresh-token flooding.
-      this.log.error(`Rate limiter unavailable for ${bucket}`, error instanceof Error ? error.stack : String(error));
+      this.log.error({ err: error, bucket, requestId: request.headers?.['x-request-id'] }, 'Rate limiter unavailable');
       throw new ServiceUnavailableException('Rate limiter unavailable');
     }
 
@@ -57,11 +51,7 @@ export class RateLimitGuard implements CanActivate {
 
     if (count > options.limit) {
       response.setHeader('Retry-After', String(retryAfter));
-      throw tooManyRequests(
-        'RATE_LIMITED',
-        `درخواست‌های شما بیش از حد مجاز است. ${retryAfter} ثانیه دیگر دوباره تلاش کنید.`,
-        `Too many requests. Try again in ${retryAfter} seconds.`,
-      );
+      throw tooManyRequests('RATE_LIMITED');
     }
     return true;
   }

@@ -1,0 +1,11 @@
+node_modules
+dist
+build
+.next
+coverage
+AUDIT
+apps/web/tsconfig.tsbuildinfo
+apps/api/prisma/migrations
+apps/api/prisma/schema.prisma.bak
+package-lock.json
+*.docx

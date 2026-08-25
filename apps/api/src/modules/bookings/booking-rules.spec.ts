@@ -14,19 +14,24 @@ function harness(options: { settings?: Record<string, number>; counts?: Counts }
   const lock = { release: jest.fn() };
   const redis = { lock: jest.fn().mockResolvedValue(lock) };
   const settings = {
-    numeric: jest.fn().mockImplementation((key: string, fallback: number) =>
-      Promise.resolve(options.settings?.[key] ?? fallback)),
+    numeric: jest
+      .fn()
+      .mockImplementation((key: string, fallback: number) => Promise.resolve(options.settings?.[key] ?? fallback)),
   };
   // `type: 'trial'` guards call count() once; the regular-lesson guard calls it
   // twice (completed trials, then pending ones). The student-overlap check is
   // the first count() in the transaction, so it answers 0.
   const counts = options.counts ?? {};
-  const bookingCount = jest.fn()
+  const bookingCount = jest
+    .fn()
     .mockResolvedValueOnce(0)
     .mockResolvedValueOnce(counts.priorTrial ?? counts.trialUsed ?? 0)
     .mockResolvedValueOnce(counts.pendingTrial ?? 0);
   const tx = {
-    booking: { count: bookingCount, create: jest.fn().mockResolvedValue({ id: 'booking-new', startsAt: new Date(), paymentExpiresAt: null }) },
+    booking: {
+      count: bookingCount,
+      create: jest.fn().mockResolvedValue({ id: 'booking-new', startsAt: new Date(), paymentExpiresAt: null }),
+    },
     creditEntry: { create: jest.fn(), aggregate: jest.fn() },
     enrollment: { findFirst: jest.fn() },
   };
@@ -38,7 +43,15 @@ function harness(options: { settings?: Record<string, number>; counts?: Counts }
     }),
   };
   const queue = { scheduleBooking: jest.fn(), scheduleExpiration: jest.fn() };
-  const svc = new BookingsService(db as never, {} as never, redis as never, queue as never, availability as never, {} as never, settings as never);
+  const svc = new BookingsService(
+    db as never,
+    {} as never,
+    redis as never,
+    queue as never,
+    availability as never,
+    {} as never,
+    settings as never,
+  );
   return { svc, tx, redis, settings, availability };
 }
 

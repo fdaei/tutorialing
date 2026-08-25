@@ -2,7 +2,8 @@
 # spike.js equivalent — sudden ~20x jump from a quiet baseline.
 # Usage: load/spike.sh [base_url]
 set -euo pipefail
-BASE="${1:-http://localhost:4001/api}"
+source "$(dirname "$0")/config.sh"
+BASE="$(load_base_url "${1:-}")"
 echo "== baseline: 5 connections, 10s, GET /teachers =="
 npx -y autocannon -c 5 -d 10 -m GET "$BASE/teachers"
 echo

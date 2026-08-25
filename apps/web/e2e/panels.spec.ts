@@ -2,24 +2,42 @@ import { expect, test, type Page } from '@playwright/test';
 import jwt from 'jsonwebtoken';
 
 const permissions = [
-  'users.read', 'users.manage', 'teachers.read', 'teachers.verify', 'teacher-prices.manage',
-  'languages.manage', 'tests.manage', 'tests.review', 'bookings.read', 'bookings.manage',
-  'tickets.read', 'tickets.manage', 'payments.read', 'payments.refund', 'payouts.manage',
-  'reviews.manage', 'audit.read', 'settings.manage', 'cms.manage', 'notifications.read',
-  'roles.manage', 'reports.read', 'availability.manage',
+  'users.read',
+  'users.manage',
+  'teachers.read',
+  'teachers.verify',
+  'teacher-prices.manage',
+  'languages.manage',
+  'tests.manage',
+  'tests.review',
+  'bookings.read',
+  'bookings.manage',
+  'tickets.read',
+  'tickets.manage',
+  'payments.read',
+  'payments.refund',
+  'payouts.manage',
+  'reviews.manage',
+  'audit.read',
+  'settings.manage',
+  'cms.manage',
+  'notifications.read',
+  'roles.manage',
+  'reports.read',
+  'availability.manage',
 ];
 
 function session(page: Page, id: string, roles: string[], granted: string[] = []) {
   const secret = process.env.JWT_ACCESS_SECRET;
   if (!secret) throw new Error('JWT_ACCESS_SECRET is required for panel E2E tests');
   const token = jwt.sign({ id, roles, permissions: granted }, secret, { expiresIn: '15m' });
-  return page.addInitScript(value => sessionStorage.setItem('access_token', value), token);
+  return page.addInitScript((value) => sessionStorage.setItem('access_token', value), token);
 }
 
 function failures(page: Page) {
   const found: string[] = [];
-  page.on('pageerror', error => found.push(`pageerror: ${error.message}`));
-  page.on('response', response => {
+  page.on('pageerror', (error) => found.push(`pageerror: ${error.message}`));
+  page.on('response', (response) => {
     if (response.status() >= 500) found.push(`${response.status()} ${response.url()}`);
   });
   return found;
@@ -40,8 +58,14 @@ test('student panel routes and data widgets render', async ({ page }) => {
   const errors = failures(page);
   await session(page, 'user-student-completed', ['STUDENT']);
   await visit(page, [
-    '/dashboard', '/dashboard/plan', '/dashboard/classes', '/dashboard/matches',
-    '/dashboard/tests', '/dashboard/tickets', '/dashboard/wallet', '/dashboard/profile',
+    '/dashboard',
+    '/dashboard/plan',
+    '/dashboard/classes',
+    '/dashboard/matches',
+    '/dashboard/tests',
+    '/dashboard/tickets',
+    '/dashboard/wallet',
+    '/dashboard/profile',
   ]);
   expect(errors).toEqual([]);
 });
@@ -51,10 +75,18 @@ test('teacher panel routes and data widgets render', async ({ page }) => {
   const errors = failures(page);
   await session(page, 'user-teacher-approved', ['TEACHER']);
   await visit(page, [
-    '/teacher-panel', '/teacher-panel/profile', '/teacher-panel/availability',
-    '/teacher-panel/classes', '/teacher-panel/students', '/teacher-panel/earnings',
-    '/teacher-panel/more', '/teacher-panel/plans', '/teacher-panel/tickets',
-    '/teacher-panel/reviews', '/teacher-panel/notifications', '/teacher-panel/settings',
+    '/teacher-panel',
+    '/teacher-panel/profile',
+    '/teacher-panel/availability',
+    '/teacher-panel/classes',
+    '/teacher-panel/students',
+    '/teacher-panel/earnings',
+    '/teacher-panel/more',
+    '/teacher-panel/plans',
+    '/teacher-panel/tickets',
+    '/teacher-panel/reviews',
+    '/teacher-panel/notifications',
+    '/teacher-panel/settings',
   ]);
   expect(errors).toEqual([]);
 });
@@ -64,13 +96,31 @@ test('administrator can render every administration feature', async ({ page }) =
   const errors = failures(page);
   await session(page, 'user-admin', ['ADMIN'], permissions);
   await visit(page, [
-    '/admin', '/admin/search', '/admin/users', '/admin/teachers',
-    '/admin/teacher-applications', '/admin/teacher-documents', '/admin/teacher-prices',
-    '/admin/languages', '/admin/tests', '/admin/test-reviews', '/admin/bookings',
-    '/admin/availability-blocks', '/admin/tickets', '/admin/finance', '/admin/payments',
-    '/admin/discounts', '/admin/refunds', '/admin/teacher-earnings', '/admin/payouts',
-    '/admin/reviews', '/admin/roles', '/admin/cms', '/admin/notifications',
-    '/admin/audit', '/admin/settings',
+    '/admin',
+    '/admin/search',
+    '/admin/users',
+    '/admin/teachers',
+    '/admin/teacher-applications',
+    '/admin/teacher-documents',
+    '/admin/teacher-prices',
+    '/admin/languages',
+    '/admin/tests',
+    '/admin/test-reviews',
+    '/admin/bookings',
+    '/admin/availability-blocks',
+    '/admin/tickets',
+    '/admin/finance',
+    '/admin/payments',
+    '/admin/discounts',
+    '/admin/refunds',
+    '/admin/teacher-earnings',
+    '/admin/payouts',
+    '/admin/reviews',
+    '/admin/roles',
+    '/admin/cms',
+    '/admin/notifications',
+    '/admin/audit',
+    '/admin/settings',
   ]);
   expect(errors).toEqual([]);
 });

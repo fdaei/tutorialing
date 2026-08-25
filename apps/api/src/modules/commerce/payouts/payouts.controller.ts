@@ -9,7 +9,10 @@ import { DiscountDto, PayoutApprovalDto, PayoutWindowDto } from '../dto/request/
 @RateLimit(RATE_LIMIT_TIERS.moneyAdjacent)
 @Controller('payouts')
 export class PayoutsController {
-  constructor(private s: PayoutsService, private discountSvc: DiscountsService) {}
+  constructor(
+    private s: PayoutsService,
+    private discountSvc: DiscountsService,
+  ) {}
 
   @Post('generate')
   generate(@Body() d: PayoutWindowDto) {

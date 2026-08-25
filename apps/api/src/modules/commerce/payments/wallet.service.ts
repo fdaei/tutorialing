@@ -1,21 +1,29 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService, Tx } from '../../../prisma.service';
+import { PrismaService, Tx } from '../../../infrastructure/database/prisma.service';
 
 @Injectable()
 export class WalletService {
   constructor(private db: PrismaService) {}
 
   async walletBalance(userId: string, tx: Tx = this.db) {
-    const agg = await tx.walletEntry.groupBy({ by: ['direction'], where: { userId, account: 'user_wallet' }, _sum: { amount: true } });
-    const cred = agg.find(x => x.direction === 'CREDIT')?._sum.amount ?? 0;
-    const deb = agg.find(x => x.direction === 'DEBIT')?._sum.amount ?? 0;
+    const agg = await tx.walletEntry.groupBy({
+      by: ['direction'],
+      where: { userId, account: 'user_wallet' },
+      _sum: { amount: true },
+    });
+    const cred = agg.find((x) => x.direction === 'CREDIT')?._sum.amount ?? 0;
+    const deb = agg.find((x) => x.direction === 'DEBIT')?._sum.amount ?? 0;
     return cred - deb;
   }
 
   async transactions(userId: string) {
-    const entries = await this.db.walletEntry.findMany({ where: { userId, account: 'user_wallet' }, orderBy: { createdAt: 'desc' }, take: 100 });
+    const entries = await this.db.walletEntry.findMany({
+      where: { userId, account: 'user_wallet' },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
     let running = await this.walletBalance(userId);
-    return entries.map(entry => {
+    return entries.map((entry) => {
       const balanceAfter = running;
       running += entry.direction === 'CREDIT' ? -entry.amount : entry.amount;
       return { ...entry, balanceAfter, status: 'SUCCESS' as const };
@@ -23,12 +31,36 @@ export class WalletService {
   }
 
   invoices(userId: string) {
-    return this.db.payment.findMany({ where: { userId }, orderBy: { createdAt: 'desc' }, take: 100, select: { id: true, purpose: true, amount: true, status: true, gatewayReference: true, createdAt: true } });
+    return this.db.payment.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+      select: { id: true, purpose: true, amount: true, status: true, gatewayReference: true, createdAt: true },
+    });
   }
 
-  ledger(tx: Tx, userId: string, direction: 'DEBIT' | 'CREDIT', amount: number, description: string, referenceType: string, referenceId: string, idempotencyKey: string) {
+  ledger(
+    tx: Tx,
+    userId: string,
+    direction: 'DEBIT' | 'CREDIT',
+    amount: number,
+    description: string,
+    referenceType: string,
+    referenceId: string,
+    idempotencyKey: string,
+  ) {
     return tx.walletEntry.create({
-      data: { userId, transactionId: `tx_${referenceId}`, account: 'user_wallet', direction, amount, description, referenceType, referenceId, idempotencyKey }
+      data: {
+        userId,
+        transactionId: `tx_${referenceId}`,
+        account: 'user_wallet',
+        direction,
+        amount,
+        description,
+        referenceType,
+        referenceId,
+        idempotencyKey,
+      },
     });
   }
 }

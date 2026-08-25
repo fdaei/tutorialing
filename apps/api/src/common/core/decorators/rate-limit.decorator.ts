@@ -36,6 +36,7 @@ export const RATE_LIMIT_TIERS = {
   moneyAdjacent: { limit: 30, windowSeconds: 600 },
   fileUpload: { limit: 30, windowSeconds: 600 },
   search: { limit: 60, windowSeconds: 600 },
+  publicRead: { limit: 120, windowSeconds: 60 },
   adminWrite: { limit: 120, windowSeconds: 600 },
   examSubmission: { limit: 30, windowSeconds: 600 },
   // Higher budget than examSubmission: the answers endpoint is hit repeatedly

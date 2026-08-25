@@ -7,7 +7,11 @@ import { PayDto, RefundDto } from '../dto/request/payments.dto';
 
 @Controller('payments')
 export class PaymentsController {
-  constructor(private s: PaymentsService, private walletSvc: WalletService, private refundSvc: RefundsService) {}
+  constructor(
+    private s: PaymentsService,
+    private walletSvc: WalletService,
+    private refundSvc: RefundsService,
+  ) {}
 
   @RateLimit(RATE_LIMIT_TIERS.paymentInit)
   @Post()
@@ -34,10 +38,14 @@ export class PaymentsController {
   }
 
   @Get('wallet/transactions')
-  transactions(@CurrentUser() u: AuthUser) { return this.walletSvc.transactions(u.id); }
+  transactions(@CurrentUser() u: AuthUser) {
+    return this.walletSvc.transactions(u.id);
+  }
 
   @Get('invoices')
-  invoices(@CurrentUser() u: AuthUser) { return this.walletSvc.invoices(u.id); }
+  invoices(@CurrentUser() u: AuthUser) {
+    return this.walletSvc.invoices(u.id);
+  }
 
   @Roles('ADMIN', 'FINANCE')
   @Permissions('payments.refund')

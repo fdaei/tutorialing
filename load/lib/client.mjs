@@ -2,8 +2,9 @@
 // Assumes the API is running locally with AUTH_DEV_OTP=true (fixed code 123456)
 // and ZARINPAL_SANDBOX=true with no merchant id (dev-fallback gateway, see
 // apps/api/src/modules/commerce/gateway.service.ts).
+import { loadConfig } from '../config.mjs';
 
-export const BASE = process.env.LOAD_API_URL ?? 'http://localhost:4001/api';
+export const BASE = loadConfig.apiUrl;
 
 export async function api(path, opts = {}) {
   const res = await fetch(`${BASE}${path}`, {
@@ -11,7 +12,11 @@ export async function api(path, opts = {}) {
     headers: { 'content-type': 'application/json', ...(opts.headers ?? {}) },
   });
   let body = null;
-  try { body = await res.json(); } catch { /* empty body */ }
+  try {
+    body = await res.json();
+  } catch {
+    /* empty body */
+  }
   return { status: res.status, headers: res.headers, body };
 }
 
@@ -23,12 +28,14 @@ export async function loginWithOtp(phone) {
     method: 'POST',
     body: JSON.stringify({ challengeId, phone, code: '123456' }),
   });
-  if (verify.status >= 400) throw new Error(`otp/verify failed for ${phone}: ${verify.status} ${JSON.stringify(verify.body)}`);
+  if (verify.status >= 400)
+    throw new Error(`otp/verify failed for ${phone}: ${verify.status} ${JSON.stringify(verify.body)}`);
   return verify.body; // { accessToken, expiresIn, user }
 }
 
 export function authed(token) {
-  return (path, opts = {}) => api(path, { ...opts, headers: { authorization: `Bearer ${token}`, ...(opts.headers ?? {}) } });
+  return (path, opts = {}) =>
+    api(path, { ...opts, headers: { authorization: `Bearer ${token}`, ...(opts.headers ?? {}) } });
 }
 
 export function assert(cond, msg) {

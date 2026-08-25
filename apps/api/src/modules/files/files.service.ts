@@ -3,9 +3,9 @@ import { GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from 
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomUUID } from 'crypto';
 import type { Readable } from 'stream';
-import { PrismaService } from '../../prisma.service';
+import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { badRequest, notFound } from '../../common';
-import { config } from '../../config';
+import { filesConfig } from '../../config/files.config';
 
 const allowed = new Set([
   'image/jpeg',
@@ -24,89 +24,89 @@ const allowed = new Set([
 
 @Injectable()
 export class FilesService {
-  private readonly cfg = config();
+  private readonly cfg = filesConfig();
   private readonly s3 = new S3Client({
-    region: 'us-east-1',
-    endpoint: this.cfg.S3_ENDPOINT,
-    forcePathStyle: true,
+    region: this.cfg.region,
+    endpoint: this.cfg.endpoint,
+    forcePathStyle: this.cfg.forcePathStyle,
     credentials: {
-      accessKeyId: this.cfg.S3_ACCESS_KEY,
-      secretAccessKey: this.cfg.S3_SECRET_KEY,
+      accessKeyId: this.cfg.accessKey,
+      secretAccessKey: this.cfg.secretKey,
     },
   });
 
   constructor(private readonly db: PrismaService) {}
 
-  async createUpload(ownerId: string, data: { originalName: string; mimeType: string; size: number; checksum: string; purpose: string }) {
+  async createUpload(
+    ownerId: string,
+    data: { originalName: string; mimeType: string; size: number; checksum: string; purpose: string },
+  ) {
     if (!allowed.has(data.mimeType)) {
-      throw badRequest(
-        'FILE_TYPE_NOT_ALLOWED',
-        'فرمت فایل مجاز نیست. برای مدارک PDF، JPG یا PNG و برای ویدئو MP4، WebM یا MOV انتخاب کنید.',
-        'The file type is not allowed. Use PDF, JPG, or PNG for documents and MP4, WebM, or MOV for videos.',
-        { mimeType: { fa: 'فرمت فایل انتخاب‌شده توسط سامانه پشتیبانی نمی‌شود.', en: 'The selected file format is not supported.' } },
-      );
+      throw badRequest('FILE_TYPE_NOT_ALLOWED');
     }
-    if (data.size <= 0 || data.size > 50 * 1024 * 1024) {
-      throw badRequest(
-        'FILE_SIZE_INVALID',
-        'حجم فایل باید بیشتر از صفر و حداکثر ۵۰ مگابایت باشد.',
-        'The file must be larger than zero and no more than 50 MB.',
-        { size: { fa: 'فایلی با حجم حداکثر ۵۰ مگابایت انتخاب کنید.', en: 'Choose a file no larger than 50 MB.' } },
-      );
+    if (data.size <= 0 || data.size > this.cfg.maxUploadBytes) {
+      throw badRequest('FILE_SIZE_INVALID');
     }
     if (!/^[a-f0-9]{64}$/i.test(data.checksum)) {
-      throw badRequest('FILE_CHECKSUM_INVALID', 'اعتبارسنجی فایل ناموفق بود. فایل را دوباره انتخاب کنید.', 'File validation failed. Select the file again.');
+      throw badRequest('FILE_CHECKSUM_INVALID');
     }
-    const ext = data.originalName.split('.').pop()?.replace(/[^a-z0-9]/gi, '').slice(0, 8) || 'bin';
+    const ext =
+      data.originalName
+        .split('.')
+        .pop()
+        ?.replace(/[^a-z0-9]/gi, '')
+        .slice(0, 8) || 'bin';
     const key = `${ownerId}/${data.purpose}/${randomUUID()}.${ext}`;
     const file = await this.db.storedFile.create({ data: { ownerId, key, ...data, status: 'PENDING' } });
-    const uploadUrl = await getSignedUrl(this.s3, new PutObjectCommand({
-      Bucket: this.cfg.S3_BUCKET,
-      Key: key,
-      ContentType: data.mimeType,
-      ContentLength: data.size,
-      Metadata: { checksum: data.checksum },
-    }), { expiresIn: 600 });
-    return { fileId: file.id, uploadUrl, expiresIn: 600 };
+    const uploadUrl = await getSignedUrl(
+      this.s3,
+      new PutObjectCommand({
+        Bucket: this.cfg.bucket,
+        Key: key,
+        ContentType: data.mimeType,
+        ContentLength: data.size,
+        Metadata: { checksum: data.checksum },
+      }),
+      { expiresIn: this.cfg.uploadUrlTtlSeconds },
+    );
+    return { fileId: file.id, uploadUrl, expiresIn: this.cfg.uploadUrlTtlSeconds };
   }
 
   async uploadContent(ownerId: string, id: string, checksum: string, body: Readable) {
     const file = await this.db.storedFile.findFirst({ where: { id, ownerId, status: 'PENDING' } });
-    if (!file) throw notFound('UPLOAD_NOT_FOUND', 'آپلود پیدا نشد یا قبلاً تکمیل شده است.', 'The upload was not found or has already been completed.');
+    if (!file) throw notFound('UPLOAD_NOT_FOUND');
     if (!checksum || checksum !== file.checksum) {
-      throw badRequest('UPLOAD_CHECKSUM_MISMATCH', 'محتوای فایل با فایل انتخاب‌شده مطابقت ندارد.', 'The uploaded content does not match the selected file.');
+      throw badRequest('UPLOAD_CHECKSUM_MISMATCH');
     }
-    await this.s3.send(new PutObjectCommand({
-      Bucket: this.cfg.S3_BUCKET,
-      Key: file.key,
-      Body: body,
-      ContentType: file.mimeType,
-      ContentLength: file.size,
-      Metadata: { checksum: file.checksum },
-    }));
+    await this.s3.send(
+      new PutObjectCommand({
+        Bucket: this.cfg.bucket,
+        Key: file.key,
+        Body: body,
+        ContentType: file.mimeType,
+        ContentLength: file.size,
+        Metadata: { checksum: file.checksum },
+      }),
+    );
     return { ok: true };
   }
 
   async complete(ownerId: string, id: string) {
     const file = await this.db.storedFile.findFirst({ where: { id, ownerId } });
-    if (!file) throw notFound('UPLOAD_NOT_FOUND', 'فایل بارگذاری‌شده پیدا نشد.', 'The uploaded file was not found.');
+    if (!file) throw notFound('UPLOAD_NOT_FOUND');
     let head;
     try {
-      head = await this.s3.send(new HeadObjectCommand({ Bucket: this.cfg.S3_BUCKET, Key: file.key }));
+      head = await this.s3.send(new HeadObjectCommand({ Bucket: this.cfg.bucket, Key: file.key }));
     } catch {
-      throw badRequest(
-        'UPLOAD_CONTENT_MISSING',
-        'ارسال فایل به فضای ذخیره‌سازی کامل نشد. اتصال را بررسی و دوباره تلاش کنید.',
-        'The file was not fully uploaded to storage. Check the connection and try again.',
-      );
+      throw badRequest('UPLOAD_CONTENT_MISSING');
     }
-    if (head.ContentLength !== file.size || head.ContentType !== file.mimeType || head.Metadata?.checksum !== file.checksum) {
+    if (
+      head.ContentLength !== file.size ||
+      head.ContentType !== file.mimeType ||
+      head.Metadata?.checksum !== file.checksum
+    ) {
       await this.db.storedFile.update({ where: { id }, data: { status: 'QUARANTINED' } });
-      throw badRequest(
-        'UPLOAD_VALIDATION_FAILED',
-        'فایل دریافت شد اما اندازه، نوع یا محتوای آن معتبر نیست. فایل را دوباره بارگذاری کنید.',
-        'The file was received, but its size, type, or content is invalid. Upload it again.',
-      );
+      throw badRequest('UPLOAD_VALIDATION_FAILED');
     }
     return this.db.storedFile.update({ where: { id }, data: { status: 'SAFE' } });
   }
@@ -119,17 +119,21 @@ export class FilesService {
         status: 'SAFE',
         OR: [
           { ownerId: requesterId },
-          ...(reviewer ? [
-            { verificationItems: { some: {} } },
-            { testAnswers: { some: { attempt: { status: 'UNDER_REVIEW' as const } } } },
-          ] : []),
+          ...(reviewer
+            ? [
+                { verificationItems: { some: {} } },
+                { testAnswers: { some: { attempt: { status: 'UNDER_REVIEW' as const } } } },
+              ]
+            : []),
         ],
       },
     });
-    if (!file) throw notFound('FILE_NOT_FOUND', 'فایل پیدا نشد یا اجازه مشاهده آن را ندارید.', 'The file was not found or you cannot access it.');
+    if (!file) throw notFound('FILE_NOT_FOUND');
     return {
-      url: await getSignedUrl(this.s3, new GetObjectCommand({ Bucket: this.cfg.S3_BUCKET, Key: file.key }), { expiresIn: 300 }),
-      expiresIn: 300,
+      url: await getSignedUrl(this.s3, new GetObjectCommand({ Bucket: this.cfg.bucket, Key: file.key }), {
+        expiresIn: this.cfg.downloadUrlTtlSeconds,
+      }),
+      expiresIn: this.cfg.downloadUrlTtlSeconds,
     };
   }
 }

@@ -1,0 +1,206 @@
+'use client';
+import { useEffect, useMemo } from 'react';
+import { useForm } from 'react-hook-form';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Bell, Camera, CheckCircle2, Globe2, LockKeyhole, UserRound } from 'lucide-react';
+import { api, apiField, apiMessage } from '@/lib/api';
+import { PageHeading } from '@/components/shared/page-heading';
+type Profile = {
+  id: string;
+  name: string | null;
+  phone: string | null;
+  email?: string | null;
+  locale: 'fa' | 'en' | null;
+  timezone: string | null;
+  profileComplete: boolean;
+};
+type Form = { name: string; email: string; locale: 'fa' | 'en'; timezone: string };
+export function StudentProfile() {
+  const qc = useQueryClient(),
+    q = useQuery({ queryKey: ['profile'], queryFn: () => api<Profile>('/users/me') }),
+    {
+      register,
+      handleSubmit,
+      reset,
+      formState: { errors },
+    } = useForm<Form>(),
+    save = useMutation({
+      mutationFn: (d: Form) => api('/users/me', { method: 'PUT', body: JSON.stringify(d) }),
+      onSuccess: async () => {
+        await qc.invalidateQueries({ queryKey: ['profile'] });
+      },
+    });
+  useEffect(() => {
+    if (q.data)
+      reset({
+        name: q.data.name ?? '',
+        email: q.data.email ?? '',
+        locale: q.data.locale ?? 'fa',
+        timezone: q.data.timezone ?? 'Asia/Tehran',
+      });
+  }, [q.data, reset]);
+  const completion = useMemo(
+      () =>
+        q.data
+          ? [q.data.name, q.data.phone, q.data.email, q.data.locale, q.data.timezone].filter(Boolean).length * 20
+          : 0,
+      [q.data],
+    ),
+    displayName = q.data?.name?.trim() || 'زبان‌آموز';
+  return (
+    <>
+      <PageHeading
+        title="پروفایل و تنظیمات"
+        description="اطلاعات حساب، زبان رابط و ترجیحات اعلان‌های خود را مدیریت کنید."
+      />
+      {q.isLoading && <div className="skeleton h-[520px] rounded-2xl" />}
+      {q.isError && (
+        <div className="rounded-2xl bg-red-50 p-5 text-red-700">
+          {apiMessage(q.error, 'اطلاعات پروفایل دریافت نشد.')}
+        </div>
+      )}
+      {q.data && (
+        <form onSubmit={handleSubmit((d) => save.mutate(d))} className="grid gap-5 xl:grid-cols-[280px_1fr]">
+          <aside className="panel-card h-fit p-5 text-center">
+            <div className="relative mx-auto w-fit">
+              <span className="brand-gradient grid size-24 place-items-center rounded-3xl text-3xl font-black text-white">
+                {displayName.slice(0, 1)}
+              </span>
+              <button
+                type="button"
+                disabled
+                title="نیازمند endpoint بارگذاری آواتار"
+                className="absolute -bottom-2 -left-2 grid size-9 place-items-center rounded-full bg-white text-indigo-600 shadow"
+              >
+                <Camera size={17} />
+              </button>
+            </div>
+            <h2 className="mt-5 font-black">{displayName}</h2>
+            <p className="mt-1 text-sm text-muted">{q.data.phone || 'شماره ثبت نشده'}</p>
+            <div className="mt-6 text-start">
+              <div className="flex justify-between text-xs">
+                <span>تکمیل پروفایل</span>
+                <b>{completion.toLocaleString('fa-IR')}٪</b>
+              </div>
+              <div className="mt-2 h-2 rounded-full bg-gray-100">
+                <div className="h-full rounded-full bg-emerald-500" style={{ width: `${completion}%` }} />
+              </div>
+            </div>
+          </aside>
+          <div className="grid gap-5">
+            <Section icon={<UserRound />} title="اطلاعات شخصی">
+              <div className="grid gap-4 md:grid-cols-2">
+                <Field label="نام و نام خانوادگی" error={errors.name?.message || apiField(save.error, 'name')}>
+                  <input
+                    className="input"
+                    {...register('name', {
+                      required: 'نام و نام خانوادگی الزامی است.',
+                      minLength: { value: 2, message: 'حداقل ۲ نویسه وارد کنید.' },
+                    })}
+                  />
+                </Field>
+                <Field label="شماره موبایل" helper="برای تغییر شماره با پشتیبانی تماس بگیرید.">
+                  <input className="input bg-gray-50" value={q.data.phone ?? ''} disabled />
+                </Field>
+                <Field label="ایمیل" error={errors.email?.message || apiField(save.error, 'email')}>
+                  <input
+                    dir="ltr"
+                    type="email"
+                    className="input text-left"
+                    {...register('email', {
+                      pattern: { value: /^[^@]+@[^@]+\.[^@]+$/, message: 'ایمیل معتبر وارد کنید.' },
+                    })}
+                  />
+                </Field>
+              </div>
+            </Section>
+            <Section icon={<Globe2 />} title="زبان و منطقه زمانی">
+              <div className="grid gap-4 md:grid-cols-2">
+                <Field label="زبان رابط">
+                  <select className="input" {...register('locale')}>
+                    <option value="fa">فارسی</option>
+                    <option value="en">English</option>
+                  </select>
+                </Field>
+                <Field label="منطقه زمانی">
+                  <select className="input" {...register('timezone')}>
+                    <option value="Asia/Tehran">تهران (UTC+3:30)</option>
+                    <option value="Europe/London">لندن</option>
+                    <option value="America/Toronto">تورنتو</option>
+                  </select>
+                </Field>
+              </div>
+            </Section>
+            <Section icon={<Bell />} title="اعلان‌ها">
+              <label className="flex items-center justify-between gap-4 rounded-xl bg-gray-50 p-4">
+                <span>
+                  <b className="block text-sm">یادآوری کلاس‌ها و آزمون‌ها</b>
+                  <small className="mt-1 block text-muted">اعلان‌های ضروری حساب همیشه فعال می‌مانند.</small>
+                </span>
+                <input type="checkbox" defaultChecked className="size-5 accent-indigo-600" />
+              </label>
+            </Section>
+            <Section icon={<LockKeyhole />} title="امنیت">
+              <p className="text-sm text-muted">
+                تغییر رمز برای حساب‌های ورود با رمز عبور پس از اضافه‌شدن endpoint مربوط فعال می‌شود. ورود فعلی پروژه
+                مبتنی بر کد یک‌بارمصرف است.
+              </p>
+            </Section>
+            {save.isError && (
+              <div role="alert" className="rounded-xl bg-red-50 p-4 text-sm text-red-700">
+                {apiMessage(save.error, 'ذخیره تغییرات ناموفق بود.')}
+              </div>
+            )}
+            {save.isSuccess && (
+              <div
+                role="status"
+                className="flex items-center gap-2 rounded-xl bg-emerald-50 p-4 text-sm font-bold text-emerald-700"
+              >
+                <CheckCircle2 size={18} />
+                تغییرات با موفقیت ذخیره شد.
+              </div>
+            )}
+            <button disabled={save.isPending} className="primary-button w-fit px-7 py-3 disabled:opacity-50">
+              {save.isPending ? 'در حال ذخیره…' : 'ذخیره تغییرات'}
+            </button>
+          </div>
+        </form>
+      )}
+    </>
+  );
+}
+function Section({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
+  return (
+    <section className="panel-card p-5 md:p-6">
+      <h2 className="mb-5 flex items-center gap-2 font-black text-gray-900">
+        <span className="text-indigo-600">{icon}</span>
+        {title}
+      </h2>
+      {children}
+    </section>
+  );
+}
+function Field({
+  label,
+  helper,
+  error,
+  children,
+}: {
+  label: string;
+  helper?: string;
+  error?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-2 block text-sm font-bold">{label}</span>
+      {children}
+      {helper && <small className="mt-2 block text-muted">{helper}</small>}
+      {error && (
+        <small role="alert" className="mt-2 block text-red-600">
+          {error}
+        </small>
+      )}
+    </label>
+  );
+}

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { Booking } from '@prisma/client';
-import { PrismaService, Tx } from '../../../prisma.service';
+import { PrismaService, Tx } from '../../../infrastructure/database/prisma.service';
 import { SettingsService } from '../../../common';
 
 /** Used when the setting row is absent or unusable. */
@@ -20,7 +20,10 @@ const DAY_MS = 86_400_000;
  */
 @Injectable()
 export class EarningsService {
-  constructor(private db: PrismaService, private settings: SettingsService) {}
+  constructor(
+    private db: PrismaService,
+    private settings: SettingsService,
+  ) {}
 
   commissionPercent(tx: Tx = this.db) {
     return this.settings.numeric('commerce.commissionPercent', DEFAULT_COMMISSION_PERCENT, 100, tx);
@@ -38,7 +41,7 @@ export class EarningsService {
   async accrue(tx: Tx, booking: Pick<Booking, 'id' | 'teacherId' | 'price'>) {
     const percent = await this.commissionPercent(tx);
     const holdDays = await this.escrowHoldDays(tx);
-    const commissionAmount = Math.round(booking.price * percent / 100);
+    const commissionAmount = Math.round((booking.price * percent) / 100);
     const netAmount = booking.price - commissionAmount;
     const earning = await tx.earning.upsert({
       where: { bookingId: booking.id },
@@ -53,7 +56,10 @@ export class EarningsService {
       update: {},
     });
     if (earning.netAmount > 0) {
-      const teacher = await tx.teacher.findUniqueOrThrow({ where: { id: booking.teacherId }, select: { userId: true } });
+      const teacher = await tx.teacher.findUniqueOrThrow({
+        where: { id: booking.teacherId },
+        select: { userId: true },
+      });
       // Same `user_wallet` account the student side uses, so `walletBalance`
       // and `GET /payments/wallet` report a teacher's balance with no special
       // casing. The payout transfer debits it again when the money leaves.
