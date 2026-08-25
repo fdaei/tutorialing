@@ -46,6 +46,19 @@
       "evidence": "git ls-tree 62d6c15 AUDIT/ vs HEAD; 7 docs + npm-audit.json deleted"
     },
     {
+      "id": "AUD-002",
+      "severity": "HIGH",
+      "category": "process",
+      "title": "HEAD carried a committed file with unresolved git conflict markers",
+      "location": "apps/api/src/common/core/guards/authorization.guard.ts, landed via one of the two unlabelled 'update' commits (a77fa1f, 68c9f6e) on 2026-08-25",
+      "impact": "authorization.guard.ts as committed is not valid TypeScript (literal <<<<<<< / ||||||| / ======= / >>>>>>> markers). A fresh clone or CI checkout of main fails typecheck/build immediately. Root cause: an autostash (git stash list still shows stash@{0}) was popped mid-refactor, conflicted across ~17 files, and the manual resolution was left uncommitted (and in this one file, unstaged) while other touched files were committed as-is.",
+      "status": "fixed",
+      "verified": true,
+      "evidence_detail": "git show HEAD:apps/api/src/common/core/guards/authorization.guard.ts showed the raw markers; the working tree already carried a correct hand-resolved version, unstaged.",
+      "fix_commit": "124b646",
+      "note": "Fixing this required finishing the refactor the conflict was in the middle of: consolidating the old apps/api/src/common/auth.ts barrel and the duplicate apps/api/src/common/guards/access-token.guard.ts into apps/api/src/common/core (which already held the canonical, current guard implementations - JWT algorithm pinned, TokenRevocationService-integrated AccessGuard), and wiring the previously-orphaned common/decorators/{authorize,public-rate-limit}.decorator.ts and common/utils/{assertion,runtime-environment}.util.ts into the common/core barrel so every module import resolves through one path. All ~17 affected files' imports verified consistent (no stale common/auth or common/errors references remain); full verify gate re-run clean: typecheck (api/web/contracts), lint (api/web), test (38 api suites/210 tests + 7 web suites/24 tests, 234 total), build (contracts/api/web) all green. A stale, unrelated autostash (stash@{0}) predating the common/core restructure and the commerce module split (diffs against apps/api/src/common/guards/authorization.guard.ts and commerce/commerce.controller.ts, paths that no longer exist) was left untouched rather than dropped or applied - flagged for the user to review."
+    },
+    {
       "id": "FIN-101",
       "severity": "HIGH",
       "category": "financial",
@@ -86,6 +99,11 @@
     }
   ],
   "fixed": [
+    {
+      "id": "AUD-002",
+      "commit": "124b646",
+      "gates": "typecheck (api/web/contracts)/lint (api/web)/build (contracts/api/web) green; 234 tests (210 api, 24 web)"
+    },
     {
       "id": "FIN-102",
       "commit": "ec8f3e4",
