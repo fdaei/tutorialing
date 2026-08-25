@@ -1,12 +1,6 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { PriceStatus } from '@prisma/client';
-<<<<<<< Updated upstream
-import { CurrentUser, Permissions, Roles, type AuthUser } from '../../common';
-||||||| Stash base
-import { CurrentUser, Permissions, Roles, type AuthUser } from '../../common/auth';
-=======
-import { Authorize, CurrentUser, Roles, type AuthUser } from '../../common/auth';
->>>>>>> Stashed changes
+import { Authorize, CurrentUser, Roles, type AuthUser } from '../../common';
 import { PricingService } from './pricing.service';
 import { ProposalDto } from './dto/request/proposal.dto';
 import { PriceReviewDto } from './dto/request/price-review.dto';

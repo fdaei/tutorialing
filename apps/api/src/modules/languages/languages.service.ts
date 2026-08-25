@@ -1,14 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { LanguageDirection, Prisma, ProficiencySystem } from '@prisma/client';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
-<<<<<<< Updated upstream
-import { badRequest, conflict, notFound } from '../../common';
-||||||| Stash base
-import { badRequest, conflict, notFound } from '../../common/errors';
-=======
-import { badRequest, conflict, notFound } from '../../common/errors';
-import { assertDomain, requireValue } from '../../common/utils';
->>>>>>> Stashed changes
+import { badRequest, conflict, notFound, assertDomain, requireValue } from '../../common';
 
 export type LanguageInput = {
   code: string;

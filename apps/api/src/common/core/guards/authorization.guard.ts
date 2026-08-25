@@ -3,14 +3,8 @@ import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
 import { ROLES_KEY, PERMISSIONS_KEY } from '../constants/auth.constants';
 import { AuthUser } from '../types/authenticated-user.type';
-<<<<<<< Updated upstream:apps/api/src/common/core/guards/authorization.guard.ts
 import { forbidden } from '../exceptions/domain.exception';
-||||||| Stash base:apps/api/src/common/guards/authorization.guard.ts
-import { forbidden } from '../errors';
-=======
-import { forbidden } from '../errors';
 import { assertDomain } from '../utils';
->>>>>>> Stashed changes:apps/api/src/common/guards/authorization.guard.ts
 
 @Injectable()
 export class AuthorizationGuard implements CanActivate {
