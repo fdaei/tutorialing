@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ReviewStatus } from '@prisma/client';
 import { PrismaService, type DbClient, type Tx } from '../../infrastructure/database/prisma.service';
 import { badRequest, conflict, forbidden, notFound } from '../../common';
-import { SettingsService } from '../../common';
+import { SettingsService } from '../settings/settings.service';
 
 @Injectable()
 export class ReviewsService {

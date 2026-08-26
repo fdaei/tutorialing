@@ -12,7 +12,7 @@ import { AppModule } from './app.module';
 import { ApiExceptionFilter } from './common';
 import { validationResponse } from './common';
 import { config } from './config';
-import { runtimeEnvironment } from './common/utils';
+import { runtimeEnvironment } from './common/types';
 
 async function bootstrap() {
   const cfg = config();

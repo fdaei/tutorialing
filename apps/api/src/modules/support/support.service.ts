@@ -1,8 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { Prisma, Role, TicketStatus } from '@prisma/client';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { badRequest, forbidden, notFound } from '../../common';
 import { config } from '../../config';
+import { SMS_PROVIDER, SmsProvider } from '../../infrastructure/messaging/sms/sms-provider';
 
 const STAFF_ROLES: Role[] = ['ADMIN', 'STAFF', 'SUPPORT'];
 const isStaff = (roles: string[]) => roles.some((role) => STAFF_ROLES.includes(role as Role));
@@ -13,7 +14,17 @@ const authorRole = (roles: string[]): Role =>
 
 @Injectable()
 export class SupportService {
-  constructor(private db: PrismaService) {}
+  constructor(
+    private db: PrismaService,
+    @Inject(SMS_PROVIDER) private provider: SmsProvider,
+  ) {}
+
+  adminTickets() {
+    return this.db.ticket.findMany({
+      include: { user: { select: { name: true, phone: true } }, replies: { orderBy: { createdAt: 'asc' }, take: 5 } },
+      orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }], take: 200,
+    });
+  }
 
   async create(
     userId: string,
@@ -308,26 +319,6 @@ export class SupportService {
     return result.updated;
   }
 
-  notifications(userId: string) {
-    return this.db.notification.findMany({
-      where: { userId },
-      include: { deliveries: true },
-      orderBy: { createdAt: 'desc' },
-      take: 100,
-    });
-  }
-  read(userId: string, id: string) {
-    return this.db.notification.updateMany({ where: { id, userId }, data: { readAt: new Date() } });
-  }
-  async page(slug: string) {
-    const page = await this.db.cmsPage.findFirst({ where: { slug, published: true } });
-    if (!page) throw notFound('PAGE_NOT_FOUND');
-    return page;
-  }
-  settings() {
-    return this.db.setting.findMany({ where: { public: true } });
-  }
-
   /** Active users who can act on an unassigned ticket. */
   private async supportStaffIds(tx: Prisma.TransactionClient) {
     const staff = await tx.user.findMany({
@@ -349,14 +340,14 @@ export class SupportService {
     try {
       const cfg = config();
       let providerId: string, providerResponse: Prisma.InputJsonValue;
-      if (cfg.KAVENEGAR_API_KEY) {
-        const response = await fetch(
-          `${cfg.KAVENEGAR_API_BASE}/v1/${cfg.KAVENEGAR_API_KEY}/verify/lookup.json?receptor=${encodeURIComponent(user.phone)}&token=${encodeURIComponent(ticketId.slice(-8))}&template=${encodeURIComponent(cfg.KAVENEGAR_SUPPORT_TEMPLATE)}`,
-          { method: 'POST' },
-        );
-        providerResponse = (await response.json()) as Prisma.InputJsonValue;
-        if (!response.ok) throw new Error('SMS provider rejected ticket assignment');
-        providerId = `kavenegar-${Date.now()}`;
+      if (this.provider.configured) {
+        const result = await this.provider.sendLookup({
+          phone: user.phone,
+          template: cfg.KAVENEGAR_SUPPORT_TEMPLATE,
+          tokens: [ticketId.slice(-8)],
+        });
+        providerResponse = result.response as Prisma.InputJsonValue;
+        providerId = result.providerId;
       } else {
         providerId = `development-${Date.now()}`;
         providerResponse = { adapter: 'development', ticketId };

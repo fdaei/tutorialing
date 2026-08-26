@@ -1,21 +1,27 @@
-import { Injectable, ServiceUnavailableException } from '@nestjs/common';
+import { Inject, Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
+import { SMS_PROVIDER, SmsProvider } from '../../infrastructure/messaging/sms/sms-provider';
 import { config } from '../../config';
 @Injectable()
 export class SmsService {
-  constructor(private db: PrismaService) {}
+  constructor(
+    private db: PrismaService,
+    @Inject(SMS_PROVIDER) private provider: SmsProvider,
+  ) {}
   async sendOtp(phone: string, code: string, userId?: string) {
     const cfg = config();
     let providerId: string;
     let response: object;
-    if (cfg.KAVENEGAR_API_KEY) {
-      const r = await fetch(
-        `${cfg.KAVENEGAR_API_BASE}/v1/${cfg.KAVENEGAR_API_KEY}/verify/lookup.json?receptor=${encodeURIComponent(phone)}&token=${code}&template=${encodeURIComponent(cfg.KAVENEGAR_OTP_TEMPLATE)}`,
-        { method: 'POST' },
-      );
-      if (!r.ok) throw new ServiceUnavailableException('SMS provider unavailable');
-      response = (await r.json()) as object;
-      providerId = `kavenegar-${Date.now()}`;
+    if (this.provider.configured) {
+      try {
+        ({ response, providerId } = await this.provider.sendLookup({
+          phone,
+          template: cfg.KAVENEGAR_OTP_TEMPLATE,
+          tokens: [code],
+        }));
+      } catch {
+        throw new ServiceUnavailableException('SMS provider unavailable');
+      }
     } else if (cfg.AUTH_DEV_OTP) {
       // Local development only: no provider is configured, so the code is echoed
       // back to the caller instead of being delivered.

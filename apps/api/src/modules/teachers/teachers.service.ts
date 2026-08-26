@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma, TeacherStatus } from '@prisma/client';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
-import { AuditService } from '../../common';
+import { AuditService } from '../../system/audit/audit.service';
 import { badRequest, notFound } from '../../common';
 
 export type TeacherApplicationInput = {
@@ -25,6 +25,14 @@ export class TeachersService {
     private readonly db: PrismaService,
     private readonly audit: AuditService,
   ) {}
+
+  adminApplications() {
+    return this.db.teacher.findMany({
+      where: { status: { notIn: ['DRAFT', 'APPROVED'] } },
+      include: { user: { select: { phone: true, email: true } }, verificationItems: { include: { file: true } }, verificationHistory: { orderBy: { createdAt: 'desc' } } },
+      orderBy: { submittedAt: 'asc' },
+    });
+  }
 
   async directory(query: {
     page: number;

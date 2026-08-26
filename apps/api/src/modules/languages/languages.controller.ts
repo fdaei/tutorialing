@@ -1,8 +1,10 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
-import { Authorize, CurrentUser, Public, type AuthUser } from '../../common';
+import { CurrentUser, Public, Roles, type AuthUser } from '../../common';
+import { PermissionKeys, RequirePermissions } from '../auth/authorization';
 import { LanguagesService } from './languages.service';
 import { LanguageDto } from './dto/request/language.dto';
 import { UpdateLanguageDto } from './dto/request/update-language.dto';
+import { ApiTags } from '@nestjs/swagger';
 
 @Controller('languages')
 export class LanguagesController {
@@ -12,8 +14,10 @@ export class LanguagesController {
   }
 }
 
-@Authorize(['ADMIN', 'STAFF'], ['languages.manage'])
+@Roles('ADMIN', 'STAFF')
+@RequirePermissions(PermissionKeys.Languages.Manage)
 @Controller('admin/languages')
+@ApiTags('admin')
 export class AdminLanguagesController {
   constructor(private readonly service: LanguagesService) {}
 

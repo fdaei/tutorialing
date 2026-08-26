@@ -3,7 +3,7 @@ import { type AvailabilityOverride, type AvailabilityRule, type BlockedPeriod, t
 import { fromZonedTime } from 'date-fns-tz';
 import { PrismaService, type DbClient } from '../../infrastructure/database/prisma.service';
 import { badRequest, conflict, notFound } from '../../common';
-import { SettingsService } from '../../common';
+import { SettingsService } from '../settings/settings.service';
 import type {
   AdminBlockedPeriodInput,
   AvailabilityOverrideInput,

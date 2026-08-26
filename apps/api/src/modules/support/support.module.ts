@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { SupportController } from './support.controller';
-import { NotificationsController } from './notifications.controller';
 import { SupportService } from './support.service';
-@Module({ controllers: [SupportController, NotificationsController], providers: [SupportService] })
+import { ContentModule } from '../content/content.module';
+import { AdminSupportController } from './admin-support.controller';
+@Module({ imports: [ContentModule], controllers: [SupportController, AdminSupportController], providers: [SupportService] })
 export class SupportModule {}

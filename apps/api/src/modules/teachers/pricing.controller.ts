@@ -1,9 +1,11 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { PriceStatus } from '@prisma/client';
-import { Authorize, CurrentUser, Roles, type AuthUser } from '../../common';
+import { CurrentUser, Roles, type AuthUser } from '../../common';
+import { PermissionKeys, RequirePermissions } from '../auth/authorization';
 import { PricingService } from './pricing.service';
 import { ProposalDto } from './dto/request/proposal.dto';
 import { PriceReviewDto } from './dto/request/price-review.dto';
+import { ApiTags } from '@nestjs/swagger';
 
 @Roles('TEACHER')
 @Controller('teacher/pricing')
@@ -20,8 +22,10 @@ export class TeacherPricingController {
   }
 }
 
-@Authorize(['ADMIN', 'STAFF', 'FINANCE'], ['teacher-prices.manage'])
+@Roles('ADMIN', 'STAFF', 'FINANCE')
+@RequirePermissions(PermissionKeys.TeacherPrices.Manage)
 @Controller('admin/teacher-prices')
+@ApiTags('admin')
 export class AdminPricingController {
   constructor(private readonly service: PricingService) {}
   @Get() list(

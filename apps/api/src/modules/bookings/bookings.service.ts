@@ -3,11 +3,11 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { BookingsRepository } from './bookings.repository';
 import { badRequest, conflict, domainError, DOMAIN_ERRORS, forbidden, notFound } from '../../common';
-import { QueueService } from '../queue/queue.service';
+import { BookingJobsService } from './booking-jobs.service';
 import { AvailabilityService } from './availability.service';
-import { RedisService } from '../../infrastructure/cache/redis.service';
+import { RedisService } from '../../infrastructure/redis/redis.service';
 import { EarningsService } from '../commerce';
-import { SettingsService } from '../../common';
+import { SettingsService } from '../settings/settings.service';
 
 type RefundTier = { beforeHours: number; refundPercent: number };
 
@@ -43,11 +43,13 @@ export class BookingsService {
     private db: PrismaService,
     private repo: BookingsRepository,
     private redis: RedisService,
-    private queue: QueueService,
+    private queue: BookingJobsService,
     private availability: AvailabilityService,
     private earnings: EarningsService,
     private settings: SettingsService,
   ) {}
+
+  adminList() { return this.repo.adminList(); }
 
   async create(
     studentId: string,

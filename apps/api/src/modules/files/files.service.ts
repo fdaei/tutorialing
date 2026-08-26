@@ -1,11 +1,10 @@
-import { Injectable } from '@nestjs/common';
-import { GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { Inject, Injectable } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import type { Readable } from 'stream';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { badRequest, notFound, assertDomain, requireValue } from '../../common';
 import { filesConfig } from '../../config/files.config';
+import { OBJECT_STORAGE, ObjectStorage } from './object-storage.port';
 
 const allowed = new Set([
   'image/jpeg',
@@ -25,17 +24,7 @@ const allowed = new Set([
 @Injectable()
 export class FilesService {
   private readonly cfg = filesConfig();
-  private readonly s3 = new S3Client({
-    region: this.cfg.region,
-    endpoint: this.cfg.endpoint,
-    forcePathStyle: this.cfg.forcePathStyle,
-    credentials: {
-      accessKeyId: this.cfg.accessKey,
-      secretAccessKey: this.cfg.secretKey,
-    },
-  });
-
-  constructor(private readonly db: PrismaService) {}
+  constructor(private readonly db: PrismaService, @Inject(OBJECT_STORAGE) private readonly storage: ObjectStorage) {}
 
   async createUpload(
     ownerId: string,
@@ -52,17 +41,7 @@ export class FilesService {
         .slice(0, 8) || 'bin';
     const key = `${ownerId}/${data.purpose}/${randomUUID()}.${ext}`;
     const file = await this.db.storedFile.create({ data: { ownerId, key, ...data, status: 'PENDING' } });
-    const uploadUrl = await getSignedUrl(
-      this.s3,
-      new PutObjectCommand({
-        Bucket: this.cfg.bucket,
-        Key: key,
-        ContentType: data.mimeType,
-        ContentLength: data.size,
-        Metadata: { checksum: data.checksum },
-      }),
-      { expiresIn: this.cfg.uploadUrlTtlSeconds },
-    );
+    const uploadUrl = await this.storage.createUploadUrl({ key, contentType: data.mimeType, contentLength: data.size, checksum: data.checksum });
     return { fileId: file.id, uploadUrl, expiresIn: this.cfg.uploadUrlTtlSeconds };
   }
 
@@ -71,16 +50,7 @@ export class FilesService {
       notFound('UPLOAD_NOT_FOUND'),
     );
     assertDomain(checksum && checksum === file.checksum, () => badRequest('UPLOAD_CHECKSUM_MISMATCH'));
-    await this.s3.send(
-      new PutObjectCommand({
-        Bucket: this.cfg.bucket,
-        Key: file.key,
-        Body: body,
-        ContentType: file.mimeType,
-        ContentLength: file.size,
-        Metadata: { checksum: file.checksum },
-      }),
-    );
+    await this.storage.putObject({ key: file.key, body, contentType: file.mimeType, contentLength: file.size, checksum: file.checksum });
     return { ok: true };
   }
 
@@ -88,16 +58,12 @@ export class FilesService {
     const file = requireValue(await this.db.storedFile.findFirst({ where: { id, ownerId } }), () =>
       notFound('UPLOAD_NOT_FOUND'),
     );
-    let head;
-    try {
-      head = await this.s3.send(new HeadObjectCommand({ Bucket: this.cfg.bucket, Key: file.key }));
-    } catch {
-      throw badRequest('UPLOAD_CONTENT_MISSING');
-    }
+    const head = await this.storage.headObject(file.key);
+    if (!head) throw badRequest('UPLOAD_CONTENT_MISSING');
     if (
-      head.ContentLength !== file.size ||
-      head.ContentType !== file.mimeType ||
-      head.Metadata?.checksum !== file.checksum
+      head.contentLength !== file.size ||
+      head.contentType !== file.mimeType ||
+      head.checksum !== file.checksum
     ) {
       await this.db.storedFile.update({ where: { id }, data: { status: 'QUARANTINED' } });
       throw badRequest('UPLOAD_VALIDATION_FAILED');
@@ -126,9 +92,7 @@ export class FilesService {
       () => notFound('FILE_NOT_FOUND'),
     );
     return {
-      url: await getSignedUrl(this.s3, new GetObjectCommand({ Bucket: this.cfg.bucket, Key: file.key }), {
-        expiresIn: this.cfg.downloadUrlTtlSeconds,
-      }),
+      url: await this.storage.createDownloadUrl(file.key),
       expiresIn: this.cfg.downloadUrlTtlSeconds,
     };
   }

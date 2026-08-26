@@ -1,10 +1,12 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { ReviewStatus } from '@prisma/client';
-import { Authorize, CurrentUser, Roles, type AuthUser } from '../../common';
+import { CurrentUser, Roles, type AuthUser } from '../../common';
+import { PermissionKeys, RequirePermissions } from '../auth/authorization';
 import { ReviewsService } from './reviews.service';
 import { CreateReviewDto } from './dto/request/create-review.dto';
 import { ModerateReviewDto } from './dto/request/moderate-review.dto';
 import { ReplyReviewDto } from './dto/request/reply-review.dto';
+import { ApiTags } from '@nestjs/swagger';
 
 @Controller('reviews')
 export class ReviewsController {
@@ -21,8 +23,10 @@ export class ReviewsController {
   }
 }
 
-@Authorize(['ADMIN', 'STAFF'], ['reviews.manage'])
+@Roles('ADMIN', 'STAFF')
+@RequirePermissions(PermissionKeys.Reviews.Manage)
 @Controller('admin/reviews')
+@ApiTags('admin')
 export class AdminReviewsController {
   constructor(private readonly service: ReviewsService) {}
   @Get() list(

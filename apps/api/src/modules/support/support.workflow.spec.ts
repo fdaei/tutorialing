@@ -1,13 +1,18 @@
 import { SupportService } from './support.service';
 
+const smsProvider = { configured: false, sendLookup: jest.fn() } as any;
+
 describe('SupportService status and assignment history', () => {
   it('limits a regular user ticket list to tickets owned by that user', async () => {
     const findMany = jest.fn().mockResolvedValue([]);
     const count = jest.fn().mockResolvedValue(0);
-    const service = new SupportService({
-      ticket: { findMany, count },
-      $transaction: jest.fn().mockResolvedValue([[], 0]),
-    } as any);
+    const service = new SupportService(
+      {
+        ticket: { findMany, count },
+        $transaction: jest.fn().mockResolvedValue([[], 0]),
+      } as any,
+      smsProvider,
+    );
 
     await service.list('student-1', ['STUDENT'], { page: 1, pageSize: 20 });
 
@@ -27,7 +32,7 @@ describe('SupportService status and assignment history', () => {
       ticketReply: { create: jest.fn() },
       notification: { create: jest.fn() },
     };
-    const service = new SupportService({ $transaction: jest.fn((callback) => callback(tx)) } as any);
+    const service = new SupportService({ $transaction: jest.fn((callback) => callback(tx)) } as any, smsProvider);
     await service.changeStatus('support-1', ['SUPPORT'], 'ticket-1', 'IN_PROGRESS');
     expect(tx.ticketStatusHistory.create).toHaveBeenCalledWith({
       data: expect.objectContaining({ fromStatus: 'OPEN', toStatus: 'IN_PROGRESS', actorId: 'support-1' }),
@@ -60,7 +65,7 @@ describe('SupportService status and assignment history', () => {
       $transaction: jest.fn((callback) => callback(tx)),
       notificationPreference: { findUnique: jest.fn().mockResolvedValue({ sms: false }) },
     } as any;
-    const service = new SupportService(db);
+    const service = new SupportService(db, smsProvider);
     await service.assign('admin-1', ['ADMIN'], 'ticket-1', 'support-2');
     expect(tx.ticketAssignmentHistory.create).toHaveBeenCalledWith({
       data: expect.objectContaining({ fromAssigneeId: null, toAssigneeId: 'support-2', actorId: 'admin-1' }),
@@ -72,7 +77,14 @@ describe('SupportService status and assignment history', () => {
 });
 
 describe('SupportService.detail (SEC-210)', () => {
-  const TICKET = { id: 'ticket-1', userId: 'user-a', subject: 'Help', replies: [], statusHistory: [], assignmentHistory: [] };
+  const TICKET = {
+    id: 'ticket-1',
+    userId: 'user-a',
+    subject: 'Help',
+    replies: [],
+    statusHistory: [],
+    assignmentHistory: [],
+  };
 
   /** Mirrors `detail()`'s real `where` shape (`id` plus, for a non-staff
    * caller, `userId`) closely enough that a different authenticated user
@@ -82,7 +94,7 @@ describe('SupportService.detail (SEC-210)', () => {
       const matches = where.id === TICKET.id && (where.userId === undefined || where.userId === TICKET.userId);
       return Promise.resolve(matches ? TICKET : null);
     });
-    const service = new SupportService({ ticket: { findFirst } } as any);
+    const service = new SupportService({ ticket: { findFirst } } as any, smsProvider);
     return { service, findFirst };
   }
 

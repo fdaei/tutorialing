@@ -5,6 +5,13 @@ import { PrismaService } from '../../infrastructure/database/prisma.service';
 export class BookingsRepository {
   constructor(private readonly prisma: PrismaService) {}
 
+  adminList() {
+    return this.prisma.booking.findMany({
+      include: { student: { select: { name: true, phone: true } }, teacher: { select: { nameFa: true, nameEn: true, slug: true } }, payment: true, classRecord: true },
+      orderBy: { startsAt: 'desc' }, take: 200,
+    });
+  }
+
   findById(id: string) {
     return this.prisma.booking.findUnique({
       where: { id },
