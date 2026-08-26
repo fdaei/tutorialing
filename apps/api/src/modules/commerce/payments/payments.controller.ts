@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
-import { Authorize, CurrentUser, PublicRateLimit, RateLimit, RATE_LIMIT_TIERS, type AuthUser } from '../../../common';
+import { CurrentUser, PublicRateLimit, RateLimit, RATE_LIMIT_TIERS, Roles, type AuthUser } from '../../../common';
+import { PermissionKeys, RequirePermissions } from '../../auth/authorization';
 import { PaymentsService } from './payments.service';
 import { WalletService } from './wallet.service';
 import { RefundsService } from './refunds.service';
@@ -46,7 +47,8 @@ export class PaymentsController {
     return this.walletSvc.invoices(u.id);
   }
 
-  @Authorize(['ADMIN', 'FINANCE'], ['payments.refund'])
+  @Roles('ADMIN', 'FINANCE')
+  @RequirePermissions(PermissionKeys.Payments.Refund)
   @RateLimit(RATE_LIMIT_TIERS.moneyAdjacent)
   @Post(':id/refunds')
   refund(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() d: RefundDto) {

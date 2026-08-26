@@ -1,6 +1,6 @@
 import type { SignOptions } from 'jsonwebtoken';
 import { config } from './index';
-import { runtimeEnvironment } from '../common/utils';
+import { runtimeEnvironment } from '../common/types';
 
 export function authConfig() {
   const env = config();

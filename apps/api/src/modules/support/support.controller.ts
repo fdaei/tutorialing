@@ -1,19 +1,22 @@
 import { Body, Controller, Get, Param, Patch, Post, Put, Query } from '@nestjs/common';
-import { Authorize, CurrentUser, Public, type AuthUser } from '../../common';
+import { CurrentUser, Public, Roles, type AuthUser } from '../../common';
+import { PermissionKeys, RequirePermissions } from '../auth/authorization';
 import { SupportService } from './support.service';
 import { TicketDto } from './dto/request/ticket.dto';
 import { ReplyDto } from './dto/request/reply.dto';
 import { StatusDto } from './dto/request/status.dto';
 import { AssignmentDto } from './dto/request/assignment.dto';
+import { SettingsService } from '../settings/settings.service';
+import { ContentService } from '../content/content.service';
 
 @Controller('support')
 export class SupportController {
-  constructor(private s: SupportService) {}
+  constructor(private s: SupportService, private settingsService: SettingsService, private contentService: ContentService) {}
   @Public() @Get('public-settings') settings() {
-    return this.s.settings();
+    return this.settingsService.publicSettings();
   }
   @Public() @Get('pages/:slug') page(@Param('slug') slug: string) {
-    return this.s.page(slug);
+    return this.contentService.publishedPage(slug);
   }
   @Post('tickets') create(@CurrentUser() u: AuthUser, @Body() d: TicketDto) {
     return this.s.create(u.id, u.roles, d);
@@ -27,14 +30,14 @@ export class SupportController {
   @Post('tickets/:id/replies') reply(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() d: ReplyDto) {
     return this.s.reply(u.id, u.roles, id, d);
   }
-  @Authorize(['ADMIN', 'STAFF', 'SUPPORT'], ['tickets.manage']) @Patch('tickets/:id/status') status(
+  @Roles('ADMIN', 'STAFF', 'SUPPORT') @RequirePermissions(PermissionKeys.Tickets.Manage) @Patch('tickets/:id/status') status(
     @CurrentUser() u: AuthUser,
     @Param('id') id: string,
     @Body() d: StatusDto,
   ) {
     return this.s.changeStatus(u.id, u.roles, id, d.status, d.note);
   }
-  @Authorize(['ADMIN', 'STAFF', 'SUPPORT'], ['tickets.manage']) @Patch('tickets/:id/assignment') assign(
+  @Roles('ADMIN', 'STAFF', 'SUPPORT') @RequirePermissions(PermissionKeys.Tickets.Manage) @Patch('tickets/:id/assignment') assign(
     @CurrentUser() u: AuthUser,
     @Param('id') id: string,
     @Body() d: AssignmentDto,

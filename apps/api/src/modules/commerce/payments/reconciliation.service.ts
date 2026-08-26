@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import type { Payment } from '@prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
-import { RedisService } from '../../../infrastructure/cache/redis.service';
+import { RedisService } from '../../../infrastructure/redis/redis.service';
 import { GatewayService } from './gateway.service';
 import { PaymentsService } from './payments.service';
 

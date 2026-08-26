@@ -17,6 +17,8 @@ import { AutoDiscountsService } from './discounts/auto-discounts.service';
 
 import { PackagesController } from './packages/packages.controller';
 import { PackagesService } from './packages/packages.service';
+import { AdminCommerceController } from './admin-commerce.controller';
+import { AdminCommerceService } from './admin-commerce.service';
 
 /**
  * Money. Grouped into four concerns that map onto the sub-folders:
@@ -25,7 +27,7 @@ import { PackagesService } from './packages/packages.service';
  * automatic rules) and `packages/` (sellable session bundles).
  */
 @Module({
-  controllers: [PaymentsController, PackagesController, PayoutsController, TeacherFinanceController],
+  controllers: [PaymentsController, PackagesController, PayoutsController, TeacherFinanceController, AdminCommerceController],
   providers: [
     PaymentsService,
     GatewayService,
@@ -37,6 +39,7 @@ import { PackagesService } from './packages/packages.service';
     DiscountsService,
     AutoDiscountsService,
     PackagesService,
+    AdminCommerceService,
   ],
   exports: [
     PaymentsService,

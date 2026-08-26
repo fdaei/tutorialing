@@ -7,6 +7,7 @@ import { PricingService } from './pricing.service';
 import { AdminPricingController, TeacherPricingController } from './pricing.controller';
 import { ReviewsService } from './reviews.service';
 import { AdminReviewsController, ReviewsController } from './reviews.controller';
+import { AdminTeachersController } from './admin-teachers.controller';
 
 @Module({
   controllers: [
@@ -17,6 +18,7 @@ import { AdminReviewsController, ReviewsController } from './reviews.controller'
     AdminPricingController,
     ReviewsController,
     AdminReviewsController,
+    AdminTeachersController,
   ],
   providers: [TeachersService, VerificationService, PricingService, ReviewsService],
   exports: [TeachersService, PricingService, ReviewsService],

@@ -1,5 +1,6 @@
 import { Body, Controller, Param, Post, Put } from '@nestjs/common';
-import { Authorize, CurrentUser, Roles, type AuthUser } from '../../common';
+import { CurrentUser, Roles, type AuthUser } from '../../common';
+import { PermissionKeys, RequirePermissions } from '../auth/authorization';
 import { VerificationService } from './verification.service';
 import { DocumentDto } from './dto/request/document.dto';
 import { ResubmitDto } from './dto/request/resubmit.dto';
@@ -28,7 +29,7 @@ export class VerificationController {
   ) {
     return this.service.introVideo(user.id, body.fileId);
   }
-  @Authorize(['ADMIN', 'STAFF'], ['teachers.verify']) @Post('admin/verification-items/:id/review') review(
+  @Roles('ADMIN', 'STAFF') @RequirePermissions(PermissionKeys.Teachers.Verify) @Post('admin/verification-items/:id/review') review(
     @CurrentUser() user: AuthUser,
     @Param('id') id: string,
     @Body() body: ReviewDto,

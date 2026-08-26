@@ -29,6 +29,74 @@ function harness(options: { balanceCredit?: number; balanceDebit?: number; pendi
 
 const p2002 = Object.assign(new Prisma.PrismaClientKnownRequestError('unique', { code: 'P2002', clientVersion: '6' }), {});
 
+describe('PayoutsService.approvePayout (PERF-305)', () => {
+  const items = Array.from({ length: 12 }, (_, index) => ({
+    id: `item-${index}`,
+    earningId: `earning-${index}`,
+    teacherId: `teacher-${index % 3}`,
+    amount: 10_000 + index,
+  }));
+
+  function approvalHarness(teachers = Array.from({ length: 3 }, (_, index) => ({ id: `teacher-${index}`, userId: `user-${index}` }))) {
+    const tx = {
+      payoutBatch: {
+        findUniqueOrThrow: jest.fn().mockResolvedValue({ id: 'batch-1', status: 'DRAFT', items }),
+        update: jest.fn().mockResolvedValue({ id: 'batch-1', status: 'TRANSFERRED' }),
+      },
+      earning: { updateMany: jest.fn().mockResolvedValue({ count: items.length }) },
+      teacher: {
+        findMany: jest.fn().mockResolvedValue(teachers),
+        findUniqueOrThrow: jest.fn().mockRejectedValue(new Error('missing teacher')),
+      },
+      walletEntry: { createMany: jest.fn().mockResolvedValue({ count: items.length }) },
+    };
+    const db = { $transaction: jest.fn((fn: (client: typeof tx) => unknown) => fn(tx)) };
+    return { service: new PayoutsService(db as never), tx };
+  }
+
+  it('batches teacher resolution and wallet debits instead of issuing two statements per item', async () => {
+    const { service, tx } = approvalHarness();
+
+    await service.approvePayout('batch-1', 'finance-1', 'bank-reference');
+
+    expect(tx.teacher.findMany).toHaveBeenCalledTimes(1);
+    expect(tx.teacher.findMany).toHaveBeenCalledWith({
+      where: { id: { in: ['teacher-0', 'teacher-1', 'teacher-2'] } },
+      select: { id: true, userId: true },
+    });
+    expect(tx.teacher.findUniqueOrThrow).not.toHaveBeenCalled();
+    expect(tx.walletEntry.createMany).toHaveBeenCalledTimes(1);
+    expect(tx.walletEntry.createMany).toHaveBeenCalledWith({
+      data: expect.arrayContaining([
+        expect.objectContaining({ userId: 'user-0', referenceId: 'item-0', idempotencyKey: 'payout-debit:item-0' }),
+      ]),
+      skipDuplicates: true,
+    });
+  });
+
+  it('preserves idempotency through unique keys and skipDuplicates', async () => {
+    const { service, tx } = approvalHarness();
+
+    await service.approvePayout('batch-1', 'finance-1', 'bank-reference');
+
+    const data = tx.walletEntry.createMany.mock.calls[0][0].data;
+    expect(new Set(data.map((row: { idempotencyKey: string }) => row.idempotencyKey)).size).toBe(items.length);
+    expect(tx.walletEntry.createMany.mock.calls[0][0].skipDuplicates).toBe(true);
+  });
+
+  it('fails before creating debits when a payout item references a missing teacher', async () => {
+    const { service, tx } = approvalHarness([{ id: 'teacher-0', userId: 'user-0' }]);
+
+    await expect(service.approvePayout('batch-1', 'finance-1', 'bank-reference')).rejects.toThrow('missing teacher');
+
+    expect(tx.teacher.findUniqueOrThrow).toHaveBeenCalledWith({
+      where: { id: 'teacher-1' },
+      select: { userId: true },
+    });
+    expect(tx.walletEntry.createMany).not.toHaveBeenCalled();
+  });
+});
+
 describe('PayoutsService.requestWithdrawal', () => {
   it('runs the balance-check transaction at Serializable isolation (FIN-003)', async () => {
     const h = harness();

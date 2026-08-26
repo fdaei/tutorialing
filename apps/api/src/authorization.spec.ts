@@ -48,7 +48,7 @@ const HTTP = /@(Get|Post|Patch|Put|Delete)\(\s*(?:'([^']*)')?\s*\)/g;
 
 function parseRoutes(): Route[] {
   const out: Route[] = [];
-  for (const file of controllerFiles(join(SRC, 'modules'))) {
+  for (const root of ['modules', 'application', 'system']) for (const file of controllerFiles(join(SRC, root))) {
     const src = readFileSync(file, 'utf8');
     const controllers = [...src.matchAll(CONTROLLER)];
     controllers.forEach((ctrl, index) => {
@@ -67,7 +67,7 @@ function parseRoutes(): Route[] {
       // individually — recognise them as equivalent so a route using the
       // composed form isn't misread as having no access decision.
       const classRoles = /@Roles\(|@Authorize\(/.test(classDecorators);
-      const classPerms = /@Permissions\(|@Authorize\(/.test(classDecorators);
+      const classPerms = /@Permissions\(|@RequirePermissions\(|@Authorize\(/.test(classDecorators);
       const classPublic = /@Public\(\)|@PublicRateLimit\(/.test(classDecorators);
 
       const body = src.slice(bodyStart, bodyEnd);
@@ -82,7 +82,7 @@ function parseRoutes(): Route[] {
           file: relative(SRC, file),
           public: classPublic || /@Public\(\)|@PublicRateLimit\(/.test(seg),
           roles: classRoles || /@Roles\(|@Authorize\(/.test(seg),
-          permissions: classPerms || /@Permissions\(|@Authorize\(/.test(seg),
+          permissions: classPerms || /@Permissions\(|@RequirePermissions\(|@Authorize\(/.test(seg),
           rateLimited: /@RateLimit\(|@PublicRateLimit\(/.test(seg),
         });
       });
@@ -165,5 +165,25 @@ describe('route authorization matrix', () => {
       expect(route).toBeDefined();
       expect(route?.rateLimited).toBe(true);
     }
+  });
+
+  it('protects every distributed /admin route and keeps its controller discoverable', () => {
+    const adminRoutes = routes.filter((route) => route.path === '/admin' || route.path.startsWith('/admin/'));
+    expect(adminRoutes.length).toBeGreaterThan(15);
+    expect(adminRoutes.filter((route) => route.public || (!route.roles && !route.permissions))).toEqual([]);
+    expect(adminRoutes.filter((route) => !/class\s+Admin\w*Controller/.test(readFileSync(join(SRC, route.file), 'utf8')))).toEqual([]);
+  });
+
+  it('preserves the decomposed legacy admin route surface without duplicates', () => {
+    const adminKeys = routes.filter((route) => route.path.startsWith('/admin')).map(key);
+    expect(new Set(adminKeys).size).toBe(adminKeys.length);
+    expect(adminKeys).toEqual(expect.arrayContaining([
+      'GET /admin/dashboard', 'GET /admin/users', 'GET /admin/users/:id', 'POST /admin/users',
+      'PATCH /admin/users/:id/status', 'PATCH /admin/users/:id/roles', 'GET /admin/teacher-applications',
+      'POST /admin/teacher-applications/:id/transition', 'GET /admin/bookings', 'GET /admin/tickets',
+      'GET /admin/notification-deliveries', 'GET /admin/roles', 'GET /admin/permissions', 'POST /admin/roles',
+      'POST /admin/roles/revoke', 'POST /admin/permissions/grant', 'GET /admin/reports', 'GET /admin/audit-logs',
+      'GET /admin/payments', 'GET /admin/settings', 'PUT /admin/settings/:key', 'GET /admin/cms', 'PUT /admin/cms/:slug',
+    ]));
   });
 });

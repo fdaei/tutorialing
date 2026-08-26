@@ -1,11 +1,11 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { Prisma, type Payment, type PaymentStatus } from '@prisma/client';
 import { PrismaService, Tx } from '../../../infrastructure/database/prisma.service';
-import { RedisService } from '../../../infrastructure/cache/redis.service';
+import { RedisService } from '../../../infrastructure/redis/redis.service';
 import { badRequest, conflict, isPrismaKnownError, notFound, runtimeEnvironment } from '../../../common';
 import { config } from '../../../config';
 import { paymentConfig } from '../../../config/payment.config';
-import { QueueService } from '../../queue/queue.service';
+import { BookingJobsService } from '../../bookings/booking-jobs.service';
 import { GatewayService } from './gateway.service';
 import { WalletService } from './wallet.service';
 import { PayDto } from '../dto/request/payments.dto';
@@ -17,7 +17,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
   private reconciliationTimer?: NodeJS.Timeout;
   constructor(
     private db: PrismaService,
-    private queue: QueueService,
+    private queue: BookingJobsService,
     private gateway: GatewayService,
     private wallet: WalletService,
     private autoDiscounts: AutoDiscountsService,

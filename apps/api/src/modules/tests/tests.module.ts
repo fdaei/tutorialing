@@ -1,9 +1,0 @@
-import { Module } from '@nestjs/common';
-import { TestsController, ExaminerController, TestBuilderController } from './tests.controller';
-import { TestsService } from './tests.service';
-import { ScoringService } from './scoring.service';
-@Module({
-  controllers: [TestsController, ExaminerController, TestBuilderController],
-  providers: [TestsService, ScoringService],
-})
-export class TestsModule {}

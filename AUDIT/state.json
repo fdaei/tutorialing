@@ -2,7 +2,7 @@
   "$comment": "Audit state for the Prompt-1 methodology run started 2026-08-08. The previous schema-documentation pass's state was preserved as AUDIT/state.schema-pass.json.",
   "phase": 3,
   "phaseName": "Backend performance and scalability audit",
-  "status": "Phase 1 deliverable written (financial). Phase 2 (security) complete and committed at 501f150: SEC-207 (privilege escalation, high), SEC-208 (search over-exposure, medium), SEC-209 (refresh-token timing safety, low), SEC-210 (self-scoped IDOR regression coverage, low) all fixed. SEC-201/202/204 remain open/accepted per the report (dependency currency, upload sniffing, accepted risk). SEC-211/RBAC-001/TEST-001 documented, not fixed, per user instruction. Phase 3 (performance) report written (AUDIT/performance-phase-3-report.md, PERF-301..313). Batch 1 complete and committed by responsibility: PERF-301/302/303 at 707a9b7, PERF-306 at b250133, and PERF-312 at e280c99. New finding PERF-314 discovered and documented (not fixed) during Batch 1. PERF-310 (caching) deliberately not implemented; reassessed in the batch-1 report and downgraded from the original report's HIGH severity now that PERF-301/306's root causes are fixed - no candidate currently rises above CACHE OPTIONAL. Batch 2 has not started and requires explicit approval.",
+  "status": "Phase 1 deliverable written (financial). Phase 2 (security) complete at 501f150. Phase 3 source report committed unchanged at 459ed1d. Batch 1 complete and committed: PERF-301/302/303 at 707a9b7, PERF-306 at b250133, PERF-312 at e280c99, results at 6f1dbe4. Batch 2 investigated PERF-304/305/308/314: PERF-304 and PERF-305 are fixed and fully gated but intentionally UNCOMMITTED for review; PERF-308 is CONFIG REQUIRED pending production topology; PERF-314 is ACCEPT/NO ACTION because current Prisma relation reads are fixed-count batched queries and join loading is preview-gated with row-multiplication risk. PERF-307/309/310/311/313 were investigated and deferred. PERF-310 remains CACHE OPTIONAL. Batch 3 has not started.",
   "baselineCommit": "ebdb499",
   "startedAt": "2026-08-08",
   "priorPasses": {
@@ -264,6 +264,38 @@
       "gates": "typecheck/lint/build green; 281 api tests / 24 web tests"
     },
     {
+      "id": "PERF-304",
+      "severity": "MEDIUM",
+      "category": "performance",
+      "title": "User listings have no indexes supporting their chronological sorts",
+      "location": "apps/api/prisma/schema.prisma User; AdminRepository.getUsers(); SearchService.users()",
+      "impact": "Admin default pages sort by createdAt and staff search default pages sort by updatedAt; both require a full sort/table traversal at scale.",
+      "status": "fixed (uncommitted - Batch 2 review)",
+      "verified": true,
+      "phase": 3,
+      "batch": 2,
+      "report": "AUDIT/performance-phase-3-report.md PERF-304, AUDIT/performance-phase-3-batch-2-results.md PERF-304",
+      "fix": "Added standalone User [createdAt] and [updatedAt] indexes after verifying that the historical [status, updatedAt] hypothesis did not match either default query completely.",
+      "evidence": "Before: Seq Scan + Sort for both default paths. After with enable_seqscan=off on the 28-row dev table: Index Scan Backward on User_createdAt_idx and User_updatedAt_idx respectively. Absolute production improvement not reliably measurable locally.",
+      "gates": "typecheck/lint/build green; 284 api tests / 24 web tests; authorization 5/5; architecture 4/4"
+    },
+    {
+      "id": "PERF-305",
+      "severity": "MEDIUM-HIGH",
+      "category": "performance",
+      "title": "Payout transfer performs two sequential SQL operations per item inside one transaction",
+      "location": "apps/api/src/modules/commerce/payouts/payouts.service.ts approvePayout()",
+      "impact": "Back-office transfer latency and transaction duration grew linearly with payout item count.",
+      "status": "fixed (uncommitted - Batch 2 review)",
+      "verified": true,
+      "phase": 3,
+      "batch": 2,
+      "report": "AUDIT/performance-phase-3-report.md PERF-305, AUDIT/performance-phase-3-batch-2-results.md PERF-305",
+      "fix": "Batch unique teacher lookup once and insert all wallet debits with createMany(skipDuplicates), preserving unique idempotency keys and missing-teacher fail-fast behavior; no concurrency introduced.",
+      "evidence": "Measured deterministic delegate/statement count for 12 items: 12 teacher reads + 12 insert-only upserts (24) to one findMany + one createMany (2).",
+      "gates": "3 new regression tests; full API 284/284; targeted payout/reconciliation/money 29/29"
+    },
+    {
       "id": "PERF-306",
       "severity": "MEDIUM-HIGH",
       "category": "performance",
@@ -279,6 +311,76 @@
       "evidence": "Measured (not estimated) via Prisma query-event instrumentation against the live seeded DB: 84 SQL statements before (12 real candidates x 7 statements each) vs 5 statements after (constant, independent of candidate count) - a 94% reduction at N=12, improving further toward the endpoint's N=40 cap. Full e2e POST /api/matching test, followed by a real booking against a returned slot, both pass.",
       "regression_tests": "matching.service.spec.ts (asserts slotsForCandidates called exactly once, not per-candidate); availability.service.spec.ts new 'AvailabilityService.slotsForCandidates (PERF-306)' describe block (per-candidate isolation + batched-query-count assertions)",
       "gates": "typecheck/lint/build green; 281 api tests / 24 web tests; e2e 5/6 pass (the 1 failure is the pre-existing, unrelated TEST-001)"
+    },
+    {
+      "id": "PERF-307",
+      "severity": "LOW-MEDIUM",
+      "category": "performance",
+      "title": "Payment reconciliation sweeps process external provider calls sequentially",
+      "location": "PaymentsService.reconcilePending(); ReconciliationService.reconcile()",
+      "impact": "Potential background sweep throughput limit, not user-facing request latency.",
+      "status": "deferred - no backlog, provider-limit, or sweep-duration evidence",
+      "verified": true,
+      "phase": 3,
+      "batch": 2,
+      "note": "Current work is bounded and single-flight; concurrency would retain N external calls while bursting Zarinpal and conditional DB work. Add telemetry before reconsidering.",
+      "report": "AUDIT/performance-phase-3-batch-2-results.md"
+    },
+    {
+      "id": "PERF-308",
+      "severity": "LOW-MEDIUM",
+      "category": "performance",
+      "title": "Database connection pool has no explicit production capacity configuration",
+      "location": "DATABASE_URL / PrismaService / deployment configuration",
+      "impact": "Potential exhaustion under horizontal scaling, but no current incident is evidenced.",
+      "status": "config required - no code change",
+      "verified": true,
+      "phase": 3,
+      "batch": 2,
+      "note": "Local PostgreSQL max_connections=100 with 3 reserved; production replica count, worker pools, PgBouncer, DB budget, and concurrency are absent. Do not guess connection_limit/pool_timeout.",
+      "report": "AUDIT/performance-phase-3-batch-2-results.md"
+    },
+    {
+      "id": "PERF-309",
+      "severity": "MEDIUM",
+      "category": "performance",
+      "title": "OTP response waits for the SMS provider",
+      "location": "AuthService.requestOtp(); SmsService.sendOtp()",
+      "impact": "Kavenegar latency is user-visible, but synchronous provider acceptance is part of the current fail-closed contract.",
+      "status": "deferred - product decision required",
+      "verified": true,
+      "phase": 3,
+      "batch": 2,
+      "note": "Queueing would require a pending state, retries, duplicate handling, and failure UX; it is not a latency-only refactor.",
+      "report": "AUDIT/performance-phase-3-batch-2-results.md"
+    },
+    {
+      "id": "PERF-310",
+      "severity": "CACHE OPTIONAL",
+      "category": "performance",
+      "title": "Optional caching opportunities for selected public reads",
+      "location": "teacher directory/profile, languages, public settings, CMS pages",
+      "impact": "Could reduce DB traffic under proven production read volume; underlying query defects are already fixed.",
+      "status": "not implemented - CACHE OPTIONAL",
+      "verified": true,
+      "phase": 3,
+      "batch": 2,
+      "note": "Redis availability alone is not justification. Financial, authorization, availability, and authenticated user-specific state remain DO NOT CACHE.",
+      "report": "AUDIT/performance-phase-3-batch-1-results.md, AUDIT/performance-phase-3-batch-2-results.md"
+    },
+    {
+      "id": "PERF-311",
+      "severity": "LOW-MEDIUM",
+      "category": "performance",
+      "title": "Public responses have no explicit client/CDN cache policy",
+      "location": "public GET controllers",
+      "impact": "Repeat requests cannot be reused by clients/CDNs, but deployed CDN and freshness requirements are unspecified.",
+      "status": "deferred - cache policy required",
+      "verified": true,
+      "phase": 3,
+      "batch": 2,
+      "note": "No Cache-Control header added without approved staleness and invalidation decisions.",
+      "report": "AUDIT/performance-phase-3-batch-2-results.md"
     },
     {
       "id": "PERF-312",
@@ -297,18 +399,32 @@
       "gates": "typecheck/lint/build green; 281 api tests / 24 web tests"
     },
     {
+      "id": "PERF-313",
+      "severity": "LOW",
+      "category": "performance",
+      "title": "Local Compose services have no resource limits",
+      "location": "docker-compose.yml",
+      "impact": "Unknown for production because this repository does not expose the production scheduler/resource model.",
+      "status": "no action - production deployment evidence required",
+      "verified": true,
+      "phase": 3,
+      "batch": 2,
+      "note": "Do not infer production CPU/memory/shm settings from local infrastructure Compose.",
+      "report": "AUDIT/performance-phase-3-batch-2-results.md"
+    },
+    {
       "id": "PERF-314",
       "severity": "LOW-MEDIUM",
       "category": "performance",
       "title": "Prisma issues one SQL statement per included to-many relation instead of a single joined query",
       "location": "general - confirmed via apps/api/src/modules/bookings/availability.service.ts's teacher.findFirst include shape (4 to-many relations = 5 SQL statements, not 1)",
       "impact": "Not specific to AvailabilityService - any service using include with multiple to-many relations pays this per-call cost. Blast radius across the codebase not sized this pass (would require its own grep/audit).",
-      "status": "open - documented only, not fixed",
+      "status": "accepted - no action after Batch 2 measurement",
       "verified": true,
       "phase": 3,
       "batch": 1,
-      "note": "Discovered while investigating PERF-306. Registered rather than fixed to avoid expanding Batch 1's approved scope. Recommended for Batch 2: evaluate Prisma's relationLoadStrategy: 'join' (PostgreSQL) as a global or per-query opt-in - a genuine architectural decision, not a drop-in fix.",
-      "report": "AUDIT/performance-phase-3-batch-1-results.md PERF-314"
+      "note": "Measured admin includes use a fixed 2-6 batched SQL statements depending on included relations, not one query per root row. Installed Prisma 6.19.3 rejects relationLoadStrategy without the relationJoins preview feature; JOIN loading can multiply child rows (34 roles/121 permissions produced 144 joined rows locally). No demonstrated latency defect justifies preview enablement or a global JOIN.",
+      "report": "AUDIT/performance-phase-3-batch-1-results.md PERF-314, AUDIT/performance-phase-3-batch-2-results.md PERF-314"
     }
   ],
   "fixed": [
@@ -326,6 +442,16 @@
       "id": "PERF-303",
       "commit": "707a9b7",
       "gates": "typecheck/lint/build green; 281 tests (api), 24 (web)"
+    },
+    {
+      "id": "PERF-304",
+      "commit": "uncommitted (Batch 2 review)",
+      "gates": "typecheck/lint/build green; 284 api tests, 24 web tests; e2e 5/6 identical TEST-001"
+    },
+    {
+      "id": "PERF-305",
+      "commit": "uncommitted (Batch 2 review)",
+      "gates": "typecheck/lint/build green; 284 api tests, 24 web tests; 3 new regression tests"
     },
     {
       "id": "PERF-306",
@@ -405,7 +531,18 @@
       "note": "fixed-window ~2x boundary burst, accepted at current limits"
     }
   ],
-  "next_action": "Phase 3 Batch 1 (PERF-301/302/303/306/312) is implemented, tested, documented in AUDIT/performance-phase-3-batch-1-results.md, and committed by responsibility (707a9b7, b250133, e280c99, plus the audit-documentation commit). Two migrations are applied to the dev DB: 20260826054927_add_payment_ticket_userid_indexes and 20260826055153_teacher_search_trigram_indexes; Prisma reports all 14 migrations applied and the schema up to date. Full gate green (typecheck/lint/build/test 281 api + 24 web; authorization 5/5; architecture 4/4; e2e 5/6, with the identical pre-existing TEST-001 failure at platform.e2e-spec.ts:245). Wait for explicit user approval before starting Batch 2. Potential Batch 2 scope remains PERF-304, PERF-305, PERF-307, PERF-308 re-evaluation, PERF-314, then PERF-310/311 scoped to CACHE OPTIONAL only, then PERF-309/313 pending product/ops decisions. LOAD-001 (inherited) still needs a production-build load test to confirm magnitude. Phase 2 closed at commit 501f150 (SEC-207/208/209/210). Still open, untouched by design: SEC-201, SEC-202, SEC-211, RBAC-001, TEST-001. MIG-001 steps 2-5 still gated on a verified DB backup.",
+  "next_action": "Review uncommitted Phase 3 Batch 2 changes and AUDIT/performance-phase-3-batch-2-results.md. PERF-304 and PERF-305 are fixed; PERF-308 is CONFIG REQUIRED; PERF-314 is ACCEPT/NO ACTION; PERF-307/309/310/311/313 remain deferred. Full gate: 284 API, 24 web, authorization 5/5, architecture 4/4, targeted financial 29/29, typecheck/lint/build/Prisma valid; e2e 5/6 with identical TEST-001 at platform.e2e-spec.ts:245. Migration 20260826103000_add_user_listing_sort_indexes is applied; all 15 migrations are up to date. Do not commit Batch 2 until explicit approval. Do not start Batch 3. LOAD-001, SEC-201/202/211, RBAC-001, TEST-001, and MIG-001 steps 2-5 remain untouched.",
+  "notificationArchitectureReview": {
+    "date": "2026-08-26",
+    "decision": "B — BUILD NARROW MESSAGING INFRASTRUCTURE",
+    "status": "implemented and verified",
+    "review": "AUDIT/notification-architecture-review.md",
+    "implementation": "AUDIT/notification-module-implementation.md",
+    "scope": "Provider-neutral SMS contract and Kavenegar adapter only; Auth OTP ownership and every existing domain transaction/retry/failure semantic preserved.",
+    "deferred": "Central NotificationModule, template registry, email, push, events/outbox, queue changes, persistence changes, preference redesign, and async OTP.",
+    "phase3Isolation": "Existing uncommitted Performance Phase 3 Batch 2 work was preserved; Batch 3 was not started.",
+    "gates": "API typecheck, lint, production build, and all 44 unit/architecture/authorization suites green (291/291 tests)."
+  },
   "approvedChanges": [
     {
       "id": "MIG-001",

@@ -81,28 +81,37 @@ export class PayoutsService {
       // completed. Transferring it to their bank account takes it back out, so
       // the wallet keeps showing what the platform still owes them rather than
       // counting the same earning twice.
-      if (reference) {
-        for (const item of batch.items) {
-          const teacher = await tx.teacher.findUniqueOrThrow({
-            where: { id: item.teacherId },
-            select: { userId: true },
-          });
-          await tx.walletEntry.upsert({
-            where: { idempotencyKey: `payout-debit:${item.id}` },
-            create: {
-              userId: teacher.userId,
-              transactionId: `tx_${batch.id}`,
-              account: 'user_wallet',
-              direction: 'DEBIT',
-              amount: item.amount,
-              description: 'payout transferred to bank account',
-              referenceType: 'PayoutItem',
-              referenceId: item.id,
-              idempotencyKey: `payout-debit:${item.id}`,
-            },
-            update: {},
-          });
+      if (reference && batch.items.length) {
+        const teacherIds = [...new Set(batch.items.map((item) => item.teacherId))];
+        const teachers = await tx.teacher.findMany({
+          where: { id: { in: teacherIds } },
+          select: { id: true, userId: true },
+        });
+        const userIdByTeacher = new Map(teachers.map((teacher) => [teacher.id, teacher.userId]));
+        // PayoutItem.teacherId predates a database relation. Preserve the old
+        // fail-fast behavior if historical/corrupt data references a missing
+        // teacher, while keeping the normal path to one batched lookup.
+        if (teachers.length !== teacherIds.length) {
+          const missingId = teacherIds.find((teacherId) => !userIdByTeacher.has(teacherId))!;
+          await tx.teacher.findUniqueOrThrow({ where: { id: missingId }, select: { userId: true } });
         }
+        // update: {} made the previous upsert insert-only in practice. The
+        // unique idempotencyKey plus skipDuplicates preserves replay safety in
+        // one set-based INSERT instead of one upsert round trip per item.
+        await tx.walletEntry.createMany({
+          data: batch.items.map((item) => ({
+            userId: userIdByTeacher.get(item.teacherId)!,
+            transactionId: `tx_${batch.id}`,
+            account: 'user_wallet' as const,
+            direction: 'DEBIT' as const,
+            amount: item.amount,
+            description: 'payout transferred to bank account',
+            referenceType: 'PayoutItem',
+            referenceId: item.id,
+            idempotencyKey: `payout-debit:${item.id}`,
+          })),
+          skipDuplicates: true,
+        });
       }
       return tx.payoutBatch.update({
         where: { id },

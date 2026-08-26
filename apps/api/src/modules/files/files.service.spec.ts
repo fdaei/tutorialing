@@ -30,7 +30,8 @@ function harness() {
     return Promise.resolve(matches ? FILE : null);
   });
   const db = { storedFile: { findFirst } };
-  const svc = new FilesService(db as never);
+  const storage = { createDownloadUrl: jest.fn().mockResolvedValue('https://storage.example/file') };
+  const svc = new FilesService(db as never, storage as never);
   return { svc, findFirst };
 }
 

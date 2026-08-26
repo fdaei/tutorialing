@@ -214,6 +214,15 @@ model User {
   ticketReplies           TicketReply[]             @relation("TicketReplyAuthor")
   ticketStatusActions     TicketStatusHistory[]     @relation("TicketStatusActor")
   ticketAssignmentActions TicketAssignmentHistory[] @relation("TicketAssignmentActor")
+
+  // PERF-304: the two user-listing paths use different chronological sorts:
+  // AdminRepository orders by createdAt while SearchService orders by
+  // updatedAt. Standalone indexes cover their unfiltered/default pages and
+  // still let Postgres scan newest-first while applying an optional status
+  // filter; the audit's original [status, updatedAt] hypothesis covered
+  // neither default query completely.
+  @@index([createdAt])
+  @@index([updatedAt])
 }
 
 model Permission {
