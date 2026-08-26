@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { type BlockedPeriod } from '@prisma/client';
+import { type AvailabilityOverride, type AvailabilityRule, type BlockedPeriod, type Booking } from '@prisma/client';
 import { fromZonedTime } from 'date-fns-tz';
 import { PrismaService, type DbClient } from '../../infrastructure/database/prisma.service';
 import { badRequest, conflict, notFound } from '../../common';
@@ -34,6 +34,28 @@ const localInstant = (day: string, minute: number, timezone: string) => {
   const hours = String(Math.floor(minute / 60)).padStart(2, '0');
   const minutes = String(minute % 60).padStart(2, '0');
   return fromZonedTime(`${day}T${hours}:${minutes}:00`, timezone);
+};
+const groupByTeacherId = <T extends { teacherId: string }>(rows: T[]): Map<string, T[]> => {
+  const grouped = new Map<string, T[]>();
+  for (const row of rows) {
+    const bucket = grouped.get(row.teacherId);
+    if (bucket) bucket.push(row);
+    else grouped.set(row.teacherId, [row]);
+  }
+  return grouped;
+};
+
+type AvailabilityRuleRow = Pick<AvailabilityRule, 'weekday' | 'startMinute' | 'endMinute' | 'timezone' | 'breakMinutes'>;
+
+/** What {@link AvailabilityService.slotsForCandidates} needs per teacher — the
+ * scalar fields and active availability rules a caller (the matching
+ * questionnaire) has typically already fetched in its own candidate query. */
+export type AvailabilityCandidate = {
+  id: string;
+  trialDuration: number;
+  lessonDuration: number;
+  breakMinutes: number;
+  availabilityRules: AvailabilityRuleRow[];
 };
 
 @Injectable()
@@ -202,12 +224,7 @@ export class AvailabilityService {
 
   async slots(teacherId: string, from: Date, to: Date, type: SlotType = 'regular'): Promise<AvailabilitySlot[]> {
     this.validateRange(from, to);
-    const [minLeadMinutes, maxAdvanceDays] = await Promise.all([
-      this.settings.numeric('booking.minLeadMinutes', 120, 10_080),
-      this.settings.numeric('booking.maxAdvanceDays', 60, 730),
-    ]);
-    const firstBookable = new Date(Date.now() + minLeadMinutes * 60_000);
-    const lastBookable = new Date(Date.now() + maxAdvanceDays * DAY_MS);
+    const { firstBookable, lastBookable } = await this.bookableWindow();
     const priceField = type === 'trial' ? 'approvedTrialPrice' : 'approvedRegularPrice';
     const teacher = await this.db.teacher.findFirst({
       where: { id: teacherId, status: 'APPROVED', [priceField]: { not: null } },
@@ -225,9 +242,101 @@ export class AvailabilityService {
       },
     });
     if (!teacher) throw notFound('TEACHER_NOT_BOOKABLE');
-    const duration = type === 'trial' ? teacher.trialDuration : teacher.lessonDuration;
-    const timezone = teacher.availabilityRules[0]?.timezone ?? 'Asia/Tehran';
-    const overrides = new Map(teacher.availabilityOverrides.map((row) => [dateKey(row.date), row]));
+    return this.computeSlots({ ...teacher, from, to, type, firstBookable, lastBookable });
+  }
+
+  /**
+   * Batched form of {@link slots} for many teachers at once (the matching
+   * questionnaire's up-to-40-candidate scoring pass — PERF-306). A single
+   * per-teacher `slots()` call re-fetches the teacher row plus four relations
+   * per candidate; here the two global settings and the three per-teacher
+   * relations are each fetched once across every candidate (5 queries total,
+   * regardless of candidate count) instead of once per candidate. Candidates
+   * must already carry their own scalar fields and active `availabilityRules`
+   * (the matching questionnaire's initial teacher query already selects
+   * these), since re-fetching the teacher row itself would defeat the point.
+   */
+  async slotsForCandidates(
+    candidates: AvailabilityCandidate[],
+    from: Date,
+    to: Date,
+    type: SlotType = 'regular',
+  ): Promise<Map<string, AvailabilitySlot[]>> {
+    this.validateRange(from, to);
+    const result = new Map<string, AvailabilitySlot[]>();
+    if (!candidates.length) return result;
+    const { firstBookable, lastBookable } = await this.bookableWindow();
+    const teacherIds = candidates.map((candidate) => candidate.id);
+    const [overrides, blockedPeriods, bookings] = await Promise.all([
+      this.db.availabilityOverride.findMany({
+        where: {
+          teacherId: { in: teacherIds },
+          date: { gte: utcDate(new Date(from.getTime() - DAY_MS)), lte: utcDate(new Date(to.getTime() + DAY_MS)) },
+        },
+      }),
+      this.db.blockedPeriod.findMany({
+        where: { teacherId: { in: teacherIds }, startsAt: { lt: to }, endsAt: { gt: from } },
+      }),
+      this.db.booking.findMany({
+        where: {
+          teacherId: { in: teacherIds },
+          startsAt: { lt: to },
+          endsAt: { gt: from },
+          status: { in: ['PENDING_PAYMENT', 'CONFIRMED'] },
+        },
+      }),
+    ]);
+    const overridesByTeacher = groupByTeacherId(overrides);
+    const blockedPeriodsByTeacher = groupByTeacherId(blockedPeriods);
+    const bookingsByTeacher = groupByTeacherId(bookings);
+    for (const candidate of candidates) {
+      result.set(
+        candidate.id,
+        this.computeSlots({
+          ...candidate,
+          availabilityOverrides: overridesByTeacher.get(candidate.id) ?? [],
+          blockedPeriods: blockedPeriodsByTeacher.get(candidate.id) ?? [],
+          bookings: bookingsByTeacher.get(candidate.id) ?? [],
+          from,
+          to,
+          type,
+          firstBookable,
+          lastBookable,
+        }),
+      );
+    }
+    return result;
+  }
+
+  private async bookableWindow() {
+    const [minLeadMinutes, maxAdvanceDays] = await Promise.all([
+      this.settings.numeric('booking.minLeadMinutes', 120, 10_080),
+      this.settings.numeric('booking.maxAdvanceDays', 60, 730),
+    ]);
+    return {
+      firstBookable: new Date(Date.now() + minLeadMinutes * 60_000),
+      lastBookable: new Date(Date.now() + maxAdvanceDays * DAY_MS),
+    };
+  }
+
+  private computeSlots(params: {
+    trialDuration: number;
+    lessonDuration: number;
+    breakMinutes: number;
+    availabilityRules: AvailabilityRuleRow[];
+    availabilityOverrides: AvailabilityOverride[];
+    blockedPeriods: Array<Pick<BlockedPeriod, 'startsAt' | 'endsAt'>>;
+    bookings: Array<Pick<Booking, 'startsAt' | 'endsAt'>>;
+    from: Date;
+    to: Date;
+    type: SlotType;
+    firstBookable: Date;
+    lastBookable: Date;
+  }): AvailabilitySlot[] {
+    const { from, to, type, firstBookable, lastBookable, blockedPeriods, bookings } = params;
+    const duration = type === 'trial' ? params.trialDuration : params.lessonDuration;
+    const timezone = params.availabilityRules[0]?.timezone ?? 'Asia/Tehran';
+    const overrides = new Map(params.availabilityOverrides.map((row) => [dateKey(row.date), row]));
     const result: AvailabilitySlot[] = [];
     const firstLocalDay = utcDate(zonedDateKey(from, timezone));
     const lastLocalDay = utcDate(zonedDateKey(new Date(to.getTime() - 1), timezone));
@@ -243,14 +352,14 @@ export class AvailabilityService {
                 endMinute: override.endMinute,
                 timezone,
                 lessonDuration: duration,
-                breakMinutes: teacher.breakMinutes,
+                breakMinutes: params.breakMinutes,
               },
             ]
           : []
-        : teacher.availabilityRules.filter((rule) => rule.weekday === weekday);
+        : params.availabilityRules.filter((rule) => rule.weekday === weekday);
       for (const rule of rules) {
         const stepDuration = duration;
-        const breakMinutes = rule.breakMinutes ?? teacher.breakMinutes;
+        const breakMinutes = rule.breakMinutes ?? params.breakMinutes;
         for (
           let minute = rule.startMinute;
           minute + stepDuration <= rule.endMinute;
@@ -262,10 +371,7 @@ export class AvailabilityService {
           // BookingsService.create; otherwise the UI offers a slot that the
           // booking endpoint immediately rejects.
           if (startsAt < from || endsAt > to || startsAt < firstBookable || startsAt > lastBookable) continue;
-          if (
-            this.overlapsAny(startsAt, endsAt, teacher.blockedPeriods) ||
-            this.overlapsAny(startsAt, endsAt, teacher.bookings)
-          )
+          if (this.overlapsAny(startsAt, endsAt, blockedPeriods) || this.overlapsAny(startsAt, endsAt, bookings))
             continue;
           result.push({
             startsAt: startsAt.toISOString(),

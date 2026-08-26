@@ -52,9 +52,19 @@ export class MatchingService {
       },
       take: 40,
     });
+    // PERF-306: availability for all candidates is computed from a handful of
+    // batched queries (see AvailabilityService.slotsForCandidates) instead of
+    // one round of teacher/override/block/booking queries per candidate, so
+    // this loop no longer awaits anything — nothing left to parallelize.
+    const slotsByTeacher = await this.availability.slotsForCandidates(
+      teachers,
+      now,
+      to,
+      data.trialRequired ? 'trial' : 'regular',
+    );
     const candidates = [];
     for (const teacher of teachers) {
-      const slots = await this.availability.slots(teacher.id, now, to, data.trialRequired ? 'trial' : 'regular');
+      const slots = slotsByTeacher.get(teacher.id) ?? [];
       const suitableSlots = slots.filter((slot) => {
         const local = new Date(slot.startsAt);
         const weekday = Number(
