@@ -1,8 +1,8 @@
 {
   "$comment": "Audit state for the Prompt-1 methodology run started 2026-08-08. The previous schema-documentation pass's state was preserved as AUDIT/state.schema-pass.json.",
-  "phase": 2,
-  "phaseName": "Security audit",
-  "status": "Phase 1 deliverable written (financial); Phase 2 deliverable written (AUDIT/security-phase-2-report.md). All four Phase 2 findings now fixed, uncommitted, pending user approval: SEC-207 (privilege escalation, high - RoleManagementPolicy + ROLE_MANAGEMENT_POLICY.md), SEC-208 (search over-exposure, medium - search-access.policy.ts + AUDIT/SEC-208-design.md), SEC-209 (refresh-token timing safety, low - constantTimeEqual in auth.service.ts), SEC-210 (self-scoped IDOR regression coverage, low - AUDIT/SEC-210-coverage-plan.md + tests across payments/files/support/tests). SEC-201/202/204 remain open/accepted per the report (dependency currency, upload sniffing, accepted risk - none require this pass's scope).",
+  "phase": 3,
+  "phaseName": "Backend performance and scalability audit",
+  "status": "Phase 1 deliverable written (financial). Phase 2 (security) complete and committed at 501f150: SEC-207 (privilege escalation, high), SEC-208 (search over-exposure, medium), SEC-209 (refresh-token timing safety, low), SEC-210 (self-scoped IDOR regression coverage, low) all fixed. SEC-201/202/204 remain open/accepted per the report (dependency currency, upload sniffing, accepted risk). SEC-211/RBAC-001/TEST-001 documented, not fixed, per user instruction. Phase 3 (performance) report written (AUDIT/performance-phase-3-report.md, PERF-301..313). Batch 1 complete and committed by responsibility: PERF-301/302/303 at 707a9b7, PERF-306 at b250133, and PERF-312 at e280c99. New finding PERF-314 discovered and documented (not fixed) during Batch 1. PERF-310 (caching) deliberately not implemented; reassessed in the batch-1 report and downgraded from the original report's HIGH severity now that PERF-301/306's root causes are fixed - no candidate currently rises above CACHE OPTIONAL. Batch 2 has not started and requires explicit approval.",
   "baselineCommit": "ebdb499",
   "startedAt": "2026-08-08",
   "priorPasses": {
@@ -65,7 +65,7 @@
       "title": "roles.manage lets a non-ADMIN grant FINANCE-level and other high-impact capability it does not itself hold",
       "location": "apps/api/src/modules/admin/admin.service.ts setUserRoles (:177-215), assignRole (:241-257), grantPermission (:282-304); reached via PATCH /admin/users/:id/roles, POST /admin/roles, POST /admin/permissions/grant",
       "impact": "A STAFF-tier actor holding only roles.manage can grant any other non-ADMIN role (FINANCE, STAFF, EXAMINER, SUPPORT, TEACHER) and any existing permission (payments.refund, payouts.manage, settings.manage, roles.manage itself) to another account without holding it themselves - only the literal ADMIN role is specially guarded (assertActorIsAdminToGrantAdmin). Real under current seed data: prisma/seed.ts:169 grants every permission key, including roles.manage, to the STAFF/SUPPORT/FINANCE/EXAMINER seed accounts alike.",
-      "status": "fixed (uncommitted - awaiting user commit approval)",
+      "status": "fixed (committed 501f150)",
       "verified": true,
       "evidence": "Read admin.service.ts in full; grantPermission validates the target permission key exists (admin.service.ts:285-286) but never checks the actor holds it or the target role; confirmed via prisma/seed.ts:111-176 that STAFF holds roles.manage by default",
       "phase": 2,
@@ -81,7 +81,7 @@
       "title": "Generic staff search endpoint exposes payment and role data to roles that don't need it",
       "location": "apps/api/src/modules/search/search.controller.ts:9 (@Roles only, no @Permissions); search.service.ts entity handlers",
       "impact": "EXAMINER and SUPPORT roles can query GET /search/payments (amounts, status, payer name/phone) and GET /search/roles (role/permission assignments) despite neither role needing that data for its function - a least-privilege gap, not IDOR (all callers are legitimately authenticated staff).",
-      "status": "fixed (uncommitted - awaiting user commit approval)",
+      "status": "fixed (committed 501f150)",
       "verified": true,
       "phase": 2,
       "report": "AUDIT/security-phase-2-report.md SEC-208",
@@ -98,7 +98,7 @@
       "title": "Refresh-token hash comparison is not constant-time",
       "location": "apps/api/src/modules/auth/auth.service.ts:153 (hash(secret) !== session.tokenHash)",
       "impact": "Inconsistent with the OTP path three lines away, which uses timingSafeEqual deliberately. Practical exploitability assessed as very low given SHA-256 avalanche (no smooth gradient for a timing attack to climb) and 256-bit secret entropy; flagged for defense-in-depth/consistency.",
-      "status": "fixed (uncommitted - awaiting user commit approval)",
+      "status": "fixed (committed 501f150)",
       "verified": true,
       "phase": 2,
       "report": "AUDIT/security-phase-2-report.md SEC-209",
@@ -113,7 +113,7 @@
       "title": "Self-scoped route ownership checks are not covered by automated regression tests",
       "location": "apps/api/src/authorization.spec.ts:94-121 SELF_SCOPED allowlist and the 42 services it references",
       "impact": "authorization.spec.ts guarantees every route makes a deliberate access decision but does not runtime-verify the 42 SELF_SCOPED routes still filter by caller id - that rests on the one-time manual review in 02-security.md 2.2. A future regression in one of those services' ownership check would ship undetected.",
-      "status": "fixed (uncommitted - awaiting user commit approval)",
+      "status": "fixed (committed 501f150)",
       "verified": true,
       "phase": 2,
       "report": "AUDIT/security-phase-2-report.md SEC-210",
@@ -213,9 +213,150 @@
       "status": "open",
       "verified": true,
       "phase": 1
+    },
+    {
+      "id": "PERF-301",
+      "severity": "HIGH",
+      "category": "performance",
+      "title": "GET /teachers text search does a full sequential scan (ILIKE '%term%' cannot use a B-tree index)",
+      "location": "apps/api/src/modules/teachers/teachers.service.ts:43-49 directory()",
+      "impact": "Root cause of the inherited LOAD-001 finding. Every search request scans and pattern-matches the entire Teacher table across four text columns.",
+      "status": "fixed (committed 707a9b7)",
+      "verified": true,
+      "phase": 3,
+      "batch": 1,
+      "report": "AUDIT/performance-phase-3-report.md PERF-301, AUDIT/performance-phase-3-batch-1-results.md PERF-301",
+      "fix": "pg_trgm extension + one GIN trigram index per searched column (nameFa/nameEn/bioFa/bioEn) plus @@index([status, approvedTrialPrice]) for the price_asc sort. Migration 20260826055153_teacher_search_trigram_indexes.",
+      "evidence": "EXPLAIN ANALYZE before/after, isolated single-column Bitmap Index Scan confirmed with enable_seqscan=off; short-search-term index usage measured (not assumed) down to 1 character",
+      "gates": "typecheck/lint/build green; 281 api tests / 24 web tests"
+    },
+    {
+      "id": "PERF-302",
+      "severity": "HIGH",
+      "category": "performance",
+      "title": "Payment has no index on userId",
+      "location": "apps/api/prisma/schema.prisma Payment model",
+      "impact": "WalletService.invoices() (GET /payments/invoices) and AdminService.userDetail()'s nested payments read both did a full sequential scan.",
+      "status": "fixed (committed 707a9b7)",
+      "verified": true,
+      "phase": 3,
+      "batch": 1,
+      "report": "AUDIT/performance-phase-3-report.md PERF-302, AUDIT/performance-phase-3-batch-1-results.md PERF-302",
+      "fix": "@@index([userId, createdAt]) on Payment, mirroring WalletEntry. Migration 20260826054927_add_payment_ticket_userid_indexes.",
+      "evidence": "EXPLAIN before/after; forced plan shows Index Scan Backward satisfying both filter and ORDER BY with no separate Sort node",
+      "gates": "typecheck/lint/build green; 281 api tests / 24 web tests"
+    },
+    {
+      "id": "PERF-303",
+      "severity": "MEDIUM-HIGH",
+      "category": "performance",
+      "title": "Ticket has no index on userId",
+      "location": "apps/api/prisma/schema.prisma Ticket model; apps/api/src/modules/support/support.service.ts:53-72 list()",
+      "impact": "The most common caller of GET /support/tickets (a non-staff user) did a full sequential scan, while the less-common staff-queue views were indexed.",
+      "status": "fixed (committed 707a9b7)",
+      "verified": true,
+      "phase": 3,
+      "batch": 1,
+      "report": "AUDIT/performance-phase-3-report.md PERF-303, AUDIT/performance-phase-3-batch-1-results.md PERF-303",
+      "fix": "@@index([userId, updatedAt]) on Ticket - deviates from the original report's createdAt suggestion after reading the real query's actual orderBy ([priority desc, updatedAt desc], support.service.ts:124), matching the existing [status, updatedAt] staff-queue index convention. Same migration as PERF-302.",
+      "evidence": "EXPLAIN before/after; forced plan shows Index Scan Backward with no separate Sort node",
+      "note": "Final pre-commit review removed an unrelated DashboardStat default-drop produced by schema/database drift; the migration contains only the PERF-302/303 indexes.",
+      "gates": "typecheck/lint/build green; 281 api tests / 24 web tests"
+    },
+    {
+      "id": "PERF-306",
+      "severity": "MEDIUM-HIGH",
+      "category": "performance",
+      "title": "Matching questionnaire computed availability for up to 40 teachers sequentially, with redundant per-teacher re-fetches",
+      "location": "apps/api/src/modules/matching/matching.service.ts create(); apps/api/src/modules/bookings/availability.service.ts slots()",
+      "impact": "Root-caused as query elimination, not just sequential-vs-parallel: each candidate iteration re-fetched global settings (2 reads) and re-fetched the teacher row + availabilityRules the caller already had in memory, on top of genuinely per-teacher relation reads.",
+      "status": "fixed (committed b250133)",
+      "verified": true,
+      "phase": 3,
+      "batch": 1,
+      "report": "AUDIT/performance-phase-3-report.md PERF-306, AUDIT/performance-phase-3-batch-1-results.md PERF-306",
+      "fix": "Added AvailabilityService.slotsForCandidates(): fetches global settings once and batches availabilityOverride/blockedPeriod/booking reads across all candidate teacherIds (teacherId: {in:[...]}) instead of once per candidate; extracted the pure slot-computation logic into a private computeSlots() helper shared with the unchanged single-teacher slots(). MatchingService.create() now calls it once instead of looping with await per teacher - the loop is no longer async at all, so no concurrency primitive was needed once the query elimination was done.",
+      "evidence": "Measured (not estimated) via Prisma query-event instrumentation against the live seeded DB: 84 SQL statements before (12 real candidates x 7 statements each) vs 5 statements after (constant, independent of candidate count) - a 94% reduction at N=12, improving further toward the endpoint's N=40 cap. Full e2e POST /api/matching test, followed by a real booking against a returned slot, both pass.",
+      "regression_tests": "matching.service.spec.ts (asserts slotsForCandidates called exactly once, not per-candidate); availability.service.spec.ts new 'AvailabilityService.slotsForCandidates (PERF-306)' describe block (per-candidate isolation + batched-query-count assertions)",
+      "gates": "typecheck/lint/build green; 281 api tests / 24 web tests; e2e 5/6 pass (the 1 failure is the pre-existing, unrelated TEST-001)"
+    },
+    {
+      "id": "PERF-312",
+      "severity": "HIGH",
+      "category": "performance",
+      "title": "No response compression",
+      "location": "apps/api/src/main.ts",
+      "impact": "Every JSON response sent uncompressed - the broadest-reaching finding in the original report by surface area.",
+      "status": "fixed (committed e280c99)",
+      "verified": true,
+      "phase": 3,
+      "batch": 1,
+      "report": "AUDIT/performance-phase-3-report.md PERF-312, AUDIT/performance-phase-3-batch-1-results.md PERF-312",
+      "fix": "app.use(compression({ threshold: 1024 })) immediately after helmet(). Verified first: no StreamableFile/res.download/createReadStream/SSE anywhere in the API (files are served via presigned MinIO URLs, never streamed by the API itself); no reverse proxy/CDN in this repo already compressing, so no double-compression risk.",
+      "evidence": "Live-measured against the running dev server (auto-reloaded via nest start --watch): GET /api/languages 1864 -> 555 bytes (70.2%), GET /api/teachers?limit=12 10355 -> 1911 bytes (81.5%). npm ls postcss still resolves to the pinned 8.5.24 everywhere; npm audit shows the same pre-existing 5 advisories, zero new ones from the compression dependency.",
+      "gates": "typecheck/lint/build green; 281 api tests / 24 web tests"
+    },
+    {
+      "id": "PERF-314",
+      "severity": "LOW-MEDIUM",
+      "category": "performance",
+      "title": "Prisma issues one SQL statement per included to-many relation instead of a single joined query",
+      "location": "general - confirmed via apps/api/src/modules/bookings/availability.service.ts's teacher.findFirst include shape (4 to-many relations = 5 SQL statements, not 1)",
+      "impact": "Not specific to AvailabilityService - any service using include with multiple to-many relations pays this per-call cost. Blast radius across the codebase not sized this pass (would require its own grep/audit).",
+      "status": "open - documented only, not fixed",
+      "verified": true,
+      "phase": 3,
+      "batch": 1,
+      "note": "Discovered while investigating PERF-306. Registered rather than fixed to avoid expanding Batch 1's approved scope. Recommended for Batch 2: evaluate Prisma's relationLoadStrategy: 'join' (PostgreSQL) as a global or per-query opt-in - a genuine architectural decision, not a drop-in fix.",
+      "report": "AUDIT/performance-phase-3-batch-1-results.md PERF-314"
     }
   ],
   "fixed": [
+    {
+      "id": "PERF-301",
+      "commit": "707a9b7",
+      "gates": "typecheck/lint/build green; 281 tests (api, up from 279), 24 (web); e2e 5/6 (1 pre-existing unrelated TEST-001 failure)"
+    },
+    {
+      "id": "PERF-302",
+      "commit": "707a9b7",
+      "gates": "typecheck/lint/build green; 281 tests (api), 24 (web)"
+    },
+    {
+      "id": "PERF-303",
+      "commit": "707a9b7",
+      "gates": "typecheck/lint/build green; 281 tests (api), 24 (web)"
+    },
+    {
+      "id": "PERF-306",
+      "commit": "b250133",
+      "gates": "typecheck/lint/build green; 281 tests (api), 24 (web); e2e 5/6 (1 pre-existing unrelated TEST-001 failure)"
+    },
+    {
+      "id": "PERF-312",
+      "commit": "e280c99",
+      "gates": "typecheck/lint/build green; 281 tests (api), 24 (web)"
+    },
+    {
+      "id": "SEC-207",
+      "commit": "501f150",
+      "gates": "typecheck/lint/build green; 279 tests (api, up from 234 at Phase 2 start), 24 (web)"
+    },
+    {
+      "id": "SEC-208",
+      "commit": "501f150",
+      "gates": "typecheck/lint/build green; 279 tests (api), 24 (web)"
+    },
+    {
+      "id": "SEC-209",
+      "commit": "501f150",
+      "gates": "typecheck/lint/build green; 279 tests (api), 24 (web)"
+    },
+    {
+      "id": "SEC-210",
+      "commit": "501f150",
+      "gates": "typecheck/lint/build green; 279 tests (api), 24 (web)"
+    },
     {
       "id": "AUD-002",
       "commit": "124b646",
@@ -264,7 +405,7 @@
       "note": "fixed-window ~2x boundary burst, accepted at current limits"
     }
   ],
-  "next_action": "All four Phase 2 findings (SEC-207/208/209/210) fixed, uncommitted; awaiting user's review and go-ahead to commit as one or more commits. Nothing else queued from this phase - SEC-201 (dependency currency)/SEC-202 (upload content sniffing) remain open per the report's remediation order if wanted next. Separate follow-ups noted but not fixed (out of scope for their respective tasks): a pre-existing shared-token test-isolation bug in apps/api/test/platform.e2e-spec.ts's admin test; prisma/seed.ts over-granting every permission to every staff-tier seed account; TestsService.resume() returning 200 null instead of 404 for a non-owner (candidate SEC-211, not filed). MIG-001 steps 2-5 still gated on a verified DB backup.",
+  "next_action": "Phase 3 Batch 1 (PERF-301/302/303/306/312) is implemented, tested, documented in AUDIT/performance-phase-3-batch-1-results.md, and committed by responsibility (707a9b7, b250133, e280c99, plus the audit-documentation commit). Two migrations are applied to the dev DB: 20260826054927_add_payment_ticket_userid_indexes and 20260826055153_teacher_search_trigram_indexes; Prisma reports all 14 migrations applied and the schema up to date. Full gate green (typecheck/lint/build/test 281 api + 24 web; authorization 5/5; architecture 4/4; e2e 5/6, with the identical pre-existing TEST-001 failure at platform.e2e-spec.ts:245). Wait for explicit user approval before starting Batch 2. Potential Batch 2 scope remains PERF-304, PERF-305, PERF-307, PERF-308 re-evaluation, PERF-314, then PERF-310/311 scoped to CACHE OPTIONAL only, then PERF-309/313 pending product/ops decisions. LOAD-001 (inherited) still needs a production-build load test to confirm magnitude. Phase 2 closed at commit 501f150 (SEC-207/208/209/210). Still open, untouched by design: SEC-201, SEC-202, SEC-211, RBAC-001, TEST-001. MIG-001 steps 2-5 still gated on a verified DB backup.",
   "approvedChanges": [
     {
       "id": "MIG-001",
