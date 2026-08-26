@@ -336,6 +336,24 @@ model Teacher {
   // `approvedAt` or `rating`.
   @@index([status, approvedAt])
   @@index([status, rating])
+  // Backs directory()'s sort=price_asc path (orderBy: approvedTrialPrice asc),
+  // which had no supporting index despite the two other default sorts above
+  // being covered.
+  @@index([status, approvedTrialPrice])
+  // PERF-301: directory()'s `search` filter compiles to a leading-wildcard
+  // ILIKE '%term%' across these four columns, which a plain B-tree index can
+  // never accelerate regardless of table size. pg_trgm GIN indexes let
+  // Postgres answer ILIKE via trigram matching instead of a sequential scan;
+  // one index per column (rather than one combined tsvector column) so
+  // Postgres can BitmapOr just the columns a given search actually needs, and
+  // to keep this additive/reversible without a generated-column migration.
+  // Extension activation lives in the migration SQL (see
+  // migrations/*_teacher_search_trigram_indexes) since Prisma's schema
+  // doesn't model `CREATE EXTENSION`.
+  @@index([nameFa(ops: raw("gin_trgm_ops"))], type: Gin)
+  @@index([nameEn(ops: raw("gin_trgm_ops"))], type: Gin)
+  @@index([bioFa(ops: raw("gin_trgm_ops"))], type: Gin)
+  @@index([bioEn(ops: raw("gin_trgm_ops"))], type: Gin)
 }
 
 model VerificationItem {
@@ -662,6 +680,10 @@ model Payment {
 
   @@index([discountId])
   @@index([discountRuleId])
+  // Backs WalletService.invoices() (GET /payments/invoices) and
+  // AdminService.userDetail()'s nested payments read — both filter by userId
+  // and sort by createdAt desc. Mirrors WalletEntry's [userId, createdAt] shape.
+  @@index([userId, createdAt])
 }
 
 model WalletEntry {
@@ -1114,6 +1136,13 @@ model Ticket {
 
   @@index([status, updatedAt])
   @@index([assignedToId, status])
+  // Backs SupportService.list()'s non-staff path (GET /support/tickets), which
+  // filters by userId for every caller who isn't staff — the most common
+  // caller of this endpoint, previously unindexed while the staff-queue
+  // views were. Second column is updatedAt, not createdAt: list()'s actual
+  // orderBy is [priority desc, updatedAt desc] (support.service.ts:124),
+  // matching the existing [status, updatedAt] staff-queue index's convention.
+  @@index([userId, updatedAt])
 }
 
 model TicketReply {
