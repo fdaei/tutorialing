@@ -10,13 +10,16 @@ import { webConfig } from './config';
 // dev-only 'unsafe-eval' no client JS runs at all and every page renders blank.
 // Production bundles never eval, so the deployed CSP stays strict.
 const devEval = webConfig.nodeEnv === 'development' ? " 'unsafe-eval'" : '';
-const externalOrigin = (() => {
+function origin(value: string) {
   try {
-    return webConfig.s3Origin ? new URL(webConfig.s3Origin).origin : '';
+    return value ? new URL(value).origin : '';
   } catch {
     return '';
   }
-})();
+}
+
+const apiOrigin = origin(webConfig.apiUrl);
+const externalOrigin = origin(webConfig.s3Origin);
 
 function cspHeader(nonce: string) {
   return [
@@ -26,7 +29,7 @@ function cspHeader(nonce: string) {
     "img-src 'self' data: blob:",
     "font-src 'self' data:",
     `media-src 'self' blob:${externalOrigin ? ` ${externalOrigin}` : ''}`,
-    `connect-src 'self'${externalOrigin ? ` ${externalOrigin}` : ''}`,
+    `connect-src 'self'${apiOrigin ? ` ${apiOrigin}` : ''}${externalOrigin ? ` ${externalOrigin}` : ''}`,
     "object-src 'none'",
     "base-uri 'self'",
     "frame-ancestors 'self'",
