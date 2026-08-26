@@ -26,7 +26,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const value = (await headers()).get('x-lingospeak-locale'),
     locale = isLocale(value) ? value : 'fa';
   return (
-    <html lang={locale === 'fa' ? 'fa-IR' : 'en'} dir={direction(locale)} suppressHydrationWarning>
+    <html
+      lang={locale === 'fa' ? 'fa-IR' : 'en'}
+      dir={direction(locale)}
+      data-scroll-behavior="smooth"
+      suppressHydrationWarning
+    >
       <body>
         <Providers locale={locale}>{children}</Providers>
       </body>
