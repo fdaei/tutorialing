@@ -113,3 +113,62 @@ describe('AvailabilityService blocked periods', () => {
     );
   });
 });
+
+describe('AvailabilityService.slotsForCandidates (PERF-306)', () => {
+  const settings = {
+    numeric: jest.fn((key: string, fallback: number) =>
+      Promise.resolve(key === 'booking.maxAdvanceDays' ? 730 : fallback),
+    ),
+  } as any;
+
+  it('batches per-teacher reads into one query each and keeps each candidate isolated', async () => {
+    const tomorrow = new Date(Date.now() + 2 * 86_400_000);
+    tomorrow.setUTCHours(0, 0, 0, 0);
+    const start = new Date(tomorrow);
+    start.setUTCHours(10, 0, 0, 0);
+    const end = new Date(tomorrow);
+    end.setUTCHours(11, 0, 0, 0);
+    const rule = { weekday: tomorrow.getUTCDay(), startMinute: 600, endMinute: 660, timezone: 'UTC', breakMinutes: 0 };
+    const candidates = [
+      { id: 'a', trialDuration: 30, lessonDuration: 60, breakMinutes: 0, availabilityRules: [rule] },
+      { id: 'b', trialDuration: 30, lessonDuration: 60, breakMinutes: 0, availabilityRules: [rule] },
+      { id: 'c', trialDuration: 30, lessonDuration: 60, breakMinutes: 0, availabilityRules: [rule] },
+    ];
+    const db = {
+      availabilityOverride: { findMany: jest.fn().mockResolvedValue([]) },
+      // Only teacher 'a' is blocked...
+      blockedPeriod: { findMany: jest.fn().mockResolvedValue([{ teacherId: 'a', startsAt: start, endsAt: end }]) },
+      // ...and only teacher 'b' is booked — 'c' should be unaffected by either.
+      booking: { findMany: jest.fn().mockResolvedValue([{ teacherId: 'b', startsAt: start, endsAt: end }]) },
+    } as any;
+    const service = new AvailabilityService(db, settings);
+    const to = new Date(tomorrow.getTime() + 86_400_000 - 1);
+
+    const result = await service.slotsForCandidates(candidates, tomorrow, to, 'regular');
+
+    expect(result.get('a')).toEqual([]);
+    expect(result.get('b')).toEqual([]);
+    expect(result.get('c')).toHaveLength(1);
+    // One batched call per relation, not one per candidate.
+    expect(db.availabilityOverride.findMany).toHaveBeenCalledTimes(1);
+    expect(db.blockedPeriod.findMany).toHaveBeenCalledTimes(1);
+    expect(db.booking.findMany).toHaveBeenCalledTimes(1);
+    expect(settings.numeric).toHaveBeenCalledTimes(2);
+  });
+
+  it('returns an empty map without querying when there are no candidates', async () => {
+    const db = {
+      availabilityOverride: { findMany: jest.fn() },
+      blockedPeriod: { findMany: jest.fn() },
+      booking: { findMany: jest.fn() },
+    } as any;
+    const service = new AvailabilityService(db, settings);
+    const from = new Date();
+    const to = new Date(from.getTime() + 86_400_000);
+
+    const result = await service.slotsForCandidates([], from, to, 'regular');
+
+    expect(result.size).toBe(0);
+    expect(db.availabilityOverride.findMany).not.toHaveBeenCalled();
+  });
+});
