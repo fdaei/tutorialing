@@ -6,6 +6,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
+import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 import { ApiExceptionFilter } from './common';
@@ -24,6 +25,12 @@ async function bootstrap() {
   // Must be set before the per-IP rate limiter reads `request.ip`; see TRUST_PROXY.
   app.set('trust proxy', cfg.TRUST_PROXY);
   app.use(helmet());
+  // JSON responses compress 70-90%; the API never streams binary content
+  // itself (file up/downloads go through presigned MinIO URLs), so there's
+  // no download/SSE path this could interfere with. threshold keeps tiny
+  // responses (e.g. `{ ok: true }`) from paying gzip's per-request overhead
+  // for no size benefit.
+  app.use(compression({ threshold: 1024 }));
   app.use(cookieParser());
   app.enableCors({ origin: cfg.WEB_URL, credentials: true });
   app.useGlobalPipes(
