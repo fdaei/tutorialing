@@ -18,6 +18,8 @@ jobs:
     name: Quality checks
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/lingospeak
 
     steps:
       - name: Check out repository
