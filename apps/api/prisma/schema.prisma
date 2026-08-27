@@ -179,11 +179,13 @@ enum BlogPostStatus {
   PUBLISHED
   ARCHIVED
 }
+
 enum BlogCommentStatus {
   PENDING
   APPROVED
   REJECTED
 }
+
 enum BlogReactionType {
   LIKE
   DISLIKE
@@ -191,7 +193,8 @@ enum BlogReactionType {
 
 model User {
   id                      String                    @id @default(cuid())
-  phone                   String                    @unique
+  phone                   String?                   @unique
+  googleSubject           String?                   @unique
   name                    String?
   email                   String?
   avatarKey               String?
@@ -229,10 +232,10 @@ model User {
   ticketReplies           TicketReply[]             @relation("TicketReplyAuthor")
   ticketStatusActions     TicketStatusHistory[]     @relation("TicketStatusActor")
   ticketAssignmentActions TicketAssignmentHistory[] @relation("TicketAssignmentActor")
-  blogPosts BlogPost[] @relation("BlogAuthor")
-  blogComments BlogComment[]
-  blogReactions BlogReaction[]
-  blogRatings BlogRating[]
+  blogPosts               BlogPost[]                @relation("BlogAuthor")
+  blogComments            BlogComment[]
+  blogReactions           BlogReaction[]
+  blogRatings             BlogRating[]
 
   // PERF-304: the two user-listing paths use different chronological sorts:
   // AdminRepository orders by createdAt while SearchService orders by
@@ -1132,6 +1135,30 @@ model NotificationPreference {
   @@unique([userId, type])
 }
 
+/// Transactional outbox.
+///
+/// A state change and the message announcing it are written in one
+/// transaction, so a queue that is unreachable at commit time cannot swallow
+/// the message: the row survives and `OutboxDispatcher` delivers it later.
+/// `idempotencyKey` is derived from the subject (e.g. `booking-confirmed:<id>`)
+/// so re-recording the same event is a no-op rather than a duplicate delivery.
+model OutboxEvent {
+  id             String    @id @default(cuid())
+  type           String
+  payload        Json
+  idempotencyKey String    @unique
+  attempts       Int       @default(0)
+  /// Backoff gate: an event is only picked up once this is in the past.
+  availableAt    DateTime  @default(now())
+  /// Null means still owed a delivery. Set exactly once, by the dispatcher.
+  processedAt    DateTime?
+  lastError      String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([processedAt, availableAt])
+}
+
 model Reminder {
   id          String   @id @default(cuid())
   bookingId   String
@@ -1350,99 +1377,111 @@ model LocalizedContent {
 }
 
 model BlogCategory {
-  id String @id @default(cuid())
-  slug String @unique
-  nameFa String
-  nameEn String
-  posts BlogPost[]
-  createdAt DateTime @default(now())
+  id        String     @id @default(cuid())
+  slug      String     @unique
+  nameFa    String
+  nameEn    String
+  posts     BlogPost[]
+  createdAt DateTime   @default(now())
 }
+
 model BlogTag {
-  id String @id @default(cuid())
-  slug String @unique
+  id     String     @id @default(cuid())
+  slug   String     @unique
   nameFa String
   nameEn String
-  posts BlogPost[]
+  posts  BlogPost[]
 }
+
 model BlogPost {
-  id String @id @default(cuid())
-  slug String @unique
-  titleFa String
-  titleEn String
-  excerptFa String
-  excerptEn String
-  contentFa String
-  contentEn String
-  coverImage String?
-  status BlogPostStatus @default(DRAFT)
-  authorId String
-  categoryId String?
-  seoTitleFa String?
-  seoTitleEn String?
+  id               String         @id @default(cuid())
+  slug             String         @unique
+  titleFa          String
+  titleEn          String
+  excerptFa        String
+  excerptEn        String
+  contentFa        String
+  contentEn        String
+  coverImage       String?
+  status           BlogPostStatus @default(DRAFT)
+  authorId         String
+  categoryId       String?
+  seoTitleFa       String?
+  seoTitleEn       String?
   seoDescriptionFa String?
   seoDescriptionEn String?
-  publishedAt DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  author User @relation("BlogAuthor", fields:[authorId], references:[id])
-  category BlogCategory? @relation(fields:[categoryId], references:[id], onDelete:SetNull)
-  tags BlogTag[]
-  images BlogImage[]
-  comments BlogComment[]
-  reactions BlogReaction[]
-  ratings BlogRating[]
-  views BlogView[]
+  publishedAt      DateTime?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  author           User           @relation("BlogAuthor", fields: [authorId], references: [id])
+  category         BlogCategory?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  tags             BlogTag[]
+  images           BlogImage[]
+  comments         BlogComment[]
+  reactions        BlogReaction[]
+  ratings          BlogRating[]
+  views            BlogView[]
+
   @@index([status, publishedAt])
   @@index([categoryId])
 }
+
 model BlogImage {
-  id String @id @default(cuid())
-  postId String
-  key String
-  url String
-  altFa String?
-  altEn String?
+  id        String   @id @default(cuid())
+  postId    String
+  key       String
+  url       String
+  altFa     String?
+  altEn     String?
   createdAt DateTime @default(now())
-  post BlogPost @relation(fields:[postId], references:[id], onDelete:Cascade)
+  post      BlogPost @relation(fields: [postId], references: [id], onDelete: Cascade)
 }
+
 model BlogComment {
-  id String @id @default(cuid())
-  postId String
-  userId String?
-  body String
-  status BlogCommentStatus @default(PENDING)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  post BlogPost @relation(fields:[postId], references:[id], onDelete:Cascade)
-  user User? @relation(fields:[userId], references:[id], onDelete:SetNull)
-  @@index([postId,status])
+  id        String            @id @default(cuid())
+  postId    String
+  userId    String?
+  body      String
+  status    BlogCommentStatus @default(PENDING)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  post      BlogPost          @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([postId, status])
 }
+
 model BlogReaction {
-  id String @id @default(cuid())
-  postId String
-  userId String
-  type BlogReactionType
-  createdAt DateTime @default(now())
-  post BlogPost @relation(fields:[postId], references:[id], onDelete:Cascade)
-  user User @relation(fields:[userId], references:[id], onDelete:Cascade)
-  @@unique([postId,userId])
+  id        String           @id @default(cuid())
+  postId    String
+  userId    String
+  type      BlogReactionType
+  createdAt DateTime         @default(now())
+  post      BlogPost         @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
 }
+
 model BlogRating {
-  id String @id @default(cuid())
-  postId String
-  userId String
-  value Int
+  id        String   @id @default(cuid())
+  postId    String
+  userId    String
+  value     Int
   createdAt DateTime @default(now())
-  post BlogPost @relation(fields:[postId], references:[id], onDelete:Cascade)
-  user User @relation(fields:[userId], references:[id], onDelete:Cascade)
-  @@unique([postId,userId])
+  post      BlogPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
 }
+
 model BlogView {
-  id String @id @default(cuid())
-  postId String
+  id         String   @id @default(cuid())
+  postId     String
   visitorKey String
-  createdAt DateTime @default(now())
-  post BlogPost @relation(fields:[postId], references:[id], onDelete:Cascade)
-  @@unique([postId,visitorKey])
-  @@index([postId,createdAt])
+  createdAt  DateTime @default(now())
+  post       BlogPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, visitorKey])
+  @@index([postId, createdAt])
 }

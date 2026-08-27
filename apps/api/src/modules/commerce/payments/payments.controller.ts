@@ -1,5 +1,7 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Param, Post, Query, Res } from '@nestjs/common';
+import type { Response } from 'express';
 import { CurrentUser, PublicRateLimit, RateLimit, RATE_LIMIT_TIERS, Roles, type AuthUser } from '../../../common';
+import { config } from '../../../config';
 import { PermissionKeys, RequirePermissions } from '../../auth/authorization';
 import { PaymentsService } from './payments.service';
 import { WalletService } from './wallet.service';
@@ -28,8 +30,30 @@ export class PaymentsController {
 
   @PublicRateLimit(RATE_LIMIT_TIERS.paymentCallback)
   @Get('callback')
-  callback(@Query('Authority') a: string, @Query('Status') status: string) {
-    return this.s.callback(a, status);
+  async callback(
+    @Query('Authority') authority: string,
+    @Query('Status') status: string,
+    @Headers('accept') accept: string | undefined,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const browserRequest = accept?.includes('text/html') ?? false;
+    try {
+      const payment = await this.s.callback(authority, status);
+      if (browserRequest) {
+        response.redirect(302, `${config().WEB_URL}/payment/${payment.status === 'PAID' ? 'success' : 'failure'}`);
+        return;
+      }
+      return payment;
+    } catch (error) {
+      // Payment providers return the customer to this endpoint in their
+      // browser. Keep machine clients' original HTTP error, but give a human a
+      // useful destination instead of exposing the API error response.
+      if (browserRequest) {
+        response.redirect(302, `${config().WEB_URL}/payment/failure`);
+        return;
+      }
+      throw error;
+    }
   }
 
   @Get('wallet')
@@ -39,8 +63,8 @@ export class PaymentsController {
 
   @RateLimit(RATE_LIMIT_TIERS.paymentInit)
   @Post('wallet/top-up')
-  async topUp(@CurrentUser() u: AuthUser, @Body() d: WalletTopUpDto) {
-    return this.walletSvc.topUp(u.id, d.amount);
+  topUp(@CurrentUser() u: AuthUser, @Body() d: WalletTopUpDto) {
+    return this.s.createWalletTopUp(u.id, d.amount, d.idempotencyKey);
   }
 
   @Get('wallet/transactions')
