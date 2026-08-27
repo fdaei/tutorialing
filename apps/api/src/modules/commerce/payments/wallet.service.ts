@@ -1,16 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import crypto from 'node:crypto';
 import { PrismaService, Tx } from '../../../infrastructure/database/prisma.service';
 
 @Injectable()
 export class WalletService {
   constructor(private db: PrismaService) {}
-
-  async topUp(userId: string, amount: number) {
-    const id = `topup_${crypto.randomUUID()}`;
-    await this.ledger(this.db, userId, 'CREDIT', amount, 'wallet top-up', 'TopUp', id, id);
-    return { ok: true, balance: await this.walletBalance(userId) };
-  }
 
   async walletBalance(userId: string, tx: Tx = this.db) {
     const agg = await tx.walletEntry.groupBy({

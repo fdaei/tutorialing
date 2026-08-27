@@ -1,6 +1,12 @@
-import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { Prisma, type Payment, type PaymentStatus } from '@prisma/client';
+import { randomUUID } from 'node:crypto';
 import { PrismaService, Tx } from '../../../infrastructure/database/prisma.service';
+import {
+  bookingConfirmedKey,
+  OutboxService,
+  OUTBOX_EVENT_TYPES,
+} from '../../../infrastructure/database/outbox/outbox.service';
 import { RedisService } from '../../../infrastructure/redis/redis.service';
 import { badRequest, conflict, isPrismaKnownError, notFound, runtimeEnvironment } from '../../../common';
 import { config } from '../../../config';
@@ -22,7 +28,10 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     private wallet: WalletService,
     private autoDiscounts: AutoDiscountsService,
     private redis: RedisService,
+    private outbox: OutboxService,
   ) {}
+
+  private readonly logger = new Logger(PaymentsService.name);
 
   onModuleInit() {
     if (runtimeEnvironment(config().NODE_ENV).isTest) return;
@@ -92,7 +101,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     }
     if (payment.status === 'PAID' && payment.bookingId) {
       const booking = await this.db.booking.findUnique({ where: { id: payment.bookingId } });
-      if (booking) await this.queue.scheduleBooking(booking.id, booking.startsAt);
+      if (booking) await this.scheduleReminders(booking.id, booking.startsAt);
     }
     return payment;
   }
@@ -102,6 +111,41 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     // resume another user's payment.
     if (payment.userId !== userId) throw conflict('PAYMENT_KEY_CONFLICT');
     return payment;
+  }
+
+  async createWalletTopUp(userId: string, amount: number, requestedKey?: string) {
+    const idempotencyKey = requestedKey || `wallet-top-up:${randomUUID()}`;
+    const existing = await this.db.payment.findUnique({ where: { idempotencyKey } });
+    let payment = existing ? this.assertOwned(existing, userId) : undefined;
+
+    if (!payment) {
+      const id = `topup_${randomUUID()}`;
+      try {
+        payment = await this.db.payment.create({
+          data: {
+            id,
+            userId,
+            purpose: 'wallet_top_up',
+            referenceId: id,
+            subtotal: amount,
+            amount,
+            gatewayAmount: amount,
+            walletAmount: 0,
+            status: 'PENDING',
+            idempotencyKey,
+          },
+        });
+      } catch (error) {
+        if (!isPrismaKnownError(error) || error.code !== 'P2002') throw error;
+        const raced = await this.db.payment.findUnique({ where: { idempotencyKey } });
+        if (!raced) throw error;
+        payment = this.assertOwned(raced, userId);
+      }
+    }
+
+    if (payment.status !== 'PENDING') return { paymentId: payment.id, status: payment.status };
+    const gateway = await this.gatewayRedirect(userId, payment.id);
+    return { paymentId: payment.id, status: payment.status, ...gateway };
   }
 
   private async createPaymentRecord(userId: string, d: PayDto) {
@@ -312,9 +356,33 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     // Only a booking this settlement actually confirmed gets reminders.
     if (paid.status === 'PAID' && paid.bookingId) {
       const booking = await this.db.booking.findUnique({ where: { id: paid.bookingId } });
-      if (booking?.status === 'CONFIRMED') await this.queue.scheduleBooking(booking.id, booking.startsAt);
+      if (booking?.status === 'CONFIRMED') await this.scheduleReminders(booking.id, booking.startsAt);
     }
     return paid;
+  }
+
+  /**
+   * Best-effort reminder scheduling, immediately after the settlement commits.
+   *
+   * This used to be awaited bare, so a queue that was unreachable for the
+   * half-second after the commit threw out of `settleVerified` — reporting a
+   * failure for a payment that had in fact succeeded, and losing the reminder
+   * for good, because every later retry sees the payment already PAID and
+   * returns early.
+   *
+   * The `OutboxEvent` written inside the settling transaction is now the
+   * guarantee; this call is only here so the common case does not wait for the
+   * dispatcher's next tick. A failure is therefore logged, not raised.
+   */
+  private async scheduleReminders(bookingId: string, startsAt: Date) {
+    try {
+      await this.queue.scheduleBooking(bookingId, startsAt);
+    } catch (error) {
+      this.logger.warn(
+        `immediate reminder scheduling failed for booking ${bookingId}, left to the outbox dispatcher: ` +
+          `${error instanceof Error ? error.message : 'unknown error'}`,
+      );
+    }
   }
 
   private async failPayment(paymentId: string, payload: object) {
@@ -339,6 +407,19 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
 
   private async fulfill(tx: Tx, paymentId: string, previousStatus: PaymentStatus) {
     const payment = await tx.payment.findUniqueOrThrow({ where: { id: paymentId } });
+    if (payment.purpose === 'wallet_top_up') {
+      await this.wallet.ledger(
+        tx,
+        payment.userId,
+        'CREDIT',
+        payment.amount,
+        'wallet top-up',
+        'Payment',
+        payment.id,
+        `wallet-top-up:${payment.id}`,
+      );
+      return;
+    }
     if (payment.purpose === 'booking') {
       const booking = await tx.booking.findUnique({ where: { id: payment.referenceId } });
       // A gateway callback can land after the 15-minute payment window closed
@@ -353,6 +434,12 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
         return;
       }
       await tx.booking.update({ where: { id: booking.id }, data: { status: 'CONFIRMED' } });
+      // Written here, not after the commit: the reminder enqueue below is a
+      // best-effort fast path, and this row is what guarantees the reminders
+      // are scheduled even if Redis is unreachable at exactly this moment.
+      await this.outbox.enqueue(tx, OUTBOX_EVENT_TYPES.bookingConfirmed, bookingConfirmedKey(booking.id), {
+        bookingId: booking.id,
+      });
       return;
     }
     const pkg = await tx.package.findUniqueOrThrow({ where: { id: payment.referenceId } });

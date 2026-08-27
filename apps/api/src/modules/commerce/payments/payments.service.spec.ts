@@ -38,6 +38,7 @@ function harness(
   const queue = { scheduleBooking: jest.fn() };
   const autoDiscounts = { evaluate: jest.fn().mockResolvedValue(null) };
   const redis = { lock: jest.fn().mockResolvedValue({ token: 't', release: jest.fn() }) };
+  const outbox = { enqueue: jest.fn().mockResolvedValue({}) };
   const svc = new PaymentsService(
     db as never,
     queue as never,
@@ -45,8 +46,9 @@ function harness(
     wallet as never,
     autoDiscounts as never,
     redis as never,
+    outbox as never,
   );
-  return { svc, db, tx, queue, wallet, autoDiscounts, redis, created };
+  return { svc, db, tx, queue, wallet, autoDiscounts, redis, created, outbox };
 }
 
 const pay = (over: Record<string, unknown> = {}) => ({
@@ -158,12 +160,13 @@ function callbackHarness(
     bookingStatus?: string | null;
     walletAmount?: number;
     walletCreditsSeen?: number;
+    purpose?: string;
   } = {},
 ) {
   const payment = {
     id: 'payment-1',
     userId: USER,
-    purpose: 'booking',
+    purpose: options.purpose ?? 'booking',
     referenceId: BOOKING.id,
     bookingId: BOOKING.id,
     status: options.paymentStatus ?? 'PENDING',
@@ -206,18 +209,37 @@ function callbackHarness(
   const gateway = { verify: jest.fn().mockResolvedValue({ ok: true, reference: 'REF-1' }) };
   const queue = { scheduleBooking: jest.fn() };
   const redis = { lock: jest.fn().mockResolvedValue({ token: 't', release: jest.fn() }) };
+  const wallet = { ledger: jest.fn() };
+  const outbox = { enqueue: jest.fn().mockResolvedValue({}) };
   const svc = new PaymentsService(
     db as never,
     queue as never,
     gateway as never,
-    { ledger: jest.fn() } as never,
+    wallet as never,
     { evaluate: jest.fn().mockResolvedValue(null) } as never,
     redis as never,
+    outbox as never,
   );
-  return { svc, db, tx, gateway, queue, payment };
+  return { svc, db, tx, gateway, queue, payment, wallet, outbox };
 }
 
 describe('PaymentsService.callback', () => {
+  it('credits a wallet top-up only after the gateway verifies it', async () => {
+    const h = callbackHarness({ purpose: 'wallet_top_up' });
+    await h.svc.callback('auth-1', 'OK');
+    expect(h.wallet.ledger).toHaveBeenCalledWith(
+      h.tx,
+      USER,
+      'CREDIT',
+      250_000,
+      'wallet top-up',
+      'Payment',
+      'payment-1',
+      'wallet-top-up:payment-1',
+    );
+    expect(h.tx.booking.update).not.toHaveBeenCalled();
+  });
+
   it('confirms the booking on a normal in-window payment', async () => {
     const h = callbackHarness();
     await h.svc.callback('auth-1', 'OK');
@@ -290,6 +312,43 @@ describe('PaymentsService.callback', () => {
     expect(returned.queue.scheduleBooking).not.toHaveBeenCalled();
   });
 
+  /**
+   * FIN-301. The settling transaction commits the PAID payment and the
+   * CONFIRMED booking; the enqueue that schedules the reminders is a separate
+   * call afterwards. A queue that is unreachable for that half-second used to
+   * throw out of `settleVerified` — reporting failure for a payment that had
+   * succeeded, and losing the reminder for good, because every later retry sees
+   * the payment already PAID and returns early.
+   */
+  it('records the confirmation in the outbox inside the settling transaction', async () => {
+    const h = callbackHarness();
+    await h.svc.callback('auth-1', 'OK');
+    expect(h.outbox.enqueue).toHaveBeenCalledWith(
+      h.tx,
+      'BOOKING_CONFIRMED',
+      `booking-confirmed:${BOOKING.id}`,
+      { bookingId: BOOKING.id },
+    );
+  });
+
+  it('still settles the payment when the queue is unreachable at commit time', async () => {
+    const h = callbackHarness();
+    h.queue.scheduleBooking.mockRejectedValue(new Error('ECONNREFUSED'));
+
+    const payment = await h.svc.callback('auth-1', 'OK');
+
+    // The capture is real money: it must be recorded whatever the queue is
+    // doing. The outbox row is what the dispatcher picks up later.
+    expect(payment).toBeDefined();
+    expect(h.outbox.enqueue).toHaveBeenCalled();
+  });
+
+  it('does not record a confirmation for a booking it could not confirm', async () => {
+    const h = callbackHarness({ paymentStatus: 'EXPIRED', bookingStatus: 'CANCELLED' });
+    await h.svc.callback('auth-1', 'OK');
+    expect(h.outbox.enqueue).not.toHaveBeenCalled();
+  });
+
   it('leaves an already refunded payment alone rather than re-crediting it', async () => {
     const h = callbackHarness({ paymentStatus: 'REFUNDED' });
     await h.svc.callback('auth-1', 'OK');
@@ -359,7 +418,9 @@ function gatewayRedirectHarness(
     resumeUrl: jest.fn().mockImplementation((authority: string) => `https://gateway.example/${authority}`),
   };
   const redis = { lock: jest.fn().mockResolvedValue(lockResult) };
-  const svc = new PaymentsService(db as never, {} as never, gateway as never, {} as never, {} as never, redis as never);
+  const svc = new PaymentsService(
+    db as never, {} as never, gateway as never, {} as never, {} as never, redis as never, {} as never,
+  );
   return { svc, db, gateway, redis };
 }
 
