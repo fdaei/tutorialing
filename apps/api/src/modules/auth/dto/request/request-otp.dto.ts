@@ -1,6 +1,6 @@
-import { IsIranianPhone } from '../../../../common/validators/is-iranian-phone.decorator';
+import { IsInternationalPhone } from '../../../../common/validators/is-international-phone.decorator';
 
 export class RequestOtpDto {
-  @IsIranianPhone()
+  @IsInternationalPhone()
   phone!: string;
 }
