@@ -114,7 +114,30 @@ export class AuthService {
       await this.db.otpChallenge.update({ where: { id: challenge.id }, data: { attempts: { increment: 1 } } });
       throw badRequest('OTP_INCORRECT');
     }
-    await this.db.otpChallenge.update({ where: { id: challenge.id }, data: { verifiedAt: new Date() } });
+
+    // Claiming the challenge and checking that it was still claimable are one
+    // statement. Read-then-update let two requests carrying the same correct
+    // code both see `verifiedAt: null` and both go on to mint a session, so a
+    // single OTP could open two of them.
+    //
+    // The guards above are re-stated here rather than trusted from the read:
+    // they cover every field another request can move underneath us. `phone`
+    // and `codeHash` are not among them — neither is ever updated — so
+    // comparing those against the read row stays correct.
+    const claimed = await this.db.otpChallenge.updateMany({
+      where: {
+        id: challenge.id,
+        verifiedAt: null,
+        expiresAt: { gt: new Date() },
+        attempts: { lt: this.settings.otpAttemptLimit },
+      },
+      data: { verifiedAt: new Date() },
+    });
+    // Losing the claim means the challenge was verified, expired, or exhausted
+    // by a concurrent request in the microseconds since the read. All three are
+    // already indistinguishable to a caller from the checks above, so the loser
+    // gets the same answer rather than a new code that would disclose the race.
+    if (claimed.count !== 1) throw badRequest('OTP_INVALID_OR_EXPIRED');
     return this.createSession(challenge.userId, meta);
   }
 

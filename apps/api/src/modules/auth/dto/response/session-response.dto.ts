@@ -2,7 +2,7 @@ import { Expose, Type } from 'class-transformer';
 
 class SessionUserDto {
   @Expose() id!: string;
-  @Expose() phone!: string;
+  @Expose() phone!: string | null;
   @Expose() name!: string | null;
   @Expose() locale!: string;
   @Expose() timezone!: string;

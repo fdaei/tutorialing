@@ -6,6 +6,7 @@ import { RequestOtpDto } from './dto/request/request-otp.dto';
 import { VerifyOtpDto } from './dto/request/verify-otp.dto';
 import { authConfig } from '../../config/auth.config';
 import { SessionMapper } from './mappers/session.mapper';
+import { GoogleAuthDto } from './dto/request/google-auth.dto';
 
 // Per-IP budgets layered on top of the per-phone limits already enforced in
 // AuthService: those stop one number being spammed, these stop a single host
@@ -52,6 +53,13 @@ export class AuthController {
       ip: req.ip,
       userAgent: req.headers['user-agent'],
     });
+    this.set(res, out.refreshToken);
+    return SessionMapper.toResponse(out);
+  }
+  @PublicRateLimit(OTP_VERIFY_LIMIT)
+  @Post('google')
+  async google(@Body() d: GoogleAuthDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const out = await this.auth.verifyGoogle(d.credential, { ip: req.ip, userAgent: req.headers['user-agent'] });
     this.set(res, out.refreshToken);
     return SessionMapper.toResponse(out);
   }

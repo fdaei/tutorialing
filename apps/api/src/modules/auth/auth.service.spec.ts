@@ -25,6 +25,7 @@ function harness() {
       }),
       findUnique: jest.fn(),
       update: jest.fn().mockResolvedValue({}),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
     user: { upsert: jest.fn().mockResolvedValue({ id: 'user-1', phone: PHONE }) },
   };
@@ -321,3 +322,86 @@ describe.each<Conflict>(['serialization-failure', 'no-rows'])(
     });
   },
 );
+
+/**
+ * SEC-212. `verifyOtp` checked `verifiedAt` and then set it in a separate
+ * statement, so two requests carrying the same correct code could both find
+ * the challenge unverified and both mint a session — one OTP opening two.
+ *
+ * The claim is now a single `updateMany` guarded on everything a concurrent
+ * request can move (`verifiedAt`, `expiresAt`, `attempts`), and only the caller
+ * that actually moved the row gets a session.
+ */
+function otpRaceHarness(codeHash: string) {
+  const challenge = {
+    id: 'challenge-1', phone: PHONE, userId: 'user-1', codeHash,
+    attempts: 0, verifiedAt: null as Date | null, expiresAt: new Date(Date.now() + 60_000),
+  };
+  const createdSessionIds: string[] = [];
+  const db: Record<string, unknown> = {
+    otpChallenge: {
+      findUnique: jest.fn(() => Promise.resolve({ ...challenge })),
+      update: jest.fn(() => Promise.resolve({})),
+      // Stands in for the Postgres statement: it matches only a challenge that
+      // is still unverified, and the first caller to match it takes it.
+      updateMany: jest.fn(({ data }: { data: { verifiedAt: Date } }) => {
+        if (challenge.verifiedAt) return Promise.resolve({ count: 0 });
+        challenge.verifiedAt = data.verifiedAt;
+        return Promise.resolve({ count: 1 });
+      }),
+    },
+    refreshSession: {
+      create: jest.fn(({ data }: { data: { id: string } }) => {
+        createdSessionIds.push(data.id);
+        return Promise.resolve(data);
+      }),
+    },
+    user: { findUniqueOrThrow: jest.fn().mockResolvedValue(ACTIVE_USER) },
+  };
+  const jwt = { signAsync: jest.fn().mockResolvedValue('new-access-token') };
+  const svc = new AuthService(db as never, jwt as never, {} as never);
+  return { svc, createdSessionIds, db: db as never as { otpChallenge: { updateMany: jest.Mock } } };
+}
+
+describe('AuthService.verifyOtp concurrency (SEC-212)', () => {
+  it('lets exactly one of two simultaneous verifications of the same correct code create a session', async () => {
+    const h = harness();
+    await h.svc.requestOtp(PHONE);
+    const code = h.sms.sendOtp.mock.calls[0][1] as string;
+    const codeHash = h.challenges[0]!.codeHash as string;
+
+    const { svc, createdSessionIds } = otpRaceHarness(codeHash);
+    const outcomes = await Promise.allSettled([
+      svc.verifyOtp('challenge-1', PHONE, code, {}),
+      svc.verifyOtp('challenge-1', PHONE, code, {}),
+    ]);
+
+    expect(outcomes.filter((o) => o.status === 'fulfilled')).toHaveLength(1);
+    const rejected = outcomes.filter((o) => o.status === 'rejected');
+    expect(rejected).toHaveLength(1);
+    expect((rejected[0] as PromiseRejectedResult).reason).toMatchObject({
+      response: expect.objectContaining({ code: 'OTP_INVALID_OR_EXPIRED' }),
+    });
+    expect(createdSessionIds).toHaveLength(1);
+  });
+
+  it('claims the challenge with every mutable guard restated, not just its id', async () => {
+    const h = harness();
+    await h.svc.requestOtp(PHONE);
+    const code = h.sms.sendOtp.mock.calls[0][1] as string;
+    const codeHash = h.challenges[0]!.codeHash as string;
+
+    const { svc, db } = otpRaceHarness(codeHash);
+    await svc.verifyOtp('challenge-1', PHONE, code, {});
+
+    expect(db.otpChallenge.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: 'challenge-1',
+        verifiedAt: null,
+        expiresAt: { gt: expect.any(Date) },
+        attempts: { lt: expect.any(Number) },
+      },
+      data: { verifiedAt: expect.any(Date) },
+    });
+  });
+});

@@ -1,11 +1,11 @@
 import { IsString, Length, Matches } from 'class-validator';
-import { IsIranianPhone } from '../../../../common/validators/is-iranian-phone.decorator';
+import { IsInternationalPhone } from '../../../../common/validators/is-international-phone.decorator';
 
 export class VerifyOtpDto {
   @IsString()
   challengeId!: string;
 
-  @IsIranianPhone()
+  @IsInternationalPhone()
   phone!: string;
 
   @IsString()
