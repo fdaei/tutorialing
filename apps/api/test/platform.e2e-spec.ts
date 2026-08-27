@@ -16,7 +16,10 @@ describe('LingoSpeak platform flows', () => {
     teacher: any,
     slot: any,
     test: any;
-  const phone = `09${String(Date.now()).slice(-9)}`;
+  // E.164, matching `IsInternationalPhone` on the OTP DTOs. This fixture was
+  // still on the national `09...` form and every flow below it failed at the
+  // first request as a result.
+  const phone = `+989${String(Date.now()).slice(-9)}`;
   beforeAll(async () => {
     const module = await Test.createTestingModule({ imports: [AppModule] }).compile();
     db = module.get(PrismaService);
@@ -209,21 +212,6 @@ describe('LingoSpeak platform flows', () => {
       .set('authorization', `Bearer ${adminToken}`)
       .expect(200);
     const user = await db.user.findUniqueOrThrow({ where: { id: userId } });
-    await request(app.getHttpServer())
-      .post('/api/admin/roles')
-      .set('authorization', `Bearer ${adminToken}`)
-      .send({ userId: user.id, role: 'SUPPORT' })
-      .expect(201);
-    await request(app.getHttpServer())
-      .post('/api/admin/permissions/grant')
-      .set('authorization', `Bearer ${adminToken}`)
-      .send({ userId: user.id, role: 'SUPPORT', permission: 'tickets.read' })
-      .expect(201);
-    expect(
-      await db.rolePermission.count({
-        where: { userId: user.id, role: 'SUPPORT', permission: { key: 'tickets.read' } },
-      }),
-    ).toBe(1);
     await db.walletEntry.create({
       data: {
         userId: user.id,
@@ -258,5 +246,25 @@ describe('LingoSpeak platform flows', () => {
       where: { idempotencyKey: `wallet-rollback:${payment.body.id}` },
     });
     expect(rollback?.amount).toBe(100000);
+
+    // Role and permission grants come last on purpose. Both call
+    // `TokenRevocationService.revokeUser`, which voids every access token this
+    // user is already holding — that is the point of it — so doing them earlier
+    // would 401 the student's own payment requests above.
+    await request(app.getHttpServer())
+      .post('/api/admin/roles')
+      .set('authorization', `Bearer ${adminToken}`)
+      .send({ userId: user.id, role: 'SUPPORT' })
+      .expect(201);
+    await request(app.getHttpServer())
+      .post('/api/admin/permissions/grant')
+      .set('authorization', `Bearer ${adminToken}`)
+      .send({ userId: user.id, role: 'SUPPORT', permission: 'tickets.read' })
+      .expect(201);
+    expect(
+      await db.rolePermission.count({
+        where: { userId: user.id, role: 'SUPPORT', permission: { key: 'tickets.read' } },
+      }),
+    ).toBe(1);
   });
 });
