@@ -6,6 +6,7 @@ import './globals.css';
 import { Providers } from './providers';
 import { direction, isLocale } from '@/lib/i18n';
 import { webConfig } from '@/config';
+import { GoogleAnalytics } from '@/components/analytics/google-analytics';
 export async function generateMetadata(): Promise<Metadata> {
   const value = (await headers()).get('x-lingospeak-locale'),
     locale = isLocale(value) ? value : 'fa',
@@ -33,6 +34,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       suppressHydrationWarning
     >
       <body>
+        <GoogleAnalytics />
         <Providers locale={locale}>{children}</Providers>
       </body>
     </html>

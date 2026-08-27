@@ -29,6 +29,7 @@ export function Header() {
     [p('/teachers'), t('teachers')],
     [p('/placement'), t('placement')],
     [p('/matching'), t('matching')],
+    [p('/blog'), locale === 'fa' ? 'بلاگ' : 'Blog'],
     [p('/teacher-apply'), locale === 'fa' ? 'مدرس شوید' : 'Become a teacher'],
     [p('/about'), locale === 'fa' ? 'درباره ما' : 'About us'],
   ];
