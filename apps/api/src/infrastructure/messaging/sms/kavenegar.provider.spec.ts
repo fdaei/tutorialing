@@ -1,6 +1,9 @@
 const configValue = {
   KAVENEGAR_API_KEY: 'secret-key',
   KAVENEGAR_API_BASE: 'https://sms.example.test',
+  // The provider deadline is configured centrally now, alongside Google's and
+  // Zarinpal's, rather than being a constant in this file.
+  PROVIDER_TIMEOUT_MS: 10_000,
 };
 
 jest.mock('../../../config', () => ({ config: () => configValue }));

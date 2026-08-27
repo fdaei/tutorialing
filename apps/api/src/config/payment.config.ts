@@ -9,6 +9,7 @@ export function paymentConfig() {
     apiBase: sandbox ? env.ZARINPAL_SANDBOX_API_BASE : env.ZARINPAL_API_BASE,
     startBase: sandbox ? env.ZARINPAL_SANDBOX_START_BASE : env.ZARINPAL_START_BASE,
     webUrl: env.WEB_URL,
+    providerTimeoutMs: env.PROVIDER_TIMEOUT_MS,
     reconciliationIntervalMs: env.PAYMENT_RECONCILIATION_INTERVAL_MS,
     reconciliationMinimumAgeMs: env.PAYMENT_RECONCILIATION_MINIMUM_AGE_MS,
     reconciliationRetryAfterMs: env.PAYMENT_RECONCILIATION_RETRY_AFTER_MS,

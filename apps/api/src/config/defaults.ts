@@ -31,6 +31,12 @@ export const defaultConfig = {
     uploadUrlTtlSeconds: 600,
     downloadUrlTtlSeconds: 300,
   },
+  providers: {
+    // Deadline for every outbound call to a third party (Google, Zarinpal,
+    // Kavenegar). Without one, a provider that accepts the connection and then
+    // never answers holds an API worker open for as long as it likes.
+    timeoutMs: 10_000,
+  },
   health: {
     checkTimeoutMs: 2_000,
     serviceName: 'lingospeak-api',

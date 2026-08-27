@@ -18,6 +18,8 @@ export function authConfig() {
     otpHourlyLimit: env.AUTH_OTP_HOURLY_LIMIT,
     otpAttemptLimit: env.AUTH_OTP_ATTEMPT_LIMIT,
     developmentOtp: env.AUTH_DEV_OTP,
+    googleClientId: env.GOOGLE_CLIENT_ID,
+    providerTimeoutMs: env.PROVIDER_TIMEOUT_MS,
     secureCookie: runtime.isProduction,
   };
 }

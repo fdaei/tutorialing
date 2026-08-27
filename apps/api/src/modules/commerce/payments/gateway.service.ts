@@ -18,10 +18,11 @@ export class GatewayService {
       const authority = `dev_${randomUUID()}`;
       return { authority, url: `${webUrl}/payment/development?authority=${authority}` };
     }
-    const response = await fetch(`${apiBase}/pg/v4/payment/request.json`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', accept: 'application/json' },
-      body: JSON.stringify({ merchant_id: merchantId, amount: toRial(amount), description, callback_url: callbackUrl }),
+    const response = await this.send(`${apiBase}/pg/v4/payment/request.json`, {
+      merchant_id: merchantId,
+      amount: toRial(amount),
+      description,
+      callback_url: callbackUrl,
     });
     const body = await this.body(response);
     const authority = body.data?.authority;
@@ -44,14 +45,49 @@ export class GatewayService {
     if (authority.startsWith('dev_') && !merchantId)
       return { ok: true, reference: `DEV-${createHash('sha1').update(authority).digest('hex').slice(0, 12)}` };
     if (!merchantId) return { ok: false };
-    const response = await fetch(`${apiBase}/pg/v4/payment/verify.json`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', accept: 'application/json' },
-      body: JSON.stringify({ merchant_id: merchantId, amount: toRial(amount), authority }),
+    const response = await this.send(`${apiBase}/pg/v4/payment/verify.json`, {
+      merchant_id: merchantId,
+      amount: toRial(amount),
+      authority,
     });
     const body = await this.body(response);
     const ok = response.ok && [100, 101].includes(body.data?.code ?? 0);
     return { ok, ...(ok && body.data?.ref_id != null ? { reference: String(body.data.ref_id) } : {}) };
+  }
+
+  /**
+   * Every Zarinpal call goes through here so neither can be left without a
+   * deadline. A gateway that accepts the connection and then never answers used
+   * to hold the request open indefinitely — on `verify` that is worse than a
+   * refusal, because the caller is a payment callback and the money has already
+   * moved.
+   *
+   * Deliberately no retry. `request` and `verify` are not safe to replay blind:
+   * a retried `request` opens a second gateway session for one payment, and a
+   * retried `verify` re-attempts a capture whose outcome we do not know. The
+   * repair path for a lost verify already exists and is deliberate —
+   * `ReconciliationService` re-verifies stale settleable payments and settles
+   * them through the same code a real callback uses.
+   */
+  private async send(url: string, payload: object) {
+    const { providerTimeoutMs } = paymentConfig();
+    try {
+      return await fetch(url, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', accept: 'application/json' },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(providerTimeoutMs),
+      });
+    } catch (error) {
+      // `AbortSignal.timeout` rejects with a `TimeoutError`; a DNS or socket
+      // failure arrives as a `TypeError`. Both are normalised to the same 502
+      // the rest of this class raises, so callers see one gateway failure mode
+      // rather than a raw undici error escaping as a 500.
+      const timedOut = error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError');
+      throw new BadGatewayException(
+        timedOut ? `Zarinpal did not respond within ${providerTimeoutMs}ms` : 'Zarinpal request failed',
+      );
+    }
   }
 
   private async body(response: Response) {

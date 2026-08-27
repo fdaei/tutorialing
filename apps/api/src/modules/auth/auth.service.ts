@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Prisma } from '@prisma/client';
+import { OAuth2Client, type TokenPayload } from 'google-auth-library';
 import { createHash, createHmac, randomBytes, randomInt, randomUUID, timingSafeEqual } from 'crypto';
 import { badRequest, isPrismaKnownError, tooManyRequests, unauthorized } from '../../common';
 import { authConfig } from '../../config/auth.config';
@@ -141,31 +142,56 @@ export class AuthService {
     return this.createSession(challenge.userId, meta);
   }
 
+  /**
+   * Google's client is built once and kept, because the certificate cache it
+   * verifies against lives on the instance — rebuilding it per sign-in would
+   * turn a local check back into a network call every time.
+   *
+   * `transporterOptions.timeout` is the deadline on the one outbound call this
+   * path can still make: the periodic certificate refresh. Without it a Google
+   * endpoint that accepts the connection and then never answers holds the
+   * request — and the worker serving it — open indefinitely.
+   */
+  private google?: OAuth2Client;
+  private googleClient(clientId: string) {
+    return (this.google ??= new OAuth2Client({
+      clientId,
+      transporterOptions: { timeout: this.settings.providerTimeoutMs },
+    }));
+  }
+
+  /**
+   * Verifies the credential locally against Google's published signing keys
+   * instead of asking `oauth2.googleapis.com/tokeninfo` on every sign-in.
+   *
+   * Two problems with the call it replaces. The credential travelled in the
+   * query string, so a Google ID token — a bearer credential for that account —
+   * was written into access logs, tracing spans, and every proxy in between.
+   * And it had no deadline at all.
+   *
+   * `verifyIdToken` checks the signature, `aud` (against our client id), `iss`
+   * (Google's two accepted issuers) and `exp` in-process, so the common path
+   * makes no outbound request whatsoever. The remaining checks are the ones it
+   * does not make for us: that the token identifies someone, and that the
+   * address on it has actually been verified by Google.
+   */
   async verifyGoogle(credential: string, meta: SessionMetadata) {
-    if (!this.settings.googleClientId) throw badRequest('GOOGLE_AUTH_NOT_CONFIGURED');
-    let response: Response;
+    const clientId = this.settings.googleClientId;
+    if (!clientId) throw badRequest('GOOGLE_AUTH_NOT_CONFIGURED');
+
+    let profile: TokenPayload | undefined;
     try {
-      response = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`);
+      const ticket = await this.googleClient(clientId).verifyIdToken({ idToken: credential, audience: clientId });
+      profile = ticket.getPayload();
     } catch {
+      // A malformed token, a bad signature, an expired token and an unreachable
+      // certificate endpoint are all the same answer to the caller: this
+      // credential did not establish who they are.
       throw unauthorized('GOOGLE_TOKEN_INVALID');
     }
-    if (!response.ok) throw unauthorized('GOOGLE_TOKEN_INVALID');
-    const profile = (await response.json()) as {
-      sub?: string;
-      aud?: string;
-      iss?: string;
-      email?: string;
-      email_verified?: string;
-      name?: string;
-    };
-    if (
-      !profile.sub ||
-      profile.aud !== this.settings.googleClientId ||
-      !['accounts.google.com', 'https://accounts.google.com'].includes(profile.iss ?? '') ||
-      profile.email_verified !== 'true' ||
-      !profile.email
-    )
+    if (!profile?.sub || profile.email_verified !== true || !profile.email) {
       throw unauthorized('GOOGLE_TOKEN_INVALID');
+    }
 
     const user = await this.db.user.upsert({
       where: { googleSubject: profile.sub },
