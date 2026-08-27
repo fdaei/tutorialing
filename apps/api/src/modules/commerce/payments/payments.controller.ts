@@ -4,7 +4,7 @@ import { PermissionKeys, RequirePermissions } from '../../auth/authorization';
 import { PaymentsService } from './payments.service';
 import { WalletService } from './wallet.service';
 import { RefundsService } from './refunds.service';
-import { PayDto, RefundDto } from '../dto/request/payments.dto';
+import { PayDto, RefundDto, WalletTopUpDto } from '../dto/request/payments.dto';
 
 @Controller('payments')
 export class PaymentsController {
@@ -35,6 +35,12 @@ export class PaymentsController {
   @Get('wallet')
   async wallet(@CurrentUser() u: AuthUser) {
     return { balance: await this.walletSvc.walletBalance(u.id) };
+  }
+
+  @RateLimit(RATE_LIMIT_TIERS.paymentInit)
+  @Post('wallet/top-up')
+  async topUp(@CurrentUser() u: AuthUser, @Body() d: WalletTopUpDto) {
+    return this.walletSvc.topUp(u.id, d.amount);
   }
 
   @Get('wallet/transactions')

@@ -174,6 +174,21 @@ enum TicketDirection {
   SYSTEM
 }
 
+enum BlogPostStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+enum BlogCommentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+enum BlogReactionType {
+  LIKE
+  DISLIKE
+}
+
 model User {
   id                      String                    @id @default(cuid())
   phone                   String                    @unique
@@ -214,6 +229,10 @@ model User {
   ticketReplies           TicketReply[]             @relation("TicketReplyAuthor")
   ticketStatusActions     TicketStatusHistory[]     @relation("TicketStatusActor")
   ticketAssignmentActions TicketAssignmentHistory[] @relation("TicketAssignmentActor")
+  blogPosts BlogPost[] @relation("BlogAuthor")
+  blogComments BlogComment[]
+  blogReactions BlogReaction[]
+  blogRatings BlogRating[]
 
   // PERF-304: the two user-listing paths use different chronological sorts:
   // AdminRepository orders by createdAt while SearchService orders by
@@ -1328,4 +1347,102 @@ model LocalizedContent {
   @@unique([entityType, entityId, field, locale])
   @@index([entityType, entityId])
   @@index([locale])
+}
+
+model BlogCategory {
+  id String @id @default(cuid())
+  slug String @unique
+  nameFa String
+  nameEn String
+  posts BlogPost[]
+  createdAt DateTime @default(now())
+}
+model BlogTag {
+  id String @id @default(cuid())
+  slug String @unique
+  nameFa String
+  nameEn String
+  posts BlogPost[]
+}
+model BlogPost {
+  id String @id @default(cuid())
+  slug String @unique
+  titleFa String
+  titleEn String
+  excerptFa String
+  excerptEn String
+  contentFa String
+  contentEn String
+  coverImage String?
+  status BlogPostStatus @default(DRAFT)
+  authorId String
+  categoryId String?
+  seoTitleFa String?
+  seoTitleEn String?
+  seoDescriptionFa String?
+  seoDescriptionEn String?
+  publishedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  author User @relation("BlogAuthor", fields:[authorId], references:[id])
+  category BlogCategory? @relation(fields:[categoryId], references:[id], onDelete:SetNull)
+  tags BlogTag[]
+  images BlogImage[]
+  comments BlogComment[]
+  reactions BlogReaction[]
+  ratings BlogRating[]
+  views BlogView[]
+  @@index([status, publishedAt])
+  @@index([categoryId])
+}
+model BlogImage {
+  id String @id @default(cuid())
+  postId String
+  key String
+  url String
+  altFa String?
+  altEn String?
+  createdAt DateTime @default(now())
+  post BlogPost @relation(fields:[postId], references:[id], onDelete:Cascade)
+}
+model BlogComment {
+  id String @id @default(cuid())
+  postId String
+  userId String?
+  body String
+  status BlogCommentStatus @default(PENDING)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  post BlogPost @relation(fields:[postId], references:[id], onDelete:Cascade)
+  user User? @relation(fields:[userId], references:[id], onDelete:SetNull)
+  @@index([postId,status])
+}
+model BlogReaction {
+  id String @id @default(cuid())
+  postId String
+  userId String
+  type BlogReactionType
+  createdAt DateTime @default(now())
+  post BlogPost @relation(fields:[postId], references:[id], onDelete:Cascade)
+  user User @relation(fields:[userId], references:[id], onDelete:Cascade)
+  @@unique([postId,userId])
+}
+model BlogRating {
+  id String @id @default(cuid())
+  postId String
+  userId String
+  value Int
+  createdAt DateTime @default(now())
+  post BlogPost @relation(fields:[postId], references:[id], onDelete:Cascade)
+  user User @relation(fields:[userId], references:[id], onDelete:Cascade)
+  @@unique([postId,userId])
+}
+model BlogView {
+  id String @id @default(cuid())
+  postId String
+  visitorKey String
+  createdAt DateTime @default(now())
+  post BlogPost @relation(fields:[postId], references:[id], onDelete:Cascade)
+  @@unique([postId,visitorKey])
+  @@index([postId,createdAt])
 }
