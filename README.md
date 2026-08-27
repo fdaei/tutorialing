@@ -1,5 +1,7 @@
 # LingoSpeak
 
+[![CI](https://github.com/fdaei/tutorialing/actions/workflows/ci.yml/badge.svg)](https://github.com/fdaei/tutorialing/actions/workflows/ci.yml)
+
 LingoSpeak یک پلتفرم چندزبانه آموزش زبان و مارکت‌پلیس مدرس است. این مخزن به‌صورت
 monorepo پیاده‌سازی شده و شامل رابط کاربری Next.js، API مبتنی بر NestJS و سرویس‌های
 PostgreSQL، Redis و MinIO است.
