@@ -267,4 +267,25 @@ describe('LingoSpeak platform flows', () => {
       }),
     ).toBe(1);
   });
+  /**
+   * SEC-215. `phone` and `googleSubject` are both nullable — either alone is a
+   * complete identity — and nothing stopped a row carrying neither. Such a user
+   * can never sign in and can never be matched to an inbound login, yet it can
+   * still own bookings, payments and a wallet balance.
+   *
+   * Asserted against the database rather than a service, because the point of
+   * the fix is that it holds for every writer, including a migration, a manual
+   * `psql` session, or a future code path that forgets.
+   */
+  it('refuses a user row carrying neither a phone nor a Google subject', async () => {
+    await expect(
+      db.$executeRaw`INSERT INTO "User" ("id", "updatedAt") VALUES ('e2e-no-identity', now())`,
+    ).rejects.toThrow(/User_has_identity/);
+
+    // Either identity alone is still accepted.
+    const withPhone = `09${String(Date.now()).slice(-9)}`;
+    await db.$executeRaw`INSERT INTO "User" ("id", "phone", "updatedAt") VALUES ('e2e-phone-only', ${withPhone}, now())`;
+    await db.$executeRaw`INSERT INTO "User" ("id", "googleSubject", "updatedAt") VALUES ('e2e-google-only', 'e2e-google-subject', now())`;
+    await db.user.deleteMany({ where: { id: { in: ['e2e-phone-only', 'e2e-google-only'] } } });
+  });
 });
