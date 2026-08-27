@@ -2,8 +2,6 @@ import { Injectable, Logger } from '@nestjs/common';
 import { config } from '../../../config';
 import { SmsLookupRequest, SmsProvider, SmsProviderError, SmsProviderResult } from './sms-provider';
 
-const PROVIDER_TIMEOUT_MS = 10_000;
-
 const maskPhone = (phone: string) => (phone.length < 7 ? '***' : `${phone.slice(0, 4)}***${phone.slice(-3)}`);
 
 @Injectable()
@@ -28,7 +26,7 @@ export class KavenegarProvider implements SmsProvider {
     try {
       const response = await fetch(
         `${this.cfg.KAVENEGAR_API_BASE}/v1/${this.cfg.KAVENEGAR_API_KEY}/verify/lookup.json?${query.toString()}`,
-        { method: 'POST', signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS) },
+        { method: 'POST', signal: AbortSignal.timeout(this.cfg.PROVIDER_TIMEOUT_MS) },
       );
       let body: object;
       try {

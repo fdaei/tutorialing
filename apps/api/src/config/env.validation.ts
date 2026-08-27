@@ -23,6 +23,10 @@ export const envSchema = z.object({
   AUTH_OTP_HOURLY_WINDOW_SECONDS: z.coerce.number().int().positive().default(defaultConfig.auth.otpHourlyWindowSeconds),
   AUTH_OTP_HOURLY_LIMIT: z.coerce.number().int().positive().default(defaultConfig.auth.otpHourlyLimit),
   AUTH_OTP_ATTEMPT_LIMIT: z.coerce.number().int().positive().default(defaultConfig.auth.otpAttemptLimit),
+  GOOGLE_CLIENT_ID: z.preprocess(
+    (value) => (value === '' ? undefined : value),
+    z.string().min(10).optional(),
+  ),
   API_URL: z.string().url().default(defaultConfig.app.apiUrl),
   WEB_URL: z.string().url().default(defaultConfig.app.webUrl),
   S3_ENDPOINT: z.string().url().default(defaultConfig.storage.endpoint),
@@ -41,6 +45,7 @@ export const envSchema = z.object({
     .int()
     .positive()
     .default(defaultConfig.storage.downloadUrlTtlSeconds),
+  PROVIDER_TIMEOUT_MS: z.coerce.number().int().positive().default(defaultConfig.providers.timeoutMs),
   HEALTH_CHECK_TIMEOUT_MS: z.coerce.number().int().positive().default(defaultConfig.health.checkTimeoutMs),
   DASHBOARD_STATS_RECONCILIATION_INTERVAL_MS: z.coerce
     .number()
