@@ -110,7 +110,7 @@ export function StudentTests() {
                   </button>
                 ) : (
                   <Link
-                    href={done ? `/test/session?attempt=${a.id}` : `/test/session?attempt=${a.id}`}
+                    href={done ? '/dashboard/tests' : `/test/session?attempt=${a.id}`}
                     className="primary-button"
                   >
                     {done ? 'مشاهده نتیجه' : a.status === 'IN_PROGRESS' ? 'ادامه آزمون' : 'شروع آزمون'}{' '}

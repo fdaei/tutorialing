@@ -21,7 +21,7 @@
     "format:check": "prettier --check \"{apps,packages,scripts,load}/**/*.{ts,tsx,mjs,js,json,yml,yaml}\" \"*.{json,yml,yaml,mjs}\"",
     "verify": "npm run db:format && npm run db:validate && npm run typecheck && npm run lint && npm run test && npm run build",
     "env:check": "node --env-file=.env scripts/check-env.mjs",
-    "services:up": "docker compose up -d --wait postgres redis minio && docker compose run --rm --no-deps minio-init",
+    "services:up": "docker compose up -d --wait postgres redis minio && docker compose run --rm --no-deps -T minio-init",
     "services:status": "docker compose ps",
     "services:down": "docker compose down",
     "health:api": "node --env-file=.env scripts/check-health.mjs",

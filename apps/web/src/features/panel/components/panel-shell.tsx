@@ -282,6 +282,28 @@ export function PanelShell({ title, items, children }: { title: string; items: N
           })}
         </nav>
       )}
+      {me.data && (roles.includes('TEACHER') || roles.includes('ADMIN')) && (
+        <div className={`mt-5 rounded-2xl p-3 ${adminMode ? 'bg-white/[.07]' : 'bg-[#f7f8fc]'}`}>
+          <small className={`mb-2 block px-1 text-[11px] font-bold ${adminMode ? 'text-white/45' : 'text-muted'}`}>
+            {fa ? 'جابه‌جایی پنل' : 'Switch workspace'}
+          </small>
+          <div className="grid gap-1">
+            <Link href={p('/dashboard')} className="flex items-center gap-2 rounded-lg px-2 py-2 text-xs font-bold hover:bg-blue/10">
+              <Home size={15} /> {fa ? 'پنل کاربر' : 'User dashboard'}
+            </Link>
+            {roles.includes('TEACHER') && (
+              <Link href={p('/teacher-panel')} className="flex items-center gap-2 rounded-lg px-2 py-2 text-xs font-bold hover:bg-blue/10">
+                <BookOpen size={15} /> {fa ? 'پنل مدرس' : 'Teacher panel'}
+              </Link>
+            )}
+            {roles.includes('ADMIN') && (
+              <Link href={p('/admin')} className="flex items-center gap-2 rounded-lg px-2 py-2 text-xs font-bold hover:bg-blue/10">
+                <ShieldCheck size={15} /> {fa ? 'پنل مدیریت' : 'Admin panel'}
+              </Link>
+            )}
+          </div>
+        </div>
+      )}
       <div className={`mt-3 rounded-2xl p-3 ${adminMode ? 'bg-white/[.07]' : 'bg-[#f7f8fc]'}`}>
         <div className="flex items-center gap-3">
           <span className="brand-gradient grid size-9 place-items-center rounded-full font-black text-white">

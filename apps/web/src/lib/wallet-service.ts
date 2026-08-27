@@ -78,8 +78,10 @@ export const walletService = {
       createdAt: row.createdAt,
     }));
   },
-  // TODO(api): add POST /payments/wallet/top-up. The existing POST /payments only accepts booking/package references.
-  topUp: async (_request: PaymentRequest): Promise<never> => {
-    throw new Error('سرویس افزایش موجودی هنوز از سمت سرور فعال نشده است.');
+  topUp: async (request: PaymentRequest) => {
+    return api<{ ok: boolean; balance: number }>('/payments/wallet/top-up', {
+      method: 'POST',
+      body: JSON.stringify({ amount: request.amount, discountCode: request.discountCode }),
+    });
   },
 };
