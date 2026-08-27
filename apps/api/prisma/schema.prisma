@@ -191,6 +191,15 @@ enum BlogReactionType {
   DISLIKE
 }
 
+/// A user is identified by a phone number, a Google subject, or both. Both
+/// columns are nullable because either one alone is a complete identity, but a
+/// row with neither can never be signed into and never be matched to an inbound
+/// login — while still owning bookings, payments and a wallet balance.
+///
+/// The `User_has_identity` CHECK constraint enforcing that is defined in
+/// migration `20260828100000_user_identity_constraint`, because Prisma has no
+/// schema-level syntax for CHECK constraints. Do not drop it by regenerating
+/// this model from the database.
 model User {
   id                      String                    @id @default(cuid())
   phone                   String?                   @unique
