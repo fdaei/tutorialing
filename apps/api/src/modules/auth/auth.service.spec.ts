@@ -86,24 +86,38 @@ describe('OTP hashing', () => {
  * unchanged by that swap, plus the one new edge case a non-constant-time `!==`
  * could never hit: a stored hash of a different length than the computed one.
  */
-function refreshHarness(session: unknown) {
-  const db = {
+const ACTIVE_USER = {
+  id: 'user-1', phone: PHONE, name: null, locale: 'fa', timezone: 'Asia/Tehran',
+  profileComplete: false, status: 'ACTIVE', roles: [],
+};
+
+/** The `where` shape of the atomic rotation claim, as opposed to a family revoke. */
+const CLAIM_WHERE = { id: 'session-1', revokedAt: null, expiresAt: { gt: expect.any(Date) } };
+
+function refreshHarness(session: unknown, claimedRows = 1) {
+  const db: Record<string, unknown> = {
     refreshSession: {
       findUnique: jest.fn().mockResolvedValue(session),
       create: jest.fn().mockResolvedValue({}),
       update: jest.fn().mockResolvedValue({}),
-      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      // Both the rotation claim and `revokeFamily` are `updateMany`; the claim
+      // is the one filtered by session id, so assertions match on `where`.
+      updateMany: jest.fn().mockImplementation(({ where }: { where: { familyId?: string } }) =>
+        Promise.resolve({ count: where.familyId ? 1 : claimedRows }),
+      ),
     },
-    user: {
-      findUniqueOrThrow: jest.fn().mockResolvedValue({
-        id: 'user-1', phone: PHONE, name: null, locale: 'fa', timezone: 'Asia/Tehran',
-        profileComplete: false, status: 'ACTIVE', roles: [],
-      }),
-    },
+    user: { findUniqueOrThrow: jest.fn().mockResolvedValue(ACTIVE_USER) },
   };
+  // `refresh()` rotates inside `$transaction`; the mock hands the same client
+  // back as the transaction client.
+  db.$transaction = jest.fn((run: (tx: unknown) => unknown) => run(db));
   const jwt = { signAsync: jest.fn().mockResolvedValue('new-access-token') };
   const svc = new AuthService(db as never, jwt as never, {} as never);
-  return { svc, db, jwt };
+  return { svc, db: db as never as {
+    refreshSession: Record<'findUnique' | 'create' | 'update' | 'updateMany', jest.Mock>;
+    user: { findUniqueOrThrow: jest.Mock };
+    $transaction: jest.Mock;
+  }, jwt };
 }
 
 function refreshSecretAndHash() {
@@ -121,11 +135,20 @@ describe('AuthService.refresh (SEC-209)', () => {
     const result = await svc.refresh(`session-1.${secret}`, {});
     expect(result.accessToken).toBe('new-access-token');
     expect(db.refreshSession.create).toHaveBeenCalled();
+    // The revocation *is* the claim, and it only matches a session that is
+    // still unrevoked and unexpired.
+    expect(db.refreshSession.updateMany).toHaveBeenCalledWith({
+      where: CLAIM_WHERE,
+      data: { revokedAt: expect.any(Date) },
+    });
     expect(db.refreshSession.update).toHaveBeenCalledWith({
       where: { id: 'session-1' },
-      data: expect.objectContaining({ revokedAt: expect.any(Date) }),
+      data: { replacedById: expect.any(String) },
     });
-    expect(db.refreshSession.updateMany).not.toHaveBeenCalled();
+    // Rotation must be one transaction, not three loose statements (SEC-211).
+    expect(db.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+      isolationLevel: 'Serializable',
+    });
   });
 
   it('2. rejects an invalid refresh token (wrong secret) and revokes the family', async () => {
@@ -218,3 +241,83 @@ describe('AuthService.refresh (SEC-209)', () => {
     expect(db.refreshSession.updateMany).toHaveBeenCalled();
   });
 });
+
+/**
+ * SEC-211. Rotation used to read the session, mint its replacement, and revoke
+ * the original as three separate statements, so two requests carrying one
+ * refresh token could both pass the `revokedAt` check and both mint a session.
+ *
+ * These drive two `refresh()` calls concurrently against a shared row whose
+ * `updateMany` behaves like the Postgres statement it stands for: it matches
+ * only a session that is still unrevoked, and the first caller to match takes
+ * it. Both ways Postgres can report the loss are covered — a serialization
+ * failure (what Serializable actually raises) and zero matched rows (what a
+ * weakened isolation level would leave the claim to catch on its own).
+ */
+type Conflict = 'serialization-failure' | 'no-rows';
+
+function racingHarness(tokenHash: string, conflict: Conflict) {
+  const row = {
+    id: 'session-1', userId: 'user-1', familyId: 'family-1', tokenHash,
+    revokedAt: null as Date | null, expiresAt: new Date(Date.now() + 60_000),
+  };
+  const createdSessionIds: string[] = [];
+  const db: Record<string, unknown> = {
+    refreshSession: {
+      findUnique: jest.fn(() => Promise.resolve({ ...row })),
+      create: jest.fn(({ data }: { data: { id: string } }) => {
+        createdSessionIds.push(data.id);
+        return Promise.resolve(data);
+      }),
+      update: jest.fn(() => Promise.resolve({})),
+      updateMany: jest.fn(({ where, data }: { where: { familyId?: string }; data: { revokedAt: Date } }) => {
+        if (where.familyId) {
+          row.revokedAt ??= data.revokedAt;
+          return Promise.resolve({ count: 1 });
+        }
+        if (row.revokedAt) {
+          if (conflict === 'serialization-failure') {
+            return Promise.reject(Object.assign(new Error('could not serialize access'), { code: 'P2034' }));
+          }
+          return Promise.resolve({ count: 0 });
+        }
+        row.revokedAt = data.revokedAt;
+        return Promise.resolve({ count: 1 });
+      }),
+    },
+    user: { findUniqueOrThrow: jest.fn().mockResolvedValue(ACTIVE_USER) },
+  };
+  db.$transaction = jest.fn((run: (tx: unknown) => unknown) => run(db));
+  const jwt = { signAsync: jest.fn().mockResolvedValue('new-access-token') };
+  const svc = new AuthService(db as never, jwt as never, {} as never);
+  return { svc, row, createdSessionIds, db: db as never as { refreshSession: { create: jest.Mock; updateMany: jest.Mock } } };
+}
+
+describe.each<Conflict>(['serialization-failure', 'no-rows'])(
+  'AuthService.refresh concurrency (SEC-211, loser sees %s)',
+  (conflict) => {
+    it('rotates exactly once and answers the loser with reuse detection', async () => {
+      const { secret, tokenHash } = refreshSecretAndHash();
+      const { svc, createdSessionIds, db } = racingHarness(tokenHash, conflict);
+      const token = `session-1.${secret}`;
+
+      const outcomes = await Promise.allSettled([svc.refresh(token, {}), svc.refresh(token, {})]);
+      const fulfilled = outcomes.filter((o) => o.status === 'fulfilled');
+      const rejected = outcomes.filter((o) => o.status === 'rejected');
+
+      expect(fulfilled).toHaveLength(1);
+      expect(rejected).toHaveLength(1);
+      expect((rejected[0] as PromiseRejectedResult).reason).toMatchObject({
+        response: { code: 'REFRESH_TOKEN_EXPIRED_OR_REUSED' },
+      });
+      // The whole point: one refresh token yields one new session, never two.
+      expect(createdSessionIds).toHaveLength(1);
+      expect(db.refreshSession.create).toHaveBeenCalledTimes(1);
+      // Reuse detection still takes the family down with it.
+      expect(db.refreshSession.updateMany).toHaveBeenCalledWith({
+        where: { familyId: 'family-1', revokedAt: null },
+        data: { revokedAt: expect.any(Date) },
+      });
+    });
+  },
+);
