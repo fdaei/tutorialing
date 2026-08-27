@@ -23,6 +23,7 @@ import { LanguagesModule } from './modules/languages/languages.module';
 import { SearchModule } from './application/search/search.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { ContentModule } from './modules/content/content.module';
+import { BlogModule } from './modules/blog/blog.module';
 @Module({
   imports: [
     ConfigModule,
@@ -43,6 +44,7 @@ import { ContentModule } from './modules/content/content.module';
     SupportModule,
     NotificationsModule,
     ContentModule,
+    BlogModule,
     LearningModule,
     AdminDashboardModule,
   ],

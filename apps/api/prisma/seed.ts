@@ -16,6 +16,7 @@ import {
   TicketDirection,
   TicketMessageType,
   TicketStatus,
+  BlogPostStatus,
 } from '@prisma/client';
 
 const db = new PrismaClient();
@@ -1709,6 +1710,8 @@ async function seedTicketsCmsAndSettings() {
     ['booking.minLeadMinutes', { value: 120 }, true],
     ['booking.maxAdvanceDays', { value: 60 }, true],
     ['reviews.autoDeactivateOneStarCount', { value: 5 }, false],
+    // Replace with the real GA4 Measurement ID from the admin settings panel.
+    ['analytics.googleMeasurementId', { value: 'G-XXXXXXXXXX' }, true],
   ];
   for (const [key, value, isPublic] of rules) {
     await db.setting.upsert({
@@ -1953,6 +1956,20 @@ async function seedAudit() {
   }
 }
 
+async function seedBlog() {
+  const productivity = await db.blogCategory.upsert({ where: { slug: 'learning-tips' }, update: {}, create: { slug: 'learning-tips', nameFa: 'نکات یادگیری', nameEn: 'Learning tips' } });
+  const culture = await db.blogCategory.upsert({ where: { slug: 'culture' }, update: {}, create: { slug: 'culture', nameFa: 'فرهنگ و زبان', nameEn: 'Culture & language' } });
+  const tags = await Promise.all([
+    ['speaking', 'مکالمه', 'Speaking'] as const, ['vocabulary', 'واژگان', 'Vocabulary'] as const, ['study-plan', 'برنامه‌ریزی', 'Study plan'] as const,
+  ].map(([slug, nameFa, nameEn]) => db.blogTag.upsert({ where: { slug }, update: {}, create: { slug, nameFa, nameEn } })));
+  const posts = [
+    { slug: 'speak-with-confidence', categoryId: productivity.id, titleFa: 'چطور با اعتمادبه‌نفس انگلیسی صحبت کنیم؟', titleEn: 'How to speak English with confidence', excerptFa: 'تمرین‌های کوتاه و کاربردی برای عبور از ترس مکالمه.', excerptEn: 'Short practical exercises to overcome speaking anxiety.', contentFa: '# از اشتباه کردن نترسید\n\nمکالمه مهارتی است که با تمرین روزانه رشد می‌کند. هر روز پنج دقیقه درباره‌ی یک موضوع ساده صحبت کنید و صدای خود را ضبط کنید.', contentEn: '# Embrace mistakes\n\nSpeaking grows through daily practice. Talk for five minutes about a simple topic and record yourself.', tagIds: [tags[0]!.id, tags[2]!.id] },
+    { slug: 'vocabulary-in-context', categoryId: productivity.id, titleFa: 'واژگان را در جمله یاد بگیرید', titleEn: 'Learn vocabulary in context', excerptFa: 'چرا حفظ کردن فهرست لغات کافی نیست و چه روشی بهتر جواب می‌دهد؟', excerptEn: 'Why word lists are not enough—and what works better.', contentFa: '## یک کلمه، سه جمله\n\nهر واژه‌ی جدید را در سه جمله‌ی واقعی به کار ببرید و روز بعد آن جمله‌ها را مرور کنید.', contentEn: '## One word, three sentences\n\nUse every new word in three real sentences and review them the next day.', tagIds: [tags[1]!.id] },
+    { slug: 'english-through-films', categoryId: culture.id, titleFa: 'یادگیری زبان با فیلم و سریال', titleEn: 'Learn English through films', excerptFa: 'یک روش سه‌مرحله‌ای برای تبدیل تماشای فیلم به تمرین زبان.', excerptEn: 'A three-step method to turn movie time into language practice.', contentFa: '### روش سه‌مرحله‌ای\n\nابتدا با زیرنویس فارسی، سپس انگلیسی و در پایان بدون زیرنویس تماشا کنید.', contentEn: '### The three-step method\n\nWatch first with native subtitles, then English subtitles, and finally without subtitles.', tagIds: [tags[0]!.id, tags[1]!.id] },
+  ];
+  for (const p of posts) await db.blogPost.upsert({ where: { slug: p.slug }, update: { ...p, tagIds: undefined, status: BlogPostStatus.PUBLISHED, publishedAt: now }, create: { ...p, tagIds: undefined, authorId: users.admin.id, status: BlogPostStatus.PUBLISHED, publishedAt: now, tags: { connect: p.tagIds!.map(id => ({ id })) } } } as any);
+}
+
 async function main() {
   await seedUsersAndPermissions();
   await seedLanguages();
@@ -1962,6 +1979,7 @@ async function main() {
   await seedBookingsFinanceAndReviews();
   await seedDemoExperience();
   await seedTicketsCmsAndSettings();
+  await seedBlog();
   await seedAudit();
   console.log('Seed completed successfully with multilingual workflow data.');
 }
