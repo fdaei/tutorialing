@@ -79,9 +79,13 @@ export const walletService = {
     }));
   },
   topUp: async (request: PaymentRequest) => {
-    return api<{ ok: boolean; balance: number }>('/payments/wallet/top-up', {
+    return api<{ paymentId: string; status: string; url?: string }>('/payments/wallet/top-up', {
       method: 'POST',
-      body: JSON.stringify({ amount: request.amount, discountCode: request.discountCode }),
+      body: JSON.stringify({
+        amount: request.amount,
+        discountCode: request.discountCode,
+        idempotencyKey: crypto.randomUUID(),
+      }),
     });
   },
 };

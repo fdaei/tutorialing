@@ -87,8 +87,6 @@ export class BookingsService {
           });
           if (studentOverlap) throw conflict('STUDENT_BOOKING_OVERLAP');
 
-          if (data.type === 'regular' && !data.enrollmentId)
-            await this.assertTrialCompleted(tx, studentId, data.teacherId);
           if (data.type === 'trial') await this.assertTrialNotUsed(tx, studentId, data.teacherId);
 
           let enrollmentId: string | undefined;
@@ -163,24 +161,6 @@ export class BookingsService {
     const leadMinutes = (startsAt.getTime() - Date.now()) / 60_000;
     if (leadMinutes < minLeadMinutes) throw badRequest('BOOKING_LEAD_TIME_TOO_SHORT');
     if (leadMinutes / 1_440 > maxAdvanceDays) throw badRequest('BOOKING_TOO_FAR_AHEAD');
-  }
-
-  /**
-   * The trial session is mandatory: a student's first lesson with a given teacher
-   * has to be a trial, so both sides can assess fit before committing to a full
-   * class. Nothing enforced this, so a student could book straight into a regular
-   * lesson. Credit-based bookings are exempt — buying a package is itself a
-   * deliberate commitment, and the trial precedes the purchase.
-   */
-  private async assertTrialCompleted(tx: Prisma.TransactionClient, studentId: string, teacherId: string) {
-    const priorTrial = await tx.booking.count({
-      where: { studentId, teacherId, type: 'trial', status: { in: ['COMPLETED', 'NO_SHOW'] } },
-    });
-    if (priorTrial) return;
-    const pendingTrial = await tx.booking.count({
-      where: { studentId, teacherId, type: 'trial', status: { in: ['PENDING_PAYMENT', 'CONFIRMED'] } },
-    });
-    throw badRequest('TRIAL_SESSION_REQUIRED');
   }
 
   /**

@@ -1,5 +1,6 @@
 'use client';
 
+import { localized, isDefaultLocale, translate } from '@/lib/i18n';
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CalendarDays, Clock, Plus, Trash2 } from 'lucide-react';
@@ -31,7 +32,7 @@ const weekdayEn = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frid
 
 export function TeacherAvailabilityManager() {
   const { locale } = useTranslations(),
-    fa = locale === 'fa',
+    fa = isDefaultLocale(locale),
     qc = useQueryClient(),
     query = useQuery({ queryKey: ['availability-me'], queryFn: () => api<Availability>('/availability/me') });
   const [rules, setRules] = useState<Rule[]>([]),
@@ -94,7 +95,7 @@ export function TeacherAvailabilityManager() {
   });
   const addOverride = useMutation({
     mutationFn: () => {
-      if (!overrideDate) throw new Error(fa ? 'تاریخ را انتخاب کنید.' : 'Choose a date.');
+      if (!overrideDate) throw new Error(translate(locale, 'teacherteacherAvailabilityManagerChooseADate'));
       const [sh = 0, sm = 0] = overrideStart.split(':').map(Number),
         [eh = 0, em = 0] = overrideEnd.split(':').map(Number);
       return api('/availability/me/overrides', {
@@ -144,7 +145,10 @@ export function TeacherAvailabilityManager() {
   if (query.isError)
     return (
       <ErrorBox
-        message={apiMessage(query.error, fa ? 'برنامه زمانی دریافت نشد.' : 'Could not load availability.')}
+        message={apiMessage(
+          query.error,
+          translate(locale, 'teacherteacherAvailabilityManagerCouldNotLoadAvailability'),
+        )}
         retry={() => query.refetch()}
       />
     );
@@ -153,11 +157,11 @@ export function TeacherAvailabilityManager() {
       <section className="rounded-3xl border hairline bg-white p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="text-2xl font-black">{fa ? 'برنامه هفتگی تکرارشونده' : 'Recurring weekly schedule'}</h2>
+            <h2 className="text-2xl font-black">
+              {translate(locale, 'teacherteacherAvailabilityManagerRecurringWeeklySchedule')}
+            </h2>
             <p className="mt-2 text-sm text-muted">
-              {fa
-                ? 'مدت کلاس و فاصله بین کلاس‌ها برای هر بازه مستقل است. هم‌پوشانی در سرور رد می‌شود.'
-                : 'Lesson length and break are stored per range. Server-side validation rejects overlaps.'}
+              {translate(locale, 'teacherteacherAvailabilityManagerLessonLengthAndBreakAreStoredPerRange')}
             </p>
           </div>
           <button
@@ -165,7 +169,7 @@ export function TeacherAvailabilityManager() {
             className="flex items-center gap-2 rounded-xl border border-purple px-4 py-3 font-bold text-purple"
           >
             <Plus size={18} />
-            {fa ? 'افزودن بازه' : 'Add range'}
+            {translate(locale, 'teacherteacherAvailabilityManagerAddRange')}
           </button>
         </div>
         <div className="mt-6 grid gap-3">
@@ -180,7 +184,7 @@ export function TeacherAvailabilityManager() {
                   onChange={(event) => updateRule(index, { weekday: Number(event.target.value) })}
                   className="input"
                 >
-                  {(fa ? weekdayFa : weekdayEn).map((day, i) => (
+                  {localized({ fa: weekdayFa, en: weekdayEn }, locale).map((day, i) => (
                     <option value={i} key={day}>
                       {day}
                     </option>
@@ -192,18 +196,18 @@ export function TeacherAvailabilityManager() {
                   value={rule.lessonDuration ?? 60}
                   min={15}
                   max={240}
-                  label={fa ? 'مدت' : 'Duration'}
+                  label={translate(locale, 'teacherteacherAvailabilityManagerDuration')}
                   onChange={(lessonDuration) => updateRule(index, { lessonDuration })}
                 />
                 <NumberInput
                   value={rule.breakMinutes ?? 15}
                   min={0}
                   max={120}
-                  label={fa ? 'فاصله' : 'Break'}
+                  label={translate(locale, 'teacherteacherAvailabilityManagerBreak')}
                   onChange={(breakMinutes) => updateRule(index, { breakMinutes })}
                 />
                 <button
-                  aria-label={fa ? 'حذف بازه' : 'Remove range'}
+                  aria-label={translate(locale, 'teacherteacherAvailabilityManagerRemoveRange')}
                   onClick={() => setRules((current) => current.filter((_, i) => i !== index))}
                   className="grid size-11 place-items-center rounded-xl text-red-600 hover:bg-red-50"
                 >
@@ -213,7 +217,7 @@ export function TeacherAvailabilityManager() {
             ))
           ) : (
             <p className="rounded-2xl border border-dashed hairline p-8 text-center text-muted">
-              {fa ? 'هنوز برنامه هفتگی ثبت نشده است.' : 'No weekly schedule has been added.'}
+              {translate(locale, 'teacherteacherAvailabilityManagerNoWeeklyScheduleHasBeenAdded')}
             </p>
           )}
         </div>
@@ -224,22 +228,20 @@ export function TeacherAvailabilityManager() {
           className="brand-gradient mt-5 rounded-xl px-6 py-3 font-black text-white disabled:opacity-50"
         >
           {saveRules.isPending
-            ? fa
-              ? 'در حال ذخیره…'
-              : 'Saving…'
-            : fa
-              ? 'ذخیره برنامه هفتگی'
-              : 'Save weekly schedule'}
+            ? translate(locale, 'teacherteacherAvailabilityManagerSaving')
+            : translate(locale, 'teacherteacherAvailabilityManagerSaveWeeklySchedule')}
         </button>
-        {saveRules.isSuccess && <Success text={fa ? 'برنامه هفتگی ذخیره شد.' : 'Weekly schedule saved.'} />}
+        {saveRules.isSuccess && (
+          <Success text={translate(locale, 'teacherteacherAvailabilityManagerWeeklyScheduleSaved')} />
+        )}
       </section>
       <div className="grid gap-6 xl:grid-cols-2">
         <section className="rounded-3xl border hairline bg-white p-6">
-          <h2 className="text-2xl font-black">{fa ? 'استثنای یک روز' : 'Single-day exception'}</h2>
+          <h2 className="text-2xl font-black">
+            {translate(locale, 'teacherteacherAvailabilityManagerSingleDayException')}
+          </h2>
           <p className="mt-2 text-sm text-muted">
-            {fa
-              ? 'این استثنا جای برنامه هفتگی همان روز را می‌گیرد.'
-              : 'This exception replaces the weekly schedule for that date.'}
+            {translate(locale, 'teacherteacherAvailabilityManagerThisExceptionReplacesTheWeeklyScheduleForThat')}
           </p>
           <div className="mt-5 grid gap-4">
             <JalaliDateTimePicker value={overrideDate} onChange={setOverrideDate} withTime={false} />
@@ -251,15 +253,15 @@ export function TeacherAvailabilityManager() {
                 className="size-5 accent-purple"
               />
               <span>
-                {fa
-                  ? 'به‌جای تعطیلی کامل، یک بازه آزاد اضافه شود.'
-                  : 'Add an available range instead of closing the whole day.'}
+                {translate(locale, 'teacherteacherAvailabilityManagerAddAnAvailableRangeInsteadOfClosingThe')}
               </span>
             </label>
             {overrideAvailable && (
               <div className="grid grid-cols-2 gap-3">
                 <label>
-                  <span className="mb-2 block text-xs text-muted">{fa ? 'شروع' : 'Start'}</span>
+                  <span className="mb-2 block text-xs text-muted">
+                    {translate(locale, 'teacherteacherAvailabilityManagerStart')}
+                  </span>
                   <input
                     type="time"
                     value={overrideStart}
@@ -268,7 +270,9 @@ export function TeacherAvailabilityManager() {
                   />
                 </label>
                 <label>
-                  <span className="mb-2 block text-xs text-muted">{fa ? 'پایان' : 'End'}</span>
+                  <span className="mb-2 block text-xs text-muted">
+                    {translate(locale, 'teacherteacherAvailabilityManagerEnd')}
+                  </span>
                   <input
                     type="time"
                     value={overrideEnd}
@@ -282,14 +286,14 @@ export function TeacherAvailabilityManager() {
               value={overrideReason}
               onChange={(event) => setOverrideReason(event.target.value)}
               className="input"
-              placeholder={fa ? 'دلیل اختیاری' : 'Optional reason'}
+              placeholder={translate(locale, 'teacherteacherAvailabilityManagerOptionalReason')}
             />
             <button
               disabled={addOverride.isPending || !overrideDate}
               onClick={() => addOverride.mutate()}
               className="brand-gradient rounded-xl py-3 font-black text-white disabled:opacity-50"
             >
-              {fa ? 'ذخیره استثنا' : 'Save exception'}
+              {translate(locale, 'teacherteacherAvailabilityManagerSaveException')}
             </button>
             {addOverride.isError && <InlineError error={addOverride.error} field="endMinute" fa={fa} />}
           </div>
@@ -301,9 +305,7 @@ export function TeacherAvailabilityManager() {
                   <p className="mt-1 text-sm text-muted">
                     {item.available
                       ? `${minutes(item.startMinute)}–${minutes(item.endMinute)}`
-                      : fa
-                        ? 'تعطیل کامل'
-                        : 'Closed all day'}
+                      : translate(locale, 'teacherteacherAvailabilityManagerClosedAllDay')}
                     {item.reason ? ` · ${item.reason}` : ''}
                   </p>
                 </div>
@@ -315,11 +317,11 @@ export function TeacherAvailabilityManager() {
           </div>
         </section>
         <section className="rounded-3xl border hairline bg-white p-6">
-          <h2 className="text-2xl font-black">{fa ? 'مسدودکردن بازه زمانی' : 'Block a time period'}</h2>
+          <h2 className="text-2xl font-black">
+            {translate(locale, 'teacherteacherAvailabilityManagerBlockATimePeriod')}
+          </h2>
           <p className="mt-2 text-sm text-muted">
-            {fa
-              ? 'بازه مسدود فوراً از نوبت‌های عمومی حذف و رزرو آن در Backend رد می‌شود.'
-              : 'The period is immediately removed from public slots and rejected by the booking backend.'}
+            {translate(locale, 'teacherteacherAvailabilityManagerThePeriodIsImmediatelyRemovedFromPublicSlots')}
           </p>
           <div className="mt-5 grid gap-4">
             <JalaliDateTimePicker value={blockStart} onChange={setBlockStart} />
@@ -328,19 +330,19 @@ export function TeacherAvailabilityManager() {
               value={blockReason}
               onChange={(event) => setBlockReason(event.target.value)}
               className="input"
-              placeholder={fa ? 'دلیل اختیاری' : 'Optional reason'}
+              placeholder={translate(locale, 'teacherteacherAvailabilityManagerOptionalReason')}
             />
             <button
               disabled={addBlock.isPending || !blockStart || !blockEnd}
               onClick={() => addBlock.mutate()}
               className="brand-gradient rounded-xl py-3 font-black text-white disabled:opacity-50"
             >
-              {fa ? 'ثبت مسدودی' : 'Create block'}
+              {translate(locale, 'teacherteacherAvailabilityManagerCreateBlock')}
             </button>
             {addBlock.isError && <InlineError error={addBlock.error} field="endsAt" fa={fa} />}{' '}
             {addBlock.isSuccess && (
               <Success
-                text={fa ? 'بازه مسدود شد و فهرست به‌روز شد.' : 'The period was blocked and the list refreshed.'}
+                text={translate(locale, 'teacherteacherAvailabilityManagerThePeriodWasBlockedAndTheListRefreshed')}
               />
             )}
           </div>
@@ -353,8 +355,8 @@ export function TeacherAvailabilityManager() {
                       {formatDateTime(item.startsAt, fa)} — {formatDateTime(item.endsAt, fa)}
                     </strong>
                     <p className="mt-1 text-sm text-muted">
-                      {item.reason || (fa ? 'بدون دلیل ثبت‌شده' : 'No reason supplied')}
-                      {item.adminCreated ? ` · ${fa ? 'توسط ادمین' : 'Admin'}` : ''}
+                      {item.reason || translate(locale, 'teacherteacherAvailabilityManagerNoReasonSupplied')}
+                      {item.adminCreated ? ` · ${translate(locale, 'teacherteacherAvailabilityManagerAdmin')}` : ''}
                     </p>
                   </div>
                   <button
@@ -368,7 +370,7 @@ export function TeacherAvailabilityManager() {
               ))
             ) : (
               <p className="rounded-2xl border border-dashed hairline p-6 text-center text-sm text-muted">
-                {fa ? 'مسدودی فعالی وجود ندارد.' : 'There are no active blocked periods.'}
+                {translate(locale, 'teacherteacherAvailabilityManagerThereAreNoActiveBlockedPeriods')}
               </p>
             )}
           </div>
@@ -439,12 +441,13 @@ function dateOnlyIso(date: Date) {
   return new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())).toISOString();
 }
 function formatDate(value: string, fa: boolean) {
-  return new Intl.DateTimeFormat(fa ? 'fa-IR-u-ca-persian' : 'en-US', { dateStyle: 'full', timeZone: 'UTC' }).format(
-    new Date(value),
-  );
+  return new Intl.DateTimeFormat(translate(fa, 'commercepricingManagerEnUS'), {
+    dateStyle: 'full',
+    timeZone: 'UTC',
+  }).format(new Date(value));
 }
 function formatDateTime(value: string, fa: boolean) {
-  return new Intl.DateTimeFormat(fa ? 'fa-IR-u-ca-persian' : 'en-US', {
+  return new Intl.DateTimeFormat(translate(fa, 'commercepricingManagerEnUS'), {
     dateStyle: 'medium',
     timeStyle: 'short',
   }).format(new Date(value));
@@ -453,7 +456,7 @@ function InlineError({ error, field, fa }: { error: unknown; field: string; fa: 
   const detail = apiField(error, field);
   return (
     <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-800">
-      {detail || apiMessage(error, fa ? 'ذخیره ناموفق بود.' : 'Could not save.')}
+      {detail || apiMessage(error, translate(fa, 'teacherteacherAvailabilityManagerCouldNotSave'))}
     </p>
   );
 }

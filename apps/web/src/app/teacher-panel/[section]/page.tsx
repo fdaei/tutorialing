@@ -1,15 +1,12 @@
-import { PanelActions } from '@/features/panel/components/panel-actions';
-import { PanelShell, teacherNav } from '@/features/panel/components/panel-shell';
-import { ResourceView } from '@/features/panel/components/resource-view';
-import { TeacherAvailabilityManager } from '@/features/teacher/components/teacher-availability-manager';
-import { PricingManager } from '@/features/commerce/components/pricing-manager';
-import { MyTicketManager } from '@/features/support/components/my-ticket-manager';
+import { localized, isDefaultLocale, translate } from '@/lib/i18n';
+import { PanelActions, PanelShell, ResourceView, teacherNav } from '@/features/panel';
+import { TeacherAvailabilityManager, TeacherFinance, TeacherMore, TeacherProfileHub } from '@/features/teacher';
+import { PricingManager } from '@/features/commerce';
+import { MyTicketManager } from '@/features/support';
 import { requestLocale } from '@/lib/server-locale';
-import { TeacherProfileHub } from '@/features/teacher/components/teacher-profile-hub';
-import { TeacherFinance } from '@/features/teacher/components/teacher-finance';
-import { TeacherMore } from '@/features/teacher/components/teacher-more';
-import { TeacherPlannerCalendar } from '@/features/scheduling/components/teacher-planner-calendar';
+import { TeacherPlannerCalendar } from '@/features/scheduling';
 import { redirect } from 'next/navigation';
+import { FeatureErrorBoundary } from '@/shared/components/error-boundaries';
 
 const map: Record<string, [string, string, string]> = {
   profile: ['پروفایل عمومی', 'Public profile', '/teacher/application'],
@@ -32,11 +29,11 @@ const map: Record<string, [string, string, string]> = {
 export default async function Section({ params }: { params: Promise<{ section: string }> }) {
   const { section } = await params;
   const locale = await requestLocale(),
-    fa = locale === 'fa';
+    fa = isDefaultLocale(locale);
   const [titleFa, titleEn, endpoint] = map[section] ?? ['پنل مدرس', 'Teacher panel', '/users/me'];
   if (['verification', 'video', 'languages', 'specialties'].includes(section))
-    redirect(`/${locale === 'fa' ? '' : 'en/'}teacher-panel/profile`);
-  if (section === 'calendar') redirect(`/${locale === 'fa' ? '' : 'en/'}teacher-panel/availability`);
+    redirect(`/${translate(locale, 'teacherPanelsectionEn')}teacher-panel/profile`);
+  if (section === 'calendar') redirect(`/${translate(locale, 'teacherPanelsectionEn')}teacher-panel/availability`);
   const content =
     section === 'profile' ? (
       <TeacherProfileHub />
@@ -59,12 +56,12 @@ export default async function Section({ params }: { params: Promise<{ section: s
     ) : (
       <>
         <PanelActions role="teacher" section={section} endpoint={endpoint} />
-        <ResourceView title={fa ? titleFa : titleEn} endpoint={endpoint} />
+        <ResourceView title={localized({ fa: titleFa, en: titleEn }, locale)} endpoint={endpoint} />
       </>
     );
   return (
     <PanelShell title="پنل مدرس" items={teacherNav}>
-      {content}
+      <FeatureErrorBoundary name={`teacher-${section}`}>{content}</FeatureErrorBoundary>
     </PanelShell>
   );
 }

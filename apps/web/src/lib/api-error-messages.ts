@@ -1,6 +1,20 @@
 export type ApiLocale = 'fa' | 'en';
 
 export const API_ERROR_MESSAGES: Record<string, Record<ApiLocale, string>> = {
+  GOOGLE_AUTH_NOT_CONFIGURED: { fa: 'ورود با گوگل هنوز تنظیم نشده است.', en: 'Google sign-in is not configured yet.' },
+  GOOGLE_TOKEN_INVALID: { fa: 'ورود با گوگل معتبر نبود؛ دوباره تلاش کنید.', en: 'Google sign-in was invalid. Try again.' },
+  INVALID_CREDENTIALS: {
+    fa: 'ایمیل، شماره موبایل یا رمز عبور اشتباه است.',
+    en: 'The email, mobile number, or password is incorrect.',
+  },
+  IDENTITY_INVALID: {
+    fa: 'ایمیل یا شماره موبایل واردشده معتبر نیست.',
+    en: 'Enter a valid email address or mobile number.',
+  },
+  IDENTITY_ALREADY_REGISTERED: {
+    fa: 'قبلاً حسابی با این ایمیل یا شماره موبایل ساخته شده است.',
+    en: 'An account already exists with this email address or mobile number.',
+  },
   RATE_LIMITED: {
     fa: 'درخواست‌های شما بیش از حد مجاز است. {0} ثانیه دیگر دوباره تلاش کنید.',
     en: 'Too many requests. Try again in {0} seconds.',
@@ -292,6 +306,10 @@ export const API_ERROR_MESSAGES: Record<string, Record<ApiLocale, string>> = {
   FILE_SIZE_INVALID: {
     fa: 'حجم فایل باید بیشتر از صفر و حداکثر ۵۰ مگابایت باشد.',
     en: 'The file must be larger than zero and no more than 50 MB.',
+  },
+  SUPPORT_ATTACHMENT_INVALID: {
+    fa: 'ضمیمه معتبر نیست. فایل PDF، JPG یا PNG تا ۱۰ مگابایت انتخاب کنید.',
+    en: 'The attachment is invalid. Select a PDF, JPG, or PNG file up to 10 MB.',
   },
   FILE_CHECKSUM_INVALID: {
     fa: 'اعتبارسنجی فایل ناموفق بود. فایل را دوباره انتخاب کنید.',

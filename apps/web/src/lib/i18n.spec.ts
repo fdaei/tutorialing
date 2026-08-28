@@ -1,4 +1,4 @@
-import { direction, formatDate, formatMoney, localePath, translate } from './i18n';
+import { direction, formatDate, formatMoney, localePath, localized, localeTag, resolveLocale, translate } from './i18n';
 
 describe('localization primitives', () => {
   it('preserves an equivalent route while changing its locale prefix', () => {
@@ -10,6 +10,17 @@ describe('localization primitives', () => {
     expect(translate('fa', 'teachers')).toBe('مدرس‌ها');
     expect(direction('fa')).toBe('rtl');
     expect(direction('en')).toBe('ltr');
+    expect(localeTag('fa')).toBe('fa-IR');
+  });
+  it('normalizes missing or unsupported locale values to the safe default', () => {
+    expect(resolveLocale(undefined)).toBe('fa');
+    expect(resolveLocale(null)).toBe('fa');
+    expect(resolveLocale('de')).toBe('fa');
+    expect(resolveLocale('en')).toBe('en');
+  });
+  it('selects localized API fields and falls back to the default locale', () => {
+    expect(localized({ fa: 'عنوان', en: 'Title' }, 'en')).toBe('Title');
+    expect(localized({ fa: 'عنوان' }, 'en')).toBe('عنوان');
   });
   it('localizes dates and prices without mutating source values', () => {
     expect(formatMoney(1250000, 'fa')).toContain('۱٬۲۵۰٬۰۰۰');

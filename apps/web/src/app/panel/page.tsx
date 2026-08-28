@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { api, ApiError } from '@/lib/api';
 import { useTranslations } from '@/components/shared/locale-provider';
-import { localePath } from '@/lib/i18n';
+import { localePath, localized, translate } from '@/lib/i18n';
 import { panelHome, type PanelIdentity } from '@/lib/panel-access';
 
 export default function PanelRouter() {
@@ -21,9 +21,7 @@ export default function PanelRouter() {
     <main className="grid min-h-screen place-items-center bg-[#f7f8fc]">
       <div className="text-center">
         <span className="brand-gradient mx-auto block size-14 animate-pulse rounded-full" />
-        <p className="mt-5 font-bold text-muted">
-          {locale === 'fa' ? 'در حال ورود به پنل مناسب…' : 'Opening your workspace…'}
-        </p>
+        <p className="mt-5 font-bold text-muted">{translate(locale, 'panelOpeningYourWorkspace')}</p>
       </div>
     </main>
   );

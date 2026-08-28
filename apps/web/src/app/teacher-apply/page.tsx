@@ -4,12 +4,12 @@ import { useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { api, ApiError, apiMessage, type EducationalLanguage } from '@/lib/api';
-import { localePath } from '@/lib/i18n';
+import { localePath, localized, isDefaultLocale, translate } from '@/lib/i18n';
 import { useTranslations } from '@/components/shared/locale-provider';
 import { Header } from '@/components/layout/site';
 export default function TeacherApply() {
   const { locale } = useTranslations(),
-    fa = locale === 'fa',
+    fa = isDefaultLocale(locale),
     router = useRouter(),
     p = (x: string) => localePath(x, locale),
     [languageIds, setLanguages] = useState<string[]>([]);
@@ -45,10 +45,8 @@ export default function TeacherApply() {
       <Header />
       <main className="mx-auto max-w-3xl px-5 py-12">
         <div className="panel-card p-7">
-          <h1 className="text-3xl font-black">{fa ? 'ثبت درخواست مدرس' : 'Apply as a teacher'}</h1>
-          <p className="mt-3 text-muted">
-            {fa ? 'وارد حساب شوید و اطلاعات زیر را تکمیل کنید.' : 'Sign in and complete the form.'}
-          </p>
+          <h1 className="text-3xl font-black">{translate(locale, 'teacherApplyApplyAsATeacher')}</h1>
+          <p className="mt-3 text-muted">{translate(locale, 'teacherApplySignInAndCompleteTheForm')}</p>
           <form
             className="mt-7 grid gap-4 sm:grid-cols-2"
             onSubmit={(e) => {
@@ -62,18 +60,18 @@ export default function TeacherApply() {
             <Area name="bioEn" label="English biography (minimum 40 characters)" minLength={40} dir="ltr" required />
             <Field
               name="specialties"
-              label={fa ? 'تخصص‌ها (با کاما)' : 'Specialties (comma separated)'}
+              label={translate(locale, 'teacherApplySpecialtiesCommaSeparated')}
               defaultValue="writing,speaking"
               required
             />
             <Field
               name="levels"
-              label={fa ? 'سطح‌ها (با کاما)' : 'Levels (comma separated)'}
+              label={translate(locale, 'teacherApplyLevelsCommaSeparated')}
               defaultValue="A1,A2,B1,B2,C1"
             />
             <Field
               name="experienceYears"
-              label={fa ? 'سال سابقه' : 'Years of experience'}
+              label={translate(locale, 'teacherApplyYearsOfExperience')}
               type="number"
               min={0}
               max={60}
@@ -81,7 +79,7 @@ export default function TeacherApply() {
               required
             />
             <fieldset className="sm:col-span-2">
-              <legend className="mb-2 font-bold">{fa ? 'زبان‌های آموزشی' : 'Teaching languages'}</legend>
+              <legend className="mb-2 font-bold">{translate(locale, 'teacherApplyTeachingLanguages')}</legend>
               <div className="flex flex-wrap gap-2">
                 {languages.data?.map((x) => (
                   <label key={x.id} className="rounded-xl border hairline px-4 py-3">
@@ -93,7 +91,7 @@ export default function TeacherApply() {
                         setLanguages((ids) => (e.target.checked ? [...ids, x.id] : ids.filter((id) => id !== x.id)))
                       }
                     />
-                    {x.flag} {fa ? x.nameFa : x.nameEn}
+                    {x.flag} {localized({ fa: x.nameFa, en: x.nameEn }, locale)}
                   </label>
                 ))}
               </div>
@@ -102,10 +100,10 @@ export default function TeacherApply() {
               <div role="alert" className="sm:col-span-2 rounded-xl bg-red-50 p-4 text-red-800">
                 {submit.error instanceof ApiError && submit.error.status === 401 ? (
                   <Link className="font-bold underline" href={p('/auth?next=/teacher-apply')}>
-                    {fa ? 'ابتدا وارد حساب شوید.' : 'Sign in first.'}
+                    {translate(locale, 'teacherApplySignInFirst')}
                   </Link>
                 ) : (
-                  apiMessage(submit.error, fa ? 'ثبت درخواست ناموفق بود.' : 'Application failed.')
+                  apiMessage(submit.error, translate(locale, 'teacherApplyApplicationFailed'))
                 )}
               </div>
             )}
@@ -114,12 +112,8 @@ export default function TeacherApply() {
               className="brand-gradient rounded-xl px-6 py-4 font-black text-white disabled:opacity-40 sm:col-span-2"
             >
               {submit.isPending
-                ? fa
-                  ? 'در حال ثبت…'
-                  : 'Submitting…'
-                : fa
-                  ? 'ثبت و ادامه برای مدارک'
-                  : 'Submit and continue'}
+                ? translate(locale, 'teacherteacherFinanceSubmitting')
+                : translate(locale, 'teacherApplySubmitAndContinue')}
             </button>
           </form>
         </div>

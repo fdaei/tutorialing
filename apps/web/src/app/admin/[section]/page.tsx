@@ -1,15 +1,18 @@
-import { PanelActions } from '@/features/panel/components/panel-actions';
-import { PanelShell, adminNav } from '@/features/panel/components/panel-shell';
-import { ResourceView } from '@/features/panel/components/resource-view';
-import { AdminTestManager } from '@/features/admin/components/admin-test-manager';
-import { AdminUsersManager } from '@/features/admin/components/admin-users-manager';
-import { ExaminerReviewManager } from '@/features/admin/components/examiner-review-manager';
-import { TicketManager } from '@/features/support/components/ticket-manager';
-import { LanguageManager } from '@/features/admin/components/language-manager';
-import { PricingManager } from '@/features/commerce/components/pricing-manager';
-import { AdminFinanceCenter } from '@/features/admin/components/admin-finance-center';
+import { localized, isDefaultLocale } from '@/lib/i18n';
+import { PanelActions, PanelShell, ResourceView, adminNav } from '@/features/panel';
+import {
+  AdminFinanceCenter,
+  AdminTestManager,
+  AdminUsersManager,
+  CountryManager,
+  ExaminerReviewManager,
+  LanguageManager,
+} from '@/features/admin';
+import { TicketManager } from '@/features/support';
+import { PricingManager } from '@/features/commerce';
 import { requestLocale } from '@/lib/server-locale';
-import { TeacherPlannerCalendar } from '@/features/scheduling/components/teacher-planner-calendar';
+import { TeacherPlannerCalendar } from '@/features/scheduling';
+import { FeatureErrorBoundary } from '@/shared/components/error-boundaries';
 
 const map: Record<string, [string, string, string]> = {
   users: ['کاربران', 'Users', '/admin/users'],
@@ -32,13 +35,14 @@ const map: Record<string, [string, string, string]> = {
   audit: ['گزارش فعالیت', 'Audit log', '/admin/audit-logs'],
   cms: ['مدیریت محتوا', 'CMS', '/admin/cms'],
   settings: ['تنظیمات', 'Settings', '/admin/settings'],
+  countries: ['کشورها و پیش‌شماره‌ها', 'Countries and calling codes', '/admin/countries'],
   search: ['جستجوی سراسری', 'Global search', '/admin/dashboard'],
 };
 
 export default async function Section({ params }: { params: Promise<{ section: string }> }) {
   const { section } = await params;
   const locale = await requestLocale(),
-    fa = locale === 'fa';
+    fa = isDefaultLocale(locale);
   const [titleFa, titleEn, endpoint] = map[section] ?? ['مدیریت', 'Administration', '/admin/dashboard'];
   let content: React.ReactNode;
   if (section === 'tests') content = <AdminTestManager />;
@@ -47,7 +51,7 @@ export default async function Section({ params }: { params: Promise<{ section: s
       <div className="grid gap-6">
         <TeacherPlannerCalendar mode="admin" />
         <PanelActions role="admin" section={section} endpoint={endpoint} />
-        <ResourceView title={fa ? titleFa : titleEn} endpoint={endpoint} />
+        <ResourceView title={localized({ fa: titleFa, en: titleEn }, locale)} endpoint={endpoint} />
       </div>
     );
   else if (section === 'users')
@@ -60,18 +64,19 @@ export default async function Section({ params }: { params: Promise<{ section: s
   else if (section === 'test-reviews') content = <ExaminerReviewManager />;
   else if (section === 'tickets') content = <TicketManager />;
   else if (section === 'languages') content = <LanguageManager />;
+  else if (section === 'countries') content = <CountryManager />;
   else if (section === 'teacher-prices') content = <PricingManager mode="admin" />;
   else if (section === 'finance' || section === 'payouts') content = <AdminFinanceCenter />;
   else
     content = (
       <>
         <PanelActions role="admin" section={section} endpoint={endpoint} />
-        <ResourceView title={fa ? titleFa : titleEn} endpoint={endpoint} />
+        <ResourceView title={localized({ fa: titleFa, en: titleEn }, locale)} endpoint={endpoint} />
       </>
     );
   return (
     <PanelShell title="مدیریت لینگواسپیک" items={adminNav}>
-      {content}
+      <FeatureErrorBoundary name={`admin-${section}`}>{content}</FeatureErrorBoundary>
     </PanelShell>
   );
 }

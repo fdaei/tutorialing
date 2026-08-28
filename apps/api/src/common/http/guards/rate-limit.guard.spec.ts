@@ -42,7 +42,9 @@ describe('RateLimitGuard', () => {
 
     const overConsume: Consume = jest.fn().mockResolvedValue({ count: 4, retryAfter: 42 });
     const over = build(limit, overConsume);
-    await expect(over.guard.canActivate(over.context)).rejects.toMatchObject({ response: { code: 'RATE_LIMITED' } });
+    await expect(over.guard.canActivate(over.context)).rejects.toMatchObject({
+      response: { code: 'RATE_LIMITED', retryAfterSeconds: 42 },
+    });
     expect(over.setHeader).toHaveBeenCalledWith('Retry-After', '42');
   });
 

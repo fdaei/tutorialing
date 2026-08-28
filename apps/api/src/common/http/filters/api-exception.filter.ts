@@ -82,6 +82,7 @@ export class ApiExceptionFilter implements ExceptionFilter {
       code: String(body.code ?? (status >= 500 ? 'INTERNAL_ERROR' : 'REQUEST_FAILED')),
       message,
       fieldErrors: localizedFields,
+      ...(typeof body.retryAfterSeconds === 'number' ? { retryAfterSeconds: body.retryAfterSeconds } : {}),
       locale,
       path: request.url,
       requestId: response.getHeader('x-request-id'),

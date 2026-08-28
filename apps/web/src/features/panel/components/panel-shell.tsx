@@ -28,7 +28,7 @@ import {
 } from 'lucide-react';
 import { LanguageSwitcher } from '@/components/shared/language-switcher';
 import { useTranslations } from '@/components/shared/locale-provider';
-import { localePath } from '@/lib/i18n';
+import { localePath, localized, isDefaultLocale, translate } from '@/lib/i18n';
 import type { AdminDashboard } from '@lingospeak/contracts';
 
 export type NavItem = {
@@ -46,11 +46,12 @@ export function PanelShell({ title, items, children }: { title: string; items: N
     [open, setOpen] = useState(false),
     [moreOpen, setMoreOpen] = useState(false),
     { locale } = useTranslations(),
-    fa = locale === 'fa',
+    fa = isDefaultLocale(locale),
     p = (href: string) => localePath(href, locale);
   const me = useQuery({
     queryKey: ['panel-me'],
-    queryFn: () => api<{ name?: string; roles: string[]; permissions: string[] }>('/users/me'),
+    queryFn: () =>
+      api<{ name?: string; avatarUrl?: string | null; roles: string[]; permissions: string[] }>('/users/me'),
     retry: false,
   });
   useEffect(() => {
@@ -112,15 +113,18 @@ export function PanelShell({ title, items, children }: { title: string; items: N
     queryFn: () => api<AdminDashboard>('/admin/dashboard'),
     enabled: adminMode && roles.some((role) => ['ADMIN', 'STAFF'].includes(role)),
   });
-  if (me.isLoading) return <div className="skeleton min-h-screen" />;
+  // Never render account navigation or page content until authentication has
+  // been confirmed. In particular, a 401 used to trigger the redirect above
+  // while briefly exposing the panel shell and its children.
+  if (me.isLoading || !me.data) return <div className="skeleton min-h-screen" />;
   if (me.data && ((allowed.length && !roles.some((r) => allowed.includes(r))) || (currentItem && !canSee(currentItem))))
     return (
       <main className="grid min-h-screen place-items-center">
         <div className="panel-card p-10 text-center">
           <ShieldCheck className="mx-auto text-red-500" />
-          <h1 className="mt-4 text-2xl font-black">{fa ? 'دسترسی مجاز نیست' : 'Access denied'}</h1>
+          <h1 className="mt-4 text-2xl font-black">{translate(locale, 'panelpanelShellAccessDenied')}</h1>
           <Link href={p('/panel')} className="mt-5 inline-block text-blue">
-            {fa ? 'رفتن به پنل مجاز' : 'Open my workspace'}
+            {translate(locale, 'panelpanelShellOpenMyWorkspace')}
           </Link>
         </div>
       </main>
@@ -128,27 +132,15 @@ export function PanelShell({ title, items, children }: { title: string; items: N
 
   const displayTitle = adminMode
     ? primaryRole === 'SUPPORT'
-      ? fa
-        ? 'پنل پشتیبانی'
-        : 'Support workspace'
+      ? translate(locale, 'panelpanelShellSupportWorkspace')
       : primaryRole === 'FINANCE'
-        ? fa
-          ? 'پنل مالی'
-          : 'Finance workspace'
+        ? translate(locale, 'panelpanelShellFinanceWorkspace')
         : primaryRole === 'EXAMINER'
-          ? fa
-            ? 'پنل ارزیابی آزمون'
-            : 'Examiner workspace'
-          : fa
-            ? 'مدیریت لینگواسپیک'
-            : 'LingoSpeak administration'
+          ? translate(locale, 'panelpanelShellExaminerWorkspace')
+          : translate(locale, 'panelpanelShellLingospeakAdministration')
     : teacherMode
-      ? fa
-        ? 'پنل مدرس'
-        : 'Teacher panel'
-      : fa
-        ? 'پنل زبان‌آموز'
-        : 'Student dashboard';
+      ? translate(locale, 'panelpanelShellTeacherPanel')
+      : translate(locale, 'panelpanelShellStudentDashboard');
   const isActive = (href: string, children: string[] = []) =>
     [href, ...children].some((value) => {
       const localized = p(value);
@@ -207,7 +199,9 @@ export function PanelShell({ title, items, children }: { title: string; items: N
       </Link>
       {adminMode ? (
         <nav className="mt-7 flex min-h-0 flex-1 flex-col">
-          <small className="px-3 pb-2 text-[11px] font-bold text-white/45">{fa ? 'فضای کاری' : 'Workspace'}</small>
+          <small className="px-3 pb-2 text-[11px] font-bold text-white/45">
+            {translate(locale, 'panelpanelShellWorkspace')}
+          </small>
           <div className="grid gap-1.5">
             {adminWorkspace.map((group) => {
               const Icon = group.icon,
@@ -220,10 +214,10 @@ export function PanelShell({ title, items, children }: { title: string; items: N
                   className={`admin-nav-item ${active ? 'admin-nav-active' : ''}`}
                 >
                   <Icon size={18} />
-                  <span className="flex-1">{fa ? group.label : group.labelEn}</span>
+                  <span className="flex-1">{localized({ fa: group.label, en: group.labelEn }, locale)}</span>
                   {Boolean(group.badge) && (
                     <span className="admin-nav-badge">
-                      {Number(group.badge).toLocaleString(fa ? 'fa-IR' : 'en-US')}
+                      {Number(group.badge).toLocaleString(translate(locale, 'commercepricingManagerEnUS2'))}
                     </span>
                   )}
                 </Link>
@@ -238,7 +232,7 @@ export function PanelShell({ title, items, children }: { title: string; items: N
               className="admin-nav-item w-full border border-white/15"
             >
               <MoreHorizontal size={18} />
-              <span className="flex-1 text-start">{fa ? 'بیشتر' : 'More'}</span>
+              <span className="flex-1 text-start">{translate(locale, 'teacherteacherMoreMore')}</span>
               <ChevronDown size={16} className={`transition-transform ${moreOpen ? 'rotate-180' : ''}`} />
             </button>
             {moreOpen && (
@@ -253,7 +247,7 @@ export function PanelShell({ title, items, children }: { title: string; items: N
                       className={isActive(item.href) ? 'text-white' : 'text-white/60'}
                     >
                       <Icon size={16} />
-                      <span>{fa ? item.label : item.labelEn}</span>
+                      <span>{localized({ fa: item.label, en: item.labelEn }, locale)}</span>
                     </Link>
                   );
                 })}
@@ -275,7 +269,7 @@ export function PanelShell({ title, items, children }: { title: string; items: N
                 className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold ${active ? 'bg-[#eef2ff] text-blue' : 'text-muted hover:bg-[#f5f6fb] hover:text-navy'}`}
               >
                 <Icon size={19} />
-                <span className="flex-1">{fa ? item.label : item.labelEn}</span>
+                <span className="flex-1">{localized({ fa: item.label, en: item.labelEn }, locale)}</span>
                 {active && <span className="size-2 rounded-full bg-blue" />}
               </Link>
             );
@@ -285,20 +279,29 @@ export function PanelShell({ title, items, children }: { title: string; items: N
       {me.data && (roles.includes('TEACHER') || roles.includes('ADMIN')) && (
         <div className={`mt-5 rounded-2xl p-3 ${adminMode ? 'bg-white/[.07]' : 'bg-[#f7f8fc]'}`}>
           <small className={`mb-2 block px-1 text-[11px] font-bold ${adminMode ? 'text-white/45' : 'text-muted'}`}>
-            {fa ? 'جابه‌جایی پنل' : 'Switch workspace'}
+            {translate(locale, 'panelpanelShellSwitchWorkspace')}
           </small>
           <div className="grid gap-1">
-            <Link href={p('/dashboard')} className="flex items-center gap-2 rounded-lg px-2 py-2 text-xs font-bold hover:bg-blue/10">
-              <Home size={15} /> {fa ? 'پنل کاربر' : 'User dashboard'}
+            <Link
+              href={p('/dashboard')}
+              className="flex items-center gap-2 rounded-lg px-2 py-2 text-xs font-bold hover:bg-blue/10"
+            >
+              <Home size={15} /> {translate(locale, 'panelpanelShellUserDashboard')}
             </Link>
             {roles.includes('TEACHER') && (
-              <Link href={p('/teacher-panel')} className="flex items-center gap-2 rounded-lg px-2 py-2 text-xs font-bold hover:bg-blue/10">
-                <BookOpen size={15} /> {fa ? 'پنل مدرس' : 'Teacher panel'}
+              <Link
+                href={p('/teacher-panel')}
+                className="flex items-center gap-2 rounded-lg px-2 py-2 text-xs font-bold hover:bg-blue/10"
+              >
+                <BookOpen size={15} /> {translate(locale, 'panelpanelShellTeacherPanel')}
               </Link>
             )}
             {roles.includes('ADMIN') && (
-              <Link href={p('/admin')} className="flex items-center gap-2 rounded-lg px-2 py-2 text-xs font-bold hover:bg-blue/10">
-                <ShieldCheck size={15} /> {fa ? 'پنل مدیریت' : 'Admin panel'}
+              <Link
+                href={p('/admin')}
+                className="flex items-center gap-2 rounded-lg px-2 py-2 text-xs font-bold hover:bg-blue/10"
+              >
+                <ShieldCheck size={15} /> {translate(locale, 'panelpanelShellAdminPanel')}
               </Link>
             )}
           </div>
@@ -306,12 +309,20 @@ export function PanelShell({ title, items, children }: { title: string; items: N
       )}
       <div className={`mt-3 rounded-2xl p-3 ${adminMode ? 'bg-white/[.07]' : 'bg-[#f7f8fc]'}`}>
         <div className="flex items-center gap-3">
-          <span className="brand-gradient grid size-9 place-items-center rounded-full font-black text-white">
-            {(me.data?.name ?? 'L').slice(0, 1)}
+          <span className="brand-gradient grid size-9 shrink-0 overflow-hidden place-items-center rounded-full font-black text-white">
+            {me.data?.avatarUrl ? (
+              <img src={me.data.avatarUrl} alt="" className="size-full object-cover" />
+            ) : (
+              (me.data?.name ?? 'L').slice(0, 1)
+            )}
           </span>
           <span className="min-w-0 flex-1">
-            <strong className="block truncate text-xs">{me.data?.name ?? roleLabel[fa ? 0 : 1]}</strong>
-            <small className={adminMode ? 'text-white/45' : 'text-muted'}>{roleLabel[fa ? 0 : 1]}</small>
+            <strong className="block truncate text-xs">
+              {me.data?.name ?? roleLabel[localized({ fa: 0, en: 1 }, locale)]}
+            </strong>
+            <small className={adminMode ? 'text-white/45' : 'text-muted'}>
+              {roleLabel[localized({ fa: 0, en: 1 }, locale)]}
+            </small>
           </span>
         </div>
       </div>
@@ -324,7 +335,7 @@ export function PanelShell({ title, items, children }: { title: string; items: N
         className={`mt-2 flex items-center gap-3 rounded-xl px-4 py-3 text-sm ${adminMode ? 'text-white/55 hover:bg-white/10' : 'text-red-500'}`}
       >
         <LogOut size={18} />
-        {fa ? 'خروج از حساب' : 'Sign out'}
+        {translate(locale, 'panelpanelShellSignOut')}
       </button>
     </aside>
   );
@@ -332,7 +343,7 @@ export function PanelShell({ title, items, children }: { title: string; items: N
   return (
     <div className="min-h-screen bg-[#f8f9fd]">
       <div
-        className={`fixed inset-y-0 z-30 hidden hairline lg:block ${adminMode ? 'w-[260px]' : 'w-[252px]'} ${fa ? 'right-0 border-l' : 'left-0 border-r'}`}
+        className={`fixed inset-y-0 z-30 hidden hairline lg:block ${adminMode ? 'w-[260px]' : 'w-[252px]'} ${translate(locale, 'panelpanelShellLeft0BorderR')}`}
       >
         <Sidebar />
       </div>
@@ -340,9 +351,9 @@ export function PanelShell({ title, items, children }: { title: string; items: N
         <div className="fixed inset-0 z-50 bg-black/25 backdrop-blur-sm lg:hidden" onClick={() => setOpen(false)}>
           <div className="h-full w-[285px] max-w-[85vw]" onClick={(e) => e.stopPropagation()}>
             <button
-              className={`absolute top-4 z-10 grid size-9 place-items-center rounded-full bg-white shadow ${fa ? 'left-4' : 'right-4'}`}
+              className={`absolute top-4 z-10 grid size-9 place-items-center rounded-full bg-white shadow ${translate(locale, 'panelpanelShellRight4')}`}
               onClick={() => setOpen(false)}
-              aria-label={fa ? 'بستن' : 'Close'}
+              aria-label={translate(locale, 'adminadminUsersManagerClose')}
             >
               <X />
             </button>
@@ -351,10 +362,14 @@ export function PanelShell({ title, items, children }: { title: string; items: N
         </div>
       )}
       <main
-        className={`min-w-0 ${fa ? (adminMode ? 'lg:mr-[260px]' : 'lg:mr-[252px]') : adminMode ? 'lg:ml-[260px]' : 'lg:ml-[252px]'}`}
+        className={`min-w-0 ${localized({ fa: adminMode ? 'lg:mr-[260px]' : 'lg:mr-[252px]', en: adminMode ? 'lg:ml-[260px]' : 'lg:ml-[252px]' }, locale)}`}
       >
         <header className="sticky top-0 z-20 flex h-[72px] items-center gap-4 border-b hairline bg-white/95 px-5 backdrop-blur-xl md:px-8">
-          <button className="lg:hidden" onClick={() => setOpen(true)} aria-label={fa ? 'منو' : 'Menu'}>
+          <button
+            className="lg:hidden"
+            onClick={() => setOpen(true)}
+            aria-label={translate(locale, 'panelpanelShellMenu')}
+          >
             <Menu />
           </button>
           {(!adminMode || showAdminSearch) && (
@@ -362,25 +377,24 @@ export function PanelShell({ title, items, children }: { title: string; items: N
               <Search size={18} />
               <span className="truncate text-sm">
                 {adminMode
-                  ? fa
-                    ? 'جستجو در کاربران، رزروها و تیکت‌ها…'
-                    : 'Search users, bookings, and tickets…'
-                  : fa
-                    ? 'جستجو در کلاس‌ها، درس‌ها و مدرس‌ها…'
-                    : 'Search classes, lessons, and teachers…'}
+                  ? translate(locale, 'panelpanelShellSearchUsersBookingsAndTickets')
+                  : translate(locale, 'panelpanelShellSearchClassesLessonsAndTeachers')}
               </span>
             </div>
           )}
-          <div className={`${fa ? 'mr-auto' : 'ml-auto'} flex items-center gap-3`}>
+          <div className={`${translate(locale, 'panelpanelShellMlAuto')} flex items-center gap-3`}>
             <LanguageSwitcher className="rounded-xl border hairline px-2 py-1.5" />
-            <button className="grid size-9 place-items-center text-muted" aria-label={fa ? 'راهنما' : 'Help'}>
+            <button
+              className="grid size-9 place-items-center text-muted"
+              aria-label={translate(locale, 'panelpanelShellHelp')}
+            >
               <HelpCircle size={19} />
             </button>
             {notificationItem && (
               <Link
                 href={p(notificationItem.href)}
                 className="relative grid size-9 place-items-center rounded-xl bg-[#f5f7ff]"
-                aria-label={fa ? 'اعلان‌ها' : 'Notifications'}
+                aria-label={translate(locale, 'teacherteacherMoreNotifications')}
               >
                 <Bell size={19} />
                 <span className="absolute right-1 top-1 size-2 rounded-full bg-purple ring-2 ring-white" />
@@ -462,6 +476,13 @@ export const adminNav: NavItem[] = [
     href: '/admin/languages',
     label: 'زبان‌ها',
     labelEn: 'Languages',
+    roles: ['ADMIN', 'STAFF'],
+    permission: 'languages.manage',
+  },
+  {
+    href: '/admin/countries',
+    label: 'کشورها',
+    labelEn: 'Countries',
     roles: ['ADMIN', 'STAFF'],
     permission: 'languages.manage',
   },

@@ -1,4 +1,6 @@
 'use client';
+
+import { localized, isDefaultLocale, translate } from '@/lib/i18n';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { Check, ChevronDown, LoaderCircle, Search, X } from 'lucide-react';
@@ -26,7 +28,7 @@ type Props = {
 };
 export function AsyncSearchSelect({ entity, value, onChange, placeholder, disabled, className = '', name }: Props) {
   const { locale } = useTranslations(),
-    fa = locale === 'fa',
+    fa = isDefaultLocale(locale),
     id = useId(),
     root = useRef<HTMLDivElement>(null),
     [open, setOpen] = useState(false),
@@ -98,13 +100,13 @@ export function AsyncSearchSelect({ entity, value, onChange, placeholder, disabl
       >
         <Search size={17} className="text-muted" />
         <span className={`min-w-0 flex-1 truncate ${value ? 'font-bold' : 'text-muted'}`}>
-          {value?.label ?? placeholder ?? (fa ? 'جستجو و انتخاب…' : 'Search and select…')}
+          {value?.label ?? placeholder ?? translate(locale, 'sharedasyncSearchSelectSearchAndSelect')}
         </span>
         {value && (
           <span
             role="button"
             tabIndex={0}
-            aria-label={fa ? 'پاک کردن' : 'Clear'}
+            aria-label={translate(locale, 'sharedasyncSearchSelectClear')}
             onClick={(event) => {
               event.stopPropagation();
               onChange(null);
@@ -125,7 +127,7 @@ export function AsyncSearchSelect({ entity, value, onChange, placeholder, disabl
                 autoFocus
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder={fa ? 'نام، موبایل یا ایمیل…' : 'Name, phone, or email…'}
+                placeholder={translate(locale, 'commercepricingManagerNamePhoneOrEmail')}
                 className="w-full bg-transparent py-3 outline-none"
               />
             </div>
@@ -134,17 +136,17 @@ export function AsyncSearchSelect({ entity, value, onChange, placeholder, disabl
             {result.isLoading && (
               <div className="flex items-center justify-center gap-2 p-7 text-sm text-muted">
                 <LoaderCircle className="animate-spin" size={18} />
-                {fa ? 'در حال جستجو…' : 'Searching…'}
+                {translate(locale, 'sharedasyncSearchSelectSearching')}
               </div>
             )}
             {result.isError && (
               <div className="p-5 text-sm text-red-700">
-                {fa ? 'جستجو ناموفق بود. دوباره تلاش کنید.' : 'Search failed. Try again.'}
+                {translate(locale, 'sharedasyncSearchSelectSearchFailedTryAgain')}
               </div>
             )}
             {!result.isLoading && !options.length && (
               <div className="p-7 text-center text-sm text-muted">
-                {fa ? 'موردی پیدا نشد. عبارت دیگری بنویسید.' : 'No results. Try another search.'}
+                {translate(locale, 'sharedasyncSearchSelectNoResultsTryAnotherSearch')}
               </div>
             )}
             {options.map((option, index) => (
@@ -172,12 +174,8 @@ export function AsyncSearchSelect({ entity, value, onChange, placeholder, disabl
                 className="mt-1 w-full rounded-xl p-3 text-sm font-bold text-blue"
               >
                 {result.isFetchingNextPage
-                  ? fa
-                    ? 'در حال دریافت…'
-                    : 'Loading…'
-                  : fa
-                    ? 'نمایش موارد بیشتر'
-                    : 'Load more'}
+                  ? translate(locale, 'authLoading')
+                  : translate(locale, 'sharedasyncSearchSelectLoadMore')}
               </button>
             )}
           </div>

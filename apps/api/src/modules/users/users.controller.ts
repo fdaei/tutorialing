@@ -5,6 +5,11 @@ import { ProfileDto } from './dto/request/profile.dto';
 import { LocaleDto } from './dto/request/locale.dto';
 import { UserProfileMapper } from './mappers/user-profile.mapper';
 import { UserProfileResponseDto } from './dto/response/user-profile-response.dto';
+import { IsString } from 'class-validator';
+
+class AvatarDto {
+  @IsString() fileId!: string;
+}
 
 @Controller('users/me')
 export class UsersController {
@@ -19,6 +24,12 @@ export class UsersController {
   }
   @Put('locale') locale(@CurrentUser() u: AuthUser, @Body() d: LocaleDto) {
     return this.s.locale(u.id, d.locale);
+  }
+  @Put('avatar') avatar(@CurrentUser() u: AuthUser, @Body() d: AvatarDto) {
+    return this.s.setAvatar(u.id, d.fileId);
+  }
+  @Delete('avatar') removeAvatar(@CurrentUser() u: AuthUser) {
+    return this.s.removeAvatar(u.id);
   }
   @Get('favorites') favorites(@CurrentUser() u: AuthUser) {
     return this.s.favorites(u.id);

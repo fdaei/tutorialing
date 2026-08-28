@@ -1,5 +1,6 @@
 'use client';
 
+import { localized, isDefaultLocale, translate } from '@/lib/i18n';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, apiMessage, type Paginated } from '@/lib/api';
@@ -22,10 +23,11 @@ type TeacherPrice = {
 };
 export function PricingManager({ mode }: { mode: 'teacher' | 'admin' }) {
   const { locale } = useTranslations(),
-    fa = locale === 'fa';
+    fa = isDefaultLocale(locale);
   return mode === 'teacher' ? <TeacherPricing fa={fa} /> : <AdminPricing fa={fa} />;
 }
 function TeacherPricing({ fa }: { fa: boolean }) {
+  const { locale } = useTranslations();
   const qc = useQueryClient(),
     query = useQuery({ queryKey: ['teacher-pricing'], queryFn: () => api<TeacherPrice>('/teacher/pricing') }),
     [trial, setTrial] = useState(250000),
@@ -46,16 +48,14 @@ function TeacherPricing({ fa }: { fa: boolean }) {
   return (
     <div className="grid gap-6 lg:grid-cols-2">
       <section className="rounded-3xl border hairline bg-white p-6">
-        <h2 className="text-2xl font-black">{fa ? 'پیشنهاد قیمت' : 'Price proposal'}</h2>
+        <h2 className="text-2xl font-black">{translate(fa, 'commercepricingManagerPriceProposal')}</h2>
         <p className="mt-2 text-sm text-muted">
-          {fa
-            ? 'قیمت عمومی فقط بعد از تأیید نهایی مدیریت منتشر می‌شود.'
-            : 'Public prices are shown only after final management approval.'}
+          {translate(fa, 'commercepricingManagerPublicPricesAreShownOnlyAfterFinalManagement')}
         </p>
         <div className="mt-6 grid gap-4">
-          <Money label={fa ? 'قیمت پیشنهادی جلسه آزمایشی' : 'Proposed trial price'} value={trial} onChange={setTrial} />
+          <Money label={translate(fa, 'commercepricingManagerProposedTrialPrice')} value={trial} onChange={setTrial} />
           <Money
-            label={fa ? 'قیمت پیشنهادی جلسه عادی' : 'Proposed regular price'}
+            label={translate(fa, 'commercepricingManagerProposedRegularPrice')}
             value={regular}
             onChange={setRegular}
           />
@@ -65,28 +65,34 @@ function TeacherPricing({ fa }: { fa: boolean }) {
             disabled={propose.isPending}
             className="brand-gradient rounded-xl py-3 font-black text-white"
           >
-            {fa ? 'ارسال برای بررسی' : 'Submit for review'}
+            {translate(fa, 'commercepricingManagerSubmitForReview')}
           </button>
         </div>
         {data?.priceStatus === 'COUNTER_OFFER' && (
           <div className="mt-6 rounded-2xl bg-amber-50 p-5">
-            <strong>{fa ? 'پیشنهاد متقابل مدیریت' : 'Management counter offer'}</strong>
+            <strong>{translate(fa, 'commercepricingManagerManagementCounterOffer')}</strong>
             <p className="mt-2">
               {money(data.counterTrialPrice, fa)} · {money(data.counterRegularPrice, fa)}
             </p>
             <button onClick={() => accept.mutate()} className="mt-4 rounded-xl bg-navy px-5 py-3 font-bold text-white">
-              {fa ? 'پذیرش پیشنهاد' : 'Accept counter offer'}
+              {translate(fa, 'commercepricingManagerAcceptCounterOffer')}
             </button>
           </div>
         )}
       </section>
       <section className="rounded-3xl border hairline bg-white p-6">
-        <h2 className="text-2xl font-black">{fa ? 'وضعیت و تاریخچه' : 'Status and history'}</h2>
+        <h2 className="text-2xl font-black">{translate(fa, 'commercepricingManagerStatusAndHistory')}</h2>
         <dl className="mt-5 grid gap-4 sm:grid-cols-2">
-          <Meta label={fa ? 'وضعیت' : 'Status'} value={data?.priceStatus ?? '—'} />
-          <Meta label={fa ? 'قیمت آزمایشی تأییدشده' : 'Approved trial'} value={money(data?.approvedTrialPrice, fa)} />
-          <Meta label={fa ? 'قیمت عادی تأییدشده' : 'Approved regular'} value={money(data?.approvedRegularPrice, fa)} />
-          <Meta label={fa ? 'یادداشت بررسی' : 'Review note'} value={data?.priceReviewNote ?? '—'} />
+          <Meta label={translate(fa, 'commercepricingManagerStatus')} value={data?.priceStatus ?? '—'} />
+          <Meta
+            label={translate(fa, 'commercepricingManagerApprovedTrial')}
+            value={money(data?.approvedTrialPrice, fa)}
+          />
+          <Meta
+            label={translate(fa, 'commercepricingManagerApprovedRegular')}
+            value={money(data?.approvedRegularPrice, fa)}
+          />
+          <Meta label={translate(fa, 'commercepricingManagerReviewNote')} value={data?.priceReviewNote ?? '—'} />
         </dl>
         <div className="mt-6 grid gap-3">
           {data?.priceHistory?.map((item) => (
@@ -96,7 +102,7 @@ function TeacherPricing({ fa }: { fa: boolean }) {
               </strong>
               <p className="mt-1 text-sm text-muted">
                 {item.note || '—'} ·{' '}
-                {new Intl.DateTimeFormat(fa ? 'fa-IR-u-ca-persian' : 'en-US', {
+                {new Intl.DateTimeFormat(translate(locale, 'commercepricingManagerEnUS'), {
                   dateStyle: 'medium',
                   timeStyle: 'short',
                 }).format(new Date(item.createdAt))}
@@ -109,6 +115,7 @@ function TeacherPricing({ fa }: { fa: boolean }) {
   );
 }
 function AdminPricing({ fa }: { fa: boolean }) {
+  const { locale } = useTranslations();
   const qc = useQueryClient(),
     [status, setStatus] = useState(''),
     [search, setSearch] = useState(''),
@@ -151,10 +158,10 @@ function AdminPricing({ fa }: { fa: boolean }) {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="input"
-            placeholder={fa ? 'نام، موبایل یا ایمیل…' : 'Name, phone, or email…'}
+            placeholder={translate(fa, 'commercepricingManagerNamePhoneOrEmail')}
           />
           <select value={status} onChange={(e) => setStatus(e.target.value)} className="input">
-            <option value="">{fa ? 'همه وضعیت‌ها' : 'All statuses'}</option>
+            <option value="">{translate(fa, 'commercepricingManagerAllStatuses')}</option>
             {['DRAFT', 'SUBMITTED', 'UNDER_REVIEW', 'COUNTER_OFFER', 'APPROVED', 'REJECTED'].map((x) => (
               <option key={x}>{x}</option>
             ))}
@@ -168,7 +175,7 @@ function AdminPricing({ fa }: { fa: boolean }) {
               className={`rounded-2xl border p-5 text-start ${selected?.id === item.id ? 'border-purple bg-lavender/30' : 'hairline'}`}
             >
               <div className="flex justify-between gap-3">
-                <strong>{fa ? item.nameFa : item.nameEn}</strong>
+                <strong>{localized({ fa: item.nameFa, en: item.nameEn }, locale)}</strong>
                 <span className="text-xs font-black text-purple">{item.priceStatus}</span>
               </div>
               <p className="mt-2 text-sm text-muted">
@@ -181,28 +188,28 @@ function AdminPricing({ fa }: { fa: boolean }) {
       <section className="rounded-3xl border hairline bg-white p-6">
         {selected ? (
           <>
-            <h2 className="text-2xl font-black">{fa ? selected.nameFa : selected.nameEn}</h2>
+            <h2 className="text-2xl font-black">{localized({ fa: selected.nameFa, en: selected.nameEn }, fa)}</h2>
             <p className="mt-2 text-muted">
-              {fa ? 'پیشنهاد مدرس' : 'Teacher proposal'}: {money(selected.proposedTrialPrice, fa)} /{' '}
+              {translate(fa, 'commercepricingManagerTeacherProposal')}: {money(selected.proposedTrialPrice, fa)} /{' '}
               {money(selected.proposedRegularPrice, fa)}
             </p>
             <div className="mt-5 grid gap-4">
               <select value={action} onChange={(e) => setAction(e.target.value as typeof action)} className="input">
-                <option value="start_review">{fa ? 'شروع بررسی' : 'Start review'}</option>
-                <option value="counter">{fa ? 'پیشنهاد متقابل' : 'Counter offer'}</option>
-                <option value="reject">{fa ? 'رد' : 'Reject'}</option>
-                <option value="recommend_approval">{fa ? 'پیشنهاد تأیید برای مدیر' : 'Recommend approval'}</option>
-                <option value="approve">{fa ? 'تأیید نهایی مدیر' : 'Final admin approval'}</option>
+                <option value="start_review">{translate(fa, 'commercepricingManagerStartReview')}</option>
+                <option value="counter">{translate(fa, 'commercepricingManagerCounterOffer')}</option>
+                <option value="reject">{translate(fa, 'commercepricingManagerReject')}</option>
+                <option value="recommend_approval">{translate(fa, 'commercepricingManagerRecommendApproval')}</option>
+                <option value="approve">{translate(fa, 'commercepricingManagerFinalAdminApproval')}</option>
               </select>
               {action === 'counter' && (
                 <>
                   <Money
-                    label={fa ? 'قیمت آزمایشی متقابل' : 'Counter trial'}
+                    label={translate(fa, 'commercepricingManagerCounterTrial')}
                     value={counterTrial}
                     onChange={setCounterTrial}
                   />
                   <Money
-                    label={fa ? 'قیمت عادی متقابل' : 'Counter regular'}
+                    label={translate(fa, 'commercepricingManagerCounterRegular')}
                     value={counterRegular}
                     onChange={setCounterRegular}
                   />
@@ -212,16 +219,16 @@ function AdminPricing({ fa }: { fa: boolean }) {
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 className="input min-h-28"
-                placeholder={fa ? 'یادداشت دقیق بررسی' : 'Detailed review note'}
+                placeholder={translate(fa, 'commercepricingManagerDetailedReviewNote')}
               />
               {review.isError && <ErrorText error={review.error} fa={fa} />}
               <button onClick={() => review.mutate()} className="brand-gradient rounded-xl py-3 font-black text-white">
-                {fa ? 'ثبت تصمیم' : 'Save decision'}
+                {translate(fa, 'commercepricingManagerSaveDecision')}
               </button>
             </div>
           </>
         ) : (
-          <p className="text-muted">{fa ? 'یک درخواست قیمت را انتخاب کنید.' : 'Select a price request.'}</p>
+          <p className="text-muted">{translate(fa, 'commercepricingManagerSelectAPriceRequest')}</p>
         )}
       </section>
       <style jsx global>{`
@@ -265,12 +272,15 @@ function Meta({ label, value }: { label: string; value: string }) {
   );
 }
 function money(value: number | undefined, fa: boolean) {
-  return value == null ? '—' : new Intl.NumberFormat(fa ? 'fa-IR' : 'en-US').format(value) + (fa ? ' تومان' : ' IRR');
+  return value == null
+    ? '—'
+    : new Intl.NumberFormat(translate(fa, 'commercepricingManagerEnUS2')).format(value) +
+        translate(fa, 'commercepricingManagerIrr');
 }
 function ErrorText({ error, fa }: { error: unknown; fa: boolean }) {
   return (
     <p className="rounded-xl bg-red-50 p-3 text-red-800">
-      {apiMessage(error, fa ? 'عملیات ناموفق بود.' : 'The operation failed.')}
+      {apiMessage(error, translate(fa, 'commercepricingManagerTheOperationFailed'))}
     </p>
   );
 }

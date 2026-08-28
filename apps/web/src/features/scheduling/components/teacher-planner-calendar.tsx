@@ -1,5 +1,6 @@
 'use client';
 
+import { localized, isDefaultLocale, translate } from '@/lib/i18n';
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { CalendarPlus, ChevronLeft, ChevronRight, Clock3, Plus, Trash2, X } from 'lucide-react';
@@ -22,7 +23,7 @@ type CalendarMode = 'student' | 'teacher' | 'admin';
 
 export function TeacherPlannerCalendar({ mode = 'teacher' }: { mode?: CalendarMode }) {
   const { locale } = useTranslations(),
-    fa = locale === 'fa',
+    fa = isDefaultLocale(locale),
     [month, setMonth] = useState(() => startMonth(new Date())),
     [selected, setSelected] = useState(() => dateKey(new Date())),
     [open, setOpen] = useState(false),
@@ -58,44 +59,50 @@ export function TeacherPlannerCalendar({ mode = 'teacher' }: { mode?: CalendarMo
   const selectedBookings = dayBookings(selected),
     selectedBlocks = dayBlocks(selected),
     selectedNotes = notes.filter((item) => item.date === selected).sort((a, b) => a.time.localeCompare(b.time));
-  const weekdayNames = fa ? ['ش', 'ی', 'د', 'س', 'چ', 'پ', 'ج'] : ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-  const title = new Intl.DateTimeFormat(fa ? 'fa-IR-u-ca-persian' : 'en-US', { month: 'long', year: 'numeric' }).format(
-    month,
+  const weekdayNames = localized(
+    { fa: ['ش', 'ی', 'د', 'س', 'چ', 'پ', 'ج'], en: ['S', 'M', 'T', 'W', 'T', 'F', 'S'] },
+    locale,
   );
+  const title = new Intl.DateTimeFormat(translate(locale, 'commercepricingManagerEnUS'), {
+    month: 'long',
+    year: 'numeric',
+  }).format(month);
   const changeMonth = (amount: number) =>
     setMonth((current) => new Date(current.getFullYear(), current.getMonth() + amount, 1));
   const copy =
     mode === 'admin'
       ? {
-          eyebrow: fa ? 'نمای سراسری برنامه' : 'Platform-wide schedule',
-          title: fa ? 'تقویم کلاس‌ها و رویدادها' : 'Classes and events calendar',
-          description: fa
-            ? 'رزرو همه مدرس‌ها و زبان‌آموزان، همراه با کارهای مدیریتی'
-            : 'Every teacher and student booking, alongside administrative tasks',
+          eyebrow: translate(locale, 'schedulingteacherPlannerCalendarPlatformWideSchedule'),
+          title: translate(locale, 'schedulingteacherPlannerCalendarClassesAndEventsCalendar'),
+          description: translate(
+            locale,
+            'schedulingteacherPlannerCalendarEveryTeacherAndStudentBookingAlongsideAdministrativeTasks',
+          ),
         }
       : mode === 'student'
         ? {
-            eyebrow: fa ? 'برنامه یادگیری من' : 'My learning schedule',
-            title: fa ? 'تقویم کلاس‌ها و کارها' : 'Classes and tasks calendar',
-            description: fa
-              ? 'کلاس‌ها، تمرین‌ها و یادآوری‌های شخصی در یک نگاه'
-              : 'Classes, assignments, and personal reminders at a glance',
+            eyebrow: translate(locale, 'schedulingteacherPlannerCalendarMyLearningSchedule'),
+            title: translate(locale, 'schedulingteacherPlannerCalendarClassesAndTasksCalendar'),
+            description: translate(
+              locale,
+              'schedulingteacherPlannerCalendarClassesAssignmentsAndPersonalRemindersAtAGlance',
+            ),
           }
         : {
-            eyebrow: fa ? 'نمای یکپارچه برنامه' : 'Unified schedule',
-            title: fa ? 'تقویم کاری من' : 'My work calendar',
-            description: fa
-              ? 'کلاس‌ها، مسدودی‌ها و یادداشت‌های شخصی در یک نگاه'
-              : 'Classes, blocked times, and personal notes at a glance',
+            eyebrow: translate(locale, 'schedulingteacherPlannerCalendarUnifiedSchedule'),
+            title: translate(locale, 'schedulingteacherPlannerCalendarMyWorkCalendar'),
+            description: translate(locale, 'schedulingteacherPlannerCalendarClassesBlockedTimesAndPersonalNotesAtA'),
           };
   const bookingTitle = (item: Booking) => {
     if (mode === 'admin')
-      return `${item.student?.name || item.student?.phone || (fa ? 'زبان‌آموز' : 'Student')} — ${fa ? item.teacher?.nameFa : item.teacher?.nameEn || item.teacher?.nameFa || (fa ? 'مدرس' : 'Teacher')}`;
+      return `${item.student?.name || item.student?.phone || translate(locale, 'schedulingteacherPlannerCalendarStudent')} — ${localized({ fa: item.teacher?.nameFa, en: item.teacher?.nameEn || item.teacher?.nameFa || translate(locale, 'schedulingteacherPlannerCalendarTeacher') }, locale)}`;
     if (mode === 'student')
       return (
-        (fa ? item.teacher?.nameFa : item.teacher?.nameEn) || item.teacher?.nameFa || (fa ? 'کلاس من' : 'My class')
+        localized({ fa: item.teacher?.nameFa, en: item.teacher?.nameEn }, locale) ||
+        item.teacher?.nameFa ||
+        translate(locale, 'schedulingteacherPlannerCalendarMyClass')
       );
-    return item.student?.name || (fa ? 'کلاس رزروشده' : 'Booked class');
+    return item.student?.name || translate(locale, 'schedulingteacherPlannerCalendarBookedClass');
   };
   return (
     <section className="panel-card overflow-hidden">
@@ -107,24 +114,24 @@ export function TeacherPlannerCalendar({ mode = 'teacher' }: { mode?: CalendarMo
         </div>
         <button onClick={() => setOpen(true)} className="primary-button">
           <CalendarPlus size={18} />
-          {fa ? 'رویداد جدید' : 'New event'}
+          {translate(locale, 'schedulingteacherPlannerCalendarNewEvent')}
         </button>
       </div>
       <div className="grid lg:grid-cols-[1fr_340px]">
         <div className="p-4 md:p-6">
           <div className="mb-5 flex items-center justify-between">
             <button
-              onClick={() => changeMonth(fa ? 1 : -1)}
+              onClick={() => changeMonth(localized({ fa: 1, en: -1 }, locale))}
               className="grid size-10 place-items-center rounded-xl border hairline bg-white"
             >
-              {fa ? <ChevronRight /> : <ChevronLeft />}
+              {localized({ fa: <ChevronRight />, en: <ChevronLeft /> }, locale)}
             </button>
             <strong className="text-lg">{title}</strong>
             <button
-              onClick={() => changeMonth(fa ? -1 : 1)}
+              onClick={() => changeMonth(localized({ fa: -1, en: 1 }, locale))}
               className="grid size-10 place-items-center rounded-xl border hairline bg-white"
             >
-              {fa ? <ChevronLeft /> : <ChevronRight />}
+              {localized({ fa: <ChevronLeft />, en: <ChevronRight /> }, locale)}
             </button>
           </div>
           <div className="grid grid-cols-7">
@@ -149,16 +156,18 @@ export function TeacherPlannerCalendar({ mode = 'teacher' }: { mode?: CalendarMo
                   <span
                     className={`grid size-7 place-items-center rounded-full text-xs font-bold ${key === today ? 'bg-indigo-600 text-white' : ''}`}
                   >
-                    {new Intl.NumberFormat(fa ? 'fa-IR' : 'en-US').format(date.getDate())}
+                    {new Intl.NumberFormat(translate(locale, 'commercepricingManagerEnUS2')).format(date.getDate())}
                   </span>
                   <span className="mt-2 grid gap-1">
                     {booked.slice(0, 2).map((item) => (
                       <i key={item.id} className="calendar-event bg-indigo-50 text-indigo-700">
-                        {time(item.startsAt)} {fa ? 'کلاس' : 'Class'}
+                        {time(item.startsAt)} {translate(locale, 'schedulingteacherPlannerCalendarClass')}
                       </i>
                     ))}
                     {blocked.length > 0 && (
-                      <i className="calendar-event bg-rose-50 text-rose-700">{fa ? 'مسدود' : 'Blocked'}</i>
+                      <i className="calendar-event bg-rose-50 text-rose-700">
+                        {translate(locale, 'schedulingteacherPlannerCalendarBlocked')}
+                      </i>
                     )}
                     {dayNotes.slice(0, 1).map((item) => (
                       <i key={item.id} className={`calendar-event calendar-${item.color}`}>
@@ -178,12 +187,15 @@ export function TeacherPlannerCalendar({ mode = 'teacher' }: { mode?: CalendarMo
         </div>
         <aside className="border-t hairline bg-[#fafbff] p-5 lg:border-s lg:border-t-0 md:p-6">
           <p className="text-xs font-bold text-blue">
-            {new Intl.DateTimeFormat(fa ? 'fa-IR-u-ca-persian' : 'en-US', { weekday: 'long' }).format(selectedDate)}
+            {new Intl.DateTimeFormat(translate(locale, 'commercepricingManagerEnUS'), {
+              weekday: 'long',
+            }).format(selectedDate)}
           </p>
           <h3 className="mt-1 text-xl font-black">
-            {new Intl.DateTimeFormat(fa ? 'fa-IR-u-ca-persian' : 'en-US', { day: 'numeric', month: 'long' }).format(
-              selectedDate,
-            )}
+            {new Intl.DateTimeFormat(translate(locale, 'commercepricingManagerEnUS'), {
+              day: 'numeric',
+              month: 'long',
+            }).format(selectedDate)}
           </h3>
           <div className="mt-5 grid gap-3">
             {selectedBookings.map((item) => (
@@ -199,7 +211,7 @@ export function TeacherPlannerCalendar({ mode = 'teacher' }: { mode?: CalendarMo
                 key={item.id}
                 color="rose"
                 time={time(item.startsAt)}
-                title={item.reason || (fa ? 'زمان مسدود' : 'Blocked time')}
+                title={item.reason || translate(locale, 'schedulingteacherPlannerCalendarBlockedTime')}
               />
             ))}
             {selectedNotes.map((item) => (
@@ -210,7 +222,7 @@ export function TeacherPlannerCalendar({ mode = 'teacher' }: { mode?: CalendarMo
                   <small className="text-muted">{item.time}</small>
                 </div>
                 <button
-                  aria-label={fa ? 'حذف' : 'Delete'}
+                  aria-label={translate(locale, 'schedulingteacherPlannerCalendarDelete')}
                   onClick={() => save(notes.filter((note) => note.id !== item.id))}
                   className="text-red-500"
                 >
@@ -221,10 +233,10 @@ export function TeacherPlannerCalendar({ mode = 'teacher' }: { mode?: CalendarMo
             {!selectedBookings.length && !selectedBlocks.length && !selectedNotes.length && (
               <div className="rounded-2xl border border-dashed hairline p-6 text-center">
                 <p className="text-sm text-muted">
-                  {fa ? 'برای این روز برنامه‌ای ثبت نشده.' : 'Nothing planned for this day.'}
+                  {translate(locale, 'schedulingteacherPlannerCalendarNothingPlannedForThisDay')}
                 </p>
                 <button onClick={() => setOpen(true)} className="mt-3 text-sm font-bold text-blue">
-                  {fa ? 'افزودن یادداشت' : 'Add a note'}
+                  {translate(locale, 'schedulingteacherPlannerCalendarAddANote')}
                 </button>
               </div>
             )}
@@ -285,8 +297,12 @@ function NoteDialog({
       >
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-bold text-blue">{fa ? 'برنامه‌ریزی شخصی' : 'Personal planning'}</p>
-            <h3 className="mt-1 text-xl font-black">{fa ? 'رویداد یا یادداشت جدید' : 'New event or note'}</h3>
+            <p className="text-sm font-bold text-blue">
+              {translate(fa, 'schedulingteacherPlannerCalendarPersonalPlanning')}
+            </p>
+            <h3 className="mt-1 text-xl font-black">
+              {translate(fa, 'schedulingteacherPlannerCalendarNewEventOrNote')}
+            </h3>
           </div>
           <button type="button" onClick={close} className="grid size-9 place-items-center rounded-full bg-slate-100">
             <X size={18} />
@@ -294,37 +310,45 @@ function NoteDialog({
         </div>
         <div className="mt-5 grid gap-4">
           <label>
-            <span className="mb-2 block text-sm font-bold">{fa ? 'عنوان' : 'Title'}</span>
+            <span className="mb-2 block text-sm font-bold">
+              {translate(fa, 'schedulingteacherPlannerCalendarTitle')}
+            </span>
             <input
               name="title"
               required
               maxLength={80}
               autoFocus
               className="input"
-              placeholder={fa ? 'مثلاً آماده‌سازی درس مکالمه' : 'e.g. Prepare speaking lesson'}
+              placeholder={translate(fa, 'schedulingteacherPlannerCalendarEGPrepareSpeakingLesson')}
             />
           </label>
           <div className="grid grid-cols-2 gap-3">
             <label>
-              <span className="mb-2 block text-sm font-bold">{fa ? 'تاریخ' : 'Date'}</span>
+              <span className="mb-2 block text-sm font-bold">
+                {translate(fa, 'schedulingteacherPlannerCalendarDate')}
+              </span>
               <input name="date" type="date" required defaultValue={date} className="input latin" />
             </label>
             <label>
-              <span className="mb-2 block text-sm font-bold">{fa ? 'ساعت' : 'Time'}</span>
+              <span className="mb-2 block text-sm font-bold">
+                {translate(fa, 'schedulingteacherPlannerCalendarTime')}
+              </span>
               <input name="time" type="time" required defaultValue="09:00" className="input latin" />
             </label>
           </div>
           <label>
-            <span className="mb-2 block text-sm font-bold">{fa ? 'رنگ' : 'Color'}</span>
+            <span className="mb-2 block text-sm font-bold">
+              {translate(fa, 'schedulingteacherPlannerCalendarColor')}
+            </span>
             <select name="color" className="input">
-              <option value="indigo">{fa ? 'آبی — کار' : 'Blue — Work'}</option>
-              <option value="amber">{fa ? 'زرد — یادآوری' : 'Yellow — Reminder'}</option>
-              <option value="emerald">{fa ? 'سبز — شخصی' : 'Green — Personal'}</option>
+              <option value="indigo">{translate(fa, 'schedulingteacherPlannerCalendarBlueWork')}</option>
+              <option value="amber">{translate(fa, 'schedulingteacherPlannerCalendarYellowReminder')}</option>
+              <option value="emerald">{translate(fa, 'schedulingteacherPlannerCalendarGreenPersonal')}</option>
             </select>
           </label>
           <button className="primary-button justify-center">
             <Plus size={18} />
-            {fa ? 'ذخیره در تقویم' : 'Save to calendar'}
+            {translate(fa, 'schedulingteacherPlannerCalendarSaveToCalendar')}
           </button>
         </div>
       </form>

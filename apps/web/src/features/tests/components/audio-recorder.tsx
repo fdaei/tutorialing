@@ -1,5 +1,6 @@
 'use client';
 
+import { localized, isDefaultLocale, translate } from '@/lib/i18n';
 import { useEffect, useRef, useState } from 'react';
 import { Mic, RotateCcw, Square, UploadCloud } from 'lucide-react';
 import { api } from '@/lib/api';
@@ -20,7 +21,7 @@ const extensions: Record<string, string> = {
 
 export function AudioRecorder({ value, onUploaded }: Props) {
   const { locale } = useTranslations(),
-    fa = locale === 'fa';
+    fa = isDefaultLocale(locale);
   const recorder = useRef<MediaRecorder | null>(null),
     chunks = useRef<Blob[]>([]),
     lastBlob = useRef<Blob | null>(null),
@@ -61,11 +62,7 @@ export function AudioRecorder({ value, onUploaded }: Props) {
       })
       .catch(() => {
         if (!cancelled) {
-          setError(
-            fa
-              ? 'فایل ذخیره شده است، اما پخش آن فعلاً در دسترس نیست. دوباره تلاش کنید.'
-              : 'The recording is saved, but playback is temporarily unavailable. Try again.',
-          );
+          setError(translate(locale, 'testsaudioRecorderTheRecordingIsSavedButPlaybackIsTemporarily'));
           setStatus('error');
         }
       });
@@ -99,11 +96,7 @@ export function AudioRecorder({ value, onUploaded }: Props) {
       setError('');
       setStatus('recording');
     } catch {
-      setError(
-        fa
-          ? 'دسترسی میکروفون ممکن نیست. مجوز مرورگر را فعال کنید.'
-          : 'Microphone access is unavailable. Allow it in your browser settings.',
-      );
+      setError(translate(locale, 'testsaudioRecorderMicrophoneAccessIsUnavailableAllowItInYour'));
       setStatus('error');
     }
   }
@@ -161,11 +154,7 @@ export function AudioRecorder({ value, onUploaded }: Props) {
       replaceUrl(URL.createObjectURL(blob), true);
       await attach(signed.fileId);
     } catch {
-      setError(
-        fa
-          ? 'ذخیره صدا کامل نشد. فایل ضبط‌شده حفظ شده است؛ «تلاش دوباره» را بزنید.'
-          : 'The recording was not fully saved. Your local audio is preserved; select “Try again”.',
-      );
+      setError(translate(locale, 'testsaudioRecorderTheRecordingWasNotFullySavedYourLocal'));
       setStatus('error');
     }
   }
@@ -182,11 +171,7 @@ export function AudioRecorder({ value, onUploaded }: Props) {
         setStatus('ready');
       } else setStatus('idle');
     } catch {
-      setError(
-        fa
-          ? 'ذخیره صدا دوباره ناموفق بود. اتصال اینترنت و سرویس فایل را بررسی کنید.'
-          : 'Saving failed again. Check your connection and file service.',
-      );
+      setError(translate(locale, 'testsaudioRecorderSavingFailedAgainCheckYourConnectionAndFile'));
       setStatus('error');
     }
   }
@@ -202,7 +187,9 @@ export function AudioRecorder({ value, onUploaded }: Props) {
             className="brand-gradient inline-flex items-center gap-2 rounded-full px-5 py-3 font-bold text-white disabled:opacity-50"
           >
             <Mic size={18} />
-            {value || url ? (fa ? 'ضبط دوباره' : 'Record again') : fa ? 'شروع ضبط' : 'Start recording'}
+            {value || url
+              ? translate(locale, 'testsaudioRecorderRecordAgain')
+              : translate(locale, 'testsaudioRecorderStartRecording')}
           </button>
         ) : (
           <button
@@ -211,18 +198,18 @@ export function AudioRecorder({ value, onUploaded }: Props) {
             className="inline-flex items-center gap-2 rounded-full bg-red-700 px-5 py-3 font-bold text-white"
           >
             <Square size={17} />
-            {fa ? 'پایان ضبط' : 'Stop recording'}
+            {translate(locale, 'testsaudioRecorderStopRecording')}
           </button>
         )}
         {status === 'uploading' && (
           <span className="inline-flex items-center gap-2 text-sm">
             <UploadCloud className="animate-pulse" />
-            {fa ? 'در حال بارگذاری و ثبت پاسخ…' : 'Uploading and saving the answer…'}
+            {translate(locale, 'testsaudioRecorderUploadingAndSavingTheAnswer')}
           </span>
         )}
         {status === 'ready' && (
           <span className="text-sm font-bold text-emerald-700">
-            {fa ? 'فایل صوتی و پاسخ آزمون ذخیره شدند.' : 'The audio file and test answer are saved.'}
+            {translate(locale, 'testsaudioRecorderTheAudioFileAndTestAnswerAreSaved')}
           </span>
         )}
         {status === 'error' && (
@@ -232,7 +219,7 @@ export function AudioRecorder({ value, onUploaded }: Props) {
             className="inline-flex items-center gap-2 rounded-full border border-purple/25 bg-white px-4 py-2 text-sm font-bold text-purple"
           >
             <RotateCcw size={16} />
-            {fa ? 'تلاش دوباره' : 'Try again'}
+            {translate(locale, 'testsaudioRecorderTryAgain')}
           </button>
         )}
       </div>
@@ -243,9 +230,7 @@ export function AudioRecorder({ value, onUploaded }: Props) {
         </p>
       )}
       <p className="mt-3 text-xs text-muted">
-        {fa
-          ? 'پیش از قفل‌کردن بخش، صدای ذخیره‌شده را پخش و بررسی کنید.'
-          : 'Play and review the saved recording before locking the section.'}
+        {translate(locale, 'testsaudioRecorderPlayAndReviewTheSavedRecordingBeforeLocking')}
       </p>
     </div>
   );

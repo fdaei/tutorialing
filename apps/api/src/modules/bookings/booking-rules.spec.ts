@@ -4,7 +4,7 @@ const TEACHER = 'teacher-1';
 const STUDENT = 'student-1';
 const HOUR_MS = 3_600_000;
 
-type Counts = { priorTrial?: number; pendingTrial?: number; trialUsed?: number };
+type Counts = { trialUsed?: number };
 
 /**
  * Builds a service whose slot machinery always succeeds, so these tests isolate
@@ -18,15 +18,14 @@ function harness(options: { settings?: Record<string, number>; counts?: Counts }
       .fn()
       .mockImplementation((key: string, fallback: number) => Promise.resolve(options.settings?.[key] ?? fallback)),
   };
-  // `type: 'trial'` guards call count() once; the regular-lesson guard calls it
-  // twice (completed trials, then pending ones). The student-overlap check is
-  // the first count() in the transaction, so it answers 0.
+  // The student-overlap check is the first count() in the transaction. Trial
+  // bookings make one additional query to enforce the one-trial limit; regular
+  // lessons do not depend on trial history.
   const counts = options.counts ?? {};
   const bookingCount = jest
     .fn()
     .mockResolvedValueOnce(0)
-    .mockResolvedValueOnce(counts.priorTrial ?? counts.trialUsed ?? 0)
-    .mockResolvedValueOnce(counts.pendingTrial ?? 0);
+    .mockResolvedValueOnce(counts.trialUsed ?? 0);
   const tx = {
     booking: {
       count: bookingCount,
@@ -95,23 +94,9 @@ describe('booking window', () => {
   });
 });
 
-describe('mandatory trial session', () => {
-  it('refuses a regular lesson before any trial with that teacher', async () => {
-    const h = harness({ counts: { priorTrial: 0, pendingTrial: 0 } });
-    await expect(h.svc.create(STUDENT, book(4, { type: 'regular' }))).rejects.toMatchObject({
-      response: { code: 'TRIAL_SESSION_REQUIRED' },
-    });
-  });
-
-  it('still refuses while the trial is only booked, not taken', async () => {
-    const h = harness({ counts: { priorTrial: 0, pendingTrial: 1 } });
-    await expect(h.svc.create(STUDENT, book(4, { type: 'regular' }))).rejects.toMatchObject({
-      response: { code: 'TRIAL_SESSION_REQUIRED' },
-    });
-  });
-
-  it('allows a regular lesson once a trial has been completed', async () => {
-    const h = harness({ counts: { priorTrial: 1 } });
+describe('optional trial session', () => {
+  it('allows a regular lesson without a prior trial', async () => {
+    const h = harness();
     await expect(h.svc.create(STUDENT, book(4, { type: 'regular' }))).resolves.toMatchObject({ id: 'booking-new' });
   });
 

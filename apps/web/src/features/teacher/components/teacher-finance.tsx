@@ -1,5 +1,6 @@
 'use client';
 
+import { localized, isDefaultLocale, translate } from '@/lib/i18n';
 import { useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowDownToLine, CircleDollarSign, Clock3, ReceiptText, ShieldCheck, WalletCards } from 'lucide-react';
@@ -27,7 +28,7 @@ type Finance = {
 
 export function TeacherFinance() {
   const { locale } = useTranslations(),
-    fa = locale === 'fa',
+    fa = isDefaultLocale(locale),
     qc = useQueryClient(),
     [amount, setAmount] = useState(''),
     [iban, setIban] = useState('');
@@ -59,28 +60,28 @@ export function TeacherFinance() {
   if (query.isError)
     return (
       <div role="alert" className="panel-card p-8 text-red-700">
-        {fa ? 'اطلاعات کیف پول دریافت نشد.' : 'Could not load wallet data.'}
+        {translate(locale, 'teacherteacherFinanceCouldNotLoadWalletData')}
       </div>
     );
   const data = query.data!,
     paid = data.totals.find((x) => x.status === 'PAID')?._sum.netAmount ?? 0,
     lifetime = data.totals.reduce((sum, x) => sum + (x._sum.netAmount ?? 0), 0);
   const money = (value: number) =>
-      `${new Intl.NumberFormat(fa ? 'fa-IR' : 'en-US').format(value)} ${fa ? 'تومان' : 'IRR'}`,
+      `${new Intl.NumberFormat(translate(locale, 'commercepricingManagerEnUS2')).format(value)} ${translate(locale, 'teacherteacherFinanceIrr')}`,
     date = (value: string) =>
-      new Intl.DateTimeFormat(fa ? 'fa-IR' : 'en-US', { dateStyle: 'medium' }).format(new Date(value));
+      new Intl.DateTimeFormat(translate(locale, 'commercepricingManagerEnUS2'), { dateStyle: 'medium' }).format(
+        new Date(value),
+      );
   const validIban = /^IR\d{24}$/.test(iban.replace(/\s/g, '').toUpperCase()),
     numericAmount = Number(amount),
     canSubmit = numericAmount >= 100_000 && numericAmount <= data.availableToWithdraw && validIban;
   return (
     <div>
       <header>
-        <p className="mb-2 text-sm font-bold text-blue">{fa ? 'کیف پول مدرس' : 'Teacher wallet'}</p>
-        <h1 className="text-3xl font-black">{fa ? 'موجودی و برداشت وجه' : 'Balance & withdrawals'}</h1>
+        <p className="mb-2 text-sm font-bold text-blue">{translate(locale, 'teacherteacherFinanceTeacherWallet')}</p>
+        <h1 className="text-3xl font-black">{translate(locale, 'teacherteacherFinanceBalanceWithdrawals')}</h1>
         <p className="mt-2 text-muted">
-          {fa
-            ? 'موجودی‌ات را ببین، مبلغ دلخواه را انتخاب کن و درخواست تسویه بده.'
-            : 'View your balance, choose an amount, and request a payout.'}
+          {translate(locale, 'teacherteacherFinanceViewYourBalanceChooseAnAmountAndRequest')}
         </p>
       </header>
       <section className="wallet-hero mt-7 overflow-hidden p-6 text-white md:p-8">
@@ -88,17 +89,17 @@ export function TeacherFinance() {
           <div>
             <div className="flex items-center gap-2 text-white/70">
               <WalletCards size={20} />
-              <span className="text-sm">{fa ? 'موجودی قابل برداشت' : 'Available to withdraw'}</span>
+              <span className="text-sm">{translate(locale, 'teacherteacherFinanceAvailableToWithdraw')}</span>
             </div>
             <strong className="mt-3 block text-3xl font-black md:text-4xl">{money(data.availableToWithdraw)}</strong>
             <div className="mt-6 flex flex-wrap gap-x-6 gap-y-2 text-xs text-white/65">
               <span>
-                {fa ? 'کل کیف پول: ' : 'Wallet balance: '}
+                {translate(locale, 'teacherteacherFinanceWalletBalance')}
                 {money(data.walletBalance)}
               </span>
               {data.reservedAmount > 0 && (
                 <span>
-                  {fa ? 'در انتظار تسویه: ' : 'Reserved: '}
+                  {translate(locale, 'teacherteacherFinanceReserved')}
                   {money(data.reservedAmount)}
                 </span>
               )}
@@ -113,35 +114,37 @@ export function TeacherFinance() {
           >
             <h2 className="flex items-center gap-2 text-lg font-black">
               <ArrowDownToLine size={20} />
-              {fa ? 'درخواست برداشت' : 'Withdraw funds'}
+              {translate(locale, 'teacherteacherFinanceWithdrawFunds')}
             </h2>
             <div className="mt-4 grid gap-3">
               <label>
-                <span className="mb-1.5 block text-xs font-bold">{fa ? 'مبلغ برداشت (تومان)' : 'Amount (IRR)'}</span>
+                <span className="mb-1.5 block text-xs font-bold">
+                  {translate(locale, 'teacherteacherFinanceAmountIRR')}
+                </span>
                 <div className="relative">
                   <input
                     value={amount}
                     onChange={(event) => setAmount(event.target.value.replace(/\D/g, ''))}
                     inputMode="numeric"
                     className="input pe-20"
-                    placeholder={fa ? 'مثلاً ۵۰۰٬۰۰۰' : 'e.g. 500,000'}
+                    placeholder={translate(locale, 'teacherteacherFinanceEG500000')}
                   />
                   <button
                     type="button"
                     onClick={() => setAmount(String(data.availableToWithdraw))}
                     className="absolute inset-y-2 end-2 rounded-lg bg-indigo-50 px-3 text-xs font-bold text-indigo-700"
                   >
-                    {fa ? 'کل موجودی' : 'Maximum'}
+                    {translate(locale, 'teacherteacherFinanceMaximum')}
                   </button>
                 </div>
                 {amount && numericAmount < 100_000 && (
                   <small className="mt-1 block text-red-600">
-                    {fa ? 'حداقل مبلغ برداشت ۱۰۰٬۰۰۰ تومان است.' : 'Minimum withdrawal is 100,000 IRR.'}
+                    {translate(locale, 'teacherteacherFinanceMinimumWithdrawalIs100000IRR')}
                   </small>
                 )}
                 {numericAmount > data.availableToWithdraw && (
                   <small className="mt-1 block text-red-600">
-                    {fa ? 'مبلغ بیشتر از موجودی قابل برداشت است.' : 'Amount exceeds available balance.'}
+                    {translate(locale, 'teacherteacherFinanceAmountExceedsAvailableBalance')}
                   </small>
                 )}
                 {apiField(withdraw.error, 'amount') && (
@@ -150,7 +153,7 @@ export function TeacherFinance() {
               </label>
               <label>
                 <span className="mb-1.5 block text-xs font-bold">
-                  {fa ? 'شماره شبا به نام مدرس' : 'IBAN in teacher’s name'}
+                  {translate(locale, 'teacherteacherFinanceIbanInTeacherSName')}
                 </span>
                 <input
                   value={iban}
@@ -162,9 +165,7 @@ export function TeacherFinance() {
                 />
                 {iban && !validIban && (
                   <small className="mt-1 block text-red-600">
-                    {fa
-                      ? 'شبا باید با IR شروع شود و ۲۴ رقم داشته باشد.'
-                      : 'IBAN must start with IR followed by 24 digits.'}
+                    {translate(locale, 'teacherteacherFinanceIbanMustStartWithIRFollowedBy24')}
                   </small>
                 )}
               </label>
@@ -173,23 +174,17 @@ export function TeacherFinance() {
                 className="primary-button justify-center disabled:cursor-not-allowed disabled:opacity-45"
               >
                 {withdraw.isPending
-                  ? fa
-                    ? 'در حال ثبت…'
-                    : 'Submitting…'
-                  : fa
-                    ? 'ثبت درخواست برداشت'
-                    : 'Request withdrawal'}
+                  ? translate(locale, 'teacherteacherFinanceSubmitting')
+                  : translate(locale, 'teacherteacherFinanceRequestWithdrawal')}
               </button>
               {withdraw.isError && (
                 <p role="alert" className="rounded-xl bg-red-50 p-3 text-xs text-red-700">
-                  {apiMessage(withdraw.error, fa ? 'ثبت درخواست ناموفق بود.' : 'Could not submit request.')}
+                  {apiMessage(withdraw.error, translate(locale, 'teacherteacherFinanceCouldNotSubmitRequest'))}
                 </p>
               )}
               {withdraw.isSuccess && (
                 <p role="status" className="rounded-xl bg-emerald-50 p-3 text-xs font-bold text-emerald-700">
-                  {fa
-                    ? 'درخواست ثبت شد و موجودی آن تا تعیین تکلیف رزرو شد.'
-                    : 'Request submitted; the amount is reserved until processed.'}
+                  {translate(locale, 'teacherteacherFinanceRequestSubmittedTheAmountIsReservedUntilProcessed')}
                 </p>
               )}
             </div>
@@ -197,19 +192,23 @@ export function TeacherFinance() {
         </div>
       </section>
       <section className="mt-5 grid gap-4 sm:grid-cols-3">
-        <Metric icon={CircleDollarSign} label={fa ? 'کل درآمد خالص' : 'Lifetime net'} value={money(lifetime)} />
-        <Metric icon={ReceiptText} label={fa ? 'تسویه‌شده' : 'Paid out'} value={money(paid)} />
+        <Metric
+          icon={CircleDollarSign}
+          label={translate(locale, 'teacherteacherFinanceLifetimeNet')}
+          value={money(lifetime)}
+        />
+        <Metric icon={ReceiptText} label={translate(locale, 'teacherteacherFinancePaidOut')} value={money(paid)} />
         <Metric
           icon={ShieldCheck}
-          label={fa ? 'مبلغ رزروشده' : 'Pending requests'}
+          label={translate(locale, 'teacherteacherFinancePendingRequests')}
           value={money(data.reservedAmount)}
         />
       </section>
       <section className="mt-5 panel-card overflow-hidden">
         <div className="border-b hairline p-5 md:p-6">
-          <h2 className="text-xl font-black">{fa ? 'درخواست‌های برداشت' : 'Withdrawal requests'}</h2>
+          <h2 className="text-xl font-black">{translate(locale, 'teacherteacherFinanceWithdrawalRequests')}</h2>
           <p className="mt-1 text-sm text-muted">
-            {fa ? 'وضعیت درخواست و شماره پیگیری بانکی' : 'Request status and bank reference'}
+            {translate(locale, 'teacherteacherFinanceRequestStatusAndBankReference')}
           </p>
         </div>
         {data.withdrawals.length ? (
@@ -217,11 +216,11 @@ export function TeacherFinance() {
             <table className="teacher-table">
               <thead>
                 <tr>
-                  <th>{fa ? 'تاریخ' : 'Date'}</th>
-                  <th>{fa ? 'مبلغ' : 'Amount'}</th>
-                  <th>{fa ? 'شبا' : 'IBAN'}</th>
-                  <th>{fa ? 'وضعیت' : 'Status'}</th>
-                  <th>{fa ? 'پیگیری' : 'Reference'}</th>
+                  <th>{translate(locale, 'schedulingteacherPlannerCalendarDate')}</th>
+                  <th>{translate(locale, 'teacherteacherFinanceAmount')}</th>
+                  <th>{translate(locale, 'teacherteacherFinanceIban')}</th>
+                  <th>{translate(locale, 'commercepricingManagerStatus')}</th>
+                  <th>{translate(locale, 'teacherteacherFinanceReference')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -240,17 +239,14 @@ export function TeacherFinance() {
             </table>
           </div>
         ) : (
-          <Empty
-            fa={fa}
-            text={fa ? 'هنوز درخواست برداشتی ثبت نکرده‌اید.' : 'You have not requested a withdrawal yet.'}
-          />
+          <Empty fa={fa} text={translate(locale, 'teacherteacherFinanceYouHaveNotRequestedAWithdrawalYet')} />
         )}
       </section>
       <section className="mt-5 panel-card overflow-hidden">
         <div className="border-b hairline p-5 md:p-6">
-          <h2 className="text-xl font-black">{fa ? 'ریز درآمد کلاس‌ها' : 'Lesson earnings'}</h2>
+          <h2 className="text-xl font-black">{translate(locale, 'teacherteacherFinanceLessonEarnings')}</h2>
           <p className="mt-1 text-sm text-muted">
-            {fa ? 'مبلغ ناخالص منهای کارمزد پلتفرم' : 'Gross amount minus platform fee'}
+            {translate(locale, 'teacherteacherFinanceGrossAmountMinusPlatformFee')}
           </p>
         </div>
         {data.earnings.length ? (
@@ -258,11 +254,11 @@ export function TeacherFinance() {
             <table className="teacher-table">
               <thead>
                 <tr>
-                  <th>{fa ? 'تاریخ' : 'Date'}</th>
-                  <th>{fa ? 'مبلغ کلاس' : 'Gross'}</th>
-                  <th>{fa ? 'کارمزد' : 'Fee'}</th>
-                  <th>{fa ? 'سهم شما' : 'Your net'}</th>
-                  <th>{fa ? 'وضعیت' : 'Status'}</th>
+                  <th>{translate(locale, 'schedulingteacherPlannerCalendarDate')}</th>
+                  <th>{translate(locale, 'teacherteacherFinanceGross')}</th>
+                  <th>{translate(locale, 'teacherteacherFinanceFee')}</th>
+                  <th>{translate(locale, 'teacherteacherFinanceYourNet')}</th>
+                  <th>{translate(locale, 'commercepricingManagerStatus')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -281,14 +277,7 @@ export function TeacherFinance() {
             </table>
           </div>
         ) : (
-          <Empty
-            fa={fa}
-            text={
-              fa
-                ? 'بعد از تکمیل اولین کلاس، درآمد اینجا نمایش داده می‌شود.'
-                : 'Earnings appear after your first completed class.'
-            }
-          />
+          <Empty fa={fa} text={translate(locale, 'teacherteacherFinanceEarningsAppearAfterYourFirstCompletedClass')} />
         )}
       </section>
     </div>
@@ -312,16 +301,10 @@ function EarningStatus({ status, fa }: { status: string; fa: boolean }) {
   return (
     <span className={`status-pill ${paid ? 'status-success' : eligible ? 'status-info' : 'status-warning'}`}>
       {paid
-        ? fa
-          ? 'تسویه‌شده'
-          : 'Paid'
+        ? translate(fa, 'teacherteacherFinancePaid')
         : eligible
-          ? fa
-            ? 'آماده برداشت'
-            : 'Available'
-          : fa
-            ? 'در حال آزادسازی'
-            : 'On hold'}
+          ? translate(fa, 'teacherteacherFinanceAvailable')
+          : translate(fa, 'teacherteacherFinanceOnHold')}
     </span>
   );
 }
@@ -333,7 +316,7 @@ function WithdrawalStatus({ status, fa }: { status: string; fa: boolean }) {
     REJECTED: ['ردشده', 'Rejected', 'bg-red-50 text-red-700'],
   };
   const item = map[status] ?? [status, status, 'status-info'];
-  return <span className={`status-pill ${item[2]}`}>{item[fa ? 0 : 1]}</span>;
+  return <span className={`status-pill ${item[2]}`}>{item[localized({ fa: 0, en: 1 }, fa)]}</span>;
 }
 function Empty({ fa, text }: { fa: boolean; text: string }) {
   return (

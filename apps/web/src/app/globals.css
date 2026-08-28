@@ -13,9 +13,6 @@
   --canvas:#f8f9fd;
   --surface:#fff;
   --line:#e5e8f1;
-  /* DES-505: was #6f7890, which is 4.19:1 on --canvas and fails WCAG AA for
-     body text. Used 218 times across 45 files via `text-muted`, so this one
-     line is the whole fix. #5b6478 measures 5.59:1. */
   --muted:#5b6478;
   --green:#26a66f;
   --orange:#f28a32;
@@ -62,8 +59,28 @@ a{text-decoration:none;color:inherit}
 .status-pill{display:inline-flex;align-items:center;border-radius:999px;padding:.35rem .65rem;font-size:.7rem;font-weight:800;white-space:nowrap}.status-success{background:#ecfdf3;color:#15803d}.status-warning{background:#fffbeb;color:#b45309}.status-info{background:#eef2ff;color:#4338ca}
 .wallet-hero{border-radius:20px;background:linear-gradient(120deg,#3730a3,#4f46e5 55%,#6d5dfb);box-shadow:0 18px 45px rgba(79,70,229,.2)}
 .surface-card{background:#fff;border:1px solid var(--line);border-radius:22px;box-shadow:0 10px 34px rgba(22,28,67,.055)}
+.page-shell{width:min(100% - 2.5rem,1280px);margin-inline:auto}
+.section-space{padding-block:5.5rem}
+.hero-wash{background:radial-gradient(circle at 78% 20%,rgba(118,84,246,.09),transparent 28%),linear-gradient(180deg,#fff 0%,#fdfdff 100%)}
+.market-card{background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:0 8px 28px rgba(35,39,85,.055)}
+.floating-card{position:absolute;z-index:2;width:154px;border:1px solid rgba(226,229,241,.9);border-radius:16px;background:rgba(255,255,255,.94);padding:15px;box-shadow:0 14px 38px rgba(35,39,85,.12);backdrop-filter:blur(12px);animation:float 5s ease-in-out infinite}
+.floating-card p{margin-bottom:6px;color:var(--muted);font-size:11px}.floating-card strong{display:block;font-size:14px}.floating-card:nth-of-type(3){animation-delay:.8s}.floating-card:nth-of-type(4){animation-delay:1.3s}
+.section-title{text-align:center}.section-title p{font-size:13px;font-weight:800;color:var(--purple)}.section-title h2{margin-top:10px;font-size:clamp(1.65rem,3vw,2.25rem);font-weight:900}
+.learning-track{position:relative;display:grid;grid-template-columns:repeat(9,1fr);margin-top:3rem;padding:1.75rem 1rem;border:1px dashed #d9d5fb;border-radius:999px;background:#fff}
+.learning-track:before{content:"";position:absolute;top:43px;right:7%;left:7%;border-top:1px dashed #c9c2fa}
+.learning-track li{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center}.learning-track span{display:grid;width:28px;height:28px;place-items:center;border:5px solid #f3f0ff;border-radius:50%;background:#8065f5;color:#fff;font-size:10px}.learning-track strong{font-size:11px}
+.chip{display:inline-flex;align-items:center;gap:4px;border-radius:999px;background:#f7f7fc;padding:6px 9px}
+.teach-banner{display:grid;align-items:center;overflow:hidden;border:1px solid #ddd7ff;border-radius:24px;background:linear-gradient(110deg,#f2efff,#e7e5ff 55%,#f7f6ff);padding-inline:clamp(1.5rem,4vw,4rem)}
+.final-cta{display:flex;align-items:center;justify-content:space-between;gap:2rem;overflow:hidden;border-radius:24px;background:linear-gradient(120deg,#302a9b,#5e4ee9 60%,#7c62f5);padding:clamp(2rem,5vw,3.5rem);color:#fff;box-shadow:0 22px 60px rgba(79,70,229,.2)}
+@media(min-width:1024px){.teach-banner{grid-template-columns:.8fr 1.2fr}}
+@media(max-width:767px){.section-space{padding-block:4rem}.learning-track{grid-template-columns:1fr;margin-top:2rem;border-radius:22px;padding:1rem 1.25rem}.learning-track:before{top:35px;bottom:35px;right:33px;left:auto;border-right:1px dashed #c9c2fa;border-top:0}.learning-track li{flex-direction:row;justify-content:flex-start;gap:14px;padding:9px 0;text-align:right}.final-cta{align-items:flex-start;flex-direction:column}.floating-card{width:135px;padding:12px}}
 .input{width:100%;border:1px solid #dce0eb;border-radius:14px;padding:14px 16px;background:#fff;outline:none;transition:border-color .2s,box-shadow .2s}
 .input:focus{border-color:var(--purple);box-shadow:0 0 0 4px rgba(118,84,246,.1)}
+.profile-workspace{max-width:1220px;margin-inline:auto}
+.profile-input{width:100%;height:48px;border:1px solid #dce0eb;border-radius:12px;background:#fff;padding:0 14px;color:#172033;outline:none;transition:border-color .2s,box-shadow .2s,background-color .2s}
+.profile-input:hover:not(:read-only){border-color:#c5cad8}
+.profile-input:focus{border-color:#6366f1;box-shadow:0 0 0 4px rgba(99,102,241,.1)}
+.profile-input:read-only{border-color:#e5e7eb}
 .reveal{animation:reveal .65s cubic-bezier(.2,.8,.2,1) both}
 .reveal-delay{animation:reveal .65s .12s cubic-bezier(.2,.8,.2,1) both}
 .float-slow{animation:float 5s ease-in-out infinite}

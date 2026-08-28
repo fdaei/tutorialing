@@ -3,7 +3,6 @@ import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import {
   AlertTriangle,
-  ArrowLeft,
   ArrowRight,
   BookOpen,
   CalendarDays,
@@ -16,7 +15,7 @@ import {
 import { api } from '@/lib/api';
 import { PanelShell, studentNav } from '@/features/panel/components/panel-shell';
 import { useTranslations } from '@/components/shared/locale-provider';
-import { localePath } from '@/lib/i18n';
+import { formatDate, localePath, localized } from '@/lib/i18n';
 type Me = { name?: string };
 type Booking = {
   startsAt: string;
@@ -26,10 +25,8 @@ type Booking = {
 };
 type Attempt = { status: string; overallBand?: number };
 export default function Dashboard() {
-  const { locale } = useTranslations(),
-    fa = locale === 'fa',
+  const { locale, t } = useTranslations(),
     p = (href: string) => localePath(href, locale),
-    Arrow = fa ? ArrowLeft : ArrowRight,
     me = useQuery({ queryKey: ['me'], queryFn: () => api<Me>('/users/me') }),
     bookings = useQuery({ queryKey: ['bookings'], queryFn: () => api<Booking[]>('/bookings/me') }),
     attempts = useQuery({ queryKey: ['attempt-history'], queryFn: () => api<Attempt[]>('/tests/attempts/history') });
@@ -37,63 +34,59 @@ export default function Dashboard() {
     last = attempts.data?.find((a) => a.status === 'APPROVED'),
     assessmentDone = Boolean(last),
     hasClass = Boolean(next),
-    teacherName = fa ? next?.teacher?.nameFa : next?.teacher?.nameEn;
-  const journey = fa
-    ? [
-        [CheckCircle2, 'ساخت حساب کاربری', 'تکمیل‌شده', true],
-        [Target, 'ارزیابی سطح زبان', assessmentDone ? 'تکمیل‌شده' : 'مرحله بعدی شما', assessmentDone],
-        [BookOpen, 'انتخاب مدرس', bookings.data?.length ? 'فعال' : 'پس از تعیین سطح', Boolean(bookings.data?.length)],
-        [Headphones, 'شروع کلاس‌ها', hasClass ? 'رزرو شده' : 'در انتظار رزرو', hasClass],
-      ]
-    : [
-        [CheckCircle2, 'Create your account', 'Completed', true],
-        [Target, 'Assess your level', assessmentDone ? 'Completed' : 'Your next step', assessmentDone],
-        [
-          BookOpen,
-          'Choose a teacher',
-          bookings.data?.length ? 'Active' : 'After assessment',
-          Boolean(bookings.data?.length),
-        ],
-        [Headphones, 'Start classes', hasClass ? 'Booked' : 'Waiting for booking', hasClass],
-      ];
+    teacherName = localized({ fa: next?.teacher?.nameFa, en: next?.teacher?.nameEn }, locale);
+  const journey = [
+    { icon: CheckCircle2, title: t('createAccount'), status: t('completed'), done: true, href: '/dashboard/plan' },
+    {
+      icon: Target,
+      title: t('assessLevel'),
+      status: t(assessmentDone ? 'completed' : 'yourNextStep'),
+      done: assessmentDone,
+      href: '/placement',
+    },
+    {
+      icon: BookOpen,
+      title: t('chooseATeacher'),
+      status: t(bookings.data?.length ? 'active' : 'afterAssessment'),
+      done: Boolean(bookings.data?.length),
+      href: '/matching',
+    },
+    {
+      icon: Headphones,
+      title: t('startClasses'),
+      status: t(hasClass ? 'booked' : 'waitingForBooking'),
+      done: hasClass,
+      href: '/matching',
+    },
+  ];
   return (
-    <PanelShell title="پنل زبان‌آموز" items={studentNav}>
+    <PanelShell title={t('studentPanel')} items={studentNav}>
       <section className="soft-gradient panel-card relative overflow-hidden p-7 md:p-10">
         <div className="relative grid items-center gap-8 lg:grid-cols-[1fr_320px]">
           <div>
             <span className="inline-flex rounded-full bg-white/75 px-4 py-2 text-xs font-bold text-purple">
-              {fa ? 'هر روز یک قدم رو به جلو' : 'One step forward every day'}
+              {t('dashboardMotto')}
             </span>
             <h1 className="mt-7 text-5xl font-black leading-tight md:text-6xl">
-              {fa ? `سلام ${me.data?.name ?? 'زبان‌آموز'}؛` : `Hi ${me.data?.name ?? 'there'},`}
+              {t('dashboardGreeting')} {me.data?.name ?? t('dashboardGuest')}
               <br />
-              <span className="brand-text">{fa ? 'در مسیر بمان.' : 'stay in flow.'}</span>
+              <span className="brand-text">{t('dashboardStayInFlow')}</span>
             </h1>
-            <p className="mt-5 max-w-xl leading-8 text-muted">
-              {fa
-                ? 'برنامه‌ات را ادامه بده، کلاس بعدی و نتیجه آزمون‌ها را ببین و از همین‌جا با مدرس و پشتیبانی در ارتباط باش.'
-                : 'Continue your plan, view your next class and test results, and stay connected with your teacher and support.'}
-            </p>
+            <p className="mt-5 max-w-xl leading-8 text-muted">{t('dashboardIntro')}</p>
             <Link
               href={p(assessmentDone ? '/dashboard/plan' : '/placement')}
               className="brand-gradient brand-glow mt-7 inline-flex items-center gap-3 rounded-xl px-7 py-4 font-black text-white"
             >
-              {assessmentDone
-                ? fa
-                  ? 'ادامه برنامه یادگیری'
-                  : 'Continue learning plan'
-                : fa
-                  ? 'شروع تعیین سطح'
-                  : 'Start placement test'}
-              <Arrow size={19} />
+              {t(assessmentDone ? 'continueLearningPlan' : 'startPlacement')}
+              <ArrowRight className="rtl:rotate-180" size={19} />
             </Link>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <Stat label={fa ? 'آزمون‌ها' : 'Tests'} value={attempts.data?.length ?? 0} />
-            <Stat label={fa ? 'کلاس‌ها' : 'Classes'} value={bookings.data?.length ?? 0} />
+            <Stat label={t('tests')} value={attempts.data?.length ?? 0} />
+            <Stat label={t('classes')} value={bookings.data?.length ?? 0} />
             {last && (
               <div className="panel-card col-span-2 p-5">
-                <small className="block text-muted">{fa ? 'آخرین نمره تأییدشده' : 'Latest approved band'}</small>
+                <small className="block text-muted">{t('latestApprovedBand')}</small>
                 <strong className="latin mt-2 block text-3xl text-purple">{last.overallBand}</strong>
               </div>
             )}
@@ -109,29 +102,15 @@ export default function Dashboard() {
             <CalendarDays />
           </span>
           <span className="flex-1">
-            <small className="font-bold text-purple">
-              {hasClass ? (fa ? 'کلاس بعدی شما' : 'Your next class') : fa ? 'مرحله بعدی' : 'Next step'}
-            </small>
+            <small className="font-bold text-purple">{t(hasClass ? 'nextClass' : 'nextStep')}</small>
             <strong className="mt-1 block text-xl">
-              {hasClass
-                ? fa
-                  ? `کلاس با ${teacherName ?? 'مدرس'}`
-                  : `Class with ${teacherName ?? 'your teacher'}`
-                : fa
-                  ? 'انتخاب مدرس مناسب'
-                  : 'Choose the right teacher'}
+              {hasClass ? `${t('classWith')} ${teacherName || t('teacherFallback')}` : t('chooseTeacher')}
             </strong>
             <small className="mt-1 block text-muted">
-              {hasClass && next
-                ? new Intl.DateTimeFormat(fa ? 'fa-IR' : 'en-US', { dateStyle: 'medium', timeStyle: 'short' }).format(
-                    new Date(next.startsAt),
-                  )
-                : fa
-                  ? 'پیشنهادهای هوشمند را مشاهده کنید'
-                  : 'View your smart recommendations'}
+              {hasClass && next ? formatDate(next.startsAt, locale) : t('smartRecommendations')}
             </small>
           </span>
-          <Arrow />
+          <ArrowRight className="rtl:rotate-180" />
         </Link>
         <Link
           href={p(assessmentDone ? '/dashboard/tests' : '/placement')}
@@ -143,40 +122,25 @@ export default function Dashboard() {
             {assessmentDone ? <CheckCircle2 /> : <AlertTriangle />}
           </span>
           <span className="flex-1">
-            <small className="font-bold text-orange-500">{fa ? 'نیازمند توجه' : 'Needs attention'}</small>
+            <small className="font-bold text-orange-500">{t('needsAttention')}</small>
             <strong className="mt-1 block text-xl">
-              {assessmentDone
-                ? fa
-                  ? 'مشاهده نتیجه تعیین سطح'
-                  : 'View placement result'
-                : fa
-                  ? 'تکمیل تعیین سطح'
-                  : 'Complete placement test'}
+              {t(assessmentDone ? 'viewPlacementResult' : 'completePlacement')}
             </strong>
-            <small className="mt-1 block text-muted">
-              {assessmentDone
-                ? fa
-                  ? 'نتیجه شما آماده است'
-                  : 'Your result is ready'
-                : fa
-                  ? 'برای شروع مسیر، سطح خود را مشخص کنید'
-                  : 'Assess your level to begin'}
-            </small>
+            <small className="mt-1 block text-muted">{t(assessmentDone ? 'resultReady' : 'assessToBegin')}</small>
           </span>
-          <Arrow />
+          <ArrowRight className="rtl:rotate-180" />
         </Link>
       </section>
       <section className="mt-6 grid gap-5 xl:grid-cols-[1fr_330px]">
         <article className="panel-card p-6 md:p-8">
           <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-black">{fa ? 'مسیر یادگیری من' : 'My learning journey'}</h2>
+            <h2 className="text-2xl font-black">{t('learningJourney')}</h2>
             <Link href={p('/dashboard/plan')} className="text-sm font-bold text-blue">
-              {fa ? 'مشاهده همه' : 'View all'}
+              {t('viewAll')}
             </Link>
           </div>
           <div className="mt-6 divide-y hairline">
-            {journey.map(([I, title, status, done]) => {
-              const Icon = I as typeof Target;
+            {journey.map(({ icon: Icon, title, status, done, href }) => {
               return (
                 <div key={String(title)} className="flex items-center gap-4 py-5">
                   <span
@@ -185,21 +149,19 @@ export default function Dashboard() {
                     <Icon size={21} />
                   </span>
                   <p className="flex-1">
-                    <strong>{String(title)}</strong>
-                    <small className="mt-1 block text-muted">{String(status)}</small>
+                    <strong>{title}</strong>
+                    <small className="mt-1 block text-muted">{status}</small>
                   </p>
                   {done ? (
                     <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-600">
-                      {fa ? 'انجام شد' : 'Done'}
+                      {t('done')}
                     </span>
                   ) : (
                     <Link
-                      href={p(
-                        String(title).includes('سطح') || String(title).includes('level') ? '/placement' : '/matching',
-                      )}
+                      href={p(href)}
                       className="rounded-xl border border-blue px-4 py-2 text-sm font-bold text-blue"
                     >
-                      {fa ? 'شروع' : 'Start'}
+                      {t('start')}
                     </Link>
                   )}
                 </div>
@@ -211,18 +173,14 @@ export default function Dashboard() {
           <span className="grid size-14 place-items-center rounded-full bg-purple/25 text-violet">
             <LifeBuoy />
           </span>
-          <h2 className="mt-10 text-3xl font-black">{fa ? 'نیاز به راهنمایی دارید؟' : 'Need a hand?'}</h2>
-          <p className="mt-4 text-sm leading-7 text-white/60">
-            {fa
-              ? 'تیم پشتیبانی آماده است تا در مسیر یادگیری همراه شما باشد.'
-              : 'Our support team is ready to help throughout your learning journey.'}
-          </p>
+          <h2 className="mt-10 text-3xl font-black">{t('needHelp')}</h2>
+          <p className="mt-4 text-sm leading-7 text-white/60">{t('supportIntro')}</p>
           <Link
             href={p('/dashboard/tickets')}
             className="brand-gradient mt-8 flex items-center justify-center gap-3 rounded-xl px-5 py-4 font-black"
           >
             <MessageCircle size={19} />
-            {fa ? 'ایجاد تیکت جدید' : 'Create a ticket'}
+            {t('createTicket')}
           </Link>
         </aside>
       </section>

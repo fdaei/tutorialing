@@ -2,14 +2,41 @@ import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Prisma } from '@prisma/client';
 import { OAuth2Client, type TokenPayload } from 'google-auth-library';
-import { createHash, createHmac, randomBytes, randomInt, randomUUID, timingSafeEqual } from 'crypto';
-import { badRequest, isPrismaKnownError, tooManyRequests, unauthorized } from '../../common';
+import { createHash, createHmac, randomBytes, randomInt, randomUUID, scrypt as nodeScrypt, timingSafeEqual } from 'crypto';
+import { promisify } from 'util';
+import { badRequest, conflict, isPrismaKnownError, tooManyRequests, unauthorized } from '../../common';
 import { authConfig } from '../../config/auth.config';
 import { config } from '../../config';
 import { DbClient, PrismaService } from '../../infrastructure/database/prisma.service';
 import { SmsService } from './sms.service';
 
 const hash = (s: string) => createHash('sha256').update(s).digest('hex');
+const scrypt = promisify(nodeScrypt);
+const PASSWORD_KEY_LENGTH = 64;
+const passwordHash = async (password: string) => {
+  const salt = randomBytes(16).toString('base64url');
+  const derived = (await scrypt(password, salt, PASSWORD_KEY_LENGTH)) as Buffer;
+  return `scrypt$${salt}$${derived.toString('base64url')}`;
+};
+const passwordMatches = async (password: string, stored: string | null) => {
+  if (!stored) return false;
+  const [algorithm, salt, encoded] = stored.split('$');
+  if (algorithm !== 'scrypt' || !salt || !encoded) return false;
+  const expected = Buffer.from(encoded, 'base64url');
+  const candidate = (await scrypt(password, salt, expected.length)) as Buffer;
+  return expected.length === candidate.length && timingSafeEqual(expected, candidate);
+};
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const internationalPhonePattern = /^\+[1-9]\d{7,14}$/;
+const normalizeIdentity = (value: string) => {
+  const identity = value.trim();
+  if (emailPattern.test(identity)) return { email: identity.toLowerCase() } as const;
+  const compact = identity.replace(/[\s()-]/g, '');
+  if (internationalPhonePattern.test(compact)) return { phone: compact } as const;
+  const digits = compact.replace(/\D/g, '').replace(/^0098/, '').replace(/^98/, '').replace(/^0/, '');
+  if (digits.length === 10) return { phone: `+98${digits}` } as const;
+  throw badRequest('IDENTITY_INVALID');
+};
 
 /**
  * Constant-time equality for secret material (hash digests, OTP codes). A
@@ -95,6 +122,33 @@ export class AuthService {
       resendIn: this.settings.otpResendSeconds,
       ...(sent.developmentCode && { developmentCode: sent.developmentCode }),
     };
+  }
+
+  async loginWithPassword(identity: string, password: string, meta: SessionMetadata) {
+    const normalized = normalizeIdentity(identity);
+    const user = await this.db.user.findFirst({ where: normalized });
+    if (!user || !(await passwordMatches(password, user.passwordHash))) throw unauthorized('INVALID_CREDENTIALS');
+    return this.createSession(user.id, meta);
+  }
+
+  async registerWithPassword(name: string, identity: string, password: string, meta: SessionMetadata) {
+    const normalized = normalizeIdentity(identity);
+    if (await this.db.user.findFirst({ where: normalized })) throw conflict('IDENTITY_ALREADY_REGISTERED');
+    const hashed = await passwordHash(password);
+    try {
+      const user = await this.db.user.create({
+        data: { ...normalized, name: name.trim(), passwordHash: hashed, profileComplete: true, roles: { create: { role: 'STUDENT' } } },
+      });
+      return this.createSession(user.id, meta);
+    } catch (error) {
+      if (isPrismaKnownError(error) && error.code === 'P2002') throw conflict('IDENTITY_ALREADY_REGISTERED');
+      throw error;
+    }
+  }
+
+  async setPassword(userId: string, password: string) {
+    await this.db.user.update({ where: { id: userId }, data: { passwordHash: await passwordHash(password) } });
+    return { ok: true };
   }
 
   async verifyOtp(challengeId: string, phone: string, code: string, meta: { ip?: string; userAgent?: string }) {
@@ -193,16 +247,16 @@ export class AuthService {
       throw unauthorized('GOOGLE_TOKEN_INVALID');
     }
 
-    const user = await this.db.user.upsert({
-      where: { googleSubject: profile.sub },
-      update: { email: profile.email, name: profile.name },
-      create: {
-        googleSubject: profile.sub,
-        email: profile.email,
-        name: profile.name,
-        roles: { create: { role: 'STUDENT' } },
-      },
+    const email = profile.email.toLowerCase();
+    const existing = await this.db.user.findFirst({
+      where: { OR: [{ googleSubject: profile.sub }, { email: { equals: email, mode: 'insensitive' } }] },
     });
+    if (existing?.googleSubject && existing.googleSubject !== profile.sub) throw unauthorized('GOOGLE_TOKEN_INVALID');
+    const user = existing
+      ? await this.db.user.update({ where: { id: existing.id }, data: { googleSubject: profile.sub, email, name: profile.name } })
+      : await this.db.user.create({
+          data: { googleSubject: profile.sub, email, name: profile.name, roles: { create: { role: 'STUDENT' } } },
+        });
     return this.createSession(user.id, meta);
   }
 

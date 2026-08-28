@@ -6,7 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { LanguageSwitcher } from '@/components/shared/language-switcher';
 import { useTranslations } from '@/components/shared/locale-provider';
-import { localePath } from '@/lib/i18n';
+import { localePath, localized, translate } from '@/lib/i18n';
 import { webConfig } from '@/config';
 
 export function Brand() {
@@ -26,12 +26,12 @@ export function Header() {
     [open, setOpen] = useState(false);
   const me = useQuery({ queryKey: ['header-me'], queryFn: () => api<{ roles: string[] }>('/users/me'), retry: false });
   const links: [string, string][] = [
+    [p('/'), translate(locale, 'layoutsiteHome')],
+    [p('/courses'), translate(locale, 'layoutsiteCourses')],
     [p('/teachers'), t('teachers')],
-    [p('/placement'), t('placement')],
-    [p('/matching'), t('matching')],
-    [p('/blog'), locale === 'fa' ? 'بلاگ' : 'Blog'],
-    [p('/teacher-apply'), locale === 'fa' ? 'مدرس شوید' : 'Become a teacher'],
-    [p('/about'), locale === 'fa' ? 'درباره ما' : 'About us'],
+    [p('/languages'), translate(locale, 'layoutsiteLanguages')],
+    [p('/blog'), translate(locale, 'layoutsiteMagazine')],
+    [p('/about'), translate(locale, 'layoutsiteAboutUs')],
   ];
   return (
     <header className="sticky top-0 z-40 border-b border-transparent bg-white/92 backdrop-blur-xl">
@@ -55,10 +55,10 @@ export function Header() {
             {me.data ? t('dashboard') : t('signIn')}
           </Link>
           <Link
-            href={p('/matching')}
+            href={p('/teach')}
             className="brand-gradient brand-glow hidden rounded-xl px-5 py-2.5 text-sm font-bold text-white sm:block"
           >
-            {t('findTeacher')}
+            {translate(locale, 'layoutsiteTeachWithUs')}
           </Link>
           <button
             className="grid size-10 place-items-center lg:hidden"
@@ -96,46 +96,40 @@ export function Footer() {
         <div className="md:col-span-1">
           <Brand />
           <p className="mt-5 text-sm leading-7 text-muted">
-            {locale === 'fa'
-              ? 'پلتفرم هوشمند تطبیق مدرس آیلتس؛ از سنجش سطح تا برنامه یادگیری شخصی.'
-              : 'Smart IELTS teacher matching, from assessment to a personal learning plan.'}
+            {translate(locale, 'layoutsiteSmartIELTSTeacherMatchingFromAssessmentToA')}
           </p>
         </div>
         <div>
-          <p className="font-black">{locale === 'fa' ? 'دسترسی سریع' : 'Explore'}</p>
+          <p className="font-black">{translate(locale, 'layoutsiteExplore')}</p>
           <div className="mt-4 grid gap-3 text-sm text-muted">
             <Link href={p('/teachers')}>{t('teachers')}</Link>
             <Link href={p('/placement')}>{t('placement')}</Link>
             <Link href={p('/matching')}>{t('matching')}</Link>
-            <Link href={p('/about')}>{locale === 'fa' ? 'درباره ما' : 'About us'}</Link>
+            <Link href={p('/about')}>{translate(locale, 'layoutsiteAboutUs')}</Link>
           </div>
         </div>
         <div>
-          <p className="font-black">{locale === 'fa' ? 'پشتیبانی' : 'Support'}</p>
+          <p className="font-black">{translate(locale, 'teacherteacherMoreSupport')}</p>
           <div className="mt-4 grid gap-3 text-sm text-muted">
-            <Link href={p('/faq')}>{locale === 'fa' ? 'سؤالات متداول' : 'FAQ'}</Link>
-            <Link href={p('/contact')}>{locale === 'fa' ? 'تماس با ما' : 'Contact'}</Link>
-            <Link href={p('/terms')}>{locale === 'fa' ? 'قوانین' : 'Terms'}</Link>
-            <Link href={p('/privacy')}>{locale === 'fa' ? 'حریم خصوصی' : 'Privacy'}</Link>
-            <Link href={p('/cancellation-policy')}>
-              {locale === 'fa' ? 'لغو و بازپرداخت' : 'Cancellation and refunds'}
-            </Link>
+            <Link href={p('/faq')}>{translate(locale, 'layoutsiteFaq')}</Link>
+            <Link href={p('/contact')}>{translate(locale, 'layoutsiteContact')}</Link>
+            <Link href={p('/terms')}>{translate(locale, 'layoutsiteTerms')}</Link>
+            <Link href={p('/privacy')}>{translate(locale, 'layoutsitePrivacy')}</Link>
+            <Link href={p('/cancellation-policy')}>{translate(locale, 'layoutsiteCancellationAndRefunds')}</Link>
           </div>
         </div>
         <div>
-          <p className="font-black">{locale === 'fa' ? 'تماس با ما' : 'Contact'}</p>
+          <p className="font-black">{translate(locale, 'layoutsiteContact')}</p>
           <p className="latin mt-4 text-lg" dir="ltr">
             021 9109 4200
           </p>
           <p className="latin mt-2 text-sm text-muted">support@lingospeak.ir</p>
-          <p className="mt-2 text-sm text-muted">
-            {locale === 'fa' ? 'شنبه تا پنج‌شنبه، ۹ تا ۲۰' : 'Saturday–Thursday, 9:00–20:00'}
-          </p>
+          <p className="mt-2 text-sm text-muted">{translate(locale, 'layoutsiteSaturdayThursday9002000')}</p>
           <TrustSeals />
         </div>
       </div>
       <div className="border-t hairline py-5 text-center text-xs text-muted">
-        © ۱۴۰۵ LingoSpeak — {locale === 'fa' ? 'تمام حقوق محفوظ است.' : 'All rights reserved.'}
+        © ۱۴۰۵ LingoSpeak — {translate(locale, 'layoutsiteAllRightsReserved')}
       </div>
     </footer>
   );

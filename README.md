@@ -451,3 +451,24 @@ docker compose down --volumes
 
 > دستور بالا داده‌های محلی دیتابیس و فایل‌های MinIO را غیرقابل‌بازگشت حذف
 > می‌کند؛ فقط زمانی اجرا کنید که به reset کامل محیط توسعه نیاز دارید.
+# رابط عمومی چندزبانه LingoSpeak
+
+رابط وب فارسی و RTL در `apps/web` شامل صفحه اصلی، زبان‌ها، دوره‌ها، مدرس‌ها، مجله، معرفی همکاری مدرس، فرم چندمرحله‌ای ثبت‌نام مدرس و پنل ادمین است. داده‌های نمایشی جدید از `src/lib/marketplace-data.ts` و از طریق `marketplaceService` خوانده می‌شوند؛ برای اتصال API واقعی کافی است متدهای همین سرویس با درخواست‌های Backend جایگزین شوند، بدون اینکه JSX کارت‌ها و صفحات تغییر کند.
+
+مسیرهای اصلی: `/`، `/languages`، `/languages/[slug]`، `/courses`، `/courses/[slug]`، `/teachers`، `/teachers/[slug]`، `/teach`، `/teach/register`، `/blog`، `/blog/[slug]` و `/admin`.
+
+اجرای رابط وب:
+
+```bash
+npm run dev --workspace=@lingospeak/web
+```
+
+بررسی کیفیت:
+
+```bash
+npm run lint --workspace=@lingospeak/web
+npm run typecheck --workspace=@lingospeak/web
+npm run build --workspace=@lingospeak/web
+```
+
+فرم مدرس در حال حاضر Demo است و وضعیت موفقیت را در سمت کلاینت نمایش می‌دهد؛ بارگذاری فایل و ثبت نهایی درخواست باید به endpoint مربوط به Teacher Application متصل شود. پنل ادمین نیز از ساختار احراز هویت موجود پروژه استفاده می‌کند و برای استفاده Production به نشست معتبر و نقش ادمین Backend نیاز دارد.

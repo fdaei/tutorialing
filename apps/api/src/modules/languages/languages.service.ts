@@ -15,6 +15,18 @@ export type LanguageInput = {
   proficiencySystem: ProficiencySystem;
 };
 
+export type CountryInput = {
+  code: string;
+  nameFa: string;
+  nameEn: string;
+  dialCode: string;
+  flag: string;
+  minLength: number;
+  maxLength: number;
+  active?: boolean;
+  order?: number;
+};
+
 @Injectable()
 export class LanguagesService {
   constructor(private readonly db: PrismaService) {}
@@ -36,6 +48,80 @@ export class LanguagesService {
         proficiencySystem: true,
       },
     });
+  }
+
+  publicCountries() {
+    return this.db.country.findMany({
+      where: { active: true },
+      orderBy: [{ order: 'asc' }, { nameEn: 'asc' }],
+      select: { id: true, code: true, nameFa: true, nameEn: true, dialCode: true, flag: true, minLength: true, maxLength: true },
+    });
+  }
+
+  async adminCountries(page: number, limit: number, search = '') {
+    const where: Prisma.CountryWhereInput = search
+      ? { OR: [
+          { code: { contains: search, mode: 'insensitive' } },
+          { nameFa: { contains: search, mode: 'insensitive' } },
+          { nameEn: { contains: search, mode: 'insensitive' } },
+          { dialCode: { contains: search } },
+        ] }
+      : {};
+    const [data, total] = await this.db.$transaction([
+      this.db.country.findMany({ where, skip: (page - 1) * limit, take: limit, orderBy: [{ order: 'asc' }, { nameEn: 'asc' }] }),
+      this.db.country.count({ where }),
+    ]);
+    return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
+  }
+
+  private normalizeCountry(input: CountryInput) {
+    const code = input.code.trim().toUpperCase();
+    assertDomain(/^[A-Z]{2}$/.test(code), () => badRequest('COUNTRY_CODE_INVALID'));
+    assertDomain(Boolean(input.nameFa?.trim() && input.nameEn?.trim()), () => badRequest('COUNTRY_NAME_REQUIRED'));
+    assertDomain(/^\+[1-9]\d{0,3}$/.test(input.dialCode), () => badRequest('COUNTRY_DIAL_CODE_INVALID'));
+    assertDomain(input.minLength <= input.maxLength, () => badRequest('COUNTRY_PHONE_LENGTH_INVALID'));
+    return {
+      code,
+      nameFa: input.nameFa.trim(),
+      nameEn: input.nameEn.trim(),
+      dialCode: input.dialCode,
+      flag: input.flag.trim(),
+      minLength: input.minLength,
+      maxLength: input.maxLength,
+      active: input.active ?? true,
+      order: Math.max(0, Number(input.order ?? 0)),
+    };
+  }
+
+  async createCountry(actorId: string, input: CountryInput) {
+    const data = this.normalizeCountry(input);
+    assertDomain(!(await this.db.country.findUnique({ where: { code: data.code } })), () => conflict('COUNTRY_CODE_EXISTS'));
+    return this.db.$transaction(async (tx) => {
+      const country = await tx.country.create({ data });
+      await tx.auditLog.create({ data: { actorId, action: 'country.created', entity: 'Country', entityId: country.id, after: data } });
+      return country;
+    });
+  }
+
+  async updateCountry(actorId: string, id: string, input: Partial<CountryInput>) {
+    const before = requireValue(await this.db.country.findUnique({ where: { id } }), () => notFound('COUNTRY_NOT_FOUND'));
+    const data = this.normalizeCountry({ ...before, ...input });
+    const duplicate = await this.db.country.findFirst({ where: { code: data.code, id: { not: id } } });
+    assertDomain(!duplicate, () => conflict('COUNTRY_CODE_EXISTS'));
+    return this.db.$transaction(async (tx) => {
+      const country = await tx.country.update({ where: { id }, data });
+      await tx.auditLog.create({ data: { actorId, action: 'country.updated', entity: 'Country', entityId: id, before, after: data } });
+      return country;
+    });
+  }
+
+  async removeCountry(actorId: string, id: string) {
+    const before = requireValue(await this.db.country.findUnique({ where: { id } }), () => notFound('COUNTRY_NOT_FOUND'));
+    await this.db.$transaction(async (tx) => {
+      await tx.country.delete({ where: { id } });
+      await tx.auditLog.create({ data: { actorId, action: 'country.deleted', entity: 'Country', entityId: id, before } });
+    });
+    return { ok: true };
   }
 
   async adminList(page: number, limit: number, search = '', active?: boolean) {

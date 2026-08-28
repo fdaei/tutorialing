@@ -9,6 +9,7 @@ import { OBJECT_STORAGE, ObjectStorage } from './object-storage.port';
 const allowed = new Set([
   'image/jpeg',
   'image/png',
+  'image/webp',
   'application/pdf',
   'video/mp4',
   'video/webm',
@@ -73,6 +74,14 @@ export class FilesService {
 
   async download(requesterId: string, roles: string[], id: string) {
     const reviewer = roles.some((role) => ['ADMIN', 'STAFF', 'EXAMINER'].includes(role));
+    const supportStaff = roles.some((role) => ['ADMIN', 'STAFF', 'SUPPORT'].includes(role));
+    const supportAttachment = await this.db.ticketReply.findFirst({
+      where: {
+        attachmentId: id,
+        ...(supportStaff ? {} : { ticket: { userId: requesterId } }),
+      },
+      select: { id: true },
+    });
     const file = requireValue(
       await this.db.storedFile.findFirst({
         where: {
@@ -80,6 +89,7 @@ export class FilesService {
           status: 'SAFE',
           OR: [
             { ownerId: requesterId },
+            ...(supportAttachment ? [{ id }] : []),
             ...(reviewer
               ? [
                   { verificationItems: { some: {} } },
@@ -95,5 +105,21 @@ export class FilesService {
       url: await this.storage.createDownloadUrl(file.key),
       expiresIn: this.cfg.downloadUrlTtlSeconds,
     };
+  }
+
+  async ownedSafeImage(ownerId: string, id: string) {
+    const file = requireValue(
+      await this.db.storedFile.findFirst({
+        where: { id, ownerId, status: 'SAFE', mimeType: { in: ['image/jpeg', 'image/png', 'image/webp'] } },
+        select: { key: true, size: true },
+      }),
+      () => notFound('FILE_NOT_FOUND'),
+    );
+    assertDomain(file.size <= 5 * 1024 * 1024, () => badRequest('FILE_SIZE_INVALID'));
+    return file;
+  }
+
+  createDownloadUrl(key: string) {
+    return this.storage.createDownloadUrl(key);
   }
 }

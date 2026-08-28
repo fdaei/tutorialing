@@ -4,5 +4,6 @@ import { UsersService } from './users.service';
 import { AdminUsersController } from './admin-users.controller';
 import { AdminUsersService } from './admin-users.service';
 import { AuthModule } from '../auth/auth.module';
-@Module({ imports: [AuthModule], controllers: [UsersController, AdminUsersController], providers: [UsersService, AdminUsersService], exports: [UsersService] })
+import { FilesModule } from '../files/files.module';
+@Module({ imports: [AuthModule, FilesModule], controllers: [UsersController, AdminUsersController], providers: [UsersService, AdminUsersService], exports: [UsersService] })
 export class UsersModule {}

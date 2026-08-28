@@ -1,5 +1,6 @@
 'use client';
 
+import { localized, isDefaultLocale, translate } from '@/lib/i18n';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Clock3, Filter, MessageCircle, Search, UserRound } from 'lucide-react';
@@ -52,7 +53,7 @@ const statuses = ['OPEN', 'IN_PROGRESS', 'WAITING_USER', 'WAITING_SUPPORT', 'RES
 
 export function TicketManager() {
   const { locale } = useTranslations(),
-    fa = locale === 'fa',
+    fa = isDefaultLocale(locale),
     qc = useQueryClient(),
     [scope, setScope] = useState('all'),
     [status, setStatus] = useState(''),
@@ -105,9 +106,7 @@ export function TicketManager() {
                 setSearch(event.target.value);
                 setPage(1);
               }}
-              placeholder={
-                fa ? 'جستجو در موضوع، متن، نام، موبایل یا ایمیل…' : 'Search subject, message, name, phone, or email…'
-              }
+              placeholder={translate(locale, 'supportticketManagerSearchSubjectMessageNamePhoneOrEmail')}
               className="w-full py-3 outline-none"
             />
           </label>
@@ -119,9 +118,9 @@ export function TicketManager() {
             }}
             className="input"
           >
-            <option value="all">{fa ? 'همه تیکت‌ها' : 'All tickets'}</option>
-            <option value="mine">{fa ? 'اختصاص‌یافته به من' : 'Assigned to me'}</option>
-            <option value="unassigned">{fa ? 'بدون مسئول' : 'Unassigned'}</option>
+            <option value="all">{translate(locale, 'supportticketManagerAllTickets')}</option>
+            <option value="mine">{translate(locale, 'supportticketManagerAssignedToMe')}</option>
+            <option value="unassigned">{translate(locale, 'supportticketManagerUnassigned')}</option>
           </select>
           <select
             value={status}
@@ -131,7 +130,7 @@ export function TicketManager() {
             }}
             className="input"
           >
-            <option value="">{fa ? 'همه وضعیت‌ها' : 'All statuses'}</option>
+            <option value="">{translate(locale, 'commercepricingManagerAllStatuses')}</option>
             {statuses.map((value) => (
               <option key={value}>{value}</option>
             ))}
@@ -144,7 +143,7 @@ export function TicketManager() {
             }}
             className="input"
           >
-            <option value="">{fa ? 'همه اولویت‌ها' : 'All priorities'}</option>
+            <option value="">{translate(locale, 'supportticketManagerAllPriorities')}</option>
             <option value="urgent">urgent</option>
             <option value="high">high</option>
             <option value="normal">normal</option>
@@ -159,7 +158,7 @@ export function TicketManager() {
               setUser(value);
               setPage(1);
             }}
-            placeholder={fa ? 'فیلتر کاربر' : 'Filter user'}
+            placeholder={translate(locale, 'supportticketManagerFilterUser')}
           />
           <AsyncSearchSelect
             entity="support-agents"
@@ -168,14 +167,14 @@ export function TicketManager() {
               setAssigneeFilter(value);
               setPage(1);
             }}
-            placeholder={fa ? 'فیلتر مسئول' : 'Filter assignee'}
+            placeholder={translate(locale, 'supportticketManagerFilterAssignee')}
           />
         </div>
       </section>
       <div className="grid gap-6 xl:grid-cols-[410px_minmax(0,1fr)]">
         <section className="rounded-3xl border hairline bg-white p-4">
           <div className="flex items-center justify-between px-2">
-            <h2 className="text-xl font-black">{fa ? 'فهرست تیکت‌ها' : 'Ticket list'}</h2>
+            <h2 className="text-xl font-black">{translate(locale, 'supportticketManagerTicketList')}</h2>
             <span className="rounded-full bg-lavender px-3 py-1 text-xs font-black text-purple">
               {list.data?.pagination.total ?? 0}
             </span>
@@ -188,7 +187,7 @@ export function TicketManager() {
             </div>
           ) : list.isError ? (
             <Error
-              message={apiMessage(list.error, fa ? 'فهرست تیکت‌ها دریافت نشد.' : 'Could not load tickets.')}
+              message={apiMessage(list.error, translate(locale, 'supportticketManagerCouldNotLoadTickets'))}
               retry={() => list.refetch()}
             />
           ) : list.data?.items.length ? (
@@ -208,16 +207,16 @@ export function TicketManager() {
                   </p>
                   <p className="mt-2 line-clamp-2 text-sm">{ticket.replies[0]?.body}</p>
                   <div className="mt-3 flex items-center justify-between text-xs text-muted">
-                    <span>{ticket.assignedTo?.name || (fa ? 'بدون مسئول' : 'Unassigned')}</span>
+                    <span>{ticket.assignedTo?.name || translate(locale, 'supportticketManagerUnassigned')}</span>
                     <span>
-                      {ticket._count.replies} {fa ? 'پیام' : 'messages'}
+                      {ticket._count.replies} {translate(locale, 'supportticketManagerMessages')}
                     </span>
                   </div>
                 </button>
               ))}
             </div>
           ) : (
-            <Empty text={fa ? 'تیکتی با این فیلتر پیدا نشد.' : 'No tickets match these filters.'} />
+            <Empty text={translate(locale, 'supportticketManagerNoTicketsMatchTheseFilters')} />
           )}
           <div className="mt-4 flex items-center justify-between">
             <button
@@ -225,7 +224,7 @@ export function TicketManager() {
               onClick={() => setPage((value) => value - 1)}
               className="rounded-xl border hairline px-4 py-2 disabled:opacity-30"
             >
-              {fa ? 'قبلی' : 'Previous'}
+              {translate(locale, 'admincountryManagerPrevious')}
             </button>
             <span>
               {page} / {Math.max(1, list.data?.pagination.pages ?? 1)}
@@ -235,7 +234,7 @@ export function TicketManager() {
               onClick={() => setPage((value) => value + 1)}
               className="rounded-xl border hairline px-4 py-2 disabled:opacity-30"
             >
-              {fa ? 'بعدی' : 'Next'}
+              {translate(locale, 'admincountryManagerNext')}
             </button>
           </div>
         </section>
@@ -247,12 +246,12 @@ export function TicketManager() {
               <TicketDetailView ticket={detail.data} fa={fa} refresh={refresh} canManage={canManage} />
             ) : (
               <Error
-                message={apiMessage(detail.error, fa ? 'جزئیات تیکت دریافت نشد.' : 'Could not load ticket details.')}
+                message={apiMessage(detail.error, translate(locale, 'supportmyTicketManagerCouldNotLoadTicketDetails'))}
                 retry={() => detail.refetch()}
               />
             )
           ) : (
-            <Empty text={fa ? 'یک تیکت را انتخاب کنید.' : 'Select a ticket.'} />
+            <Empty text={translate(locale, 'supportticketManagerSelectATicket')} />
           )}
         </section>
       </div>
@@ -335,16 +334,19 @@ function TicketDetailView({
         <TicketStatus value={ticket.status} fa={fa} />
       </div>
       <dl className="mt-6 grid gap-4 rounded-2xl bg-[#f7f8fc] p-5 sm:grid-cols-2 lg:grid-cols-4">
-        <Meta label={fa ? 'کاربر' : 'User'} value={`${ticket.user.name || '—'} · ${ticket.user.phone}`} />
-        <Meta label={fa ? 'ایمیل' : 'Email'} value={ticket.user.email || '—'} />
         <Meta
-          label={fa ? 'مسئول' : 'Assignee'}
-          value={ticket.assignedTo?.name || ticket.assignedTo?.phone || (fa ? 'بدون مسئول' : 'Unassigned')}
+          label={translate(fa, 'adminadminUsersManagerUser')}
+          value={`${ticket.user.name || '—'} · ${ticket.user.phone}`}
+        />
+        <Meta label={translate(fa, 'supportticketManagerEmail')} value={ticket.user.email || '—'} />
+        <Meta
+          label={translate(fa, 'supportticketManagerAssignee')}
+          value={ticket.assignedTo?.name || ticket.assignedTo?.phone || translate(fa, 'supportticketManagerUnassigned')}
         />
         <Meta label="SLA" value={ticket.slaDueAt ? format(ticket.slaDueAt, fa) : '—'} />
-        <Meta label={fa ? 'ایجاد' : 'Created'} value={format(ticket.createdAt, fa)} />
+        <Meta label={translate(fa, 'supportticketManagerCreated')} value={format(ticket.createdAt, fa)} />
         <Meta
-          label={fa ? 'آخرین پاسخ' : 'Last reply'}
+          label={translate(fa, 'supportticketManagerLastReply')}
           value={ticket.lastReplyAt ? format(ticket.lastReplyAt, fa) : '—'}
         />
       </dl>
@@ -352,7 +354,9 @@ function TicketDetailView({
         <>
           <div className="mt-6 grid gap-4 md:grid-cols-2">
             <div>
-              <label className="mb-2 block text-sm font-black">{fa ? 'تغییر وضعیت' : 'Change status'}</label>
+              <label className="mb-2 block text-sm font-black">
+                {translate(fa, 'supportticketManagerChangeStatus')}
+              </label>
               <div className="flex gap-2">
                 <select value={status} onChange={(event) => setStatus(event.target.value)} className="input">
                   {statuses.map((value) => (
@@ -364,12 +368,14 @@ function TicketDetailView({
                   onClick={() => statusMutation.mutate()}
                   className="rounded-xl bg-navy px-4 font-bold text-white"
                 >
-                  {fa ? 'ذخیره' : 'Save'}
+                  {translate(fa, 'admincountryManagerSave')}
                 </button>
               </div>
             </div>
             <div>
-              <label className="mb-2 block text-sm font-black">{fa ? 'ارجاع مسئول' : 'Assign owner'}</label>
+              <label className="mb-2 block text-sm font-black">
+                {translate(fa, 'supportticketManagerAssignOwner')}
+              </label>
               <div className="flex gap-2">
                 <AsyncSearchSelect
                   entity="support-agents"
@@ -382,7 +388,7 @@ function TicketDetailView({
                   onClick={() => assignment.mutate()}
                   className="rounded-xl bg-navy px-4 font-bold text-white"
                 >
-                  {fa ? 'ثبت' : 'Assign'}
+                  {translate(fa, 'supportticketManagerAssign')}
                 </button>
               </div>
             </div>
@@ -391,15 +397,13 @@ function TicketDetailView({
             value={note}
             onChange={(event) => setNote(event.target.value)}
             className="input mt-3"
-            placeholder={fa ? 'یادداشت دلیل تغییر وضعیت یا ارجاع (اختیاری)' : 'Optional status/assignment note'}
+            placeholder={translate(fa, 'supportticketManagerOptionalStatusAssignmentNote')}
           />
           {(statusMutation.isError || assignment.isError) && (
             <p role="alert" className="mt-3 rounded-xl bg-red-50 p-3 text-red-800">
               {apiMessage(
                 statusMutation.error || assignment.error,
-                fa
-                  ? 'تغییر ذخیره نشد و مقدار قبلی بازگردانده شد.'
-                  : 'The change was not saved and the previous value was restored.',
+                translate(fa, 'supportticketManagerTheChangeWasNotSavedAndThePrevious'),
               )}
             </p>
           )}
@@ -417,12 +421,8 @@ function TicketDetailView({
           className="input min-h-28"
           placeholder={
             internal
-              ? fa
-                ? 'یادداشت داخلی؛ کاربر آن را نمی‌بیند.'
-                : 'Internal note; hidden from the user.'
-              : fa
-                ? 'پاسخ به کاربر…'
-                : 'Reply to the user…'
+              ? translate(fa, 'supportticketManagerInternalNoteHiddenFromTheUser')
+              : translate(fa, 'supportticketManagerReplyToTheUser')
           }
         />
         {canManage && (
@@ -433,12 +433,12 @@ function TicketDetailView({
               onChange={(event) => setInternal(event.target.checked)}
               className="accent-purple"
             />
-            {fa ? 'یادداشت داخلی' : 'Internal note'}
+            {translate(fa, 'supportticketManagerInternalNote')}
           </label>
         )}
         {reply.isError && (
           <p className="mt-3 text-sm text-red-700">
-            {apiMessage(reply.error, fa ? 'ارسال پاسخ ناموفق بود.' : 'Could not send the reply.')}
+            {apiMessage(reply.error, translate(fa, 'supportticketManagerCouldNotSendTheReply'))}
           </p>
         )}
         <button
@@ -447,16 +447,10 @@ function TicketDetailView({
           className="brand-gradient mt-4 rounded-xl px-6 py-3 font-black text-white disabled:opacity-40"
         >
           {reply.isPending
-            ? fa
-              ? 'در حال ارسال…'
-              : 'Sending…'
+            ? translate(fa, 'supportmyTicketManagerSending')
             : internal
-              ? fa
-                ? 'ثبت یادداشت داخلی'
-                : 'Save internal note'
-              : fa
-                ? 'ارسال پاسخ'
-                : 'Send reply'}
+              ? translate(fa, 'supportticketManagerSaveInternalNote')
+              : translate(fa, 'supportmyTicketManagerSendReply')}
         </button>
       </div>
     </div>
@@ -465,20 +459,12 @@ function TicketDetailView({
 function Message({ message, fa }: { message: Reply; fa: boolean }) {
   const kind =
     message.messageType === 'USER_MESSAGE'
-      ? fa
-        ? 'پیام کاربر'
-        : 'User message'
+      ? translate(fa, 'supportticketManagerUserMessage')
       : message.messageType === 'INTERNAL_NOTE'
-        ? fa
-          ? 'یادداشت داخلی'
-          : 'Internal note'
+        ? translate(fa, 'supportticketManagerInternalNote')
         : message.messageType === 'SYSTEM'
-          ? fa
-            ? 'پیام سیستمی'
-            : 'System message'
-          : fa
-            ? 'پاسخ پشتیبان'
-            : 'Support reply';
+          ? translate(fa, 'supportticketManagerSystemMessage')
+          : translate(fa, 'supportticketManagerSupportReply');
   return (
     <article
       className={`rounded-2xl border p-4 ${message.messageType === 'INTERNAL_NOTE' ? 'border-amber-200 bg-amber-50' : message.messageType === 'SYSTEM' ? 'border-dashed bg-[#f6f7fa]' : message.direction === 'INBOUND' ? 'border-blue/20 bg-blue/5' : 'border-purple/20 bg-lavender/30'}`}
@@ -492,13 +478,11 @@ function Message({ message, fa }: { message: Reply; fa: boolean }) {
       </div>
       <p className="mt-3 whitespace-pre-wrap leading-7">
         {message.body.startsWith('STATUS:')
-          ? fa
-            ? 'وضعیت تیکت به‌روزرسانی شد.'
-            : 'Ticket status was updated.'
+          ? translate(fa, 'supportticketManagerTicketStatusWasUpdated')
           : message.body}
       </p>
       <p className="mt-3 text-xs text-muted">
-        {fa ? 'نقش فرستنده' : 'Author role'}: {message.authorRole} · {message.direction}
+        {translate(fa, 'supportticketManagerAuthorRole')}: {message.authorRole} · {message.direction}
       </p>
     </article>
   );
@@ -522,16 +506,16 @@ function TicketStatus({ value, fa }: { value: string; fa: boolean }) {
   };
   return (
     <span className="rounded-full bg-lavender px-3 py-1 text-xs font-black text-purple">
-      {fa ? (map[value] ?? value) : value.replaceAll('_', ' ')}
+      {localized({ fa: map[value] ?? value, en: value.replaceAll('_', ' ') }, fa)}
     </span>
   );
 }
 function priorityLabel(value: string, fa: boolean) {
   const map: Record<string, string> = { urgent: 'فوری', high: 'زیاد', normal: 'عادی', low: 'کم' };
-  return fa ? (map[value] ?? value) : value;
+  return localized({ fa: map[value] ?? value, en: value }, fa);
 }
 function format(value: string, fa: boolean) {
-  return new Intl.DateTimeFormat(fa ? 'fa-IR-u-ca-persian' : 'en-US', {
+  return new Intl.DateTimeFormat(translate(fa, 'commercepricingManagerEnUS'), {
     dateStyle: 'medium',
     timeStyle: 'short',
   }).format(new Date(value));

@@ -9,6 +9,7 @@ export const webConfig = {
   enamadHtml: process.env.NEXT_PUBLIC_ENAMAD_HTML || webDefaults.enamadHtml,
   contactPhone: process.env.NEXT_PUBLIC_CONTACT_PHONE || webDefaults.contactPhone,
   contactEmail: process.env.NEXT_PUBLIC_CONTACT_EMAIL || webDefaults.contactEmail,
+  googleClientId: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || webDefaults.googleClientId,
   localeCookieMaxAgeSeconds:
     Number(process.env.NEXT_PUBLIC_LOCALE_COOKIE_MAX_AGE_SECONDS) || webDefaults.localeCookieMaxAgeSeconds,
 };

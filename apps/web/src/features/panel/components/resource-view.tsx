@@ -1,5 +1,6 @@
 'use client';
 
+import { localized, isDefaultLocale, translate } from '@/lib/i18n';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useTranslations } from '@/components/shared/locale-provider';
@@ -13,7 +14,7 @@ const text = (value: unknown) => (typeof value === 'string' ? value : '');
 
 export function ResourceView({ title, endpoint, empty }: { title: string; endpoint: string; empty?: string }) {
   const { locale } = useTranslations(),
-    fa = locale === 'fa',
+    fa = isDefaultLocale(locale),
     query = useQuery({ queryKey: [endpoint], queryFn: () => api<unknown>(endpoint) });
   return (
     <section>
@@ -26,16 +27,16 @@ export function ResourceView({ title, endpoint, empty }: { title: string; endpoi
       )}
       {query.isError && (
         <div role="alert" className="mt-7 rounded-3xl bg-red-50 p-6 text-red-800">
-          {fa ? 'دریافت اطلاعات ناموفق بود.' : 'Could not load data.'}{' '}
+          {translate(locale, 'panelresourceViewCouldNotLoadData')}{' '}
           <button className="font-bold underline" onClick={() => query.refetch()}>
-            {fa ? 'تلاش دوباره' : 'Try again'}
+            {translate(locale, 'testsaudioRecorderTryAgain')}
           </button>
         </div>
       )}
       {query.data != null && (
         <Data
           data={query.data}
-          empty={empty ?? (fa ? 'داده‌ای برای نمایش وجود ندارد.' : 'There is no data to display.')}
+          empty={empty ?? translate(locale, 'panelresourceViewThereIsNoDataToDisplay')}
           locale={locale}
         />
       )}
@@ -74,7 +75,7 @@ function Data({ data, empty, locale }: { data: unknown; empty: string; locale: L
 }
 
 function displayEntries(row: Row, locale: Locale): DisplayEntry[] {
-  const labels = locale === 'fa' ? labelsFa : labelsEn,
+  const labels = localized({ fa: labelsFa, en: labelsEn }, locale),
     out: DisplayEntry[] = [];
   const add = (key: string, label: string, value: unknown) => {
     if (value !== undefined && value !== null && value !== '') out.push({ key, label, value });
@@ -84,7 +85,7 @@ function displayEntries(row: Row, locale: Locale): DisplayEntry[] {
     if (item)
       add(
         `${key}Name`,
-        locale === 'fa' ? faLabel : enLabel,
+        localized({ fa: faLabel, en: enLabel }, locale),
         [text(item.name), text(item.phone)].filter(Boolean).join(' — '),
       );
   };
@@ -94,22 +95,24 @@ function displayEntries(row: Row, locale: Locale): DisplayEntry[] {
   if (teacher)
     add(
       'teacherName',
-      locale === 'fa' ? 'مدرس' : 'Teacher',
-      (locale === 'fa' ? text(teacher.nameFa) : text(teacher.nameEn)) || text(teacher.nameFa) || text(teacher.nameEn),
+      translate(locale, 'schedulingteacherPlannerCalendarTeacher'),
+      localized({ fa: text(teacher.nameFa), en: text(teacher.nameEn) }, locale) ||
+        text(teacher.nameFa) ||
+        text(teacher.nameEn),
     );
   const test = isRow(row.test) ? (row.test as Row) : undefined;
   if (test)
     add(
       'testTitle',
-      locale === 'fa' ? 'آزمون' : 'Test',
-      (locale === 'fa' ? text(test.titleFa) : text(test.titleEn)) || text(test.titleFa) || text(test.titleEn),
+      translate(locale, 'panelresourceViewTest'),
+      localized({ fa: text(test.titleFa), en: text(test.titleEn) }, locale) || text(test.titleFa) || text(test.titleEn),
     );
   const notification = isRow(row.notification) ? (row.notification as Row) : undefined;
   if (notification)
     add(
       'notificationTitle',
-      locale === 'fa' ? 'اعلان' : 'Notification',
-      (locale === 'fa' ? text(notification.titleFa) : text(notification.titleEn)) ||
+      translate(locale, 'panelresourceViewNotification'),
+      localized({ fa: text(notification.titleFa), en: text(notification.titleEn) }, locale) ||
         text(notification.titleFa) ||
         text(notification.titleEn),
     );
@@ -263,7 +266,7 @@ function format(value: unknown, key: string, locale: Locale) {
   if (typeof value === 'string' && (/At$/.test(key) || ['startsAt', 'endsAt', 'examDate', 'dueAt'].includes(key))) {
     const date = new Date(value);
     if (!isNaN(date.getTime()))
-      return new Intl.DateTimeFormat(locale === 'fa' ? 'fa-IR' : 'en-US', {
+      return new Intl.DateTimeFormat(translate(locale, 'commercepricingManagerEnUS2'), {
         dateStyle: 'medium',
         timeStyle: key === 'examDate' || key === 'dueAt' ? undefined : 'short',
       }).format(date);
@@ -275,11 +278,12 @@ function format(value: unknown, key: string, locale: Locale) {
     )
   )
     return (
-      new Intl.NumberFormat(locale === 'fa' ? 'fa-IR' : 'en-US').format(value) + (locale === 'fa' ? ' تومان' : ' IRR')
+      new Intl.NumberFormat(translate(locale, 'commercepricingManagerEnUS2')).format(value) +
+      translate(locale, 'commercepricingManagerIrr')
     );
-  if (typeof value === 'boolean') return locale === 'fa' ? (value ? 'بله' : 'خیر') : value ? 'Yes' : 'No';
+  if (typeof value === 'boolean') return localized({ fa: value ? 'بله' : 'خیر', en: value ? 'Yes' : 'No' }, locale);
   if (typeof value === 'string') {
-    const translated = locale === 'fa' ? faStatus[value] : enStatus[value];
+    const translated = localized({ fa: faStatus[value], en: enStatus[value] }, locale);
     if (translated) return translated;
   }
   return String(value);

@@ -6,6 +6,8 @@ import { config } from '../../config';
 import { SMS_PROVIDER, SmsProvider } from '../../infrastructure/messaging/sms/sms-provider';
 
 const STAFF_ROLES: Role[] = ['ADMIN', 'STAFF', 'SUPPORT'];
+const SUPPORT_ATTACHMENT_MIMES = ['image/jpeg', 'image/png', 'application/pdf'];
+const SUPPORT_ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
 const isStaff = (roles: string[]) => roles.some((role) => STAFF_ROLES.includes(role as Role));
 const authorRole = (roles: string[]): Role =>
   (['ADMIN', 'SUPPORT', 'STAFF', 'FINANCE', 'EXAMINER', 'TEACHER', 'STUDENT'] as Role[]).find((role) =>
@@ -31,6 +33,7 @@ export class SupportService {
     roles: string[],
     data: { subject: string; category: string; priority: string; body: string; attachmentId?: string },
   ) {
+    await this.validateAttachment(userId, data.attachmentId);
     const now = new Date();
     const slaHours =
       data.priority === 'urgent' ? 2 : data.priority === 'high' ? 8 : data.priority === 'normal' ? 24 : 48;
@@ -173,6 +176,7 @@ export class SupportService {
     if (!staff && ticket.userId !== userId) throw forbidden('TICKET_OWNERSHIP_REQUIRED');
     if (!staff && data.internal) throw forbidden('INTERNAL_NOTE_STAFF_ONLY');
     if (ticket.status === 'CLOSED') throw badRequest('TICKET_CLOSED');
+    await this.validateAttachment(userId, data.attachmentId);
     const internal = staff && !!data.internal;
     const nextStatus: TicketStatus = internal ? ticket.status : staff ? 'WAITING_USER' : 'WAITING_SUPPORT';
     return this.db.$transaction(async (tx) => {
@@ -229,6 +233,22 @@ export class SupportService {
       }
       return reply;
     });
+  }
+
+  private async validateAttachment(ownerId: string, attachmentId?: string) {
+    if (!attachmentId) return;
+    const attachment = await this.db.storedFile.findFirst({
+      where: {
+        id: attachmentId,
+        ownerId,
+        status: 'SAFE',
+        purpose: 'support-attachment',
+        mimeType: { in: SUPPORT_ATTACHMENT_MIMES },
+        size: { lte: SUPPORT_ATTACHMENT_MAX_BYTES },
+      },
+      select: { id: true },
+    });
+    if (!attachment) throw badRequest('SUPPORT_ATTACHMENT_INVALID');
   }
 
   async changeStatus(actorId: string, roles: string[], ticketId: string, status: TicketStatus, note?: string) {
@@ -333,7 +353,7 @@ export class SupportService {
       this.db.user.findUnique({ where: { id: userId }, select: { phone: true } }),
       this.db.notificationPreference.findUnique({ where: { userId_type: { userId, type: 'TICKET_ASSIGNED' } } }),
     ]);
-    if (!user || preference?.sms === false) return;
+    if (!user?.phone || preference?.sms === false) return;
     const delivery = await this.db.notificationDelivery.create({
       data: { notificationId, channel: 'SMS', status: 'sending', attempts: 1 },
     });

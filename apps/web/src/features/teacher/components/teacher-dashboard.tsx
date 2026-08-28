@@ -13,7 +13,7 @@ import {
   Users,
 } from 'lucide-react';
 import { api } from '@/lib/api';
-import { localePath } from '@/lib/i18n';
+import { localePath, localized, isDefaultLocale, translate } from '@/lib/i18n';
 import { useTranslations } from '@/components/shared/locale-provider';
 
 type Row = Record<string, unknown>;
@@ -28,9 +28,9 @@ const rows = (value: unknown): Row[] =>
 
 export function TeacherDashboard() {
   const { locale } = useTranslations(),
-    fa = locale === 'fa',
+    fa = isDefaultLocale(locale),
     p = (href: string) => localePath(href, locale),
-    Arrow = fa ? ArrowLeft : ArrowRight;
+    Arrow = localized({ fa: ArrowLeft, en: ArrowRight }, locale);
   const bookings = useQuery({ queryKey: ['/bookings/me'], queryFn: () => api<unknown>('/bookings/me') });
   const finance = useQuery({ queryKey: ['/teacher/finance'], queryFn: () => api<Finance>('/teacher/finance') });
   const application = useQuery({
@@ -52,42 +52,50 @@ export function TeacherDashboard() {
     .reduce((sum, item) => sum + item.netAmount, 0);
   const verified = application.data?.status === 'APPROVED',
     docs = (application.data?.verificationItems ?? []).filter((item) => item.status === 'APPROVED').length;
-  const number = (value: number) => new Intl.NumberFormat(fa ? 'fa-IR' : 'en-US').format(value),
-    money = (value: number) => `${number(value)} ${fa ? 'تومان' : 'IRR'}`;
+  const number = (value: number) =>
+      new Intl.NumberFormat(translate(locale, 'commercepricingManagerEnUS2')).format(value),
+    money = (value: number) => `${number(value)} ${translate(locale, 'teacherteacherFinanceIrr')}`;
   return (
     <div className="teacher-workspace">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="mb-2 text-sm font-bold text-blue">{fa ? 'مرکز کار مدرس' : 'Teacher workspace'}</p>
-          <h1 className="text-3xl font-black md:text-4xl">{fa ? 'سلام، امروز چه خبر؟' : 'Here’s your teaching day'}</h1>
+          <p className="mb-2 text-sm font-bold text-blue">
+            {translate(locale, 'teacherteacherDashboardTeacherWorkspace')}
+          </p>
+          <h1 className="text-3xl font-black md:text-4xl">
+            {translate(locale, 'teacherteacherDashboardHereSYourTeachingDay')}
+          </h1>
           <p className="mt-2 text-muted">
-            {fa
-              ? 'کلاس بعدی، کارهای ضروری و وضعیت درآمدت یک‌جا هستند.'
-              : 'Your next class, essential tasks, and earnings in one place.'}
+            {translate(locale, 'teacherteacherDashboardYourNextClassEssentialTasksAndEarningsIn')}
           </p>
         </div>
         <Link href={p('/teacher-panel/availability')} className="secondary-button">
           <CalendarClock size={18} />
-          {fa ? 'مدیریت برنامه' : 'Manage schedule'}
+          {translate(locale, 'teacherteacherDashboardManageSchedule')}
         </Link>
       </header>
       <section className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Stat
           icon={CalendarClock}
-          label={fa ? 'کلاس‌های پیش رو' : 'Upcoming classes'}
+          label={translate(locale, 'teacherteacherDashboardUpcomingClasses')}
           value={number(upcoming.length)}
           tone="blue"
         />
         <Stat
           icon={CheckCircle2}
-          label={fa ? 'کلاس‌های برگزارشده' : 'Completed classes'}
+          label={translate(locale, 'teacherteacherDashboardCompletedClasses')}
           value={number(completed)}
           tone="green"
         />
-        <Stat icon={Users} label={fa ? 'زبان‌آموزان' : 'Students'} value={number(students)} tone="purple" />
+        <Stat
+          icon={Users}
+          label={translate(locale, 'teacherteacherDashboardStudents')}
+          value={number(students)}
+          tone="purple"
+        />
         <Stat
           icon={CircleDollarSign}
-          label={fa ? 'قابل تسویه' : 'Available balance'}
+          label={translate(locale, 'teacherteacherDashboardAvailableBalance')}
           value={money(balance)}
           tone="orange"
         />
@@ -96,13 +104,13 @@ export function TeacherDashboard() {
         <section className="panel-card p-5 md:p-6">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-xl font-black">{fa ? 'کلاس بعدی' : 'Next class'}</h2>
+              <h2 className="text-xl font-black">{translate(locale, 'teacherteacherDashboardNextClass')}</h2>
               <p className="mt-1 text-sm text-muted">
-                {fa ? 'اطلاعاتی که برای شروع نیاز داری' : 'Everything you need to get started'}
+                {translate(locale, 'teacherteacherDashboardEverythingYouNeedToGetStarted')}
               </p>
             </div>
             <Link href={p('/teacher-panel/classes')} className="text-sm font-bold text-blue">
-              {fa ? 'همه کلاس‌ها' : 'All classes'}
+              {translate(locale, 'teacherteacherDashboardAllClasses')}
             </Link>
           </div>
           {bookings.isLoading ? (
@@ -112,47 +120,35 @@ export function TeacherDashboard() {
           ) : (
             <Empty
               icon={CalendarClock}
-              title={fa ? 'کلاس نزدیکی نداری' : 'No upcoming class'}
-              text={
-                fa
-                  ? 'برنامه هفتگی‌ات را بازبینی کن تا زمان‌های رزرو فعال باشند.'
-                  : 'Review your schedule to keep bookable times open.'
-              }
+              title={translate(locale, 'teacherteacherDashboardNoUpcomingClass')}
+              text={translate(locale, 'teacherteacherDashboardReviewYourScheduleToKeepBookableTimesOpen')}
             />
           )}
         </section>
         <section className="panel-card p-5 md:p-6">
-          <h2 className="text-xl font-black">{fa ? 'کارهای ضروری' : 'Action required'}</h2>
+          <h2 className="text-xl font-black">{translate(locale, 'teacherteacherDashboardActionRequired')}</h2>
           <p className="mt-1 text-sm text-muted">
-            {fa ? 'مواردی که روی دیده‌شدن پروفایل اثر دارند' : 'Items affecting your profile visibility'}
+            {translate(locale, 'teacherteacherDashboardItemsAffectingYourProfileVisibility')}
           </p>
           <div className="mt-5 grid gap-3">
             <Task
               done={verified}
-              title={fa ? 'تأیید حساب مدرس' : 'Teacher verification'}
+              title={translate(locale, 'teacherteacherDashboardTeacherVerification')}
               detail={
                 verified
-                  ? fa
-                    ? 'حساب شما تأیید شده'
-                    : 'Your account is verified'
-                  : fa
-                    ? `${number(docs)} مدرک تأیید شده`
-                    : `${docs} approved documents`
+                  ? translate(locale, 'teacherteacherDashboardYourAccountIsVerified')
+                  : localized({ fa: `${number(docs)} مدرک تأیید شده`, en: `${docs} approved documents` }, locale)
               }
               href={p('/teacher-panel/profile')}
               fa={fa}
             />
             <Task
               done={Boolean(upcoming.length)}
-              title={fa ? 'برنامه قابل رزرو' : 'Bookable schedule'}
+              title={translate(locale, 'teacherteacherDashboardBookableSchedule')}
               detail={
                 upcoming.length
-                  ? fa
-                    ? 'برنامه شما فعال است'
-                    : 'Your schedule is active'
-                  : fa
-                    ? 'زمان تدریس اضافه کن'
-                    : 'Add teaching hours'
+                  ? translate(locale, 'teacherteacherDashboardYourScheduleIsActive')
+                  : translate(locale, 'teacherteacherDashboardAddTeachingHours')
               }
               href={p('/teacher-panel/availability')}
               fa={fa}
@@ -163,9 +159,9 @@ export function TeacherDashboard() {
       <section className="mt-5 panel-card p-5 md:p-6">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-black">{fa ? 'دسترسی سریع' : 'Quick actions'}</h2>
+            <h2 className="text-xl font-black">{translate(locale, 'teacherteacherDashboardQuickActions')}</h2>
             <p className="mt-1 text-sm text-muted">
-              {fa ? 'کارهای پرتکرار، بدون گشتن در منو' : 'Frequent tasks without digging through menus'}
+              {translate(locale, 'teacherteacherDashboardFrequentTasksWithoutDiggingThroughMenus')}
             </p>
           </div>
         </div>
@@ -173,25 +169,25 @@ export function TeacherDashboard() {
           <Quick
             href={p('/teacher-panel/classes')}
             icon={CheckCircle2}
-            text={fa ? 'ثبت حضور کلاس' : 'Record attendance'}
+            text={translate(locale, 'teacherteacherDashboardRecordAttendance')}
             Arrow={Arrow}
           />
           <Quick
             href={p('/teacher-panel/plans')}
             icon={FileCheck2}
-            text={fa ? 'تعریف تکلیف' : 'Create assignment'}
+            text={translate(locale, 'teacherteacherDashboardCreateAssignment')}
             Arrow={Arrow}
           />
           <Quick
             href={p('/teacher-panel/availability')}
             icon={Clock3}
-            text={fa ? 'مسدود کردن زمان' : 'Block a time'}
+            text={translate(locale, 'teacherteacherDashboardBlockATime')}
             Arrow={Arrow}
           />
           <Quick
             href={p('/teacher-panel/earnings')}
             icon={CircleDollarSign}
-            text={fa ? 'مشاهده مالی' : 'View finances'}
+            text={translate(locale, 'teacherteacherDashboardViewFinances')}
             Arrow={Arrow}
           />
         </div>
@@ -232,13 +228,19 @@ function NextClass({ item, fa }: { item: Row; fa: boolean }) {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <span className="status-pill status-info">
-            {String(item.type) === 'trial' ? (fa ? 'آزمایشی' : 'Trial') : fa ? 'کلاس عادی' : 'Regular'}
+            {String(item.type) === 'trial'
+              ? translate(fa, 'teacherteacherDashboardTrial')
+              : translate(fa, 'teacherteacherDashboardRegular')}
           </span>
-          <h3 className="mt-3 text-xl font-black">{String(student.name ?? (fa ? 'زبان‌آموز' : 'Student'))}</h3>
+          <h3 className="mt-3 text-xl font-black">
+            {String(student.name ?? translate(fa, 'schedulingteacherPlannerCalendarStudent'))}
+          </h3>
           <p className="mt-1 text-sm text-muted">
-            {new Intl.DateTimeFormat(fa ? 'fa-IR' : 'en-US', { weekday: 'long', month: 'long', day: 'numeric' }).format(
-              start,
-            )}
+            {new Intl.DateTimeFormat(translate(fa, 'commercepricingManagerEnUS2'), {
+              weekday: 'long',
+              month: 'long',
+              day: 'numeric',
+            }).format(start)}
           </p>
         </div>
         <div className="rounded-2xl bg-white px-6 py-4 text-center shadow-sm">
@@ -246,7 +248,8 @@ function NextClass({ item, fa }: { item: Row; fa: boolean }) {
             {start.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
           </strong>
           <p className="mt-1 text-xs text-muted">
-            {Math.max(0, Math.round((end.getTime() - start.getTime()) / 60000))} {fa ? 'دقیقه' : 'min'}
+            {Math.max(0, Math.round((end.getTime() - start.getTime()) / 60000))}{' '}
+            {translate(fa, 'teacherteacherDashboardMin')}
           </p>
         </div>
       </div>
@@ -291,7 +294,7 @@ function Task({
         <strong className="block text-sm">{title}</strong>
         <small className="text-muted">{detail}</small>
       </span>
-      <span className="text-xs font-bold text-blue">{fa ? 'بررسی' : 'Review'}</span>
+      <span className="text-xs font-bold text-blue">{translate(fa, 'teacherteacherDashboardReview')}</span>
     </Link>
   );
 }

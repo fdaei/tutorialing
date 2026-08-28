@@ -18,6 +18,7 @@ import {
   TicketStatus,
   BlogPostStatus,
 } from '@prisma/client';
+import { seedCountries } from './country.seed';
 
 const db = new PrismaClient();
 const DAY = 86_400_000;
@@ -1973,6 +1974,7 @@ async function seedBlog() {
 async function main() {
   await seedUsersAndPermissions();
   await seedLanguages();
+  await seedCountries(db);
   await seedTeachers();
   await seedPackages();
   await seedTests();

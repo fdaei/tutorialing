@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
+import { FilesService } from '../files/files.service';
 @Injectable()
 export class UsersService {
-  constructor(private db: PrismaService) {}
+  constructor(private db: PrismaService, private files: FilesService) {}
   async me(id: string) {
     const user = await this.db.user.findUnique({
       where: { id },
@@ -11,6 +12,7 @@ export class UsersService {
         phone: true,
         name: true,
         email: true,
+        avatarKey: true,
         birthDate: true,
         locale: true,
         timezone: true,
@@ -21,7 +23,8 @@ export class UsersService {
     });
     if (!user) return null;
     const permissions = [...new Set(user.roles.flatMap((role) => role.permissions.map((item) => item.permission.key)))];
-    return { ...user, roles: user.roles.map((role) => role.role), permissions };
+    const avatarUrl = user.avatarKey ? await this.files.createDownloadUrl(user.avatarKey) : null;
+    return { ...user, avatarUrl, roles: user.roles.map((role) => role.role), permissions };
   }
   update(id: string, d: { name: string; email?: string; locale: 'fa' | 'en'; timezone: string; birthDate?: string }) {
     const { birthDate, ...rest } = d;
@@ -39,6 +42,14 @@ export class UsersService {
   }
   locale(id: string, locale: 'fa' | 'en') {
     return this.db.user.update({ where: { id }, data: { locale }, select: { locale: true } });
+  }
+  async setAvatar(id: string, fileId: string) {
+    const file = await this.files.ownedSafeImage(id, fileId);
+    await this.db.user.update({ where: { id }, data: { avatarKey: file.key } });
+    return { avatarUrl: await this.files.createDownloadUrl(file.key) };
+  }
+  removeAvatar(id: string) {
+    return this.db.user.update({ where: { id }, data: { avatarKey: null }, select: { id: true } });
   }
   favorites(id: string) {
     return this.db.favorite.findMany({ where: { userId: id }, orderBy: { createdAt: 'desc' } });
