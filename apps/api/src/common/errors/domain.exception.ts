@@ -22,8 +22,13 @@ export const domainError = (definition: DomainErrorDefinition) =>
   new HttpException({ code: definition.code }, definition.status);
 
 export class DomainException extends HttpException {
-  constructor(status: HttpStatus, code: string, fields: FieldErrorCodes = {}) {
-    super({ code, fieldErrors: fields }, status);
+  constructor(
+    status: HttpStatus,
+    code: string,
+    fields: FieldErrorCodes = {},
+    details: Record<string, unknown> = {},
+  ) {
+    super({ code, fieldErrors: fields, ...details }, status);
   }
 }
 
@@ -34,7 +39,13 @@ export const conflict = (code: string, fields: FieldErrorCodes = {}) =>
 export const forbidden = (code: string) => new DomainException(HttpStatus.FORBIDDEN, code);
 export const unauthorized = (code: string) => new DomainException(HttpStatus.UNAUTHORIZED, code);
 export const notFound = (code: string) => new DomainException(HttpStatus.NOT_FOUND, code);
-export const tooManyRequests = (code: string) => new DomainException(HttpStatus.TOO_MANY_REQUESTS, code);
+export const tooManyRequests = (code: string, retryAfterSeconds?: number) =>
+  new DomainException(
+    HttpStatus.TOO_MANY_REQUESTS,
+    code,
+    {},
+    retryAfterSeconds === undefined ? {} : { retryAfterSeconds },
+  );
 
 /**
  * Prisma's known request errors otherwise reach the client as an untranslated

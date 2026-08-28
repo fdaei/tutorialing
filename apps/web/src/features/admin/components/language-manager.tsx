@@ -1,5 +1,6 @@
 'use client';
 
+import { localized, isDefaultLocale, translate } from '@/lib/i18n';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Trash2 } from 'lucide-react';
@@ -8,7 +9,7 @@ import { useTranslations } from '@/components/shared/locale-provider';
 
 export function LanguageManager() {
   const { locale } = useTranslations(),
-    fa = locale === 'fa',
+    fa = isDefaultLocale(locale),
     qc = useQueryClient(),
     [search, setSearch] = useState(''),
     [page, setPage] = useState(1),
@@ -77,11 +78,9 @@ export function LanguageManager() {
       <section className="rounded-3xl border hairline bg-white p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="text-2xl font-black">{fa ? 'زبان‌های آموزشی' : 'Educational languages'}</h2>
+            <h2 className="text-2xl font-black">{translate(locale, 'adminlanguageManagerEducationalLanguages')}</h2>
             <p className="mt-2 text-sm text-muted">
-              {fa
-                ? 'تمام انتخاب‌گرهای زبان از این داده‌ها تغذیه می‌شوند.'
-                : 'All educational-language selectors use this database list.'}
+              {translate(locale, 'adminlanguageManagerAllEducationalLanguageSelectorsUseThisDatabaseList')}
             </p>
           </div>
           <input
@@ -91,14 +90,14 @@ export function LanguageManager() {
               setPage(1);
             }}
             className="input max-w-xs"
-            placeholder={fa ? 'جستجوی زبان…' : 'Search languages…'}
+            placeholder={translate(locale, 'adminlanguageManagerSearchLanguages')}
           />
         </div>
         {query.isLoading ? (
           <div className="mt-6 skeleton h-80 rounded-2xl" />
         ) : query.isError ? (
           <Error
-            message={apiMessage(query.error, fa ? 'زبان‌ها دریافت نشدند.' : 'Could not load languages.')}
+            message={apiMessage(query.error, translate(locale, 'adminlanguageManagerCouldNotLoadLanguages'))}
             retry={() => query.refetch()}
           />
         ) : (
@@ -106,11 +105,11 @@ export function LanguageManager() {
             <table className="w-full min-w-[700px] text-sm">
               <thead>
                 <tr className="border-b hairline text-start text-muted">
-                  <th className="p-3 text-start">{fa ? 'زبان' : 'Language'}</th>
+                  <th className="p-3 text-start">{translate(locale, 'adminlanguageManagerLanguage')}</th>
                   <th className="p-3 text-start">Code</th>
-                  <th className="p-3 text-start">{fa ? 'جهت' : 'Direction'}</th>
-                  <th className="p-3 text-start">{fa ? 'سطح‌بندی' : 'Proficiency'}</th>
-                  <th className="p-3 text-start">{fa ? 'وضعیت' : 'Status'}</th>
+                  <th className="p-3 text-start">{translate(locale, 'adminlanguageManagerDirection')}</th>
+                  <th className="p-3 text-start">{translate(locale, 'adminlanguageManagerProficiency')}</th>
+                  <th className="p-3 text-start">{translate(locale, 'commercepricingManagerStatus')}</th>
                   <th />
                 </tr>
               </thead>
@@ -119,21 +118,25 @@ export function LanguageManager() {
                   <tr key={item.id} className="border-b hairline">
                     <td className="p-3">
                       <strong>
-                        {item.flag} {fa ? item.nameFa : item.nameEn}
+                        {item.flag} {localized({ fa: item.nameFa, en: item.nameEn }, locale)}
                       </strong>
                       <small className="mt-1 block text-muted">{item.nativeName}</small>
                     </td>
                     <td className="p-3 latin">{item.code}</td>
                     <td className="p-3">{item.direction}</td>
                     <td className="p-3">{item.proficiencySystem}</td>
-                    <td className="p-3">{item.active ? (fa ? 'فعال' : 'Active') : fa ? 'غیرفعال' : 'Inactive'}</td>
+                    <td className="p-3">
+                      {item.active
+                        ? translate(locale, 'admincountryManagerActive')
+                        : translate(locale, 'admincountryManagerInactive')}
+                    </td>
                     <td className="p-3">
                       <div className="flex justify-end gap-2">
                         <button
                           onClick={() => edit(item)}
                           className="rounded-lg border hairline px-3 py-2 font-bold text-blue"
                         >
-                          {fa ? 'ویرایش' : 'Edit'}
+                          {translate(locale, 'admincountryManagerEdit')}
                         </button>
                         <button
                           onClick={() => remove.mutate(item.id)}
@@ -155,7 +158,7 @@ export function LanguageManager() {
             onClick={() => setPage((value) => value - 1)}
             className="rounded-xl border hairline px-4 py-2 disabled:opacity-30"
           >
-            {fa ? 'قبلی' : 'Previous'}
+            {translate(locale, 'admincountryManagerPrevious')}
           </button>
           <span>
             {page} / {Math.max(1, query.data?.totalPages ?? 1)}
@@ -165,13 +168,15 @@ export function LanguageManager() {
             onClick={() => setPage((value) => value + 1)}
             className="rounded-xl border hairline px-4 py-2 disabled:opacity-30"
           >
-            {fa ? 'بعدی' : 'Next'}
+            {translate(locale, 'admincountryManagerNext')}
           </button>
         </div>
       </section>
       <section className="rounded-3xl border hairline bg-white p-6">
         <h2 className="text-2xl font-black">
-          {editing ? (fa ? 'ویرایش زبان' : 'Edit language') : fa ? 'افزودن زبان' : 'Add language'}
+          {editing
+            ? translate(locale, 'adminlanguageManagerEditLanguage')
+            : translate(locale, 'adminlanguageManagerAddLanguage')}
         </h2>
         <div className="mt-5 grid gap-4">
           <Field label="Code">
@@ -185,14 +190,14 @@ export function LanguageManager() {
             />
           </Field>
           <div className="grid grid-cols-2 gap-3">
-            <Field label={fa ? 'نام فارسی' : 'Persian name'}>
+            <Field label={translate(locale, 'admincountryManagerPersianName')}>
               <input
                 value={form.nameFa}
                 onChange={(event) => setForm((current) => ({ ...current, nameFa: event.target.value }))}
                 className="input"
               />
             </Field>
-            <Field label={fa ? 'نام انگلیسی' : 'English name'}>
+            <Field label={translate(locale, 'admincountryManagerEnglishName')}>
               <input
                 value={form.nameEn}
                 onChange={(event) => setForm((current) => ({ ...current, nameEn: event.target.value }))}
@@ -202,14 +207,14 @@ export function LanguageManager() {
             </Field>
           </div>
           <div className="grid grid-cols-[1fr_90px] gap-3">
-            <Field label={fa ? 'نام بومی' : 'Native name'}>
+            <Field label={translate(locale, 'adminlanguageManagerNativeName')}>
               <input
                 value={form.nativeName}
                 onChange={(event) => setForm((current) => ({ ...current, nativeName: event.target.value }))}
                 className="input"
               />
             </Field>
-            <Field label={fa ? 'پرچم' : 'Flag'}>
+            <Field label={translate(locale, 'admincountryManagerFlag')}>
               <input
                 value={form.flag}
                 onChange={(event) => setForm((current) => ({ ...current, flag: event.target.value }))}
@@ -218,7 +223,7 @@ export function LanguageManager() {
             </Field>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <Field label={fa ? 'جهت' : 'Direction'}>
+            <Field label={translate(locale, 'adminlanguageManagerDirection')}>
               <select
                 value={form.direction}
                 onChange={(event) => setForm((current) => ({ ...current, direction: event.target.value }))}
@@ -228,7 +233,7 @@ export function LanguageManager() {
                 <option>RTL</option>
               </select>
             </Field>
-            <Field label={fa ? 'سیستم سطح' : 'Proficiency'}>
+            <Field label={translate(locale, 'adminlanguageManagerProficiency2')}>
               <select
                 value={form.proficiencySystem}
                 onChange={(event) => setForm((current) => ({ ...current, proficiencySystem: event.target.value }))}
@@ -239,7 +244,7 @@ export function LanguageManager() {
               </select>
             </Field>
           </div>
-          <Field label={fa ? 'ترتیب' : 'Order'}>
+          <Field label={translate(locale, 'admincountryManagerOrder')}>
             <input
               type="number"
               value={form.order}
@@ -254,11 +259,11 @@ export function LanguageManager() {
               onChange={(event) => setForm((current) => ({ ...current, active: event.target.checked }))}
               className="size-5 accent-purple"
             />
-            {fa ? 'فعال و قابل انتخاب' : 'Active and selectable'}
+            {translate(locale, 'admincountryManagerActiveAndSelectable')}
           </label>
           {save.isError && (
             <p role="alert" className="rounded-xl bg-red-50 p-3 text-red-800">
-              {apiMessage(save.error, fa ? 'ذخیره زبان ناموفق بود.' : 'Could not save the language.')}
+              {apiMessage(save.error, translate(locale, 'adminlanguageManagerCouldNotSaveTheLanguage'))}
             </p>
           )}
           <div className="flex gap-3">
@@ -268,11 +273,11 @@ export function LanguageManager() {
               className="brand-gradient flex flex-1 items-center justify-center gap-2 rounded-xl py-3 font-black text-white"
             >
               <Plus size={18} />
-              {fa ? 'ذخیره' : 'Save'}
+              {translate(locale, 'admincountryManagerSave')}
             </button>
             {editing && (
               <button onClick={() => setEditing(null)} className="rounded-xl border hairline px-4">
-                {fa ? 'انصراف' : 'Cancel'}
+                {translate(locale, 'admincountryManagerCancel')}
               </button>
             )}
           </div>

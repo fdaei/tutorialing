@@ -206,6 +206,7 @@ model User {
   googleSubject           String?                   @unique
   name                    String?
   email                   String?
+  passwordHash            String?
   avatarKey               String?
   // Date only; the time component is never read. Stored in UTC like every other
   // timestamp — the Jalali birth date a student enters is converted on the way
@@ -1247,6 +1248,24 @@ model Language {
   updatedAt         DateTime          @updatedAt
 
   @@index([active, order])
+}
+
+model Country {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  nameFa    String
+  nameEn    String
+  dialCode  String
+  flag      String
+  minLength Int      @default(4)
+  maxLength Int      @default(15)
+  active    Boolean  @default(true)
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([active, order])
+  @@index([dialCode])
 }
 
 model TeacherLanguage {

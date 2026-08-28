@@ -2,23 +2,32 @@
 import Link from 'next/link';
 import { BadgeCheck, Star, UserRound } from 'lucide-react';
 import type { PublicTeacher } from '@/lib/api';
+import { api } from '@/lib/api';
+import { useQuery } from '@tanstack/react-query';
 import { useTranslations } from '@/components/shared/locale-provider';
-import { localePath } from '@/lib/i18n';
+import { localePath, localized, isDefaultLocale, translate } from '@/lib/i18n';
 
 export function TeacherCard({ teacher, reason, score }: { teacher: PublicTeacher; reason?: string; score?: number }) {
+  const me = useQuery({
+    queryKey: ['header-me'],
+    queryFn: () => api<{ roles: string[] }>('/users/me'),
+    retry: false,
+  });
   const { locale } = useTranslations(),
-    fa = locale === 'fa',
+    fa = isDefaultLocale(locale),
     initials = teacher.nameEn
       .split(' ')
       .map((n) => n[0])
       .join('')
       .slice(0, 2),
-    money = new Intl.NumberFormat(fa ? 'fa-IR' : 'en-US').format(teacher.trialPrice) + (fa ? ' تومان' : ' IRR');
+    money =
+      new Intl.NumberFormat(translate(locale, 'commercepricingManagerEnUS2')).format(teacher.trialPrice) +
+      translate(locale, 'commercepricingManagerIrr');
   return (
     <article className="surface-card lift relative overflow-hidden p-5">
       {score != null && (
         <span className="absolute start-4 top-4 z-10 rounded-full bg-lavender px-3 py-1 text-xs font-black text-purple">
-          {score}% {fa ? 'تطبیق' : 'match'}
+          {score}% {translate(locale, 'teacherteacherCardMatch')}
         </span>
       )}
       <div className="flex items-start gap-4">
@@ -28,10 +37,12 @@ export function TeacherCard({ teacher, reason, score }: { teacher: PublicTeacher
         </div>
         <div className="min-w-0 flex-1">
           <h3 className="flex items-center gap-2 text-lg font-black">
-            {fa ? teacher.nameFa : teacher.nameEn}
+            {localized({ fa: teacher.nameFa, en: teacher.nameEn }, locale)}
             <BadgeCheck size={18} className="text-blue" />
           </h3>
-          <p className="mt-1 truncate text-xs text-muted">{fa ? teacher.nameEn : teacher.nameFa}</p>
+          <p className="mt-1 truncate text-xs text-muted">
+            {localized({ fa: teacher.nameEn, en: teacher.nameFa }, locale)}
+          </p>
           <p className="mt-3 flex items-center gap-1 text-sm font-bold">
             <Star size={15} fill="#f5a623" className="text-[#f5a623]" />
             {teacher.rating}
@@ -40,7 +51,7 @@ export function TeacherCard({ teacher, reason, score }: { teacher: PublicTeacher
         </div>
       </div>
       <p className="mt-5 line-clamp-2 min-h-14 text-sm leading-7 text-muted">
-        {fa ? teacher.bioFa : (teacher.bioEn ?? teacher.bioFa)}
+        {localized({ fa: teacher.bioFa, en: teacher.bioEn ?? teacher.bioFa }, locale)}
       </p>
       {reason && <p className="mt-4 rounded-xl bg-lavender p-3 text-xs font-bold text-purple">{reason}</p>}
       <div className="mt-4 flex flex-wrap gap-2">
@@ -50,16 +61,18 @@ export function TeacherCard({ teacher, reason, score }: { teacher: PublicTeacher
           </span>
         ))}
       </div>
-      <div className="mt-5 flex items-end justify-between border-t hairline pt-5">
-        <div>
-          <p className="text-xs text-muted">{fa ? 'جلسه آزمایشی' : 'Trial lesson'}</p>
-          <p className="mt-1 font-black text-blue">{money}</p>
-        </div>
+      <div className={`mt-5 flex items-end border-t hairline pt-5 ${me.data ? 'justify-between' : 'justify-end'}`}>
+        {me.data && (
+          <div>
+            <p className="text-xs text-muted">{translate(locale, 'teacherteacherBookingCardTrialLesson')}</p>
+            <p className="mt-1 font-black text-blue">{money}</p>
+          </div>
+        )}
         <Link
           href={localePath(`/teachers/${teacher.slug}`, locale)}
           className="rounded-xl border border-blue px-4 py-2.5 text-sm font-bold text-blue hover:bg-blue hover:text-white"
         >
-          {fa ? 'مشاهده و رزرو' : 'View & book'}
+          {translate(locale, 'teacherteacherCardViewBook')}
         </Link>
       </div>
     </article>

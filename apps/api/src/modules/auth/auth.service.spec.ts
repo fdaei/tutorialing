@@ -79,6 +79,33 @@ describe('OTP hashing', () => {
   });
 });
 
+describe('password authentication', () => {
+  it('registers with a salted hash and can verify the password', async () => {
+    let storedUser: Record<string, unknown> | null = null;
+    const db = {
+      user: {
+        findFirst: jest.fn().mockImplementation(() => Promise.resolve(storedUser)),
+        create: jest.fn().mockImplementation(({ data }: { data: Record<string, unknown> }) => {
+          storedUser = { id: 'password-user', status: 'ACTIVE', ...data };
+          return Promise.resolve(storedUser);
+        }),
+      },
+    };
+    const svc = new AuthService(db as never, {} as never, {} as never);
+    jest.spyOn(svc as never, 'createSession').mockResolvedValue({ accessToken: 'token' } as never);
+
+    await svc.registerWithPassword('کاربر تست', 'User@Example.com', 'correct-horse', {});
+    const saved = db.user.create.mock.calls[0]![0].data as Record<string, unknown>;
+    expect(saved.email).toBe('user@example.com');
+    expect(saved.passwordHash).not.toBe('correct-horse');
+    expect(String(saved.passwordHash)).toMatch(/^scrypt\$/);
+    await expect(svc.loginWithPassword('USER@example.com', 'correct-horse', {})).resolves.toMatchObject({ accessToken: 'token' });
+    await expect(svc.loginWithPassword('user@example.com', 'wrong-password', {})).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'INVALID_CREDENTIALS' }),
+    });
+  });
+});
+
 /**
  * SEC-209. `refresh()` compared the hashed refresh secret with plain `!==`,
  * unlike the OTP path above (which already used `timingSafeEqual`). Fixed by

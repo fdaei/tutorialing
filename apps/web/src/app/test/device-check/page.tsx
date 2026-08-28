@@ -6,12 +6,12 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { CheckCircle2, Headphones, Mic, Wifi, XCircle } from 'lucide-react';
 import { api, publicApi, ApiError } from '@/lib/api';
 import { useTranslations } from '@/components/shared/locale-provider';
-import { localePath } from '@/lib/i18n';
+import { localePath, localized, isDefaultLocale, translate } from '@/lib/i18n';
 export default function DeviceCheck() {
   const router = useRouter(),
     selectedTestId = useSearchParams().get('test') ?? '',
     { locale } = useTranslations(),
-    fa = locale === 'fa',
+    fa = isDefaultLocale(locale),
     p = (href: string) => localePath(href, locale),
     [online, setOnline] = useState(true),
     [mic, setMic] = useState<'idle' | 'ok' | 'denied'>('idle');
@@ -61,54 +61,52 @@ export default function DeviceCheck() {
       <Link href={p('/')} className="latin font-black">
         LingoSpeak
       </Link>
-      <p className="mt-14 text-sm font-black text-purple">{fa ? 'بررسی پیش از آزمون' : 'Pre-test check'}</p>
-      <h1 className="mt-3 text-4xl font-black">{fa ? 'دستگاه و دسترسی‌ها' : 'Device and permissions'}</h1>
+      <p className="mt-14 text-sm font-black text-purple">{translate(locale, 'testdeviceCheckPreTestCheck')}</p>
+      <h1 className="mt-3 text-4xl font-black">{translate(locale, 'testdeviceCheckDeviceAndPermissions')}</h1>
       {tests.data?.find((test) => test.id === selectedTestId) && (
         <p className="mt-3 text-muted">
-          {fa
-            ? tests.data.find((test) => test.id === selectedTestId)?.titleFa
-            : tests.data.find((test) => test.id === selectedTestId)?.titleEn}
+          {localized(
+            {
+              fa: tests.data.find((test) => test.id === selectedTestId)?.titleFa,
+              en: tests.data.find((test) => test.id === selectedTestId)?.titleEn,
+            },
+            locale,
+          )}
         </p>
       )}
       <div className="mt-10 grid gap-4">
         <CheckRow
           icon={<Wifi />}
-          title={fa ? 'اینترنت' : 'Internet'}
-          detail={online ? (fa ? 'متصل' : 'Connected') : fa ? 'قطع است' : 'Offline'}
+          title={translate(locale, 'testdeviceCheckInternet')}
+          detail={online ? translate(locale, 'testdeviceCheckConnected') : translate(locale, 'testdeviceCheckOffline')}
           ok={online}
         />
         <CheckRow
           icon={<Headphones />}
-          title={fa ? 'پخش صدا' : 'Audio playback'}
-          detail={fa ? 'هدفون و صدای دستگاه را بررسی کنید' : 'Check your headphones and device volume'}
+          title={translate(locale, 'testdeviceCheckAudioPlayback')}
+          detail={translate(locale, 'testdeviceCheckCheckYourHeadphonesAndDeviceVolume')}
           ok
         />
         <div className="flex items-center gap-5 rounded-3xl border hairline bg-white p-6">
           <Mic />
           <div className="flex-1">
-            <p className="font-black">{fa ? 'میکروفون' : 'Microphone'}</p>
+            <p className="font-black">{translate(locale, 'testdeviceCheckMicrophone')}</p>
             <p className="text-sm text-muted">
               {mic === 'ok'
-                ? fa
-                  ? 'آماده است'
-                  : 'Ready'
+                ? translate(locale, 'testdeviceCheckReady')
                 : mic === 'denied'
-                  ? fa
-                    ? 'دسترسی رد شده'
-                    : 'Permission denied'
-                  : fa
-                    ? 'برای Speaking لازم است'
-                    : 'Required for Speaking'}
+                  ? translate(locale, 'testdeviceCheckPermissionDenied')
+                  : translate(locale, 'testdeviceCheckRequiredForSpeaking')}
             </p>
           </div>
           <button onClick={checkMic} className="rounded-full border hairline px-4 py-2">
-            {fa ? 'بررسی' : 'Check'}
+            {translate(locale, 'testdeviceCheckCheck')}
           </button>
         </div>
       </div>
       {(start.isError || tests.isError) && !(start.error instanceof ApiError && start.error.status === 401) && (
         <p role="alert" className="mt-5 rounded-2xl bg-red-50 p-4 text-red-800">
-          {fa ? 'شروع آزمون ناموفق بود. دوباره تلاش کنید.' : 'Could not start the test. Try again.'}
+          {translate(locale, 'testdeviceCheckCouldNotStartTheTestTryAgain')}
         </p>
       )}
       <button
@@ -117,12 +115,8 @@ export default function DeviceCheck() {
         className="brand-gradient mt-8 w-full rounded-xl py-4 font-black text-white disabled:opacity-40"
       >
         {start.isPending
-          ? fa
-            ? 'در حال ساخت جلسه آزمون…'
-            : 'Creating test session…'
-          : fa
-            ? 'شروع آزمون'
-            : 'Start test'}
+          ? translate(locale, 'testdeviceCheckCreatingTestSession')
+          : translate(locale, 'testsstartTestLinkStartTest')}
       </button>
     </main>
   );

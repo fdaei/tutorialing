@@ -19,4 +19,5 @@ export class RefundDto {
 export class WalletTopUpDto {
   @IsInt() @Min(100_000) amount!: number;
   @IsOptional() @IsString() discountCode?: string;
+  @IsOptional() @IsString() idempotencyKey?: string;
 }

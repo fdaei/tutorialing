@@ -43,7 +43,7 @@ export class RateLimitGuard implements CanActivate {
 
     if (count > options.limit) {
       response.setHeader('Retry-After', String(retryAfter));
-      throw tooManyRequests('RATE_LIMITED');
+      throw tooManyRequests('RATE_LIMITED', retryAfter);
     }
     return true;
   }

@@ -1,13 +1,10 @@
-import { PanelActions } from '@/features/panel/components/panel-actions';
-import { PanelShell, studentNav } from '@/features/panel/components/panel-shell';
-import { ResourceView } from '@/features/panel/components/resource-view';
-import { MyTicketManager } from '@/features/support/components/my-ticket-manager';
+import { localized, isDefaultLocale } from '@/lib/i18n';
+import { PanelActions, PanelShell, ResourceView, studentNav } from '@/features/panel';
+import { MyTicketManager } from '@/features/support';
 import { requestLocale } from '@/lib/server-locale';
-import { StudentTests } from '@/features/student/components/student-tests';
-import { StudentMatches } from '@/features/student/components/student-matches';
-import { StudentProfile } from '@/features/student/components/student-profile';
-import { StudentWallet } from '@/features/student/components/student-wallet';
-import { TeacherPlannerCalendar } from '@/features/scheduling/components/teacher-planner-calendar';
+import { StudentMatches, StudentProfile, StudentTests, StudentWallet } from '@/features/student';
+import { TeacherPlannerCalendar } from '@/features/scheduling';
+import { FeatureErrorBoundary } from '@/shared/components/error-boundaries';
 
 const map: Record<string, [string, string, string]> = {
   classes: ['کلاس‌ها و تقویم', 'Classes and calendar', '/bookings/me'],
@@ -23,10 +20,11 @@ const map: Record<string, [string, string, string]> = {
 export default async function Section({ params }: { params: Promise<{ section: string }> }) {
   const { section } = await params;
   const locale = await requestLocale(),
-    fa = locale === 'fa';
+    fa = isDefaultLocale(locale);
   const [titleFa, titleEn, endpoint] = map[section] ?? ['بخش موردنظر', 'Section', '/users/me'];
   return (
     <PanelShell title="پنل زبان‌آموز" items={studentNav}>
+      <FeatureErrorBoundary name={`student-${section}`}>
       {section === 'tests' ? (
         <StudentTests />
       ) : section === 'classes' ? (
@@ -42,9 +40,10 @@ export default async function Section({ params }: { params: Promise<{ section: s
       ) : (
         <>
           <PanelActions role="student" section={section} endpoint={endpoint} />
-          <ResourceView title={fa ? titleFa : titleEn} endpoint={endpoint} />
+          <ResourceView title={localized({ fa: titleFa, en: titleEn }, locale)} endpoint={endpoint} />
         </>
       )}
+      </FeatureErrorBoundary>
     </PanelShell>
   );
 }

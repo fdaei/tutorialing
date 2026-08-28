@@ -1,4 +1,6 @@
 'use client';
+
+import { localized, isDefaultLocale, translate } from '@/lib/i18n';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Search, RotateCcw } from 'lucide-react';
@@ -8,7 +10,7 @@ import { publicApi, type Paginated, type PublicTeacher } from '@/lib/api';
 import { useTranslations } from '@/components/shared/locale-provider';
 export default function Directory() {
   const { locale } = useTranslations(),
-    fa = locale === 'fa',
+    fa = isDefaultLocale(locale),
     [q, setQ] = useState(''),
     [search, setSearch] = useState(''),
     [skill, setSkill] = useState(''),
@@ -25,9 +27,9 @@ export default function Directory() {
     <>
       <Header />
       <main className="mx-auto max-w-7xl px-6 py-14">
-        <p className="text-sm font-bold text-purple">{fa ? 'مدرس‌های تأییدشده' : 'Verified teachers'}</p>
+        <p className="text-sm font-bold text-purple">{translate(locale, 'teachersVerifiedTeachers')}</p>
         <h1 className="mt-3 max-w-3xl text-4xl font-black md:text-6xl">
-          {fa ? 'مدرسی پیدا کن که برای هدف تو ساخته شده.' : 'Find a teacher built around your goal.'}
+          {translate(locale, 'teachersFindATeacherBuiltAroundYourGoal')}
         </h1>
         <form
           onSubmit={(e) => {
@@ -43,33 +45,33 @@ export default function Directory() {
               value={q}
               onChange={(e) => setQ(e.target.value)}
               className="w-full bg-transparent py-4 outline-none"
-              placeholder={fa ? 'نام یا تخصص مدرس' : 'Teacher name or specialty'}
+              placeholder={translate(locale, 'teachersTeacherNameOrSpecialty')}
             />
           </label>
           <select
-            aria-label={fa ? 'مهارت' : 'Skill'}
+            aria-label={translate(locale, 'teachersSkill')}
             value={skill}
             onChange={(e) => setSkill(e.target.value)}
             className="rounded-2xl border hairline px-4"
           >
-            <option value="">{fa ? 'همه مهارت‌ها' : 'All skills'}</option>
+            <option value="">{translate(locale, 'teachersAllSkills')}</option>
             {['writing', 'speaking', 'reading', 'listening'].map((x) => (
               <option key={x}>{x}</option>
             ))}
           </select>
           <select
-            aria-label={fa ? 'مرتب‌سازی' : 'Sort'}
+            aria-label={translate(locale, 'teachersSort')}
             value={sort}
             onChange={(e) => setSort(e.target.value)}
             className="rounded-2xl border hairline px-4"
           >
-            <option value="rating">{fa ? 'بالاترین امتیاز' : 'Highest rating'}</option>
-            <option value="price_asc">{fa ? 'کمترین قیمت' : 'Lowest price'}</option>
-            <option value="newest">{fa ? 'جدیدترین' : 'Newest'}</option>
+            <option value="rating">{translate(locale, 'teachersHighestRating')}</option>
+            <option value="price_asc">{translate(locale, 'teachersLowestPrice')}</option>
+            <option value="newest">{translate(locale, 'teachersNewest')}</option>
           </select>
         </form>
         {query.isLoading && (
-          <div aria-label={fa ? 'در حال بارگذاری' : 'Loading'} className="mt-8 grid gap-6 lg:grid-cols-3">
+          <div aria-label={translate(locale, 'teachersLoading')} className="mt-8 grid gap-6 lg:grid-cols-3">
             {[1, 2, 3].map((x) => (
               <div key={x} className="skeleton h-[420px] rounded-4xl" />
             ))}
@@ -77,17 +79,18 @@ export default function Directory() {
         )}
         {query.isError && (
           <div className="mt-8 rounded-3xl bg-red-50 p-7 text-red-800">
-            <p className="font-black">{fa ? 'دریافت مدرس‌ها ناموفق بود' : 'Could not load teachers'}</p>
+            <p className="font-black">{translate(locale, 'teachersCouldNotLoadTeachers')}</p>
             <button onClick={() => query.refetch()} className="mt-3 flex gap-2 font-bold">
               <RotateCcw size={18} />
-              {fa ? 'تلاش دوباره' : 'Try again'}
+              {translate(locale, 'testsaudioRecorderTryAgain')}
             </button>
           </div>
         )}
         {query.data && (
           <>
             <p className="mt-8 text-sm text-muted">
-              {query.data.total.toLocaleString(fa ? 'fa-IR' : 'en-US')} {fa ? 'مدرس تأییدشده' : 'verified teachers'}
+              {query.data.total.toLocaleString(translate(locale, 'commercepricingManagerEnUS2'))}{' '}
+              {translate(locale, 'teachersVerifiedTeachers2')}
             </p>
             <div className="mt-5 grid gap-6 lg:grid-cols-3">
               {query.data.data.map((t) => (
@@ -96,8 +99,8 @@ export default function Directory() {
             </div>
             {!query.data.data.length && (
               <Empty
-                title={fa ? 'مدرسی پیدا نشد' : 'No teachers found'}
-                body={fa ? 'فیلترها را تغییر دهید.' : 'Try changing the filters.'}
+                title={translate(locale, 'teachersNoTeachersFound')}
+                body={translate(locale, 'teachersTryChangingTheFilters')}
               />
             )}
             <div className="mt-10 flex justify-center gap-3">
@@ -106,7 +109,7 @@ export default function Directory() {
                 onClick={() => setPage((x) => x - 1)}
                 className="rounded-full border hairline px-5 py-2 disabled:opacity-40"
               >
-                {fa ? 'قبلی' : 'Previous'}
+                {translate(locale, 'admincountryManagerPrevious')}
               </button>
               <span className="px-3 py-2">
                 {page} / {query.data.totalPages || 1}
@@ -116,7 +119,7 @@ export default function Directory() {
                 onClick={() => setPage((x) => x + 1)}
                 className="rounded-full border hairline px-5 py-2 disabled:opacity-40"
               >
-                {fa ? 'بعدی' : 'Next'}
+                {translate(locale, 'admincountryManagerNext')}
               </button>
             </div>
           </>

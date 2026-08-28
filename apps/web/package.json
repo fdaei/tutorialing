@@ -2,7 +2,7 @@
   "name": "@lingospeak/web",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "NEXT_DIST_DIR=.next-dev next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint src --max-warnings=0",

@@ -20,7 +20,7 @@ export const defaultConfig = {
     otpResendSeconds: 60,
     otpRecentRequestWindowSeconds: 600,
     otpHourlyWindowSeconds: 3_600,
-    otpHourlyLimit: 5,
+    otpHourlyLimit: 10,
     otpAttemptLimit: 5,
   },
   storage: {

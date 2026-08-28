@@ -77,8 +77,8 @@ const COMMON_ERROR_MESSAGES: Record<string, Record<ApiLocale, string>> = {
     en: 'Some form values are invalid. Review the fields.',
   },
   PHONE_INVALID: {
-    fa: 'شماره موبایل باید با 09 شروع شود و دقیقاً 11 رقم داشته باشد.',
-    en: 'The mobile number must start with 09 and contain exactly 11 digits.',
+    fa: 'شماره موبایل با پیش‌شماره کشور مطابقت ندارد.',
+    en: 'The mobile number does not match the selected country code.',
   },
   VALIDATION_IS_NOT_EMPTY: { fa: 'این فیلد نباید خالی باشد.', en: 'This field cannot be empty.' },
   VALIDATION_IS_STRING: { fa: 'این مقدار باید متن باشد.', en: 'This value must be text.' },
@@ -102,11 +102,11 @@ const COMMON_ERROR_MESSAGES: Record<string, Record<ApiLocale, string>> = {
     en: 'This field is not accepted by the API.',
   },
 };
-function errorMessage(code: string | undefined) {
+function errorMessage(code: string | undefined, values: Array<string | number> = []) {
   if (!code) return undefined;
   const lang = locale() ?? 'fa';
   return (COMMON_ERROR_MESSAGES[code] ?? API_ERROR_MESSAGES[code])?.[lang]
-    ?.replace(/\{\d+\}/g, '')
+    ?.replace(/\{(\d+)\}/g, (_, index: string) => String(values[Number(index)] ?? ''))
     .replace(/\s{2,}/g, ' ')
     .trim();
 }
@@ -116,6 +116,7 @@ export type ApiErrorBody = {
   fieldErrors?: Record<string, string>;
   requestId?: string;
   timestamp?: string;
+  retryAfterSeconds?: number;
 };
 export class ApiError extends Error {
   details: ApiErrorBody;
@@ -124,7 +125,11 @@ export class ApiError extends Error {
     details: unknown,
   ) {
     const body = (details && typeof details === 'object' ? details : {}) as ApiErrorBody;
-    super(errorMessage(body.code) || body.message || errorMessage(status >= 500 ? 'INTERNAL_ERROR' : 'REQUEST_FAILED'));
+    super(
+      errorMessage(body.code, body.retryAfterSeconds === undefined ? [] : [body.retryAfterSeconds]) ||
+        body.message ||
+        errorMessage(status >= 500 ? 'INTERNAL_ERROR' : 'REQUEST_FAILED'),
+    );
     this.name = 'ApiError';
     this.details = {
       ...body,
@@ -203,6 +208,18 @@ export type EducationalLanguage = {
   active: boolean;
   order: number;
   proficiencySystem: 'CEFR' | 'CUSTOM';
+};
+export type Country = {
+  id: string;
+  code: string;
+  nameFa: string;
+  nameEn: string;
+  dialCode: string;
+  flag: string;
+  minLength: number;
+  maxLength: number;
+  active: boolean;
+  order: number;
 };
 export type TeacherLanguage = { language: EducationalLanguage; levels: string[]; specialties: string[] };
 export type PublicTeacher = {

@@ -1,5 +1,6 @@
 'use client';
 
+import { localized, isDefaultLocale, translate } from '@/lib/i18n';
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -49,7 +50,7 @@ const sum = (rows: Aggregate[] | undefined, statuses: string[], field: string) =
 
 export function AdminFinanceCenter() {
   const { locale } = useTranslations();
-  const fa = locale === 'fa';
+  const fa = isDefaultLocale(locale);
   const queryClient = useQueryClient();
   const [status, setStatus] = useState('ALL');
   const [search, setSearch] = useState('');
@@ -100,68 +101,67 @@ export function AdminFinanceCenter() {
   const refresh = () => Promise.all([reports.refetch(), payments.refetch(), withdrawals.refetch()]);
 
   const money = (value: number) =>
-    fa ? `${value.toLocaleString('fa-IR')} تومان` : `${value.toLocaleString('en-US')} IRR`;
+    localized({ fa: `${value.toLocaleString('fa-IR')} تومان`, en: `${value.toLocaleString('en-US')} IRR` }, locale);
   const date = (value: string) =>
-    new Intl.DateTimeFormat(fa ? 'fa-IR' : 'en-US', { dateStyle: 'medium', timeStyle: 'short' }).format(
-      new Date(value),
-    );
+    new Intl.DateTimeFormat(translate(locale, 'commercepricingManagerEnUS2'), {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    }).format(new Date(value));
 
   return (
     <div className="admin-finance">
       <header className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
         <button type="button" onClick={refresh} disabled={loading} className="secondary-button self-start">
           <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-          {fa ? 'به‌روزرسانی' : 'Refresh'}
+          {translate(locale, 'adminadminFinanceCenterRefresh')}
         </button>
         <div className="text-end">
-          <p className="text-xs font-bold text-blue">{fa ? 'عملیات مالی' : 'Finance operations'}</p>
-          <h1 className="mt-2 text-3xl font-black">{fa ? 'مالی و تسویه' : 'Finance & payouts'}</h1>
+          <p className="text-xs font-bold text-blue">{translate(locale, 'adminadminFinanceCenterFinanceOperations')}</p>
+          <h1 className="mt-2 text-3xl font-black">{translate(locale, 'adminadminFinanceCenterFinancePayouts')}</h1>
           <p className="mt-2 text-sm text-muted">
-            {fa
-              ? 'ورودی پول، بدهی مدرس‌ها و انتقال‌های بانکی در یک نمای قابل پیگیری'
-              : 'Payments, teacher liabilities, and bank transfers in one traceable view'}
+            {translate(locale, 'adminadminFinanceCenterPaymentsTeacherLiabilitiesAndBankTransfersInOne')}
           </p>
         </div>
       </header>
 
       {hasError && (
         <div role="alert" className="mt-5 rounded-2xl border border-red-100 bg-red-50 p-4 text-sm text-red-700">
-          {fa
-            ? 'دریافت بخشی از اطلاعات مالی ناموفق بود. مجوزها و اتصال API را بررسی کنید.'
-            : 'Some finance data could not be loaded. Check permissions and the API connection.'}
+          {translate(locale, 'adminadminFinanceCenterSomeFinanceDataCouldNotBeLoadedCheck')}
         </div>
       )}
 
       <section className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <FinanceMetric
           icon={CircleDollarSign}
-          label={fa ? 'درآمد وصول‌شده' : 'Collected revenue'}
+          label={translate(locale, 'adminadminFinanceCenterCollectedRevenue')}
           value={money(paidRevenue)}
           tone="emerald"
           loading={loading}
         />
         <FinanceMetric
           icon={WalletCards}
-          label={fa ? 'بدهی قابل تسویه' : 'Payable earnings'}
+          label={translate(locale, 'adminadminFinanceCenterPayableEarnings')}
           value={money(payableEarnings)}
           tone="blue"
           loading={loading}
         />
         <FinanceMetric
           icon={Clock3}
-          label={fa ? 'برداشت در انتظار' : 'Pending withdrawals'}
+          label={translate(locale, 'adminadminFinanceCenterPendingWithdrawals')}
           value={money(pendingAmount)}
-          detail={
-            fa
-              ? `${pendingWithdrawals.length.toLocaleString('fa-IR')} درخواست`
-              : `${pendingWithdrawals.length} requests`
-          }
+          detail={localized(
+            {
+              fa: `${pendingWithdrawals.length.toLocaleString('fa-IR')} درخواست`,
+              en: `${pendingWithdrawals.length} requests`,
+            },
+            locale,
+          )}
           tone="amber"
           loading={loading}
         />
         <FinanceMetric
           icon={CheckCircle2}
-          label={fa ? 'انتقال بانکی‌شده' : 'Bank transferred'}
+          label={translate(locale, 'adminadminFinanceCenterBankTransferred')}
           value={money(transferred)}
           tone="purple"
           loading={loading}
@@ -181,18 +181,18 @@ export function AdminFinanceCenter() {
                 {statusLabel(item, fa)}
                 {item === 'PENDING' && pendingWithdrawals.length > 0 && (
                   <span className="ms-2 rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] text-white">
-                    {pendingWithdrawals.length.toLocaleString(fa ? 'fa-IR' : 'en-US')}
+                    {pendingWithdrawals.length.toLocaleString(translate(locale, 'commercepricingManagerEnUS2'))}
                   </span>
                 )}
               </button>
             ))}
           </div>
           <div className="text-end">
-            <h2 className="text-xl font-black">{fa ? 'درخواست‌های برداشت مدرس‌ها' : 'Teacher withdrawal requests'}</h2>
+            <h2 className="text-xl font-black">
+              {translate(locale, 'adminadminFinanceCenterTeacherWithdrawalRequests')}
+            </h2>
             <p className="mt-1 text-xs text-muted">
-              {fa
-                ? 'انتقال فقط با ثبت شماره پیگیری بانکی نهایی می‌شود.'
-                : 'A bank reference is required to complete a transfer.'}
+              {translate(locale, 'adminadminFinanceCenterABankReferenceIsRequiredToCompleteA')}
             </p>
           </div>
         </div>
@@ -203,9 +203,7 @@ export function AdminFinanceCenter() {
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               className="w-full bg-transparent text-sm text-navy outline-none"
-              placeholder={
-                fa ? 'جستجو نام مدرس، موبایل، شبا یا شماره پیگیری…' : 'Search teacher, phone, IBAN, or reference…'
-              }
+              placeholder={translate(locale, 'adminadminFinanceCenterSearchTeacherPhoneIBANOrReference')}
             />
           </label>
         </div>
@@ -219,19 +217,21 @@ export function AdminFinanceCenter() {
             <table className="finance-table">
               <thead>
                 <tr>
-                  <th>{fa ? 'مدرس' : 'Teacher'}</th>
-                  <th>{fa ? 'مبلغ' : 'Amount'}</th>
-                  <th>{fa ? 'شبا' : 'IBAN'}</th>
-                  <th>{fa ? 'درخواست' : 'Requested'}</th>
-                  <th>{fa ? 'وضعیت' : 'Status'}</th>
-                  <th>{fa ? 'عملیات' : 'Action'}</th>
+                  <th>{translate(locale, 'schedulingteacherPlannerCalendarTeacher')}</th>
+                  <th>{translate(locale, 'teacherteacherFinanceAmount')}</th>
+                  <th>{translate(locale, 'teacherteacherFinanceIban')}</th>
+                  <th>{translate(locale, 'adminadminFinanceCenterRequested')}</th>
+                  <th>{translate(locale, 'commercepricingManagerStatus')}</th>
+                  <th>{translate(locale, 'adminadminFinanceCenterAction')}</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((item) => (
                   <tr key={item.id}>
                     <td>
-                      <strong className="block">{fa ? item.teacher.nameFa : item.teacher.nameEn}</strong>
+                      <strong className="block">
+                        {localized({ fa: item.teacher.nameFa, en: item.teacher.nameEn }, locale)}
+                      </strong>
                       <small className="mt-1 block text-muted latin">{item.teacher.user?.phone || '—'}</small>
                     </td>
                     <td className="font-black">{money(item.amount)}</td>
@@ -252,7 +252,7 @@ export function AdminFinanceCenter() {
                           className="primary-button !px-3 !py-2 text-xs"
                         >
                           <ArrowDownToLine size={15} />
-                          {fa ? 'ثبت انتقال' : 'Transfer'}
+                          {translate(locale, 'adminadminFinanceCenterTransfer')}
                         </button>
                       ) : (
                         <span className="latin text-xs text-muted">{item.reference || '—'}</span>
@@ -267,7 +267,7 @@ export function AdminFinanceCenter() {
           <div className="p-12 text-center">
             <CreditCard className="mx-auto text-[#c4cada]" />
             <p className="mt-3 text-sm font-bold">
-              {fa ? 'درخواستی با این فیلتر پیدا نشد.' : 'No requests match these filters.'}
+              {translate(locale, 'adminadminFinanceCenterNoRequestsMatchTheseFilters')}
             </p>
           </div>
         )}
@@ -275,11 +275,9 @@ export function AdminFinanceCenter() {
 
       <section className="panel-card mt-5 overflow-hidden">
         <div className="border-b hairline p-5 text-end">
-          <h2 className="text-xl font-black">{fa ? 'آخرین پرداخت‌های کاربران' : 'Recent customer payments'}</h2>
+          <h2 className="text-xl font-black">{translate(locale, 'adminadminFinanceCenterRecentCustomerPayments')}</h2>
           <p className="mt-1 text-xs text-muted">
-            {fa
-              ? 'برای بازپرداخت و جزئیات بیشتر وارد بخش پرداخت‌ها شوید.'
-              : 'Open Payments for refunds and full details.'}
+            {translate(locale, 'adminadminFinanceCenterOpenPaymentsForRefundsAndFullDetails')}
           </p>
         </div>
         <div className="grid divide-y hairline">
@@ -289,7 +287,9 @@ export function AdminFinanceCenter() {
               <PaymentStatus status={item.status} fa={fa} />
               <span className="font-black">{money(item.amount)}</span>
               <span className="text-end">
-                <strong className="block">{item.user?.name || item.user?.phone || (fa ? 'کاربر' : 'User')}</strong>
+                <strong className="block">
+                  {item.user?.name || item.user?.phone || translate(locale, 'adminadminUsersManagerUser')}
+                </strong>
                 <small className="text-muted">{item.purpose}</small>
               </span>
             </div>
@@ -310,14 +310,20 @@ export function AdminFinanceCenter() {
               if (reference.trim()) transfer.mutate({ id: selected.id, bankReference: reference.trim() });
             }}
           >
-            <p className="text-xs font-bold text-blue">{fa ? 'تأیید انتقال بانکی' : 'Confirm bank transfer'}</p>
+            <p className="text-xs font-bold text-blue">
+              {translate(locale, 'adminadminFinanceCenterConfirmBankTransfer')}
+            </p>
             <h2 className="mt-2 text-2xl font-black">{money(selected.amount)}</h2>
             <div className="mt-5 rounded-2xl bg-[#f7f8fc] p-4 text-sm">
-              <p className="font-bold">{fa ? selected.teacher.nameFa : selected.teacher.nameEn}</p>
+              <p className="font-bold">
+                {localized({ fa: selected.teacher.nameFa, en: selected.teacher.nameEn }, locale)}
+              </p>
               <p className="latin mt-2 text-muted">{selected.iban}</p>
             </div>
             <label className="mt-5 block">
-              <span className="mb-2 block text-sm font-bold">{fa ? 'شماره پیگیری بانکی' : 'Bank reference'}</span>
+              <span className="mb-2 block text-sm font-bold">
+                {translate(locale, 'adminadminFinanceCenterBankReference')}
+              </span>
               <input
                 value={reference}
                 onChange={(event) => setReference(event.target.value)}
@@ -328,13 +334,11 @@ export function AdminFinanceCenter() {
               />
             </label>
             <p className="mt-3 text-xs leading-6 text-muted">
-              {fa
-                ? 'پس از تأیید، مبلغ از کیف پول مدرس کسر و درخواست نهایی می‌شود.'
-                : 'After confirmation, the amount is debited from the teacher wallet and the request is finalized.'}
+              {translate(locale, 'adminadminFinanceCenterAfterConfirmationTheAmountIsDebitedFromThe')}
             </p>
             {transfer.isError && (
               <p role="alert" className="mt-3 rounded-xl bg-red-50 p-3 text-xs text-red-700">
-                {apiMessage(transfer.error, fa ? 'ثبت انتقال ناموفق بود.' : 'Transfer failed.')}
+                {apiMessage(transfer.error, translate(locale, 'adminadminFinanceCenterTransferFailed'))}
               </p>
             )}
             <div className="mt-5 flex gap-3">
@@ -343,13 +347,15 @@ export function AdminFinanceCenter() {
                 onClick={() => setSelected(null)}
                 className="secondary-button flex-1 justify-center"
               >
-                {fa ? 'انصراف' : 'Cancel'}
+                {translate(locale, 'admincountryManagerCancel')}
               </button>
               <button
                 disabled={!reference.trim() || transfer.isPending}
                 className="primary-button flex-1 justify-center disabled:opacity-50"
               >
-                {transfer.isPending ? (fa ? 'در حال ثبت…' : 'Saving…') : fa ? 'تأیید انتقال' : 'Confirm'}
+                {transfer.isPending
+                  ? translate(locale, 'adminadminFinanceCenterSaving')
+                  : translate(locale, 'adminadminFinanceCenterConfirm')}
               </button>
             </div>
           </form>
@@ -404,7 +410,11 @@ function WithdrawalStatus({ status, fa }: { status: string; fa: boolean }) {
     REJECTED: ['ردشده', 'bg-red-50 text-red-700'],
   };
   const item = map[status] ?? [status, 'status-info'];
-  return <span className={`status-pill ${item[1]}`}>{fa ? item[0] : status.toLowerCase().replaceAll('_', ' ')}</span>;
+  return (
+    <span className={`status-pill ${item[1]}`}>
+      {localized({ fa: item[0], en: status.toLowerCase().replaceAll('_', ' ') }, fa)}
+    </span>
+  );
 }
 
 function PaymentStatus({ status, fa }: { status: string; fa: boolean }) {
@@ -413,15 +423,20 @@ function PaymentStatus({ status, fa }: { status: string; fa: boolean }) {
     <span
       className={`status-pill ${success ? 'status-success' : status === 'PENDING' ? 'status-warning' : 'bg-red-50 text-red-700'}`}
     >
-      {fa
-        ? ({
-            PAID: 'پرداخت‌شده',
-            PENDING: 'در انتظار',
-            FAILED: 'ناموفق',
-            REFUNDED: 'بازپرداخت‌شده',
-            PARTIALLY_REFUNDED: 'بازپرداخت جزئی',
-          }[status] ?? status)
-        : status.toLowerCase().replaceAll('_', ' ')}
+      {localized(
+        {
+          fa:
+            {
+              PAID: 'پرداخت‌شده',
+              PENDING: 'در انتظار',
+              FAILED: 'ناموفق',
+              REFUNDED: 'بازپرداخت‌شده',
+              PARTIALLY_REFUNDED: 'بازپرداخت جزئی',
+            }[status] ?? status,
+          en: status.toLowerCase().replaceAll('_', ' '),
+        },
+        fa,
+      )}
     </span>
   );
 }

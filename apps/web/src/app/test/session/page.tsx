@@ -6,7 +6,7 @@ import { Flag, WifiOff } from 'lucide-react';
 import { api, apiMessage } from '@/lib/api';
 import { AudioRecorder } from '@/features/tests/components/audio-recorder';
 import { useTranslations } from '@/components/shared/locale-provider';
-import { localePath } from '@/lib/i18n';
+import { localePath, localized, isDefaultLocale, translate } from '@/lib/i18n';
 type Answer = {
   value?: unknown;
   textValue?: string;
@@ -31,7 +31,7 @@ export default function TestSession() {
     router = useRouter(),
     qc = useQueryClient(),
     { locale } = useTranslations(),
-    fa = locale === 'fa',
+    fa = isDefaultLocale(locale),
     p = (href: string) => localePath(href, locale),
     attempt = useQuery({
       queryKey: ['attempt', id],
@@ -120,14 +120,7 @@ export default function TestSession() {
     },
     onSuccess: async (result) => {
       if (result.finished) {
-        if (
-          confirm(
-            fa
-              ? 'همه بخش‌ها قفل شدند. آزمون برای بررسی ارسال شود؟'
-              : 'All sections are locked. Submit the test for review?',
-          )
-        )
-          submit.mutate();
+        if (confirm(translate(locale, 'testsessionAllSectionsAreLockedSubmitTheTestFor'))) submit.mutate();
       } else await qc.invalidateQueries({ queryKey: ['attempt', id] });
     },
   });
@@ -135,7 +128,7 @@ export default function TestSession() {
   if (attempt.isError || !section)
     return (
       <main className="grid min-h-screen place-items-center">
-        <p role="alert">{fa ? 'بازیابی آزمون ناموفق بود.' : 'Could not restore the test.'}</p>
+        <p role="alert">{translate(locale, 'testsessionCouldNotRestoreTheTest')}</p>
       </main>
     );
   return (
@@ -145,16 +138,10 @@ export default function TestSession() {
         <div className="flex gap-5">
           <span>
             {save.isPending
-              ? fa
-                ? 'در حال ذخیره…'
-                : 'Saving…'
+              ? translate(locale, 'teacherteacherAvailabilityManagerSaving')
               : save.isError
-                ? fa
-                  ? 'ذخیره ناموفق'
-                  : 'Save failed'
-                : fa
-                  ? 'ذخیره شد'
-                  : 'Saved'}
+                ? translate(locale, 'testsessionSaveFailed')
+                : translate(locale, 'testsessionSaved')}
           </span>
           <span className="latin">
             {Math.floor(remaining / 60)}:{String(remaining % 60).padStart(2, '0')}
@@ -164,7 +151,7 @@ export default function TestSession() {
       {!online && (
         <div className="flex justify-center gap-2 bg-amber-100 p-3">
           <WifiOff />
-          {fa ? 'آفلاین هستید؛ پس از اتصال دوباره ذخیره می‌شود.' : 'Offline — edits will retry after reconnection.'}
+          {translate(locale, 'testsessionOfflineEditsWillRetryAfterReconnection')}
         </div>
       )}
       <div className="mx-auto max-w-4xl p-6 md:p-12">
@@ -172,12 +159,8 @@ export default function TestSession() {
           <h1 className="latin text-2xl font-bold">{section.skill}</h1>
           <span className="text-sm text-muted">
             {isRevision
-              ? fa
-                ? 'فقط پاسخ‌هایی که نیازمند اصلاح هستند قابل ویرایش‌اند.'
-                : 'Only answers marked as needing revision can be edited.'
-              : fa
-                ? 'بخش‌های قبلی پس از ثبت قابل تغییر نیستند.'
-                : 'Submitted sections cannot be edited.'}
+              ? translate(locale, 'testsessionOnlyAnswersMarkedAsNeedingRevisionCanBe')
+              : translate(locale, 'testsessionSubmittedSectionsCannotBeEdited')}
           </span>
         </div>
         <div className="mt-6 grid gap-5">
@@ -206,12 +189,8 @@ export default function TestSession() {
             className="brand-gradient mt-8 rounded-xl px-7 py-4 font-bold text-white disabled:opacity-50"
           >
             {submitRevision.isPending
-              ? fa
-                ? 'در حال ارسال اصلاحات…'
-                : 'Submitting revisions…'
-              : fa
-                ? 'ارسال پاسخ‌های اصلاح‌شده'
-                : 'Submit revised answers'}
+              ? translate(locale, 'testsessionSubmittingRevisions')
+              : translate(locale, 'testsessionSubmitRevisedAnswers')}
           </button>
         ) : (
           <button
@@ -220,21 +199,15 @@ export default function TestSession() {
             className="brand-gradient mt-8 rounded-xl px-7 py-4 font-bold text-white disabled:opacity-50"
           >
             {sectionSubmit.isPending
-              ? fa
-                ? 'در حال ذخیره و قفل‌کردن…'
-                : 'Saving and locking…'
-              : fa
-                ? 'ثبت و قفل‌کردن این بخش'
-                : 'Submit and lock this section'}
+              ? translate(locale, 'testsessionSavingAndLocking')
+              : translate(locale, 'testsessionSubmitAndLockThisSection')}
           </button>
         )}
         {(sectionSubmit.isError || submit.isError || submitRevision.isError) && (
           <p role="alert" className="mt-4 text-red-700">
             {apiMessage(
               sectionSubmit.error ?? submit.error ?? submitRevision.error,
-              fa
-                ? 'ثبت پاسخ ناموفق بود؛ خطاهای فرم را اصلاح و دوباره تلاش کنید.'
-                : 'Could not submit the answer. Correct the form errors and try again.',
+              translate(locale, 'testsessionCouldNotSubmitTheAnswerCorrectTheForm'),
             )}
           </p>
         )}
@@ -255,18 +228,20 @@ function QuestionView({
   saveAudio: (fileId: string) => Promise<void>;
   fa: boolean;
 }) {
-  const choices = Array.isArray(q.choices) ? q.choices : ((fa ? q.choices?.fa : q.choices?.en) ?? []),
-    prompt = (fa ? q.prompt.fa : q.prompt.en) ?? q.prompt.fa ?? q.prompt.en;
+  const choices = Array.isArray(q.choices)
+      ? q.choices
+      : (localized({ fa: q.choices?.fa, en: q.choices?.en }, fa) ?? []),
+    prompt = localized({ fa: q.prompt.fa, en: q.prompt.en }, fa) ?? q.prompt.fa ?? q.prompt.en;
   return (
     <article className="rounded-3xl bg-white p-7">
       <div className="flex justify-between">
         <p className="font-bold">
-          {fa ? 'سؤال' : 'Question'} {q.order}
+          {translate(fa, 'testsessionQuestion')} {q.order}
         </p>
         <button
           type="button"
           onClick={() => setAnswer({ flagged: !answer?.flagged })}
-          aria-label={fa ? 'علامت‌گذاری' : 'Flag'}
+          aria-label={translate(fa, 'testsessionFlag')}
         >
           <Flag fill={answer?.flagged ? '#a78bfa' : 'none'} />
         </button>
@@ -274,8 +249,8 @@ function QuestionView({
       <p className="mt-5">{prompt}</p>
       {answer?.reviewStatus === 'NEEDS_REVISION' && (answer.feedbackFa || answer.feedbackEn) && (
         <div className="mt-4 rounded-xl bg-amber-50 p-4 text-sm leading-7 text-amber-900">
-          <strong className="block">{fa ? 'بازخورد ارزیاب' : 'Examiner feedback'}</strong>
-          {(fa ? answer.feedbackFa : answer.feedbackEn) ?? answer.feedbackFa ?? answer.feedbackEn}
+          <strong className="block">{translate(fa, 'testsessionExaminerFeedback')}</strong>
+          {localized({ fa: answer.feedbackFa, en: answer.feedbackEn }, fa) ?? answer.feedbackFa ?? answer.feedbackEn}
         </div>
       )}
       {['single_choice', 'true_false'].includes(q.type) ? (
@@ -315,13 +290,13 @@ function QuestionView({
       ) : (
         <div>
           <textarea
-            aria-label={`${fa ? 'پاسخ' : 'Answer'} ${q.order}`}
+            aria-label={`${translate(fa, 'testsessionAnswer')} ${q.order}`}
             value={answer?.textValue ?? ''}
             onChange={(e) => setAnswer({ textValue: e.target.value })}
             className="mt-5 min-h-52 w-full rounded-2xl border hairline p-4"
           />
           <p className="mt-2 text-xs text-muted">
-            {(answer?.textValue ?? '').trim().split(/\s+/).filter(Boolean).length} {fa ? 'کلمه' : 'words'}
+            {(answer?.textValue ?? '').trim().split(/\s+/).filter(Boolean).length} {translate(fa, 'testsessionWords')}
           </p>
         </div>
       )}

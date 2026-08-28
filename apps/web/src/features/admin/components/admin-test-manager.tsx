@@ -1,5 +1,6 @@
 'use client';
 
+import { localized, isDefaultLocale, translate } from '@/lib/i18n';
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { BookOpen, ChevronDown, ChevronUp, Plus, Trash2 } from 'lucide-react';
@@ -22,7 +23,7 @@ const value = (form: FormData, key: string) => String(form.get(key) ?? '').trim(
 
 export function AdminTestManager() {
   const { locale } = useTranslations(),
-    fa = locale === 'fa',
+    fa = isDefaultLocale(locale),
     qc = useQueryClient(),
     [selected, setSelected] = useState<string>(),
     [expanded, setExpanded] = useState<string>();
@@ -39,24 +40,20 @@ export function AdminTestManager() {
     <p className="mt-3 rounded-xl bg-red-50 p-3 text-sm text-red-700">
       {mutation.error instanceof ApiError
         ? mutation.error.message
-        : fa
-          ? 'عملیات ناموفق بود.'
-          : 'The operation failed.'}
+        : translate(locale, 'commercepricingManagerTheOperationFailed')}
     </p>
   ) : mutation.isSuccess ? (
     <p className="mt-3 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-700">
-      {fa ? 'تغییرات ذخیره شد.' : 'Changes saved.'}
+      {translate(locale, 'adminadminTestManagerChangesSaved')}
     </p>
   ) : null;
   return (
     <section>
       <header className="mb-7">
-        <p className="text-sm font-bold text-purple">{fa ? 'ساخت ساده آزمون' : 'Simple test builder'}</p>
-        <h1 className="mt-2 text-3xl font-black">{fa ? 'آزمون‌ها و سؤال‌ها' : 'Tests & questions'}</h1>
+        <p className="text-sm font-bold text-purple">{translate(locale, 'adminadminTestManagerSimpleTestBuilder')}</p>
+        <h1 className="mt-2 text-3xl font-black">{translate(locale, 'adminadminTestManagerTestsQuestions')}</h1>
         <p className="mt-2 text-sm text-muted">
-          {fa
-            ? 'آزمون را بسازید، یک مهارت را باز کنید و سؤال‌ها را یکی‌یکی وارد کنید. چهار بخش استاندارد خودکار ساخته می‌شوند.'
-            : 'Create a test, open a skill and add questions one at a time. Four standard sections are created automatically.'}
+          {translate(locale, 'adminadminTestManagerCreateATestOpenASkillAndAdd')}
         </p>
       </header>
       <div className="grid gap-6 xl:grid-cols-[340px_1fr]">
@@ -80,12 +77,10 @@ export function AdminTestManager() {
           >
             <h2 className="flex items-center gap-2 font-black">
               <Plus size={18} />
-              {fa ? 'آزمون جدید' : 'New test'}
+              {translate(locale, 'adminadminTestManagerNewTest')}
             </h2>
             <p className="mt-2 text-xs leading-6 text-muted">
-              {fa
-                ? 'فقط عنوان را وارد کنید؛ ساختار آزمون آماده می‌شود.'
-                : 'Enter the titles and the structure will be ready.'}
+              {translate(locale, 'adminadminTestManagerEnterTheTitlesAndTheStructureWillBe')}
             </p>
             <div className="mt-4 grid gap-3">
               <input className={input} name="titleFa" placeholder="عنوان فارسی" required />
@@ -96,16 +91,18 @@ export function AdminTestManager() {
                 type="number"
                 min="1"
                 defaultValue="164"
-                aria-label={fa ? 'زمان آزمون به دقیقه' : 'Duration in minutes'}
+                aria-label={translate(locale, 'adminadminTestManagerDurationInMinutes')}
               />
               <button className="brand-gradient rounded-xl py-3 font-black text-white" disabled={mutation.isPending}>
-                {fa ? 'ساخت آزمون' : 'Create test'}
+                {translate(locale, 'adminadminTestManagerCreateTest')}
               </button>
             </div>
             {message}
           </form>
           <div className="panel-card overflow-hidden p-2">
-            <p className="px-3 py-3 text-xs font-bold text-muted">{fa ? 'آزمون‌های موجود' : 'Existing tests'}</p>
+            <p className="px-3 py-3 text-xs font-bold text-muted">
+              {translate(locale, 'adminadminTestManagerExistingTests')}
+            </p>
             {query.isLoading ? (
               <div className="skeleton h-24 rounded-xl" />
             ) : tests.length ? (
@@ -115,21 +112,23 @@ export function AdminTestManager() {
                   onClick={() => setSelected(test.id)}
                   className={`mb-1 w-full rounded-xl p-3 text-start ${active?.id === test.id ? 'bg-lavender text-purple' : 'hover:bg-[#f6f7fb]'}`}
                 >
-                  <strong className="block text-sm">{fa ? test.titleFa : test.titleEn}</strong>
+                  <strong className="block text-sm">{localized({ fa: test.titleFa, en: test.titleEn }, locale)}</strong>
                   <small className="mt-1 flex items-center justify-between text-muted">
                     <span>
                       {test.sections.reduce((sum, section) => sum + section.questions.length, 0)}{' '}
-                      {fa ? 'سؤال' : 'questions'}
+                      {translate(locale, 'adminadminTestManagerQuestions')}
                     </span>
                     <span className={test.published ? 'text-emerald-600' : 'text-orange-500'}>
-                      {test.published ? (fa ? 'منتشرشده' : 'Published') : fa ? 'پیش‌نویس' : 'Draft'}
+                      {test.published
+                        ? translate(locale, 'adminadminTestManagerPublished')
+                        : translate(locale, 'adminadminTestManagerDraft')}
                     </span>
                   </small>
                 </button>
               ))
             ) : (
               <p className="p-5 text-center text-sm text-muted">
-                {fa ? 'هنوز آزمونی ساخته نشده است.' : 'No tests yet.'}
+                {translate(locale, 'adminadminTestManagerNoTestsYet')}
               </p>
             )}
           </div>
@@ -140,7 +139,9 @@ export function AdminTestManager() {
               <article className="panel-card p-5 md:p-6">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
-                    <h2 className="text-2xl font-black">{fa ? active.titleFa : active.titleEn}</h2>
+                    <h2 className="text-2xl font-black">
+                      {localized({ fa: active.titleFa, en: active.titleEn }, locale)}
+                    </h2>
                     <p className="latin mt-1 text-sm text-muted">/{active.slug}</p>
                   </div>
                   <div className="flex gap-2">
@@ -155,12 +156,14 @@ export function AdminTestManager() {
                       }
                       className={`rounded-xl px-4 py-2.5 text-sm font-black ${active.published ? 'bg-orange-50 text-orange-600' : 'bg-emerald-50 text-emerald-700'}`}
                     >
-                      {active.published ? (fa ? 'لغو انتشار' : 'Unpublish') : fa ? 'انتشار آزمون' : 'Publish'}
+                      {active.published
+                        ? translate(locale, 'adminadminTestManagerUnpublish')
+                        : translate(locale, 'adminadminTestManagerPublish')}
                     </button>
                     <button
-                      aria-label={fa ? 'حذف آزمون' : 'Delete test'}
+                      aria-label={translate(locale, 'adminadminTestManagerDeleteTest')}
                       onClick={() =>
-                        confirm(fa ? 'آزمون حذف شود؟' : 'Delete this test?') &&
+                        confirm(translate(locale, 'adminadminTestManagerDeleteThisTest')) &&
                         mutation.mutate(() => api(`/admin/tests/${active.id}`, { method: 'DELETE' }))
                       }
                       className="grid size-10 place-items-center rounded-xl bg-red-50 text-red-600"
@@ -186,7 +189,7 @@ export function AdminTestManager() {
             <div className="panel-card grid min-h-80 place-items-center p-8 text-center">
               <div>
                 <BookOpen className="mx-auto text-purple" size={42} />
-                <p className="mt-4 text-muted">{fa ? 'یک آزمون بسازید یا انتخاب کنید.' : 'Create or select a test.'}</p>
+                <p className="mt-4 text-muted">{translate(locale, 'adminadminTestManagerCreateOrSelectATest')}</p>
               </div>
             </div>
           )}
@@ -209,6 +212,7 @@ function SectionCard({
   mutate: (task: () => Promise<unknown>) => void;
   fa: boolean;
 }) {
+  const { locale } = useTranslations();
   return (
     <article className="panel-card overflow-hidden">
       <button onClick={toggle} className="flex w-full items-center gap-4 p-5 text-start">
@@ -231,9 +235,9 @@ function SectionCard({
               <thead className="bg-[#f7f8fc] text-muted">
                 <tr>
                   <th className="p-3 text-start">#</th>
-                  <th className="p-3 text-start">{fa ? 'سؤال فارسی' : 'English question'}</th>
-                  <th className="p-3 text-start">{fa ? 'نوع' : 'Type'}</th>
-                  <th className="p-3 text-start">{fa ? 'امتیاز' : 'Points'}</th>
+                  <th className="p-3 text-start">{translate(fa, 'adminadminTestManagerEnglishQuestion')}</th>
+                  <th className="p-3 text-start">{translate(fa, 'adminadminTestManagerType')}</th>
+                  <th className="p-3 text-start">{translate(fa, 'adminadminTestManagerPoints')}</th>
                   <th className="p-3" />
                 </tr>
               </thead>
@@ -242,18 +246,20 @@ function SectionCard({
                   <tr key={question.id}>
                     <td className="p-3 latin">{question.order}</td>
                     <td className="p-3">
-                      <strong className="block">{fa ? question.prompt.fa : question.prompt.en}</strong>
-                      <small dir={fa ? 'ltr' : 'rtl'} className="mt-1 block text-muted">
-                        {fa ? question.prompt.en : question.prompt.fa}
+                      <strong className="block">
+                        {localized({ fa: question.prompt.fa, en: question.prompt.en }, locale)}
+                      </strong>
+                      <small dir={translate(locale, 'adminadminTestManagerRtl')} className="mt-1 block text-muted">
+                        {localized({ fa: question.prompt.en, en: question.prompt.fa }, locale)}
                       </small>
                     </td>
                     <td className="p-3 latin">{question.type}</td>
                     <td className="p-3 latin">{question.points}</td>
                     <td className="p-3 text-end">
                       <button
-                        aria-label={fa ? 'حذف سؤال' : 'Delete question'}
+                        aria-label={translate(locale, 'adminadminTestManagerDeleteQuestion')}
                         onClick={() =>
-                          confirm(fa ? 'سؤال حذف شود؟' : 'Delete question?') &&
+                          confirm(translate(locale, 'adminadminTestManagerDeleteQuestion2')) &&
                           mutate(() => api(`/admin/tests/questions/${question.id}`, { method: 'DELETE' }))
                         }
                         className="text-red-500"
@@ -266,7 +272,7 @@ function SectionCard({
                 {!section.questions.length && (
                   <tr>
                     <td colSpan={5} className="p-6 text-center text-muted">
-                      {fa ? 'سؤالی ثبت نشده است.' : 'No questions yet.'}
+                      {translate(fa, 'adminadminTestManagerNoQuestionsYet')}
                     </td>
                   </tr>
                 )}
@@ -330,40 +336,38 @@ function QuestionCreator({
     >
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h4 className="font-black">{fa ? 'ثبت سؤال جدید' : 'Add a new question'}</h4>
+          <h4 className="font-black">{translate(fa, 'adminadminTestManagerAddANewQuestion')}</h4>
           <p className="mt-1 text-xs text-muted">
-            {fa
-              ? 'هر بار یک سؤال ثبت می‌شود و ترتیب خودکار است.'
-              : 'Questions are added one at a time and ordered automatically.'}
+            {translate(fa, 'adminadminTestManagerQuestionsAreAddedOneAtATimeAnd')}
           </p>
         </div>
         <span className="rounded-full bg-white px-3 py-1 text-xs text-purple">{section.questions.length + 1}</span>
       </div>
       <div className="mt-4 grid gap-3 md:grid-cols-2">
         <label>
-          <span className="mb-2 block text-xs font-bold">{fa ? 'نوع سؤال' : 'Question type'}</span>
+          <span className="mb-2 block text-xs font-bold">{translate(fa, 'adminadminTestManagerQuestionType')}</span>
           <select value={type} onChange={(event) => setType(event.target.value)} className={input}>
-            <option value="single_choice">{fa ? 'تک‌گزینه‌ای' : 'Single choice'}</option>
-            <option value="multiple_choice">{fa ? 'چندگزینه‌ای' : 'Multiple choice'}</option>
-            <option value="true_false">{fa ? 'درست / نادرست' : 'True / false'}</option>
-            <option value="short_text">{fa ? 'پاسخ کوتاه' : 'Short answer'}</option>
-            <option value="essay">{fa ? 'پاسخ تشریحی' : 'Essay'}</option>
-            <option value="recording">{fa ? 'پاسخ صوتی' : 'Voice answer'}</option>
+            <option value="single_choice">{translate(fa, 'adminadminTestManagerSingleChoice')}</option>
+            <option value="multiple_choice">{translate(fa, 'adminadminTestManagerMultipleChoice')}</option>
+            <option value="true_false">{translate(fa, 'adminadminTestManagerTrueFalse')}</option>
+            <option value="short_text">{translate(fa, 'adminadminTestManagerShortAnswer')}</option>
+            <option value="essay">{translate(fa, 'adminadminTestManagerEssay')}</option>
+            <option value="recording">{translate(fa, 'adminadminTestManagerVoiceAnswer')}</option>
           </select>
         </label>
         <div />
-        <TextArea name="promptFa" label={fa ? 'متن فارسی سؤال' : 'Persian question'} required />
-        <TextArea name="promptEn" label={fa ? 'متن انگلیسی سؤال' : 'English question'} dir="ltr" required />
+        <TextArea name="promptFa" label={translate(fa, 'adminadminTestManagerPersianQuestion')} required />
+        <TextArea name="promptEn" label={translate(fa, 'adminadminTestManagerEnglishQuestion2')} dir="ltr" required />
         {objective && (
           <>
             <TextArea
               name="choicesFa"
-              label={fa ? 'گزینه‌های فارسی؛ هر گزینه یک خط' : 'Persian choices; one per line'}
+              label={translate(fa, 'adminadminTestManagerPersianChoicesOnePerLine')}
               required
             />
             <TextArea
               name="choicesEn"
-              label={fa ? 'گزینه‌های انگلیسی؛ هر گزینه یک خط' : 'English choices; one per line'}
+              label={translate(fa, 'adminadminTestManagerEnglishChoicesOnePerLine')}
               dir="ltr"
               required
             />
@@ -373,17 +377,13 @@ function QuestionCreator({
           <label className="md:col-span-2">
             <span className="mb-2 block text-xs font-bold">
               {type === 'multiple_choice'
-                ? fa
-                  ? 'شماره گزینه‌های صحیح، مثل ۱،۳'
-                  : 'Correct option numbers, e.g. 1,3'
-                : fa
-                  ? 'شماره گزینه صحیح'
-                  : 'Correct option number'}
+                ? translate(fa, 'adminadminTestManagerCorrectOptionNumbersEG13')
+                : translate(fa, 'adminadminTestManagerCorrectOptionNumber')}
             </span>
             {type === 'true_false' ? (
               <select name="answerKey" className={input} required>
-                <option value="1">{fa ? 'درست' : 'True'}</option>
-                <option value="2">{fa ? 'نادرست' : 'False'}</option>
+                <option value="1">{translate(fa, 'adminadminTestManagerTrue')}</option>
+                <option value="2">{translate(fa, 'adminadminTestManagerFalse')}</option>
               </select>
             ) : (
               <input
@@ -397,7 +397,7 @@ function QuestionCreator({
           </label>
         )}
         <button className="brand-gradient rounded-xl py-3 font-black text-white md:col-span-2">
-          <Plus className="inline" size={17} /> {fa ? 'ثبت این سؤال' : 'Add this question'}
+          <Plus className="inline" size={17} /> {translate(fa, 'adminadminTestManagerAddThisQuestion')}
         </button>
       </div>
     </form>

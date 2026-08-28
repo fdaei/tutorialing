@@ -1,304 +1,35 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import {
-  ArrowLeft,
-  ArrowRight,
-  BarChart3,
-  Check,
-  ClipboardCheck,
-  Headphones,
-  PenTool,
-  Target,
-  Users,
-  Video,
-} from 'lucide-react';
+import { ArrowLeft, BarChart3, BookOpen, CalendarDays, CheckCircle2, GraduationCap, Headphones, MessageSquareQuote, ShieldCheck, Sparkles, Star, Target, Users, Video } from 'lucide-react';
+import { BlogCard, CourseCard, LanguageCard, TeacherMarketCard } from '@/components/marketplace/cards';
 import { Eyebrow, Footer, Header } from '@/components/layout/site';
-import { TeacherCard } from '@/features/teacher/components/teacher-card';
-import { publicApi, type Paginated, type PublicTeacher } from '@/lib/api';
-import { requestLocale } from '@/lib/server-locale';
-import { localePath } from '@/lib/i18n';
+import { marketplaceService } from '@/lib/marketplace-data';
 
 export const dynamic = 'force-dynamic';
 
+const steps = ['تعیین هدف', 'تعیین سطح', 'انتخاب زبان', 'برنامه شخصی', 'تطبیق با مدرس', 'شروع دوره', 'پایش پیشرفت', 'مشاوره تخصصی', 'رسیدن به هدف'];
+const benefits = [[Sparkles, 'تطبیق هوشمند مدرس', 'بر اساس هدف، سطح، بودجه و زمان آزاد شما.'], [Headphones, 'مشاوره تخصصی', 'قبل از شروع، مسیر مناسب را با مشاور آموزشی پیدا کنید.'], [Target, 'برنامه یادگیری شخصی', 'یک برنامه روشن که با ریتم زندگی شما هماهنگ می‌شود.'], [BarChart3, 'پایش و تحلیل پیشرفت', 'گزارش‌های ساده و کاربردی از هر قدم یادگیری.']] as const;
+const faqs = [['چگونه می‌توانم در دوره‌ها ثبت‌نام کنم؟', 'زبان و دوره دلخواه را انتخاب کنید، جزئیات را ببینید و ثبت‌نام را آنلاین کامل کنید.'], ['آیا مدرس‌ها تأیید شده‌اند؟', 'بله، هویت، سابقه و مدارک مدرس‌ها پیش از فعال شدن پروفایل بررسی می‌شود.'], ['کلاس‌ها آنلاین هستند یا حضوری؟', 'اغلب کلاس‌ها آنلاین‌اند؛ برخی مدرس‌ها امکان کلاس حضوری را نیز در پروفایل اعلام می‌کنند.'], ['شرایط لغو یا تغییر زمان کلاس چیست؟', 'تا ۲۴ ساعت پیش از جلسه می‌توانید زمان را بدون جریمه تغییر دهید.']];
+
 export default async function Home() {
-  const locale = await requestLocale(),
-    fa = locale === 'fa',
-    p = (href: string) => localePath(href, locale),
-    Arrow = fa ? ArrowLeft : ArrowRight;
-  let featured: PublicTeacher[] = [],
-    total = 0,
-    unavailable = false;
-  try {
-    const response = await publicApi<Paginated<PublicTeacher>>('/teachers?limit=3&sort=rating', { cache: 'no-store' });
-    featured = response.data;
-    total = response.total;
-  } catch {
-    unavailable = true;
-  }
-  const c = fa
-    ? {
-        eyebrow: 'مسیر هوشمند آیلتس',
-        titleA: 'نمره هدفت اتفاقی نیست؛',
-        titleB: 'با مدرس درست به آن برس.',
-        lead: 'با تعیین سطح دقیق و تطبیق هوشمند، مدرس مناسب هدف، بودجه و زمانت را پیدا کن و با یک برنامه روشن پیش برو.',
-        match: 'مدرس مناسبم را پیدا کن',
-        test: 'شروع تعیین سطح',
-        verified: `${total.toLocaleString('fa-IR')} مدرس تأییدشده`,
-        transparent: 'انتخاب شفاف بر اساس سطح و هدف',
-        personal: 'برنامه یادگیری شخصی',
-        stepsEyebrow: 'مسیر سه‌مرحله‌ای',
-        stepsTitle: 'از شناخت سطح تا شروع کلاس',
-        featured: 'مدرس‌های منتخب',
-        all: 'مشاهده همه مدرس‌ها',
-        offline: 'سرویس مدرس‌ها در دسترس نیست. اتصال API و دیتابیس را بررسی کنید.',
-        none: 'در حال حاضر مدرس تأییدشده‌ای برای نمایش وجود ندارد.',
-        assessmentEyebrow: 'شروع درست',
-        assessmentTitle: 'اول سطح واقعی‌ات را بشناس',
-        assessmentBody: 'با آزمون چهارمهارتی، نقاط قوت و ضعف خودت را ببین و پیشنهاد مدرس دقیق‌تری دریافت کن.',
-        assessmentCta: 'شروع آزمون تعیین سطح',
-        services: 'هر چیزی که برای پیشرفت لازم داری',
-        finalSmall: 'آماده‌ای مسیرت را شروع کنی؟',
-        finalTitle: 'مدرس مناسب، برنامه روشن، پیشرفت واقعی.',
-        finalCta: 'شروع تطبیق هوشمند',
-      }
-    : {
-        eyebrow: 'A smarter IELTS journey',
-        titleA: 'Your target band is not an accident.',
-        titleB: 'Reach it with the right teacher.',
-        lead: 'Assess your level, match with a verified teacher for your goal, budget, and schedule, then move forward with a clear learning plan.',
-        match: 'Find my teacher',
-        test: 'Take the placement test',
-        verified: `${total.toLocaleString('en-US')} verified teachers`,
-        transparent: 'Transparent matching by level and goal',
-        personal: 'A personal learning plan',
-        stepsEyebrow: 'A clear three-step path',
-        stepsTitle: 'From assessment to your first class',
-        featured: 'Featured teachers',
-        all: 'View all teachers',
-        offline: 'The teacher service is unavailable. Check the API and database connection.',
-        none: 'No approved teachers are available right now.',
-        assessmentEyebrow: 'Start with clarity',
-        assessmentTitle: 'Know exactly where you stand',
-        assessmentBody:
-          'Assess all four skills, understand your strengths and gaps, and receive more accurate teacher recommendations.',
-        assessmentCta: 'Start the placement test',
-        services: 'Everything you need to make progress',
-        finalSmall: 'Ready to begin?',
-        finalTitle: 'The right teacher, a clear plan, real progress.',
-        finalCta: 'Start smart matching',
-      };
-  const steps = fa
-    ? [
-        [ClipboardCheck, 'تعیین سطح', 'سطح دقیق شما در چهار مهارت مشخص می‌شود.'],
-        [Users, 'تطبیق هوشمند', 'مدرس‌های تأییدشده متناسب با نیازتان رتبه‌بندی می‌شوند.'],
-        [Headphones, 'جلسه آزمایشی', 'قبل از انتخاب نهایی، مدرس و روش تدریس را ارزیابی کنید.'],
-      ]
-    : [
-        [ClipboardCheck, 'Assess your level', 'Measure your current ability across all four IELTS skills.'],
-        [Users, 'Smart matching', 'Rank verified teachers against your goals and preferences.'],
-        [Headphones, 'Book a trial', 'Meet the teacher and evaluate the teaching fit before committing.'],
-      ];
-  const services = fa
-    ? [
-        [Target, 'برنامه شخصی', 'برنامه متناسب با هدف، زمان و نقاط ضعف شما.'],
-        [Video, 'کلاس آنلاین', 'جلسه زنده با زمان‌بندی منعطف و لینک امن.'],
-        [BarChart3, 'ارزیابی چهار مهارت', 'نتیجه و بازخورد Reading، Listening، Writing و Speaking.'],
-        [PenTool, 'تکلیف و بازخورد', 'تکلیف، ارسال پاسخ و بازخورد مدرس در یک مسیر منظم.'],
-      ]
-    : [
-        [Target, 'Personal plan', 'A plan built around your goal, time, and weak skills.'],
-        [Video, 'Live classes', 'Secure live sessions with flexible scheduling.'],
-        [BarChart3, 'Four-skill assessment', 'Results and feedback for every IELTS skill.'],
-        [PenTool, 'Assignments & feedback', 'Submit work and receive teacher feedback in one place.'],
-      ];
-  return (
-    <>
-      <Header />
-      <main className="overflow-hidden bg-white">
-        <section className="mx-auto max-w-[1380px] px-5 pb-20 pt-12 lg:px-8 lg:pb-24 lg:pt-20">
-          <div className="grid items-center gap-12 lg:grid-cols-2">
-            <div className="reveal">
-              <Eyebrow>{c.eyebrow}</Eyebrow>
-              <h1 className="max-w-3xl text-5xl font-black leading-[1.22] tracking-[-.045em] md:text-6xl xl:text-[68px]">
-                {c.titleA}
-                <br />
-                <span className="brand-text">{c.titleB}</span>
-              </h1>
-              <p className="mt-7 max-w-2xl text-lg leading-9 text-muted">{c.lead}</p>
-              <div className="mt-9 flex flex-wrap gap-3">
-                <Link
-                  href={p('/matching')}
-                  className="brand-gradient brand-glow flex items-center gap-3 rounded-xl px-7 py-4 font-black text-white"
-                >
-                  {c.match}
-                  <Arrow size={19} />
-                </Link>
-                <Link
-                  href={p('/placement')}
-                  className="flex items-center gap-3 rounded-xl border border-[#cfd5e5] bg-white px-7 py-4 font-black hover:border-purple"
-                >
-                  {c.test}
-                  <PenTool size={18} />
-                </Link>
-              </div>
-              <div className="mt-10 grid max-w-2xl gap-3 sm:grid-cols-3">
-                <span className="rounded-xl bg-[#f7f8fc] p-4 text-sm font-bold">
-                  <Check className="mb-2 text-blue" size={18} />
-                  {c.verified}
-                </span>
-                <span className="rounded-xl bg-[#f7f8fc] p-4 text-sm font-bold">
-                  <Check className="mb-2 text-purple" size={18} />
-                  {c.transparent}
-                </span>
-                <span className="rounded-xl bg-[#f7f8fc] p-4 text-sm font-bold">
-                  <Check className="mb-2 text-violet" size={18} />
-                  {c.personal}
-                </span>
-              </div>
-            </div>
-            <div className="relative min-h-[520px] reveal-delay">
-              <div className="absolute inset-10 rounded-full border-2 border-blue/25" />
-              <div className="absolute inset-20 rounded-full border border-purple/20" />
-              <div className="absolute inset-x-10 bottom-0 top-16 overflow-hidden rounded-[42%_42%_20%_20%] bg-gradient-to-br from-[#eef3ff] to-[#eee8ff]">
-                <Image
-                  src="/images/lingospeak-student.png"
-                  alt={fa ? 'زبان‌آموز در حال مطالعه' : 'Student studying English'}
-                  fill
-                  priority
-                  sizes="(min-width: 1024px) 50vw, 100vw"
-                  className="object-cover object-[42%_center]"
-                />
-              </div>
-              <div className="float-slow panel-card absolute right-0 top-8 w-40 p-5">
-                <p className="text-xs text-muted">{fa ? 'ارزیابی سطح' : 'Level assessment'}</p>
-                <strong className="mt-2 block text-xl">{fa ? 'چهار مهارت' : 'Four skills'}</strong>
-              </div>
-              <div className="float-delay panel-card absolute left-0 top-32 w-44 p-5">
-                <p className="text-xs text-muted">{fa ? 'پیشنهاد هوشمند' : 'Smart recommendation'}</p>
-                <strong className="mt-2 block text-xl">{fa ? 'مدرس مناسب' : 'The right teacher'}</strong>
-              </div>
-              <div className="float-slow panel-card absolute bottom-5 right-3 w-48 p-5">
-                <p className="text-xs text-muted">{fa ? 'مسیر یادگیری' : 'Learning journey'}</p>
-                <strong className="mt-2 block">{fa ? 'برنامه قابل پیگیری' : 'Trackable plan'}</strong>
-                <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#edf0f6]">
-                  <span className="block h-full w-[68%] rounded-full bg-blue" />
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-        <section className="bg-canvas py-24">
-          <div className="mx-auto max-w-[1380px] px-5 lg:px-8">
-            <div className="text-center">
-              <p className="text-sm font-bold text-purple">{c.stepsEyebrow}</p>
-              <h2 className="mt-3 text-4xl font-black">{c.stepsTitle}</h2>
-            </div>
-            <div className="mt-12 grid gap-5 md:grid-cols-3">
-              {steps.map(([Icon, title, body], i) => {
-                const I = Icon as typeof ClipboardCheck;
-                return (
-                  <article key={String(title)} className="surface-card lift relative p-8">
-                    <span className="absolute end-6 top-6 grid size-10 place-items-center rounded-full bg-lavender font-black text-purple">
-                      {i + 1}
-                    </span>
-                    <span className="grid size-14 place-items-center rounded-2xl bg-[#f0f3ff] text-blue">
-                      <I size={26} />
-                    </span>
-                    <h3 className="mt-9 text-xl font-black">{String(title)}</h3>
-                    <p className="mt-4 text-sm leading-7 text-muted">{String(body)}</p>
-                  </article>
-                );
-              })}
-            </div>
-          </div>
-        </section>
-        <section className="py-24">
-          <div className="mx-auto max-w-[1380px] px-5 lg:px-8">
-            <div className="flex items-end justify-between gap-4">
-              <h2 className="text-4xl font-black">{c.featured}</h2>
-              <Link href={p('/teachers')} className="flex items-center gap-2 text-sm font-bold text-blue">
-                {c.all}
-                <Arrow size={17} />
-              </Link>
-            </div>
-            {unavailable ? (
-              <div role="alert" className="mt-10 rounded-3xl border border-red-100 bg-red-50 p-6 text-red-800">
-                {c.offline}
-              </div>
-            ) : featured.length ? (
-              <div className="mt-10 grid gap-6 lg:grid-cols-3">
-                {featured.map((t) => (
-                  <TeacherCard key={t.id} teacher={t} />
-                ))}
-              </div>
-            ) : (
-              <div className="mt-10 rounded-3xl border border-dashed hairline p-10 text-center text-muted">
-                {c.none}
-              </div>
-            )}
-          </div>
-        </section>
-        <section className="mx-auto max-w-[1380px] px-5 pb-24 lg:px-8">
-          <div className="soft-gradient grid items-center gap-8 overflow-hidden rounded-[30px] border border-violet/15 p-8 md:grid-cols-[.7fr_1.3fr] md:p-12">
-            <div className="relative mx-auto h-52 w-64">
-              <span className="absolute left-8 top-4 grid size-40 place-items-center rounded-[35px] bg-white text-blue shadow-soft">
-                <ClipboardCheck size={78} />
-              </span>
-              <span className="absolute bottom-1 right-2 grid size-20 place-items-center rounded-full bg-white text-purple shadow-soft">
-                <Check size={36} />
-              </span>
-            </div>
-            <div>
-              <p className="text-sm font-bold text-purple">{c.assessmentEyebrow}</p>
-              <h2 className="mt-3 text-4xl font-black">{c.assessmentTitle}</h2>
-              <p className="mt-4 max-w-2xl leading-8 text-muted">{c.assessmentBody}</p>
-              <Link
-                href={p('/placement')}
-                className="brand-gradient mt-7 inline-flex items-center gap-3 rounded-xl px-7 py-4 font-black text-white"
-              >
-                {c.assessmentCta}
-                <Arrow size={18} />
-              </Link>
-            </div>
-          </div>
-        </section>
-        <section className="bg-canvas py-24">
-          <div className="mx-auto max-w-[1380px] px-5 lg:px-8">
-            <h2 className="text-4xl font-black">{c.services}</h2>
-            <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-              {services.map(([Icon, title, body]) => {
-                const I = Icon as typeof Target;
-                return (
-                  <article className="surface-card lift p-7" key={String(title)}>
-                    <I className="text-purple" />
-                    <h3 className="mt-6 font-black">{String(title)}</h3>
-                    <p className="mt-3 text-sm leading-7 text-muted">{String(body)}</p>
-                  </article>
-                );
-              })}
-            </div>
-          </div>
-        </section>
-        <section className="mx-auto max-w-[1380px] px-5 py-24 lg:px-8">
-          <div className="relative overflow-hidden rounded-[28px] bg-navy p-9 text-white md:p-14">
-            <div className="absolute inset-0 opacity-20 [background-image:radial-gradient(circle_at_20%_30%,#7654f6_0,transparent_35%),radial-gradient(circle_at_80%_70%,#315efb_0,transparent_30%)]" />
-            <div className="relative flex flex-col items-start justify-between gap-8 md:flex-row md:items-center">
-              <div>
-                <p className="text-sm text-white/60">{c.finalSmall}</p>
-                <h2 className="mt-3 text-4xl font-black">{c.finalTitle}</h2>
-              </div>
-              <Link
-                href={p('/matching')}
-                className="brand-gradient brand-glow flex items-center gap-3 rounded-xl px-7 py-4 font-black"
-              >
-                {c.finalCta}
-                <Arrow />
-              </Link>
-            </div>
-          </div>
-        </section>
-      </main>
-      <Footer />
-    </>
-  );
+  const [languages, teachers, courses, posts, statistics] = await Promise.all([marketplaceService.getLanguages(), marketplaceService.getTeachers(), marketplaceService.getCourses(), marketplaceService.getPosts(), marketplaceService.getStatistics()]);
+  const statIcons = { students: Users, teachers: GraduationCap, rating: Star, classes: BookOpen };
+  return <><Header/><main className="overflow-hidden bg-white">
+    <section className="hero-wash"><div className="page-shell grid items-center gap-12 pb-14 pt-10 lg:grid-cols-[1.05fr_.95fr] lg:pb-20 lg:pt-16">
+      <div className="reveal"><Eyebrow>یادگیری زبان برای همه</Eyebrow><h1 className="max-w-2xl text-[2.55rem] font-black leading-[1.38] tracking-[-.045em] md:text-6xl">مسیر کامل یادگیری زبان،<br/>تا رسیدن به <span className="brand-text">هدف شما</span></h1><p className="mt-6 max-w-xl text-base leading-8 text-muted md:text-lg">از تعیین سطح تا پیشرفت واقعی؛ با دوره‌های آنلاین، مدرس‌های متخصص و برنامه‌ای که برای زندگی و هدف شما طراحی شده است.</p><div className="mt-8 flex flex-col gap-3 sm:flex-row"><Link href="/languages" className="brand-gradient brand-glow inline-flex min-h-13 items-center justify-center gap-3 rounded-xl px-7 font-black text-white">شروع مسیر یادگیری <ArrowLeft size={19}/></Link><Link href="/courses" className="inline-flex min-h-13 items-center justify-center rounded-xl border border-purple/35 bg-white px-7 font-black text-purple hover:bg-lavender">مشاهده دوره‌ها</Link></div><div className="mt-8 flex flex-wrap gap-x-6 gap-y-3 text-sm font-bold text-muted"><span className="flex items-center gap-2"><ShieldCheck className="text-purple" size={18}/>مدرس‌های تأییدشده</span><span className="flex items-center gap-2"><Video className="text-purple" size={18}/>کلاس آنلاین تعاملی</span><span className="flex items-center gap-2"><CalendarDays className="text-purple" size={18}/>برنامه منعطف</span></div></div>
+      <div className="relative min-h-[470px] reveal-delay lg:min-h-[560px]"><div className="absolute inset-6 overflow-hidden rounded-[36px] bg-gradient-to-br from-indigo-50 to-violet-100 shadow-soft"><Image src="/images/lingospeak-student.png" alt="زبان‌آموز در حال یادگیری زبان با لپ‌تاپ" fill priority sizes="(min-width:1024px) 46vw, 100vw" className="object-cover object-center"/></div><div className="floating-card right-0 top-16"><p>سطح فعلی شما</p><strong>B1 · متوسط</strong><span className="mt-3 block h-1.5 rounded-full bg-indigo-100"><i className="block h-full w-2/3 rounded-full bg-purple"/></span></div><div className="floating-card left-0 top-8"><p>پیشرفت کلی</p><strong className="text-2xl text-purple">۷۲٪</strong></div><div className="floating-card bottom-3 left-4"><p>جلسه بعدی</p><strong>مکالمه فرانسوی</strong><small className="mt-1 block text-muted">شنبه، ساعت ۱۸:۳۰</small></div><div className="floating-card bottom-10 right-0"><p>زبان‌های محبوب</p><strong className="text-xl tracking-[.25em]">🇬🇧 🇩🇪 🇫🇷 🇪🇸</strong></div></div>
+    </div></section>
+    <section className="page-shell -mt-3 relative z-10"><div className="grid overflow-hidden rounded-2xl border hairline bg-white shadow-soft sm:grid-cols-2 lg:grid-cols-4">{statistics.map((stat)=>{const Icon=statIcons[stat.icon];return <div key={stat.label} className="flex items-center gap-4 border-b hairline p-6 last:border-0 sm:border-l lg:border-b-0"><span className="grid size-12 place-items-center rounded-2xl bg-lavender text-purple"><Icon size={23}/></span><div><strong className="latin text-xl">{stat.value}</strong><p className="mt-1 text-xs text-muted">{stat.label}</p></div></div>})}</div></section>
+    <section className="section-space"><div className="page-shell"><div className="section-title"><p>گام‌به‌گام تا تسلط</p><h2>مسیر یادگیری شما، روشن و قابل پیگیری</h2></div><ol className="learning-track">{steps.map((step,i)=><li key={step}><span>{(i+1).toLocaleString('fa-IR')}</span><strong>{step}</strong></li>)}</ol></div></section>
+    <section className="bg-canvas section-space"><div className="page-shell"><div className="section-title"><p>چرا LingoSpeak؟</p><h2>همه‌چیز برای یک انتخاب مطمئن</h2></div><div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">{benefits.map(([Icon,title,body])=><article key={title} className="market-card lift p-6"><span className="grid size-12 place-items-center rounded-2xl bg-lavender text-purple"><Icon size={23}/></span><h3 className="mt-5 font-black">{title}</h3><p className="mt-3 text-sm leading-7 text-muted">{body}</p></article>)}</div></div></section>
+    <section className="section-space"><div className="page-shell"><SectionHeading title="زبان مورد علاقه‌ات را انتخاب کن" href="/languages" link="مشاهده همه زبان‌ها"/><div className="mt-9 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">{languages.map(x=><LanguageCard key={x.slug} language={x}/>)}</div></div></section>
+    <section className="bg-canvas section-space"><div className="page-shell"><SectionHeading title="مدرس‌هایی که با هدف شما هماهنگ‌اند" href="/teachers" link="مشاهده همه مدرس‌ها"/><div className="mt-9 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">{teachers.map(x=><TeacherMarketCard key={x.slug} teacher={x}/>)}</div></div></section>
+    <section className="section-space"><div className="page-shell"><SectionHeading title="دوره‌های پیشنهادی برای شروع" href="/courses" link="مشاهده همه دوره‌ها"/><div className="mt-9 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">{courses.map(x=><CourseCard key={x.slug} course={x}/>)}</div></div></section>
+    <section className="page-shell pb-24"><div className="teach-banner"><div className="relative min-h-64 lg:min-h-80"><Image src="/images/auth/register.png" alt="مدرس حرفه‌ای زبان آماده تدریس" fill sizes="(min-width:1024px) 36vw, 100vw" className="object-contain object-bottom"/></div><div className="py-10 lg:py-14"><p className="text-sm font-bold text-purple">به جمع مدرس‌های ما بپیوندید</p><h2 className="mt-3 text-3xl font-black leading-[1.5] md:text-4xl">مدرس زبان هستید؟<br/><span className="brand-text">شاگردهای جدید منتظر شما هستند</span></h2><div className="mt-6 grid gap-3 text-sm sm:grid-cols-2">{['دسترسی به زبان‌آموزان جدید','تعیین برنامه و ظرفیت کلاس‌ها','مدیریت درآمد و جلسات','ساخت پروفایل حرفه‌ای'].map(x=><span key={x} className="flex items-center gap-2"><CheckCircle2 size={17} className="text-purple"/>{x}</span>)}</div><Link href="/teach/register" className="brand-gradient mt-8 inline-flex min-h-12 items-center rounded-xl px-8 font-black text-white">ثبت‌نام به عنوان مدرس</Link></div></div></section>
+    <section className="bg-canvas section-space"><div className="page-shell"><SectionHeading title="مجله یادگیری زبان" href="/blog" link="مشاهده همه مقالات"/><div className="mt-9 grid gap-5 md:grid-cols-3">{posts.map(x=><BlogCard key={x.slug} post={x}/>)}</div></div></section>
+    <section className="section-space"><div className="page-shell grid gap-10 lg:grid-cols-2"><div><p className="text-sm font-bold text-purple">صدای زبان‌آموزان ما</p><h2 className="mt-3 text-3xl font-black">پیشرفت‌هایی که واقعی‌اند</h2><div className="mt-8 grid gap-4 sm:grid-cols-2">{['کلاس‌ها منظم و برنامه دقیقاً متناسب با زمان من بود. بعد از سه ماه بالاخره بدون ترس صحبت می‌کنم.','تطبیق مدرس واقعاً خوب عمل کرد؛ مدرس من هم تخصص آزمون داشت و هم روش تدریسش با من سازگار بود.'].map((q,i)=><blockquote key={q} className="market-card p-6"><MessageSquareQuote className="text-purple"/><p className="mt-4 text-sm leading-7 text-muted">«{q}»</p><footer className="mt-4 font-black">{i?'غزل صالحی':'الهام نادری'} <span className="mr-2 text-amber-400">★★★★★</span></footer></blockquote>)}</div></div><div><p className="text-sm font-bold text-purple">سؤالات متداول</p><h2 className="mt-3 text-3xl font-black">پاسخ کوتاه به سؤال‌های مهم</h2><div className="mt-8 divide-y overflow-hidden rounded-2xl border hairline bg-white">{faqs.map(([q,a],i)=><details key={q} className="group p-5" open={i===0}><summary className="cursor-pointer list-none font-black">{q}<span className="float-left text-purple group-open:rotate-45">＋</span></summary><p className="mt-3 text-sm leading-7 text-muted">{a}</p></details>)}</div></div></div></section>
+    <section className="page-shell pb-24"><div className="final-cta"><div><p className="text-sm text-white/70">از امروز شروع کنید</p><h2 className="mt-2 text-3xl font-black">یک زبان تازه، یک دنیای تازه</h2></div><div className="flex flex-wrap gap-3"><Link href="/languages" className="rounded-xl bg-white px-6 py-3 font-black text-purple">مشاهده دوره‌ها</Link><Link href="/teachers" className="rounded-xl border border-white/40 px-6 py-3 font-black text-white">پیدا کردن مدرس</Link></div></div></section>
+  </main><Footer/></>;
 }
+
+function SectionHeading({title,href,link}:{title:string;href:string;link:string}){return <div className="flex items-end justify-between gap-4"><h2 className="text-2xl font-black md:text-3xl">{title}</h2><Link href={href} className="flex shrink-0 items-center gap-2 text-sm font-black text-purple">{link}<ArrowLeft size={16}/></Link></div>}

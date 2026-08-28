@@ -15,6 +15,9 @@ export function StudentWallet() {
     invoices = useQuery({ queryKey: ['wallet-invoices'], queryFn: walletService.getInvoices }),
     pay = useMutation({
       mutationFn: () => walletService.topUp({ amount, gateway: 'zarinpal', discountCode: code || undefined }),
+      onSuccess: (result) => {
+        if (result.url) location.href = result.url;
+      },
     });
   return (
     <>

@@ -1,0 +1,4 @@
+import { CourseCard } from '@/components/marketplace/cards';
+import { Footer, Header } from '@/components/layout/site';
+import { marketplaceService } from '@/lib/marketplace-data';
+export default async function CoursesPage(){const courses=await marketplaceService.getCourses();return <><Header/><main className="page-shell section-space"><p className="text-sm font-black text-purple">یادگیری ساختاریافته</p><h1 className="mt-3 text-4xl font-black md:text-5xl">دوره‌های زبان</h1><div className="mt-8 flex flex-wrap gap-2">{['همه دوره‌ها','انگلیسی','آلمانی','فرانسوی','اسپانیایی'].map((x,i)=><span key={x} className={`rounded-full px-5 py-2 text-sm font-bold ${i?'border hairline':'bg-purple text-white'}`}>{x}</span>)}</div><div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">{courses.map(x=><CourseCard key={x.slug} course={x}/>)}</div></main><Footer/></>}

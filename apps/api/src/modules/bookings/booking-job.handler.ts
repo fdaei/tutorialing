@@ -88,6 +88,8 @@ export class BookingJobHandler {
               include: { deliveries: true },
             }));
           if (notification.deliveries.some((d) => d.channel === 'SMS' && d.status === 'sent')) continue;
+          // OAuth-only accounts may not have supplied a mobile number yet.
+          if (!user.phone) continue;
           const delivery =
             notification.deliveries.find((d) => d.channel === 'SMS') ??
             (await this.db.notificationDelivery.create({

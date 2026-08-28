@@ -1,24 +1,36 @@
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { ArrowLeft, ArrowRight, BadgeCheck, CalendarDays, Clock, ShieldCheck, Star, Users } from 'lucide-react';
 import { api, publicApi, type PublicTeacher, ApiError, apiMessage } from '@/lib/api';
 import { useTranslations } from '@/components/shared/locale-provider';
-import { localePath } from '@/lib/i18n';
+import { localePath, localized, isDefaultLocale, translate } from '@/lib/i18n';
 
 type Slot = { startsAt: string; endsAt: string; date: string; timezone: string; type: 'trial' | 'regular' };
 type Payment = { id: string; status?: string };
 
 export default function Checkout() {
   const params = useSearchParams(),
+    router = useRouter(),
     teacherId = params.get('teacher') ?? '',
     { locale } = useTranslations(),
-    fa = locale === 'fa',
+    fa = isDefaultLocale(locale),
     p = (href: string) => localePath(href, locale),
-    Arrow = fa ? ArrowLeft : ArrowRight;
+    Arrow = localized({ fa: ArrowLeft, en: ArrowRight }, locale);
+  const me = useQuery({
+    queryKey: ['checkout-me'],
+    queryFn: () => api<{ roles: string[] }>('/users/me'),
+    retry: false,
+  });
+  useEffect(() => {
+    if (me.error instanceof ApiError && me.error.status === 401) {
+      const next = `${p('/checkout')}?teacher=${encodeURIComponent(teacherId)}`;
+      router.replace(`${p('/auth')}?next=${encodeURIComponent(next)}`);
+    }
+  }, [me.error, p, router, teacherId]);
   const [lessonType, setLessonType] = useState<'trial' | 'regular'>('trial'),
     [slot, setSlot] = useState<Slot | null>(null),
     [accepted, setAccepted] = useState(false),
@@ -53,7 +65,7 @@ export default function Checkout() {
   const reservedRef = useRef<{ bookingId: string; startsAt: string; type: 'trial' | 'regular' } | null>(null);
   const checkout = useMutation({
     mutationFn: async () => {
-      if (!slot) throw new Error(fa ? 'یک زمان انتخاب کنید.' : 'Choose a time.');
+      if (!slot) throw new Error(translate(locale, 'checkoutChooseATime'));
       const held = reservedRef.current;
       const bookingId =
         held && held.startsAt === slot.startsAt && held.type === lessonType
@@ -106,17 +118,20 @@ export default function Checkout() {
     regularPrice = t?.approvedRegularPrice ?? t?.regularPrice ?? 0,
     price = lessonType === 'trial' ? trialPrice : regularPrice,
     duration = lessonType === 'trial' ? (t?.trialDuration ?? 30) : (t?.lessonDuration ?? 60),
-    money = (value: number) => new Intl.NumberFormat(fa ? 'fa-IR' : 'en-US').format(value) + (fa ? ' تومان' : ' IRR');
+    money = (value: number) =>
+      new Intl.NumberFormat(translate(locale, 'commercepricingManagerEnUS2')).format(value) +
+      translate(locale, 'commercepricingManagerIrr');
   function chooseType(type: 'trial' | 'regular') {
     setLessonType(type);
     setSlot(null);
   }
+  if (!me.data) return <div className="skeleton min-h-screen" />;
   if (!teacherId)
     return (
       <main className="mx-auto max-w-3xl px-6 py-24 text-center">
-        <h1 className="text-3xl font-black">{fa ? 'مدرس انتخاب نشده است.' : 'No teacher was selected.'}</h1>
+        <h1 className="text-3xl font-black">{translate(locale, 'checkoutNoTeacherWasSelected')}</h1>
         <Link href={p('/teachers')} className="mt-6 inline-block text-blue underline">
-          {fa ? 'مشاهده مدرس‌ها' : 'Browse teachers'}
+          {translate(locale, 'checkoutBrowseTeachers')}
         </Link>
       </main>
     );
@@ -129,7 +144,7 @@ export default function Checkout() {
             className="flex items-center gap-2 text-sm font-bold text-muted"
           >
             <Arrow size={17} />
-            {fa ? 'بازگشت به پروفایل مدرس' : 'Back to teacher profile'}
+            {translate(locale, 'checkoutBackToTeacherProfile')}
           </Link>
           <strong className="latin text-lg">LingoSpeak</strong>
         </div>
@@ -138,11 +153,13 @@ export default function Checkout() {
         <div className="mb-7 rounded-3xl border hairline bg-white p-5 shadow-soft">
           <div className="flex flex-wrap items-center gap-4">
             <div className="brand-gradient grid size-16 place-items-center rounded-2xl text-2xl font-black text-white">
-              {(fa ? t?.nameFa : t?.nameEn)?.slice(0, 1) ?? 'L'}
+              {localized({ fa: t?.nameFa, en: t?.nameEn }, locale)?.slice(0, 1) ?? 'L'}
             </div>
             <div className="min-w-0 flex-1">
               <p className="flex items-center gap-2 text-xl font-black">
-                {teacher.isLoading ? (fa ? 'در حال دریافت مدرس…' : 'Loading teacher…') : fa ? t?.nameFa : t?.nameEn}
+                {teacher.isLoading
+                  ? translate(locale, 'checkoutLoadingTeacher')
+                  : localized({ fa: t?.nameFa, en: t?.nameEn }, locale)}
                 <BadgeCheck size={19} className="text-blue" />
               </p>
               <div className="mt-2 flex flex-wrap gap-4 text-xs text-muted">
@@ -152,48 +169,51 @@ export default function Checkout() {
                 </span>
                 <span className="flex items-center gap-1">
                   <Users size={15} />
-                  {new Intl.NumberFormat(fa ? 'fa-IR' : 'en-US').format(t?.successfulClasses ?? 0)}{' '}
-                  {fa ? 'کلاس موفق' : 'successful classes'}
+                  {new Intl.NumberFormat(translate(locale, 'commercepricingManagerEnUS2')).format(
+                    t?.successfulClasses ?? 0,
+                  )}{' '}
+                  {translate(locale, 'checkoutSuccessfulClasses')}
                 </span>
                 <span>
                   {t?.languageLinks
-                    ?.map((link) => `${link.language.flag ?? ''} ${fa ? link.language.nameFa : link.language.nameEn}`)
+                    ?.map(
+                      (link) =>
+                        `${link.language.flag ?? ''} ${localized({ fa: link.language.nameFa, en: link.language.nameEn }, locale)}`,
+                    )
                     .join(' · ')}
                 </span>
               </div>
             </div>
           </div>
         </div>
-        {teacher.isError && <ErrorBox text={fa ? 'اطلاعات مدرس دریافت نشد.' : 'Could not load the teacher.'} />}
+        {teacher.isError && <ErrorBox text={translate(locale, 'checkoutCouldNotLoadTheTeacher')} />}
         <div className="grid gap-7 lg:grid-cols-[minmax(0,1fr)_360px]">
           <section className="space-y-6">
             <div className="rounded-3xl border hairline bg-white p-6">
-              <h2 className="text-xl font-black">{fa ? 'نوع جلسه را انتخاب کنید' : 'Choose the lesson type'}</h2>
+              <h2 className="text-xl font-black">{translate(locale, 'checkoutChooseTheLessonType')}</h2>
               <div className="mt-5 grid gap-3 sm:grid-cols-2">
                 <TypeCard
                   active={lessonType === 'trial'}
                   onClick={() => chooseType('trial')}
-                  title={fa ? 'جلسه آزمایشی' : 'Trial lesson'}
-                  detail={`${t?.trialDuration ?? 30} ${fa ? 'دقیقه' : 'minutes'}`}
+                  title={translate(locale, 'teacherteacherBookingCardTrialLesson')}
+                  detail={`${t?.trialDuration ?? 30} ${translate(locale, 'checkoutMinutes')}`}
                   price={money(trialPrice)}
                 />
                 <TypeCard
                   active={lessonType === 'regular'}
                   disabled={!regularPrice}
                   onClick={() => chooseType('regular')}
-                  title={fa ? 'جلسه عادی' : 'Regular lesson'}
-                  detail={`${t?.lessonDuration ?? 60} ${fa ? 'دقیقه' : 'minutes'}`}
-                  price={regularPrice ? money(regularPrice) : fa ? 'پس از تأیید مدیریت' : 'Not currently available'}
+                  title={translate(locale, 'checkoutRegularLesson')}
+                  detail={`${t?.lessonDuration ?? 60} ${translate(locale, 'checkoutMinutes')}`}
+                  price={regularPrice ? money(regularPrice) : translate(locale, 'checkoutNotCurrentlyAvailable')}
                 />
               </div>
             </div>
             <div className="rounded-3xl border hairline bg-white p-6">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <h2 className="text-xl font-black">{fa ? 'روز و ساعت' : 'Date and time'}</h2>
-                  <p className="mt-1 text-sm text-muted">
-                    {fa ? 'هر مرحله هفت روز را نشان می‌دهد.' : 'Each step shows seven days.'}
-                  </p>
+                  <h2 className="text-xl font-black">{translate(locale, 'checkoutDateAndTime')}</h2>
+                  <p className="mt-1 text-sm text-muted">{translate(locale, 'checkoutEachStepShowsSevenDays')}</p>
                 </div>
                 <div className="flex gap-2">
                   <button
@@ -203,9 +223,9 @@ export default function Checkout() {
                       setSlot(null);
                     }}
                     className="grid size-10 place-items-center rounded-xl border hairline disabled:opacity-30"
-                    aria-label={fa ? 'هفته قبل' : 'Previous week'}
+                    aria-label={translate(locale, 'checkoutPreviousWeek')}
                   >
-                    {fa ? <ArrowRight /> : <ArrowLeft />}
+                    {localized({ fa: <ArrowRight />, en: <ArrowLeft /> }, locale)}
                   </button>
                   <button
                     disabled={week === 3}
@@ -214,9 +234,9 @@ export default function Checkout() {
                       setSlot(null);
                     }}
                     className="grid size-10 place-items-center rounded-xl border hairline disabled:opacity-30"
-                    aria-label={fa ? 'هفته بعد' : 'Next week'}
+                    aria-label={translate(locale, 'checkoutNextWeek')}
                   >
-                    {fa ? <ArrowLeft /> : <ArrowRight />}
+                    {localized({ fa: <ArrowLeft />, en: <ArrowRight /> }, locale)}
                   </button>
                 </div>
               </div>
@@ -237,17 +257,19 @@ export default function Checkout() {
                         className={`rounded-2xl border p-3 text-center transition ${selectedDay === day.key ? 'border-purple bg-lavender text-purple' : 'hairline'} disabled:opacity-35`}
                       >
                         <span className="block text-xs text-muted">
-                          {new Intl.DateTimeFormat(fa ? 'fa-IR-u-ca-persian' : 'en-US', { weekday: 'short' }).format(
-                            day.date,
-                          )}
+                          {new Intl.DateTimeFormat(translate(locale, 'commercepricingManagerEnUS'), {
+                            weekday: 'short',
+                          }).format(day.date)}
                         </span>
                         <strong className="mt-1 block text-lg">
-                          {new Intl.DateTimeFormat(fa ? 'fa-IR-u-ca-persian' : 'en-US', { day: 'numeric' }).format(
-                            day.date,
-                          )}
+                          {new Intl.DateTimeFormat(translate(locale, 'commercepricingManagerEnUS'), {
+                            day: 'numeric',
+                          }).format(day.date)}
                         </strong>
                         <small className="mt-1 block">
-                          {day.slots.length ? `${day.slots.length} ${fa ? 'زمان' : 'slots'}` : fa ? 'پر' : 'Full'}
+                          {day.slots.length
+                            ? `${day.slots.length} ${translate(locale, 'checkoutSlots')}`
+                            : translate(locale, 'checkoutFull')}
                         </small>
                       </button>
                     ))}
@@ -256,14 +278,12 @@ export default function Checkout() {
                     <h3 className="flex items-center gap-2 font-black">
                       <Clock size={18} className="text-purple" />
                       {selectedDay
-                        ? new Intl.DateTimeFormat(fa ? 'fa-IR-u-ca-persian' : 'en-US', {
+                        ? new Intl.DateTimeFormat(translate(locale, 'commercepricingManagerEnUS'), {
                             weekday: 'long',
                             month: 'long',
                             day: 'numeric',
                           }).format(new Date(`${selectedDay}T12:00:00`))
-                        : fa
-                          ? 'زمانی موجود نیست'
-                          : 'No date available'}
+                        : translate(locale, 'checkoutNoDateAvailable')}
                     </h3>
                     {daySlots.length ? (
                       <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
@@ -273,7 +293,7 @@ export default function Checkout() {
                             onClick={() => setSlot(item)}
                             className={`rounded-xl border px-3 py-3 font-bold transition ${slot?.startsAt === item.startsAt ? 'border-purple bg-purple text-white shadow-lg' : 'hairline hover:border-purple hover:text-purple'}`}
                           >
-                            {new Intl.DateTimeFormat(fa ? 'fa-IR' : 'en-US', {
+                            {new Intl.DateTimeFormat(translate(locale, 'commercepricingManagerEnUS2'), {
                               hour: '2-digit',
                               minute: '2-digit',
                             }).format(new Date(item.startsAt))}
@@ -282,21 +302,13 @@ export default function Checkout() {
                       </div>
                     ) : (
                       <p className="mt-4 rounded-2xl border border-dashed hairline p-6 text-center text-sm text-muted">
-                        {fa
-                          ? 'در این روز زمان آزادی وجود ندارد. روز دیگری را انتخاب کنید.'
-                          : 'No times are available on this day. Choose another day.'}
+                        {translate(locale, 'checkoutNoTimesAreAvailableOnThisDayChoose')}
                       </p>
                     )}
                   </div>
                 </>
               )}
-              {slots.isError && (
-                <ErrorBox
-                  text={
-                    fa ? 'زمان‌های آزاد دریافت نشدند. دوباره تلاش کنید.' : 'Could not load available times. Try again.'
-                  }
-                />
-              )}
+              {slots.isError && <ErrorBox text={translate(locale, 'checkoutCouldNotLoadAvailableTimesTryAgain')} />}
             </div>
             <label className="flex gap-3 rounded-3xl border hairline bg-white p-6">
               <input
@@ -306,62 +318,62 @@ export default function Checkout() {
                 className="mt-1 size-5 accent-purple"
               />
               <span>
-                <strong>
-                  {fa ? 'سیاست لغو را خوانده‌ام و می‌پذیرم.' : 'I have read and accept the cancellation policy.'}
-                </strong>
+                <strong>{translate(locale, 'checkoutIHaveReadAndAcceptTheCancellationPolicy')}</strong>
                 <span className="mt-2 block text-sm leading-7 text-muted">
-                  {fa
-                    ? (t?.policy?.titleFa ?? 'مبلغ بازپرداخت براساس سیاست ثبت‌شده هنگام رزرو محاسبه می‌شود.')
-                    : (t?.policy?.titleEn ??
-                      'Refund eligibility is calculated from the policy snapshot saved with the booking.')}
+                  {localized(
+                    {
+                      fa: t?.policy?.titleFa ?? 'مبلغ بازپرداخت براساس سیاست ثبت‌شده هنگام رزرو محاسبه می‌شود.',
+                      en:
+                        t?.policy?.titleEn ??
+                        'Refund eligibility is calculated from the policy snapshot saved with the booking.',
+                    },
+                    locale,
+                  )}
                 </span>
               </span>
             </label>
           </section>
           <aside>
             <div className="sticky top-6 rounded-3xl bg-navy p-7 text-white shadow-2xl">
-              <h2 className="text-xl font-black">{fa ? 'خلاصه رزرو' : 'Booking summary'}</h2>
-              <Summary icon={<BadgeCheck />} label={fa ? 'مدرس' : 'Teacher'} value={fa ? t?.nameFa : t?.nameEn} />
+              <h2 className="text-xl font-black">{translate(locale, 'checkoutBookingSummary')}</h2>
+              <Summary
+                icon={<BadgeCheck />}
+                label={translate(locale, 'schedulingteacherPlannerCalendarTeacher')}
+                value={localized({ fa: t?.nameFa, en: t?.nameEn }, locale)}
+              />
               <Summary
                 icon={<CalendarDays />}
-                label={fa ? 'تاریخ و ساعت' : 'Date and time'}
+                label={translate(locale, 'checkoutDateAndTime2')}
                 value={
                   slot
-                    ? new Intl.DateTimeFormat(fa ? 'fa-IR-u-ca-persian' : 'en-US', {
+                    ? new Intl.DateTimeFormat(translate(locale, 'commercepricingManagerEnUS'), {
                         dateStyle: 'medium',
                         timeStyle: 'short',
                       }).format(new Date(slot.startsAt))
-                    : fa
-                      ? 'هنوز انتخاب نشده'
-                      : 'Not selected'
+                    : translate(locale, 'checkoutNotSelected')
                 }
               />
               <Summary
                 icon={<Clock />}
-                label={fa ? 'نوع و مدت' : 'Type and duration'}
-                value={`${lessonType === 'trial' ? (fa ? 'آزمایشی' : 'Trial') : fa ? 'عادی' : 'Regular'} · ${duration} ${fa ? 'دقیقه' : 'min'}`}
+                label={translate(locale, 'checkoutTypeAndDuration')}
+                value={`${lessonType === 'trial' ? translate(locale, 'teacherteacherDashboardTrial') : translate(locale, 'checkoutRegular')} · ${duration} ${translate(locale, 'teacherteacherDashboardMin')}`}
               />
               <div className="mt-6 border-t border-white/15 pt-5">
-                <label className="text-xs text-white/60">{fa ? 'کد تخفیف' : 'Discount code'}</label>
+                <label className="text-xs text-white/60">{translate(locale, 'checkoutDiscountCode')}</label>
                 <input
                   value={discount}
                   onChange={(event) => setDiscount(event.target.value.toUpperCase())}
                   className="mt-2 w-full rounded-xl border border-white/20 bg-white/10 px-4 py-3 outline-none placeholder:text-white/30"
-                  placeholder={fa ? 'اختیاری' : 'Optional'}
+                  placeholder={translate(locale, 'checkoutOptional')}
                 />
               </div>
               <div className="mt-6 flex items-end justify-between">
-                <span className="text-sm text-white/60">{fa ? 'مبلغ نهایی' : 'Final amount'}</span>
+                <span className="text-sm text-white/60">{translate(locale, 'checkoutFinalAmount')}</span>
                 <strong className="text-2xl">{money(price)}</strong>
               </div>
               {checkout.isError && (
                 <div role="alert" className="mt-5 rounded-xl bg-red-500/15 p-4 text-sm text-red-100">
-                  {apiMessage(
-                    checkout.error,
-                    fa
-                      ? 'رزرو انجام نشد. ممکن است این زمان هم‌اکنون رزرو یا مسدود شده باشد.'
-                      : 'Booking failed. The slot may have just been booked or blocked.',
-                  )}
+                  {apiMessage(checkout.error, translate(locale, 'checkoutBookingFailedTheSlotMayHaveJustBeen'))}
                 </div>
               )}
               <button
@@ -370,18 +382,12 @@ export default function Checkout() {
                 className="brand-gradient mt-7 flex w-full items-center justify-center gap-2 rounded-xl py-4 font-black text-white disabled:opacity-40"
               >
                 {checkout.isPending
-                  ? fa
-                    ? 'در حال بررسی نهایی…'
-                    : 'Final availability check…'
-                  : fa
-                    ? 'ادامه به پرداخت'
-                    : 'Continue to payment'}
+                  ? translate(locale, 'checkoutFinalAvailabilityCheck')
+                  : translate(locale, 'checkoutContinueToPayment')}
                 <ShieldCheck size={18} />
               </button>
               <p className="mt-4 text-center text-xs leading-6 text-white/45">
-                {fa
-                  ? 'آزاد بودن زمان پیش از ثبت نهایی دوباره در سرور بررسی می‌شود.'
-                  : 'The server rechecks availability before confirming the booking.'}
+                {translate(locale, 'checkoutTheServerRechecksAvailabilityBeforeConfirmingTheBooking')}
               </p>
             </div>
           </aside>

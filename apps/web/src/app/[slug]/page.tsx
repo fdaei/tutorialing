@@ -1,3 +1,4 @@
+import { localized, isDefaultLocale } from '@/lib/i18n';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { Header, Footer } from '@/components/layout/site';
@@ -29,21 +30,21 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const { slug } = await params,
     p = await load(slug),
     locale = await requestLocale();
-  return p ? { title: locale === 'fa' ? p.titleFa : p.titleEn, description: p.seo?.description } : {};
+  return p ? { title: localized({ fa: p.titleFa, en: p.titleEn }, locale), description: p.seo?.description } : {};
 }
 export default async function CmsPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params,
     p = await load(slug),
     locale = await requestLocale(),
-    fa = locale === 'fa';
+    fa = isDefaultLocale(locale);
   if (!p) notFound();
-  const paragraphs = (fa ? p.contentFa : p.contentEn).paragraphs;
+  const paragraphs = localized({ fa: p.contentFa, en: p.contentEn }, locale).paragraphs;
   return (
     <>
       <Header />
       <main className="mx-auto min-h-[60vh] max-w-4xl px-6 py-20">
-        <p className="text-sm font-bold text-purple">{fa ? p.titleEn : p.titleFa}</p>
-        <h1 className="display mt-4 text-5xl">{fa ? p.titleFa : p.titleEn}</h1>
+        <p className="text-sm font-bold text-purple">{localized({ fa: p.titleEn, en: p.titleFa }, locale)}</p>
+        <h1 className="display mt-4 text-5xl">{localized({ fa: p.titleFa, en: p.titleEn }, locale)}</h1>
         <div className="surface-card mt-10 grid gap-6 p-8 text-lg leading-9 text-muted">
           {paragraphs?.map((x, i) => (
             <p key={i}>{x}</p>

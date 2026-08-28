@@ -1,5 +1,6 @@
 'use client';
 
+import { localized, isDefaultLocale, translate } from '@/lib/i18n';
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, Clock3, FileAudio, PenLine, RotateCcw, UserRound } from 'lucide-react';
@@ -39,7 +40,7 @@ const tabs = [
 
 export function ExaminerReviewManager() {
   const { locale } = useTranslations(),
-    fa = locale === 'fa',
+    fa = isDefaultLocale(locale),
     qc = useQueryClient(),
     [tab, setTab] = useState<(typeof tabs)[number][0]>('pending'),
     [page, setPage] = useState(1),
@@ -78,7 +79,7 @@ export function ExaminerReviewManager() {
               onClick={() => setTab(value)}
               className={`shrink-0 rounded-xl px-4 py-3 text-sm font-bold ${tab === value ? 'brand-gradient text-white' : 'bg-[#f5f6fa] text-muted'}`}
             >
-              {fa ? labelFa : labelEn}
+              {localized({ fa: labelFa, en: labelEn }, locale)}
             </button>
           ))}
         </div>
@@ -86,7 +87,7 @@ export function ExaminerReviewManager() {
       <div className="grid gap-6 xl:grid-cols-[380px_minmax(0,1fr)]">
         <section className="rounded-3xl border hairline bg-white p-4">
           <div className="flex items-center justify-between px-2">
-            <h2 className="text-xl font-black">{fa ? 'پاسخ‌ها' : 'Answers'}</h2>
+            <h2 className="text-xl font-black">{translate(locale, 'adminexaminerReviewManagerAnswers')}</h2>
             <span className="rounded-full bg-lavender px-3 py-1 text-xs font-black text-purple">
               {queue.data?.pagination.total ?? 0}
             </span>
@@ -99,7 +100,10 @@ export function ExaminerReviewManager() {
             </div>
           ) : queue.isError ? (
             <ErrorBox
-              message={apiMessage(queue.error, fa ? 'صف بررسی دریافت نشد.' : 'Could not load the review queue.')}
+              message={apiMessage(
+                queue.error,
+                translate(locale, 'adminexaminerReviewManagerCouldNotLoadTheReviewQueue'),
+              )}
               retry={() => queue.refetch()}
             />
           ) : queue.data?.items.length ? (
@@ -112,23 +116,29 @@ export function ExaminerReviewManager() {
                 >
                   <div className="flex items-start justify-between gap-3">
                     <strong>
-                      {fa ? (item.attempt.user.name ?? 'زبان‌آموز') : (item.attempt.user.name ?? 'Learner')}
+                      {localized(
+                        { fa: item.attempt.user.name ?? 'زبان‌آموز', en: item.attempt.user.name ?? 'Learner' },
+                        locale,
+                      )}
                     </strong>
                     <Status status={item.reviewStatus} fa={fa} />
                   </div>
                   <p className="mt-2 text-sm text-muted">
                     {item.attempt.test.language.flag}{' '}
-                    {fa ? item.attempt.test.language.nameFa : item.attempt.test.language.nameEn} ·{' '}
-                    {item.question.section.title}
+                    {localized(
+                      { fa: item.attempt.test.language.nameFa, en: item.attempt.test.language.nameEn },
+                      locale,
+                    )}{' '}
+                    · {item.question.section.title}
                   </p>
                   <p className="mt-2 line-clamp-2 text-sm">
-                    {(fa ? item.question.prompt.fa : item.question.prompt.en) ??
+                    {localized({ fa: item.question.prompt.fa, en: item.question.prompt.en }, locale) ??
                       item.question.prompt.fa ??
                       item.question.prompt.en}
                   </p>
                   <p className="mt-3 flex items-center gap-2 text-xs text-muted">
                     <Clock3 size={14} />
-                    {new Intl.DateTimeFormat(fa ? 'fa-IR-u-ca-persian' : 'en-US', {
+                    {new Intl.DateTimeFormat(translate(locale, 'commercepricingManagerEnUS'), {
                       dateStyle: 'medium',
                       timeStyle: 'short',
                     }).format(new Date(item.attempt.submittedAt))}
@@ -137,7 +147,7 @@ export function ExaminerReviewManager() {
               ))}
             </div>
           ) : (
-            <Empty text={fa ? 'پاسخی در این تب وجود ندارد.' : 'There are no answers in this tab.'} />
+            <Empty text={translate(locale, 'adminexaminerReviewManagerThereAreNoAnswersInThisTab')} />
           )}
           <div className="mt-4 flex items-center justify-between">
             <button
@@ -145,7 +155,7 @@ export function ExaminerReviewManager() {
               onClick={() => setPage((value) => value - 1)}
               className="rounded-xl border hairline px-4 py-2 disabled:opacity-30"
             >
-              {fa ? 'قبلی' : 'Previous'}
+              {translate(locale, 'admincountryManagerPrevious')}
             </button>
             <span className="text-sm text-muted">
               {page} / {Math.max(1, queue.data?.pagination.pages ?? 1)}
@@ -155,7 +165,7 @@ export function ExaminerReviewManager() {
               onClick={() => setPage((value) => value + 1)}
               className="rounded-xl border hairline px-4 py-2 disabled:opacity-30"
             >
-              {fa ? 'بعدی' : 'Next'}
+              {translate(locale, 'admincountryManagerNext')}
             </button>
           </div>
         </section>
@@ -174,13 +184,7 @@ export function ExaminerReviewManager() {
               }}
             />
           ) : (
-            <Empty
-              text={
-                fa
-                  ? 'یک پاسخ را انتخاب کنید تا متن، صدا و فرم ارزیابی نمایش داده شود.'
-                  : 'Select an answer to view its text, audio, and review form.'
-              }
-            />
+            <Empty text={translate(locale, 'adminexaminerReviewManagerSelectAnAnswerToViewItsTextAudio')} />
           )}
         </section>
       </div>
@@ -226,9 +230,11 @@ function ReviewEditor({
         <div>
           <p className="flex items-center gap-2 text-sm font-bold text-purple">
             <UserRound size={17} />
-            {fa ? (answer.attempt.user.name ?? 'زبان‌آموز') : (answer.attempt.user.name ?? 'Learner')}
+            {localized({ fa: answer.attempt.user.name ?? 'زبان‌آموز', en: answer.attempt.user.name ?? 'Learner' }, fa)}
           </p>
-          <h2 className="mt-2 text-2xl font-black">{fa ? answer.attempt.test.titleFa : answer.attempt.test.titleEn}</h2>
+          <h2 className="mt-2 text-2xl font-black">
+            {localized({ fa: answer.attempt.test.titleFa, en: answer.attempt.test.titleEn }, fa)}
+          </h2>
           <p className="mt-2 text-sm text-muted">
             {answer.attempt.test.language.flag} {answer.attempt.test.language.nativeName} ·{' '}
             {answer.question.section.skill}
@@ -238,7 +244,7 @@ function ReviewEditor({
       </div>
       <div className="mt-6 rounded-2xl bg-[#f7f8fc] p-5">
         <p className="font-black">
-          {(fa ? answer.question.prompt.fa : answer.question.prompt.en) ??
+          {localized({ fa: answer.question.prompt.fa, en: answer.question.prompt.en }, fa) ??
             answer.question.prompt.fa ??
             answer.question.prompt.en}
         </p>
@@ -253,14 +259,16 @@ function ReviewEditor({
           disabled={claiming}
           className="brand-gradient mt-6 rounded-xl px-6 py-3 font-black text-white disabled:opacity-50"
         >
-          {claiming ? (fa ? 'در حال دریافت…' : 'Claiming…') : fa ? 'شروع بررسی این پاسخ' : 'Claim and start review'}
+          {claiming
+            ? translate(fa, 'adminexaminerReviewManagerClaiming')
+            : translate(fa, 'adminexaminerReviewManagerClaimAndStartReview')}
         </button>
       )}
       {canEdit && (
         <div className="mt-7">
           <div className="grid gap-4 sm:grid-cols-2">
             <label>
-              <span className="mb-2 block font-black">{fa ? 'نمره' : 'Band / score'}</span>
+              <span className="mb-2 block font-black">{translate(fa, 'adminexaminerReviewManagerBandScore')}</span>
               <input
                 type="number"
                 min={0}
@@ -272,18 +280,18 @@ function ReviewEditor({
               />
             </label>
             <label>
-              <span className="mb-2 block font-black">{fa ? 'وضعیت نتیجه' : 'Review outcome'}</span>
+              <span className="mb-2 block font-black">{translate(fa, 'adminexaminerReviewManagerReviewOutcome')}</span>
               <select
                 value={status}
                 onChange={(event) => setStatus(event.target.value as typeof status)}
                 className="input"
               >
-                <option value="APPROVED">{fa ? 'تأییدشده' : 'Approved'}</option>
-                <option value="NEEDS_REVISION">{fa ? 'نیازمند اصلاح' : 'Needs revision'}</option>
+                <option value="APPROVED">{translate(fa, 'adminexaminerReviewManagerApproved')}</option>
+                <option value="NEEDS_REVISION">{translate(fa, 'adminexaminerReviewManagerNeedsRevision')}</option>
               </select>
             </label>
           </div>
-          <h3 className="mt-6 font-black">{fa ? 'معیارهای ارزیابی' : 'Assessment criteria'}</h3>
+          <h3 className="mt-6 font-black">{translate(fa, 'adminexaminerReviewManagerAssessmentCriteria')}</h3>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             {Object.entries(criteria).map(([key, value]) => (
               <label key={key}>
@@ -301,20 +309,16 @@ function ReviewEditor({
             ))}
           </div>
           <label className="mt-5 block">
-            <span className="mb-2 block font-black">{fa ? 'بازخورد فارسی' : 'Persian feedback'}</span>
+            <span className="mb-2 block font-black">{translate(fa, 'adminexaminerReviewManagerPersianFeedback')}</span>
             <textarea
               value={feedbackFa}
               onChange={(event) => setFeedbackFa(event.target.value)}
               className="input min-h-32"
-              placeholder={
-                fa
-                  ? 'مشکل، دلیل و روش اصلاح را دقیق توضیح دهید.'
-                  : 'Explain the issue, why it matters, and how to fix it.'
-              }
+              placeholder={translate(fa, 'adminexaminerReviewManagerExplainTheIssueWhyItMattersAndHow')}
             />
           </label>
           <label className="mt-5 block">
-            <span className="mb-2 block font-black">{fa ? 'بازخورد انگلیسی' : 'English feedback'}</span>
+            <span className="mb-2 block font-black">{translate(fa, 'adminexaminerReviewManagerEnglishFeedback')}</span>
             <textarea
               dir="ltr"
               value={feedbackEn}
@@ -325,7 +329,7 @@ function ReviewEditor({
           </label>
           {review.isError && (
             <p role="alert" className="mt-4 rounded-xl bg-red-50 p-4 text-red-800">
-              {apiMessage(review.error, fa ? 'ثبت بررسی ناموفق بود.' : 'Could not save the review.')}
+              {apiMessage(review.error, translate(fa, 'adminexaminerReviewManagerCouldNotSaveTheReview'))}
             </p>
           )}
           <button
@@ -335,12 +339,8 @@ function ReviewEditor({
           >
             <CheckCircle2 size={18} />
             {review.isPending
-              ? fa
-                ? 'در حال نهایی‌سازی…'
-                : 'Finalizing…'
-              : fa
-                ? 'ثبت بررسی و به‌روزرسانی نتیجه'
-                : 'Save review and update result'}
+              ? translate(fa, 'adminexaminerReviewManagerFinalizing')
+              : translate(fa, 'adminexaminerReviewManagerSaveReviewAndUpdateResult')}
           </button>
         </div>
       )}
@@ -370,14 +370,14 @@ function ReviewAudio({ fileId, fa }: { fileId: string; fa: boolean }) {
     <div className="mt-4 rounded-xl bg-white p-4">
       <p className="mb-3 flex items-center gap-2 text-sm font-bold">
         <FileAudio size={17} />
-        {fa ? 'پاسخ صوتی ذخیره‌شده' : 'Saved audio answer'}
+        {translate(fa, 'adminexaminerReviewManagerSavedAudioAnswer')}
       </p>
       {query.isLoading ? (
         <div className="skeleton h-12 rounded-xl" />
       ) : query.data ? (
         <audio controls preload="metadata" className="w-full" src={query.data.url} />
       ) : (
-        <p className="text-sm text-red-700">{fa ? 'دریافت فایل صوتی ناموفق بود.' : 'Could not load the audio file.'}</p>
+        <p className="text-sm text-red-700">{translate(fa, 'adminexaminerReviewManagerCouldNotLoadTheAudioFile')}</p>
       )}
     </div>
   );
@@ -394,7 +394,7 @@ function Status({ status, fa }: { status: ReviewStatus; fa: boolean }) {
     <span
       className={`rounded-full px-3 py-1 text-xs font-black ${status === 'APPROVED' ? 'bg-green-50 text-green-700' : status === 'NEEDS_REVISION' ? 'bg-amber-50 text-amber-800' : status === 'IN_REVIEW' ? 'bg-blue-50 text-blue-700' : 'bg-[#f1f2f6] text-muted'}`}
     >
-      {fa ? mapFa[status] : mapEn[status]}
+      {localized({ fa: mapFa[status], en: mapEn[status] }, fa)}
     </span>
   );
 }
@@ -412,7 +412,10 @@ function criterionLabel(key: string, fa: boolean) {
     taskAchievement: 'پاسخ‌گویی به تسک',
     coherence: 'انسجام و پیوستگی',
   };
-  return fa ? (faMap[key] ?? key) : key.replace(/([A-Z])/g, ' $1').replace(/^./, (letter) => letter.toUpperCase());
+  return localized(
+    { fa: faMap[key] ?? key, en: key.replace(/([A-Z])/g, ' $1').replace(/^./, (letter) => letter.toUpperCase()) },
+    fa,
+  );
 }
 function Empty({ text }: { text: string }) {
   return (

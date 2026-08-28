@@ -5,12 +5,21 @@ import { LanguagesService } from './languages.service';
 import { LanguageDto } from './dto/request/language.dto';
 import { UpdateLanguageDto } from './dto/request/update-language.dto';
 import { ApiTags } from '@nestjs/swagger';
+import { CountryDto, UpdateCountryDto } from './dto/request/country.dto';
 
 @Controller('languages')
 export class LanguagesController {
   constructor(private readonly service: LanguagesService) {}
   @Public() @Get() list() {
     return this.service.publicList();
+  }
+}
+
+@Controller('countries')
+export class CountriesController {
+  constructor(private readonly service: LanguagesService) {}
+  @Public() @Get() list() {
+    return this.service.publicCountries();
   }
 }
 
@@ -43,5 +52,27 @@ export class AdminLanguagesController {
   }
   @Delete(':id') remove(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.service.remove(user.id, id);
+  }
+}
+
+@Roles('ADMIN', 'STAFF')
+@RequirePermissions(PermissionKeys.Languages.Manage)
+@Controller('admin/countries')
+@ApiTags('admin')
+export class AdminCountriesController {
+  constructor(private readonly service: LanguagesService) {}
+
+  @Get()
+  list(@Query('page') page = '1', @Query('limit') limit = '30', @Query('search') search = '') {
+    return this.service.adminCountries(Math.max(1, Number(page)), Math.min(100, Math.max(1, Number(limit))), search);
+  }
+  @Post() create(@CurrentUser() user: AuthUser, @Body() body: CountryDto) {
+    return this.service.createCountry(user.id, body);
+  }
+  @Patch(':id') update(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: UpdateCountryDto) {
+    return this.service.updateCountry(user.id, id, body);
+  }
+  @Delete(':id') remove(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.service.removeCountry(user.id, id);
   }
 }

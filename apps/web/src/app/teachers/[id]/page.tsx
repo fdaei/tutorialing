@@ -1,23 +1,21 @@
+import { localized, isDefaultLocale } from '@/lib/i18n';
 import { notFound } from 'next/navigation';
-import Link from 'next/link';
-import { BadgeCheck, Check, Play, Star } from 'lucide-react';
+import { BadgeCheck, Play, Star } from 'lucide-react';
 import { Header, Footer } from '@/components/layout/site';
 import { publicApi, type PublicTeacher } from '@/lib/api';
 import { requestLocale } from '@/lib/server-locale';
-import { localePath } from '@/lib/i18n';
+import { TeacherBookingCard } from '@/features/teacher/components/teacher-booking-card';
 export const dynamic = 'force-dynamic';
 export default async function Profile({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params,
     locale = await requestLocale(),
-    fa = locale === 'fa',
-    p = (href: string) => localePath(href, locale);
+    fa = isDefaultLocale(locale);
   let t: PublicTeacher;
   try {
     t = await publicApi<PublicTeacher>(`/teachers/${id}`, { cache: 'no-store' });
   } catch {
     notFound();
   }
-  const price = new Intl.NumberFormat(fa ? 'fa-IR' : 'en-US').format(t.trialPrice) + (fa ? ' تومان' : ' IRR');
   return (
     <>
       <Header />
@@ -32,17 +30,19 @@ export default async function Profile({ params }: { params: Promise<{ id: string
             <div className="mt-8 flex justify-between gap-5">
               <div>
                 <h1 className="flex gap-3 text-4xl font-black">
-                  {fa ? t.nameFa : t.nameEn}
+                  {localized({ fa: t.nameFa, en: t.nameEn }, locale)}
                   <BadgeCheck className="text-blue" />
                 </h1>
-                <p className="mt-2 text-muted">{fa ? t.nameEn : t.nameFa}</p>
+                <p className="mt-2 text-muted">{localized({ fa: t.nameEn, en: t.nameFa }, locale)}</p>
               </div>
               <p className="flex gap-2">
                 <Star fill="#f5a623" className="text-[#f5a623]" />
                 {t.rating} ({t.reviewsCount})
               </p>
             </div>
-            <p className="mt-8 text-lg leading-9 text-muted">{fa ? t.bioFa : (t.bioEn ?? t.bioFa)}</p>
+            <p className="mt-8 text-lg leading-9 text-muted">
+              {localized({ fa: t.bioFa, en: t.bioEn ?? t.bioFa }, locale)}
+            </p>
             <div className="mt-8 flex flex-wrap gap-2">
               {t.specialties.map((x) => (
                 <span key={x} className="rounded-full border hairline px-4 py-2 latin">
@@ -52,20 +52,7 @@ export default async function Profile({ params }: { params: Promise<{ id: string
             </div>
           </div>
           <aside>
-            <div className="sticky top-28 rounded-4xl border hairline bg-white p-6 shadow-soft">
-              <p className="text-sm text-muted">{fa ? 'جلسه آزمایشی' : 'Trial lesson'}</p>
-              <p className="mt-2 text-2xl font-black">{price}</p>
-              <Link
-                href={p(`/checkout?teacher=${t.id}`)}
-                className="brand-gradient mt-6 block rounded-xl py-4 text-center font-black text-white"
-              >
-                {fa ? 'انتخاب زمان' : 'Choose a time'}
-              </Link>
-              <p className="mt-5 flex gap-2 text-xs text-muted">
-                <Check size={15} />
-                {fa ? 'قانون لغو پیش از پرداخت نمایش داده می‌شود.' : 'The cancellation policy is shown before payment.'}
-              </p>
-            </div>
+            <TeacherBookingCard teacherId={t.id} trialPrice={t.trialPrice} />
           </aside>
         </div>
       </main>

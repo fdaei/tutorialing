@@ -6,6 +6,7 @@ export const webDefaults = {
   enamadHtml: '',
   contactPhone: '021 9109 4200',
   contactEmail: 'support@lingospeak.ir',
+  googleClientId: '',
   localeCookieMaxAgeSeconds: 31_536_000,
   e2eServerTimeoutMs: 120_000,
 } as const;

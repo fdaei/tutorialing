@@ -1,48 +1,48 @@
 import Link from 'next/link';
 import { Bell, BookOpen, Headphones, Settings, Star } from 'lucide-react';
-import { localePath } from '@/lib/i18n';
+import { localePath, localized, isDefaultLocale, translate } from '@/lib/i18n';
 
 export function TeacherMore({ locale }: { locale: 'fa' | 'en' }) {
-  const fa = locale === 'fa',
+  const fa = isDefaultLocale(locale),
     items = [
       [
         '/teacher-panel/plans',
         BookOpen,
-        fa ? 'تکالیف و برنامه‌ها' : 'Assignments & plans',
-        fa ? 'برای زبان‌آموز برنامه و تکلیف بساز' : 'Create plans and assignments',
+        translate(locale, 'teacherteacherMoreAssignmentsPlans'),
+        translate(locale, 'teacherteacherMoreCreatePlansAndAssignments'),
       ],
       [
         '/teacher-panel/reviews',
         Star,
-        fa ? 'نظرات و امتیازها' : 'Reviews & ratings',
-        fa ? 'بازخورد زبان‌آموزان را ببین' : 'Read student feedback',
+        translate(locale, 'teacherteacherMoreReviewsRatings'),
+        translate(locale, 'teacherteacherMoreReadStudentFeedback'),
       ],
       [
         '/teacher-panel/tickets',
         Headphones,
-        fa ? 'پشتیبانی' : 'Support',
-        fa ? 'درخواست جدید ثبت یا پیگیری کن' : 'Create or follow up a request',
+        translate(locale, 'teacherteacherMoreSupport'),
+        translate(locale, 'teacherteacherMoreCreateOrFollowUpARequest'),
       ],
       [
         '/teacher-panel/notifications',
         Bell,
-        fa ? 'اعلان‌ها' : 'Notifications',
-        fa ? 'رویدادهای مهم حساب را مرور کن' : 'Review important account events',
+        translate(locale, 'teacherteacherMoreNotifications'),
+        translate(locale, 'teacherteacherMoreReviewImportantAccountEvents'),
       ],
       [
         '/teacher-panel/settings',
         Settings,
-        fa ? 'تنظیمات حساب' : 'Account settings',
-        fa ? 'اطلاعات پایه حساب را ببین' : 'View basic account details',
+        translate(locale, 'teacherteacherMoreAccountSettings'),
+        translate(locale, 'teacherteacherMoreViewBasicAccountDetails'),
       ],
     ] as const;
   return (
     <div>
       <header>
-        <p className="mb-2 text-sm font-bold text-blue">{fa ? 'ابزارهای تکمیلی' : 'Additional tools'}</p>
-        <h1 className="text-3xl font-black">{fa ? 'بیشتر' : 'More'}</h1>
+        <p className="mb-2 text-sm font-bold text-blue">{translate(locale, 'teacherteacherMoreAdditionalTools')}</p>
+        <h1 className="text-3xl font-black">{translate(locale, 'teacherteacherMoreMore')}</h1>
         <p className="mt-2 text-muted">
-          {fa ? 'امکاناتی که هر روز لازم نداری، مرتب و در دسترس.' : 'Less frequent tools, organized and accessible.'}
+          {translate(locale, 'teacherteacherMoreLessFrequentToolsOrganizedAndAccessible')}
         </p>
       </header>
       <div className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">

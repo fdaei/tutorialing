@@ -2,7 +2,7 @@
 import { Languages } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
-import { localePath, type Locale } from '@/lib/i18n';
+import { localePath, type Locale, localized, translate } from '@/lib/i18n';
 import { useTranslations } from '@/components/shared/locale-provider';
 
 export function LanguageSwitcher({ className = '' }: { className?: string }) {
@@ -25,6 +25,8 @@ export function LanguageSwitcher({ className = '' }: { className?: string }) {
     <label className={`inline-flex items-center gap-2 ${className}`} aria-label={t('language')}>
       <Languages size={17} />
       <select
+        dir={translate(locale, 'supportmyTicketManagerLtr')}
+        lang={translate(locale, 'panelpanelActionsEn')}
         value={locale}
         onChange={(e) => change(e.target.value as Locale)}
         className="bg-transparent text-sm font-bold"

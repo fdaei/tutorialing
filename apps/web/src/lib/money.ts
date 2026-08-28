@@ -1,3 +1,4 @@
+import { localized, translate } from '@/lib/i18n';
 import type { Locale } from './i18n';
 
 /**
@@ -33,12 +34,12 @@ export function formatNumber(value: number, locale: Locale) {
  * is IRR (Rial), which would reintroduce FIN-101, and it has no notion of Toman.
  */
 export function formatMoney(value: number, locale: Locale) {
-  return `${formatNumber(value, locale)} ${locale === 'fa' ? 'تومان' : 'Toman'}`;
+  return `${formatNumber(value, locale)} ${translate(locale, 'libmoneyToman')}`;
 }
 
 /** The unit on its own, for form labels like "Amount (Toman)". */
 export function moneyUnit(locale: Locale) {
-  return locale === 'fa' ? 'تومان' : 'Toman';
+  return translate(locale, 'libmoneyToman');
 }
 
 /** For optional amounts, where a missing value should read as an em dash. */

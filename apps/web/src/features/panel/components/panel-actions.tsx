@@ -1,5 +1,6 @@
 'use client';
 
+import { localized, isDefaultLocale, translate } from '@/lib/i18n';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError, apiMessage, type EducationalLanguage } from '@/lib/api';
@@ -12,7 +13,7 @@ type Props = { role: Role; section: string; endpoint: string };
 type Localized = { fa: boolean };
 type UploadResponse = { fileId: string; uploadUrl: string };
 
-const tr = (fa: boolean, persian: string, english: string) => (fa ? persian : english);
+const tr = (fa: boolean, persian: string, english: string) => localized({ fa: persian, en: english }, fa);
 const value = (form: FormData, key: string) => String(form.get(key) ?? '').trim();
 const numeric = (form: FormData, key: string, fallback = 0) => {
   const out = Number(form.get(key));
@@ -33,16 +34,10 @@ const allowedUploadTypes = ['image/jpeg', 'image/png', 'application/pdf', 'video
 
 async function uploadFile(file: File, purpose: string, fa: boolean) {
   if (!allowedUploadTypes.includes(file.type)) {
-    throw new Error(
-      tr(
-        fa,
-        'فرمت فایل مجاز نیست. برای مدارک از PDF، JPG یا PNG و برای ویدئو از MP4، WebM یا MOV استفاده کنید.',
-        'Unsupported file format. Use PDF, JPG, or PNG for documents and MP4, WebM, or MOV for videos.',
-      ),
-    );
+    throw new Error(translate(fa, 'legacyUnsupportedFileFormatUsePDFJPGOrPNG'));
   }
   if (file.size > 50 * 1024 * 1024) {
-    throw new Error(tr(fa, 'حجم فایل نباید بیشتر از ۵۰ مگابایت باشد.', 'The file must not be larger than 50 MB.'));
+    throw new Error(translate(fa, 'legacyTheFileMustNotBeLargerThan50'));
   }
   const checksum = await sha256(file);
   const upload = await api<UploadResponse>('/files/uploads', {
@@ -89,7 +84,7 @@ function Status({ error, ok, fa }: { error: unknown; ok: boolean } & Localized) 
     const fields = error instanceof ApiError ? Object.entries(error.details.fieldErrors ?? {}) : [];
     return (
       <div role="alert" className="mt-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-900">
-        <p className="font-black">{apiMessage(error, tr(fa, 'عملیات ناموفق بود.', 'The operation failed.'))}</p>
+        <p className="font-black">{apiMessage(error, translate(fa, 'legacyTheOperationFailed'))}</p>
         {fields.length > 0 && (
           <ul className="mt-2 list-inside list-disc space-y-1">
             {fields.map(([field, message]) => (
@@ -101,7 +96,7 @@ function Status({ error, ok, fa }: { error: unknown; ok: boolean } & Localized) 
         )}
         {error instanceof ApiError && error.details.requestId && (
           <p className="mt-2 text-xs text-red-700">
-            {tr(fa, 'شناسه پیگیری', 'Request ID')}:{' '}
+            {translate(fa, 'legacyRequestID')}:{' '}
             <span className="font-mono" dir="ltr">
               {error.details.requestId}
             </span>
@@ -113,7 +108,7 @@ function Status({ error, ok, fa }: { error: unknown; ok: boolean } & Localized) 
   if (ok)
     return (
       <p role="status" className="mt-3 rounded-2xl bg-lavender p-3 text-sm font-bold text-purple">
-        {tr(fa, 'با موفقیت ذخیره شد.', 'Saved successfully.')}
+        {translate(fa, 'legacySavedSuccessfully')}
       </p>
     );
   return null;
@@ -202,7 +197,10 @@ const localizedDate = (input: unknown, fa: boolean) => {
   if (typeof input !== 'string') return '';
   const date = new Date(input);
   return Number.isFinite(date.getTime())
-    ? new Intl.DateTimeFormat(fa ? 'fa-IR' : 'en-US', { dateStyle: 'medium', timeStyle: 'short' }).format(date)
+    ? new Intl.DateTimeFormat(translate(fa, 'commercepricingManagerEnUS2'), {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      }).format(date)
     : '';
 };
 
@@ -233,12 +231,12 @@ function EntitySelect({
       >
         <option value="" disabled>
           {query.isLoading
-            ? tr(fa, 'در حال دریافت گزینه‌ها…', 'Loading options…')
+            ? translate(fa, 'legacyLoadingOptions')
             : query.isError
-              ? tr(fa, 'دریافت گزینه‌ها ناموفق بود', 'Could not load options')
+              ? translate(fa, 'legacyCouldNotLoadOptions')
               : !items.length
-                ? tr(fa, 'گزینه‌ای در دسترس نیست', 'No options available')
-                : tr(fa, 'انتخاب کنید', 'Choose an option')}
+                ? translate(fa, 'legacyNoOptionsAvailable')
+                : translate(fa, 'legacyChooseAnOption')}
         </option>
         {items.map((item) => (
           <option key={item.value} value={item.value}>
@@ -248,7 +246,7 @@ function EntitySelect({
       </select>
       {query.isError && (
         <button type="button" onClick={() => query.refetch()} className="mt-2 text-xs font-bold text-purple underline">
-          {tr(fa, 'تلاش دوباره', 'Try again')}
+          {translate(fa, 'legacyTryAgain')}
         </button>
       )}
     </label>
@@ -259,7 +257,7 @@ function AssignmentSelect({ fa }: { fa: boolean }) {
   return (
     <EntitySelect
       name="assignmentId"
-      label={tr(fa, 'تکلیف', 'Assignment')}
+      label={translate(fa, 'legacyAssignment')}
       endpoint="/learning/plans"
       fa={fa}
       options={(data) =>
@@ -270,7 +268,7 @@ function AssignmentSelect({ fa }: { fa: boolean }) {
                 .filter((assignment) => assignment.status !== 'submitted')
                 .map((assignment) => ({
                   value: stringValue(assignment.id),
-                  label: `${stringValue(assignment.title) || tr(fa, 'تکلیف بدون عنوان', 'Untitled assignment')} — ${stringValue(plan.title) || tr(fa, 'برنامه یادگیری', 'Learning plan')}${assignment.dueAt ? ` · ${localizedDate(assignment.dueAt, fa)}` : ''}`,
+                  label: `${stringValue(assignment.title) || translate(fa, 'legacyUntitledAssignment')} — ${stringValue(plan.title) || translate(fa, 'legacyLearningPlan')}${assignment.dueAt ? ` · ${localizedDate(assignment.dueAt, fa)}` : ''}`,
                 }))
                 .filter((option) => option.value)
             : [],
@@ -283,7 +281,7 @@ function LearningPlanSelect({ fa }: { fa: boolean }) {
   return (
     <EntitySelect
       name="planId"
-      label={tr(fa, 'برنامه یادگیری', 'Learning plan')}
+      label={translate(fa, 'legacylearningPlan2')}
       endpoint="/learning/plans"
       fa={fa}
       options={(data) =>
@@ -293,8 +291,8 @@ function LearningPlanSelect({ fa }: { fa: boolean }) {
             return {
               value: stringValue(plan.id),
               label: [
-                stringValue(plan.title) || tr(fa, 'برنامه بدون عنوان', 'Untitled plan'),
-                stringValue(student?.name) || tr(fa, 'زبان‌آموز', 'Student'),
+                stringValue(plan.title) || translate(fa, 'legacyUntitledPlan'),
+                stringValue(student?.name) || translate(fa, 'legacyStudent'),
               ].join(' — '),
             };
           })
@@ -307,7 +305,7 @@ function StudentSelect({ fa }: { fa: boolean }) {
   return (
     <EntitySelect
       name="studentId"
-      label={tr(fa, 'زبان‌آموز', 'Student')}
+      label={translate(fa, 'legacystudent2')}
       endpoint="/bookings/students"
       fa={fa}
       options={(data) =>
@@ -319,7 +317,7 @@ function StudentSelect({ fa }: { fa: boolean }) {
           )
           .map((student) => ({
             value: stringValue(student.id),
-            label: [stringValue(student.name) || tr(fa, 'بدون نام', 'Unnamed'), stringValue(student.phone)]
+            label: [stringValue(student.name) || translate(fa, 'legacyUnnamed'), stringValue(student.phone)]
               .filter(Boolean)
               .join(' — '),
           }))
@@ -332,7 +330,7 @@ function BookingSelect({ fa }: { fa: boolean }) {
   return (
     <EntitySelect
       name="bookingId"
-      label={tr(fa, 'کلاس رزروشده', 'Booked class')}
+      label={translate(fa, 'legacyBookedClass')}
       endpoint="/bookings/me"
       fa={fa}
       options={(data) =>
@@ -342,7 +340,7 @@ function BookingSelect({ fa }: { fa: boolean }) {
             const student = nested(booking, 'student');
             return {
               value: stringValue(booking.id),
-              label: `${stringValue(student?.name) || stringValue(student?.phone) || tr(fa, 'زبان‌آموز', 'Student')} — ${localizedDate(booking.startsAt, fa)}`,
+              label: `${stringValue(student?.name) || stringValue(student?.phone) || translate(fa, 'legacystudent3')} — ${localizedDate(booking.startsAt, fa)}`,
             };
           })
           .filter((option) => option.value)
@@ -354,7 +352,7 @@ function AdminUserSelect({ fa }: { fa: boolean }) {
   return (
     <EntitySelect
       name="userId"
-      label={tr(fa, 'کاربر', 'User')}
+      label={translate(fa, 'legacyUser')}
       endpoint="/admin/users?page=1"
       fa={fa}
       options={(data) =>
@@ -362,7 +360,7 @@ function AdminUserSelect({ fa }: { fa: boolean }) {
           .map((user) => ({
             value: stringValue(user.id),
             label: [
-              stringValue(user.name) || tr(fa, 'بدون نام', 'Unnamed'),
+              stringValue(user.name) || translate(fa, 'legacyunnamed2'),
               stringValue(user.phone),
               stringValue(user.email),
             ]
@@ -375,10 +373,11 @@ function AdminUserSelect({ fa }: { fa: boolean }) {
   );
 }
 function TeacherApplicationSelect({ fa }: { fa: boolean }) {
+  const { locale } = useTranslations();
   return (
     <EntitySelect
       name="teacherId"
-      label={tr(fa, 'درخواست مدرس', 'Teacher application')}
+      label={translate(fa, 'legacyTeacherApplication')}
       endpoint="/admin/teacher-applications"
       fa={fa}
       options={(data) =>
@@ -388,7 +387,7 @@ function TeacherApplicationSelect({ fa }: { fa: boolean }) {
             return {
               value: stringValue(teacher.id),
               label: [
-                fa ? stringValue(teacher.nameFa) : stringValue(teacher.nameEn),
+                localized({ fa: stringValue(teacher.nameFa), en: stringValue(teacher.nameEn) }, locale),
                 stringValue(user?.phone),
                 stringValue(teacher.status),
               ]
@@ -402,17 +401,21 @@ function TeacherApplicationSelect({ fa }: { fa: boolean }) {
   );
 }
 function ApprovedTeacherSelect({ fa }: { fa: boolean }) {
+  const { locale } = useTranslations();
   return (
     <EntitySelect
       name="teacherId"
-      label={tr(fa, 'مدرس', 'Teacher')}
+      label={translate(fa, 'legacyTeacher')}
       endpoint="/teachers?limit=50"
       fa={fa}
       options={(data) =>
         rows(data)
           .map((teacher) => ({
             value: stringValue(teacher.id),
-            label: [fa ? stringValue(teacher.nameFa) : stringValue(teacher.nameEn), stringValue(teacher.specialties)]
+            label: [
+              localized({ fa: stringValue(teacher.nameFa), en: stringValue(teacher.nameEn) }, locale),
+              stringValue(teacher.specialties),
+            ]
               .filter(Boolean)
               .join(' — '),
           }))
@@ -422,10 +425,11 @@ function ApprovedTeacherSelect({ fa }: { fa: boolean }) {
   );
 }
 function PaymentSelect({ fa }: { fa: boolean }) {
+  const { locale } = useTranslations();
   return (
     <EntitySelect
       name="paymentId"
-      label={tr(fa, 'پرداخت', 'Payment')}
+      label={translate(fa, 'legacyPayment')}
       endpoint="/admin/payments"
       fa={fa}
       options={(data) =>
@@ -435,13 +439,13 @@ function PaymentSelect({ fa }: { fa: boolean }) {
             const user = nested(payment, 'user'),
               amount =
                 typeof payment.amount === 'number'
-                  ? new Intl.NumberFormat(fa ? 'fa-IR' : 'en-US').format(payment.amount)
+                  ? new Intl.NumberFormat(translate(locale, 'commercepricingManagerEnUS2')).format(payment.amount)
                   : '';
             return {
               value: stringValue(payment.id),
               label: [
-                stringValue(user?.name) || stringValue(user?.phone) || tr(fa, 'کاربر', 'User'),
-                amount && (fa ? `${amount} تومان` : `${amount} IRR`),
+                stringValue(user?.name) || stringValue(user?.phone) || translate(fa, 'legacyuser2'),
+                amount && localized({ fa: `${amount} تومان`, en: `${amount} IRR` }, locale),
                 localizedDate(payment.createdAt, fa),
                 stringValue(payment.status),
               ]
@@ -461,24 +465,25 @@ function Submit({ busy, fa, children }: { busy: boolean; children: React.ReactNo
       disabled={busy}
       className="mt-4 rounded-full bg-gradient-to-r from-blue to-purple px-6 py-3 font-black text-white shadow-lg shadow-purple/15 transition hover:-translate-y-0.5 disabled:opacity-50"
     >
-      {busy ? tr(fa, 'در حال انجام…', 'Working…') : children}
+      {busy ? translate(fa, 'legacyWorking') : children}
     </button>
   );
 }
 
 export function PanelActions({ role, section, endpoint }: Props) {
   const { locale } = useTranslations();
-  const fa = locale === 'fa';
+  const fa = isDefaultLocale(locale);
   if (role === 'student') return <StudentActions section={section} endpoint={endpoint} fa={fa} />;
   if (role === 'teacher') return <TeacherActions section={section} endpoint={endpoint} fa={fa} />;
   return <AdminActions section={section} endpoint={endpoint} fa={fa} />;
 }
 
 function StudentActions({ section, endpoint, fa }: Omit<Props, 'role'> & Localized) {
+  const { locale } = useTranslations();
   const action = useAction(endpoint);
   if (section === 'profile')
     return (
-      <Shell title={tr(fa, 'تکمیل پروفایل', 'Complete profile')}>
+      <Shell title={translate(fa, 'legacyCompleteProfile')}>
         <form
           className="mt-4 grid gap-4 md:grid-cols-2"
           onSubmit={(event) => {
@@ -490,23 +495,23 @@ function StudentActions({ section, endpoint, fa }: Omit<Props, 'role'> & Localiz
                 body: JSON.stringify({
                   name: value(form, 'name'),
                   email: value(form, 'email') || undefined,
-                  locale: value(form, 'locale') || (fa ? 'fa' : 'en'),
+                  locale: value(form, 'locale') || translate(locale, 'panelpanelActionsEn'),
                   timezone: value(form, 'timezone') || 'Asia/Tehran',
                 }),
               }),
             );
           }}
         >
-          <Field name="name" label={tr(fa, 'نام', 'Name')} required />
-          <Field name="email" label={tr(fa, 'ایمیل', 'Email')} type="email" dir="ltr" />
-          <Select name="locale" label={tr(fa, 'زبان رابط', 'Interface language')}>
+          <Field name="name" label={translate(fa, 'legacyName')} required />
+          <Field name="email" label={translate(fa, 'legacyEmail')} type="email" dir="ltr" />
+          <Select name="locale" label={translate(fa, 'legacyInterfaceLanguage')}>
             <option value="fa">فارسی</option>
             <option value="en">English</option>
           </Select>
-          <Field name="timezone" label={tr(fa, 'منطقه زمانی', 'Timezone')} defaultValue="Asia/Tehran" dir="ltr" />
+          <Field name="timezone" label={translate(fa, 'legacyTimezone')} defaultValue="Asia/Tehran" dir="ltr" />
           <div className="md:col-span-2">
             <Submit fa={fa} busy={action.isPending}>
-              {tr(fa, 'ذخیره پروفایل', 'Save profile')}
+              {translate(fa, 'legacySaveProfile')}
             </Submit>
           </div>
         </form>
@@ -516,7 +521,7 @@ function StudentActions({ section, endpoint, fa }: Omit<Props, 'role'> & Localiz
   if (section === 'tickets') return <TicketForm endpoint={endpoint} fa={fa} />;
   if (section === 'plan')
     return (
-      <Shell title={tr(fa, 'ارسال پاسخ تکلیف', 'Submit assignment')}>
+      <Shell title={translate(fa, 'legacySubmitAssignment')}>
         <form
           className="mt-4 grid gap-4"
           onSubmit={(event) => {
@@ -531,9 +536,9 @@ function StudentActions({ section, endpoint, fa }: Omit<Props, 'role'> & Localiz
           }}
         >
           <AssignmentSelect fa={fa} />
-          <Area name="submission" label={tr(fa, 'پاسخ', 'Response')} required />
+          <Area name="submission" label={translate(fa, 'legacyResponse')} required />
           <Submit fa={fa} busy={action.isPending}>
-            {tr(fa, 'ارسال پاسخ', 'Submit response')}
+            {translate(fa, 'legacySubmitResponse')}
           </Submit>
         </form>
         <Status fa={fa} error={action.error} ok={action.isSuccess} />
@@ -552,7 +557,7 @@ function TeacherActions({ section, endpoint, fa }: Omit<Props, 'role'> & Localiz
   if (section === 'availability')
     return (
       <div className="grid gap-5 xl:grid-cols-3">
-        <Shell title={tr(fa, 'قانون هفتگی', 'Weekly rule')}>
+        <Shell title={translate(fa, 'legacyWeeklyRule')}>
           <form
             className="mt-4 grid gap-4"
             onSubmit={(event) => {
@@ -577,7 +582,7 @@ function TeacherActions({ section, endpoint, fa }: Omit<Props, 'role'> & Localiz
           >
             <Field
               name="weekday"
-              label={tr(fa, 'روز هفته (۰ تا ۶)', 'Weekday (0–6)')}
+              label={translate(fa, 'legacyWeekday06')}
               type="number"
               min={0}
               max={6}
@@ -585,7 +590,7 @@ function TeacherActions({ section, endpoint, fa }: Omit<Props, 'role'> & Localiz
             />
             <Field
               name="startMinute"
-              label={tr(fa, 'دقیقه شروع روز', 'Start minute of day')}
+              label={translate(fa, 'legacyStartMinuteOfDay')}
               type="number"
               min={0}
               max={1440}
@@ -593,20 +598,20 @@ function TeacherActions({ section, endpoint, fa }: Omit<Props, 'role'> & Localiz
             />
             <Field
               name="endMinute"
-              label={tr(fa, 'دقیقه پایان روز', 'End minute of day')}
+              label={translate(fa, 'legacyEndMinuteOfDay')}
               type="number"
               min={0}
               max={1440}
               defaultValue={1020}
             />
-            <Field name="timezone" label={tr(fa, 'منطقه زمانی', 'Timezone')} defaultValue="Asia/Tehran" dir="ltr" />
+            <Field name="timezone" label={translate(fa, 'legacytimezone2')} defaultValue="Asia/Tehran" dir="ltr" />
             <Submit fa={fa} busy={action.isPending}>
-              {tr(fa, 'ثبت قانون', 'Save rule')}
+              {translate(fa, 'legacySaveRule')}
             </Submit>
           </form>
           <Status fa={fa} error={action.error} ok={action.isSuccess} />
         </Shell>
-        <Shell title={tr(fa, 'استثنای روز خاص', 'Date override')}>
+        <Shell title={translate(fa, 'legacyDateOverride')}>
           <form
             className="mt-4 grid gap-4"
             onSubmit={(event) => {
@@ -626,14 +631,14 @@ function TeacherActions({ section, endpoint, fa }: Omit<Props, 'role'> & Localiz
               );
             }}
           >
-            <Field name="date" label={tr(fa, 'تاریخ', 'Date')} type="date" required />
+            <Field name="date" label={translate(fa, 'legacyDate')} type="date" required />
             <label className="flex gap-2 text-sm font-bold">
               <input name="available" type="checkbox" defaultChecked />
-              {tr(fa, 'در دسترس', 'Available')}
+              {translate(fa, 'legacyAvailable')}
             </label>
             <Field
               name="startMinute"
-              label={tr(fa, 'دقیقه شروع', 'Start minute')}
+              label={translate(fa, 'legacyStartMinute')}
               type="number"
               min={0}
               max={1440}
@@ -641,19 +646,19 @@ function TeacherActions({ section, endpoint, fa }: Omit<Props, 'role'> & Localiz
             />
             <Field
               name="endMinute"
-              label={tr(fa, 'دقیقه پایان', 'End minute')}
+              label={translate(fa, 'legacyEndMinute')}
               type="number"
               min={0}
               max={1440}
               defaultValue={1020}
             />
-            <Field name="reason" label={tr(fa, 'دلیل', 'Reason')} />
+            <Field name="reason" label={translate(fa, 'legacyReason')} />
             <Submit fa={fa} busy={action.isPending}>
-              {tr(fa, 'ثبت استثنا', 'Save override')}
+              {translate(fa, 'legacySaveOverride')}
             </Submit>
           </form>
         </Shell>
-        <Shell title={tr(fa, 'مسدودسازی بازه', 'Block time range')}>
+        <Shell title={translate(fa, 'legacyBlockTimeRange')}>
           <form
             className="mt-4 grid gap-4"
             onSubmit={(event) => {
@@ -671,11 +676,11 @@ function TeacherActions({ section, endpoint, fa }: Omit<Props, 'role'> & Localiz
               );
             }}
           >
-            <Field name="startsAt" label={tr(fa, 'شروع', 'Starts at')} type="datetime-local" required />
-            <Field name="endsAt" label={tr(fa, 'پایان', 'Ends at')} type="datetime-local" required />
-            <Field name="reason" label={tr(fa, 'دلیل', 'Reason')} />
+            <Field name="startsAt" label={translate(fa, 'legacyStartsAt')} type="datetime-local" required />
+            <Field name="endsAt" label={translate(fa, 'legacyEndsAt')} type="datetime-local" required />
+            <Field name="reason" label={translate(fa, 'legacyreason2')} />
             <Submit fa={fa} busy={action.isPending}>
-              {tr(fa, 'مسدود کن', 'Block period')}
+              {translate(fa, 'legacyBlockPeriod')}
             </Submit>
           </form>
           <Status fa={fa} error={action.error} ok={action.isSuccess} />
@@ -703,18 +708,12 @@ function TeacherIntroVideo({ endpoint, fa }: { endpoint: string } & Localized) {
   const [busy, setBusy] = useState(false),
     [error, setError] = useState('');
   return (
-    <Shell title={tr(fa, 'ویدیوی معرفی', 'Introduction video')}>
-      <p className="mt-2 text-sm leading-7 text-muted">
-        {tr(
-          fa,
-          'یک ویدیوی MP4، WebM یا MOV حداکثر ۵۰ مگابایت بارگذاری کنید. با ثبت فایل جدید، ویدیوی قبلی جایگزین می‌شود.',
-          'Upload an MP4, WebM, or MOV video up to 50 MB. A new upload replaces the previous video.',
-        )}
-      </p>
+    <Shell title={translate(fa, 'legacyIntroductionVideo')}>
+      <p className="mt-2 text-sm leading-7 text-muted">{translate(fa, 'legacyUploadAnMP4WebMOrMOVVideoUp')}</p>
       <p className="mt-3 rounded-xl bg-[#f5f6fa] p-3 text-sm">
         {application.data?.introVideoKey
-          ? tr(fa, 'ویدیوی معرفی ثبت شده است.', 'An introduction video is saved.')
-          : tr(fa, 'هنوز ویدیویی ثبت نشده است.', 'No introduction video has been uploaded.')}
+          ? translate(fa, 'legacyAnIntroductionVideoIsSaved')
+          : translate(fa, 'legacyNoIntroductionVideoHasBeenUploaded')}
       </p>
       {preview.data?.url && (
         <div className="mt-4 overflow-hidden rounded-2xl border hairline">
@@ -745,7 +744,7 @@ function TeacherIntroVideo({ endpoint, fa }: { endpoint: string } & Localized) {
             );
             element.reset();
           } catch (reason) {
-            setError(apiMessage(reason, tr(fa, 'بارگذاری ویدئو ناموفق بود.', 'Video upload failed.')));
+            setError(apiMessage(reason, translate(fa, 'legacyVideoUploadFailed')));
           } finally {
             setBusy(false);
           }
@@ -759,7 +758,7 @@ function TeacherIntroVideo({ endpoint, fa }: { endpoint: string } & Localized) {
           className="w-full rounded-xl border hairline p-3"
         />
         <Submit fa={fa} busy={busy || action.isPending}>
-          {tr(fa, 'ذخیره ویدیوی معرفی', 'Save introduction video')}
+          {translate(fa, 'legacySaveIntroductionVideo')}
         </Submit>
       </form>
       {error && (
@@ -773,6 +772,7 @@ function TeacherIntroVideo({ endpoint, fa }: { endpoint: string } & Localized) {
 }
 
 function TeacherApplicationForm({ endpoint, fa }: { endpoint: string } & Localized) {
+  const { locale } = useTranslations();
   const action = useAction(endpoint);
   const languages = useQuery({ queryKey: ['languages'], queryFn: () => api<EducationalLanguage[]>('/languages') });
   const application = useQuery({
@@ -792,13 +792,9 @@ function TeacherApplicationForm({ endpoint, fa }: { endpoint: string } & Localiz
   const fieldError = (name: string) =>
     action.error instanceof ApiError ? action.error.details.fieldErrors?.[name] : undefined;
   return (
-    <Shell title={tr(fa, 'پروفایل درخواست مدرس', 'Teacher application profile')}>
+    <Shell title={translate(fa, 'legacyTeacherApplicationProfile')}>
       <p className="mt-2 text-sm leading-7 text-muted">
-        {tr(
-          fa,
-          'نام و بیوگرافی را فارسی و انگلیسی بنویسید. تخصص‌ها را مثل writing,speaking وارد کنید و حداقل یک زبان را از گزینه‌های زیر انتخاب کنید.',
-          'Enter names and biographies in both languages, use specialties such as writing,speaking, and select at least one teaching language below.',
-        )}
+        {translate(fa, 'legacyEnterNamesAndBiographiesInBothLanguagesUse')}
       </p>
       <form
         key={current ? 'loaded' : 'loading'}
@@ -825,7 +821,7 @@ function TeacherApplicationForm({ endpoint, fa }: { endpoint: string } & Localiz
       >
         <Field
           name="nameFa"
-          label={tr(fa, 'نام فارسی؛ مثال: علی رضایی', 'Persian name')}
+          label={translate(fa, 'legacyPersianName')}
           defaultValue={current?.nameFa}
           minLength={2}
           maxLength={80}
@@ -834,7 +830,7 @@ function TeacherApplicationForm({ endpoint, fa }: { endpoint: string } & Localiz
         />
         <Field
           name="nameEn"
-          label={tr(fa, 'نام انگلیسی؛ مثال: Ali Rezaei', 'English name')}
+          label={translate(fa, 'legacyEnglishName')}
           defaultValue={current?.nameEn}
           minLength={2}
           maxLength={80}
@@ -844,11 +840,7 @@ function TeacherApplicationForm({ endpoint, fa }: { endpoint: string } & Localiz
         />
         <Area
           name="bioFa"
-          label={tr(
-            fa,
-            'بیوگرافی فارسی؛ حداقل ۴۰ حرف درباره سابقه و روش تدریس',
-            'Persian biography; at least 40 characters',
-          )}
+          label={translate(fa, 'legacyPersianBiographyAtLeast40Characters')}
           defaultValue={current?.bioFa}
           minLength={40}
           maxLength={3000}
@@ -857,7 +849,7 @@ function TeacherApplicationForm({ endpoint, fa }: { endpoint: string } & Localiz
         />
         <Area
           name="bioEn"
-          label={tr(fa, 'بیوگرافی انگلیسی؛ حداقل ۴۰ حرف', 'English biography; at least 40 characters')}
+          label={translate(fa, 'legacyEnglishBiographyAtLeast40Characters')}
           defaultValue={current?.bioEn}
           minLength={40}
           maxLength={3000}
@@ -867,7 +859,7 @@ function TeacherApplicationForm({ endpoint, fa }: { endpoint: string } & Localiz
         />
         <Field
           name="specialties"
-          label={tr(fa, 'تخصص‌ها با کاما؛ مثال: writing,speaking', 'Specialties; e.g. writing,speaking')}
+          label={translate(fa, 'legacySpecialtiesEGWritingSpeaking')}
           defaultValue={current?.specialties?.join(',') || 'writing,speaking'}
           error={fieldError('specialties')}
           dir="ltr"
@@ -875,7 +867,7 @@ function TeacherApplicationForm({ endpoint, fa }: { endpoint: string } & Localiz
         />
         <Field
           name="levels"
-          label={tr(fa, 'سطح‌ها با کاما؛ مثال: A1,A2,B1', 'Levels; e.g. A1,A2,B1')}
+          label={translate(fa, 'legacyLevelsEGA1A2B1')}
           defaultValue={
             current?.languageLinks
               ?.flatMap((link) => link.levels ?? [])
@@ -886,9 +878,7 @@ function TeacherApplicationForm({ endpoint, fa }: { endpoint: string } & Localiz
           dir="ltr"
         />
         <fieldset className={fieldError('languageIds') ? 'rounded-2xl border border-red-300 bg-red-50/30 p-3' : ''}>
-          <legend className="mb-2 text-sm font-bold">
-            {tr(fa, 'زبان‌هایی که تدریس می‌کنید (حداقل یک مورد)', 'Languages you teach (select at least one)')}
-          </legend>
+          <legend className="mb-2 text-sm font-bold">{translate(fa, 'legacyLanguagesYouTeachSelectAtLeastOne')}</legend>
           <div className="flex flex-wrap gap-2">
             {languages.data?.map((language) => (
               <label key={language.id} className="rounded-xl border hairline bg-white px-3 py-2">
@@ -899,7 +889,7 @@ function TeacherApplicationForm({ endpoint, fa }: { endpoint: string } & Localiz
                   className="mx-2"
                   defaultChecked={current?.languageLinks?.some((link) => link.languageId === language.id)}
                 />
-                {language.flag} {fa ? language.nameFa : language.nameEn}
+                {language.flag} {localized({ fa: language.nameFa, en: language.nameEn }, locale)}
               </label>
             ))}
           </div>
@@ -911,7 +901,7 @@ function TeacherApplicationForm({ endpoint, fa }: { endpoint: string } & Localiz
         </fieldset>
         <Field
           name="experienceYears"
-          label={tr(fa, 'تعداد سال سابقه؛ مثلاً ۳', 'Years of experience; e.g. 3')}
+          label={translate(fa, 'legacyYearsOfExperienceEG3')}
           type="number"
           min={0}
           max={60}
@@ -920,7 +910,7 @@ function TeacherApplicationForm({ endpoint, fa }: { endpoint: string } & Localiz
           error={fieldError('experienceYears')}
         />
         <Submit fa={fa} busy={action.isPending || languages.isLoading}>
-          {tr(fa, 'ذخیره اطلاعات', 'Save application')}
+          {translate(fa, 'legacySaveApplication')}
         </Submit>
       </form>
       <Status fa={fa} error={action.error} ok={action.isSuccess} />
@@ -946,7 +936,7 @@ function TeacherFiles({ endpoint, fa }: { endpoint: string } & Localized) {
   );
   const documentsReady = uploadedKinds.has('identity') && uploadedKinds.has('certificate');
   return (
-    <Shell title={tr(fa, 'مدارک و ویدئوی معرفی', 'Documents and introduction video')}>
+    <Shell title={translate(fa, 'legacyDocumentsAndIntroductionVideo')}>
       <form
         className="mt-4 grid gap-4"
         onSubmit={async (event) => {
@@ -957,8 +947,7 @@ function TeacherFiles({ endpoint, fa }: { endpoint: string } & Localized) {
           const form = new FormData(formElement);
           try {
             const file = form.get('file');
-            if (!(file instanceof File) || !file.size)
-              throw new Error(tr(fa, 'فایلی انتخاب نشده است.', 'Select a file first.'));
+            if (!(file instanceof File) || !file.size) throw new Error(translate(fa, 'legacySelectAFileFirst'));
             const kind = value(form, 'kind');
             const fileId = await uploadFile(
               file,
@@ -972,32 +961,21 @@ function TeacherFiles({ endpoint, fa }: { endpoint: string } & Localized) {
             );
             formElement.reset();
           } catch (error) {
-            setFileError(
-              apiMessage(
-                error,
-                tr(
-                  fa,
-                  'آپلود ناموفق بود. اتصال و نوع فایل را بررسی و دوباره تلاش کنید.',
-                  'Upload failed. Check the connection and file type, then try again.',
-                ),
-              ),
-            );
+            setFileError(apiMessage(error, translate(fa, 'legacyUploadFailedCheckTheConnectionAndFileType')));
           } finally {
             setBusy(false);
           }
         }}
       >
-        <Select name="kind" label={tr(fa, 'نوع مدرک', 'Document type')}>
-          <option value="identity">{tr(fa, 'هویت', 'Identity')}</option>
-          <option value="certificate">{tr(fa, 'مدرک آموزشی', 'Certificate')}</option>
-          <option value="experience">{tr(fa, 'سابقه کاری', 'Experience')}</option>
-          <option value="demo-lesson">{tr(fa, 'دموی تدریس', 'Teaching demo')}</option>
-          <option value="intro-video">{tr(fa, 'ویدئوی معرفی', 'Introduction video')}</option>
+        <Select name="kind" label={translate(fa, 'legacyDocumentType')}>
+          <option value="identity">{translate(fa, 'legacyIdentity')}</option>
+          <option value="certificate">{translate(fa, 'legacyCertificate')}</option>
+          <option value="experience">{translate(fa, 'legacyExperience')}</option>
+          <option value="demo-lesson">{translate(fa, 'legacyTeachingDemo')}</option>
+          <option value="intro-video">{translate(fa, 'legacyintroductionVideo2')}</option>
         </Select>
         <label className="block">
-          <span className="mb-2 block text-sm font-bold">
-            {tr(fa, 'فایل (حداکثر ۵۰ مگابایت)', 'File (maximum 50 MB)')}
-          </span>
+          <span className="mb-2 block text-sm font-bold">{translate(fa, 'legacyFileMaximum50MB')}</span>
           <input
             name="file"
             type="file"
@@ -1007,23 +985,15 @@ function TeacherFiles({ endpoint, fa }: { endpoint: string } & Localized) {
           />
         </label>
         <Submit fa={fa} busy={busy || action.isPending}>
-          {tr(fa, 'آپلود و اتصال', 'Upload and attach')}
+          {translate(fa, 'legacyUploadAndAttach')}
         </Submit>
       </form>
       <p
         className={`mt-5 rounded-xl p-3 text-sm ${documentsReady ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-900'}`}
       >
         {documentsReady
-          ? tr(
-              fa,
-              'هر دو مدرک الزامی بارگذاری شده‌اند؛ درخواست را ارسال کنید.',
-              'Both required documents are uploaded; submit your application.',
-            )
-          : tr(
-              fa,
-              'برای ارسال درخواست، یک مدرک «هویت» و یک «مدرک آموزشی» جداگانه بارگذاری کنید.',
-              'Upload one Identity document and one Teaching certificate before submitting.',
-            )}
+          ? translate(fa, 'legacyBothRequiredDocumentsAreUploadedSubmitYourApplication')
+          : translate(fa, 'legacyUploadOneIdentityDocumentAndOneTeachingCertificate')}
       </p>
       <div className="mt-3 grid gap-2">
         {(application.data?.verificationItems ?? []).map((item) => (
@@ -1057,20 +1027,18 @@ function TeacherFiles({ endpoint, fa }: { endpoint: string } & Localized) {
                 );
                 element.reset();
               } catch (error) {
-                setFileError(apiMessage(error, tr(fa, 'ارسال مجدد مدرک ناموفق بود.', 'Document resubmission failed.')));
+                setFileError(apiMessage(error, translate(fa, 'legacyDocumentResubmissionFailed')));
               } finally {
                 setBusy(false);
               }
             }}
           >
             <strong>
-              {tr(fa, 'نیازمند اصلاح: ', 'Needs revision: ')}
+              {translate(fa, 'legacyNeedsRevision')}
               {item.kind}
             </strong>
             <p className="my-2 text-sm text-amber-900">
-              {item.rejectionReason ||
-                item.note ||
-                tr(fa, 'نسخه اصلاح‌شده مدرک را بارگذاری کنید.', 'Upload a corrected version.')}
+              {item.rejectionReason || item.note || translate(fa, 'legacyUploadACorrectedVersion')}
             </p>
             <input
               name="file"
@@ -1080,7 +1048,7 @@ function TeacherFiles({ endpoint, fa }: { endpoint: string } & Localized) {
               className="w-full rounded-xl border bg-white p-2"
             />
             <Submit fa={fa} busy={busy || action.isPending}>
-              {tr(fa, 'بارگذاری نسخه جدید و ارسال مجدد', 'Upload corrected file and resubmit')}
+              {translate(fa, 'legacyUploadCorrectedFileAndResubmit')}
             </Submit>
           </form>
         ))}
@@ -1092,7 +1060,7 @@ function TeacherFiles({ endpoint, fa }: { endpoint: string } & Localized) {
         }}
       >
         <Submit fa={fa} busy={action.isPending || application.isLoading || !documentsReady}>
-          {tr(fa, 'ارسال برای بررسی', 'Submit for review')}
+          {translate(fa, 'legacySubmitForReview')}
         </Submit>
       </form>
       {fileError && (
@@ -1112,7 +1080,7 @@ function documentKind(kind: string, fa: boolean) {
     experience: ['سابقه کاری', 'Experience'],
     ['demo-lesson']: ['دموی تدریس', 'Teaching demo'],
   };
-  return (map[kind] ?? [kind, kind])[fa ? 0 : 1];
+  return (map[kind] ?? [kind, kind])[localized({ fa: 0, en: 1 }, fa)];
 }
 function documentStatus(status: string, fa: boolean) {
   const map: Record<string, [string, string]> = {
@@ -1122,13 +1090,13 @@ function documentStatus(status: string, fa: boolean) {
     REJECTED: ['ردشده', 'Rejected'],
     NEEDS_REVISION: ['نیازمند اصلاح', 'Needs revision'],
   };
-  return (map[status] ?? [status, status])[fa ? 0 : 1];
+  return (map[status] ?? [status, status])[localized({ fa: 0, en: 1 }, fa)];
 }
 
 function TicketForm({ endpoint, fa }: { endpoint: string } & Localized) {
   const action = useAction(endpoint);
   return (
-    <Shell title={tr(fa, 'تیکت پشتیبانی', 'Support ticket')}>
+    <Shell title={translate(fa, 'legacySupportTicket')}>
       <form
         className="mt-4 grid gap-4"
         onSubmit={(event) => {
@@ -1147,16 +1115,16 @@ function TicketForm({ endpoint, fa }: { endpoint: string } & Localized) {
           );
         }}
       >
-        <Field name="subject" label={tr(fa, 'موضوع', 'Subject')} required />
-        <Field name="category" label={tr(fa, 'دسته', 'Category')} defaultValue="general" dir="ltr" />
-        <Select name="priority" label={tr(fa, 'اولویت', 'Priority')}>
-          <option value="normal">{tr(fa, 'معمولی', 'Normal')}</option>
-          <option value="high">{tr(fa, 'بالا', 'High')}</option>
-          <option value="urgent">{tr(fa, 'فوری', 'Urgent')}</option>
+        <Field name="subject" label={translate(fa, 'legacySubject')} required />
+        <Field name="category" label={translate(fa, 'legacyCategory')} defaultValue="general" dir="ltr" />
+        <Select name="priority" label={translate(fa, 'legacyPriority')}>
+          <option value="normal">{translate(fa, 'legacyNormal')}</option>
+          <option value="high">{translate(fa, 'legacyHigh')}</option>
+          <option value="urgent">{translate(fa, 'legacyUrgent')}</option>
         </Select>
-        <Area name="body" label={tr(fa, 'شرح', 'Message')} required />
+        <Area name="body" label={translate(fa, 'legacyMessage')} required />
         <Submit fa={fa} busy={action.isPending}>
-          {tr(fa, 'ثبت تیکت', 'Create ticket')}
+          {translate(fa, 'legacyCreateTicket')}
         </Submit>
       </form>
       <Status fa={fa} error={action.error} ok={action.isSuccess} />
@@ -1167,7 +1135,7 @@ function TicketForm({ endpoint, fa }: { endpoint: string } & Localized) {
 function PackageForm({ endpoint, fa }: { endpoint: string } & Localized) {
   const action = useAction(endpoint);
   return (
-    <Shell title={tr(fa, 'ایجاد بسته آموزشی', 'Create teaching package')}>
+    <Shell title={translate(fa, 'legacyCreateTeachingPackage')}>
       <form
         className="mt-4 grid gap-4 md:grid-cols-2"
         onSubmit={(event) => {
@@ -1192,9 +1160,9 @@ function PackageForm({ endpoint, fa }: { endpoint: string } & Localized) {
           );
         }}
       >
-        <Field name="titleFa" label={tr(fa, 'عنوان فارسی', 'Persian title')} required />
-        <Field name="titleEn" label={tr(fa, 'عنوان انگلیسی', 'English title')} required dir="ltr" />
-        <Select name="credits" label={tr(fa, 'تعداد جلسات بسته', 'Sessions in package')}>
+        <Field name="titleFa" label={translate(fa, 'legacyPersianTitle')} required />
+        <Field name="titleEn" label={translate(fa, 'legacyEnglishTitle')} required dir="ltr" />
+        <Select name="credits" label={translate(fa, 'legacySessionsInPackage')}>
           {PACKAGE_TIERS.map((tier) => (
             <option key={tier} value={tier}>
               {tr(fa, `${tier} جلسه`, `${tier} session${tier === 1 ? '' : 's'}`)}
@@ -1203,7 +1171,7 @@ function PackageForm({ endpoint, fa }: { endpoint: string } & Localized) {
         </Select>
         <Field
           name="lessonMinutes"
-          label={tr(fa, 'دقیقه هر جلسه', 'Minutes per lesson')}
+          label={translate(fa, 'legacyMinutesPerLesson')}
           type="number"
           min={15}
           max={240}
@@ -1211,17 +1179,17 @@ function PackageForm({ endpoint, fa }: { endpoint: string } & Localized) {
         />
         <Field
           name="discountPercent"
-          label={tr(fa, 'درصد تخفیف بسته', 'Package discount %')}
+          label={translate(fa, 'legacyPackageDiscount')}
           type="number"
           min={0}
           max={80}
           defaultValue={0}
         />
-        <Area name="descriptionFa" label={tr(fa, 'توضیح فارسی', 'Persian description')} required />
-        <Area name="descriptionEn" label={tr(fa, 'توضیح انگلیسی', 'English description')} required dir="ltr" />
+        <Area name="descriptionFa" label={translate(fa, 'legacyPersianDescription')} required />
+        <Area name="descriptionEn" label={translate(fa, 'legacyEnglishDescription')} required dir="ltr" />
         <div className="md:col-span-2">
           <Submit fa={fa} busy={action.isPending}>
-            {tr(fa, 'ثبت بسته برای تأیید', 'Submit package for approval')}
+            {translate(fa, 'legacySubmitPackageForApproval')}
           </Submit>
         </div>
       </form>
@@ -1234,7 +1202,7 @@ function PlanForm({ endpoint, fa }: { endpoint: string } & Localized) {
   const action = useAction(endpoint);
   return (
     <div className="grid gap-5 xl:grid-cols-2">
-      <Shell title={tr(fa, 'ساخت برنامه یادگیری', 'Create learning plan')}>
+      <Shell title={translate(fa, 'legacyCreateLearningPlan')}>
         <form
           className="mt-4 grid gap-4 md:grid-cols-2"
           onSubmit={(event) => {
@@ -1256,34 +1224,34 @@ function PlanForm({ endpoint, fa }: { endpoint: string } & Localized) {
           }}
         >
           <StudentSelect fa={fa} />
-          <Field name="title" label={tr(fa, 'عنوان برنامه', 'Plan title')} required />
+          <Field name="title" label={translate(fa, 'legacyPlanTitle')} required />
           <Field
             name="targetBand"
-            label={tr(fa, 'نمره هدف', 'Target band')}
+            label={translate(fa, 'legacyTargetBand')}
             type="number"
             step="0.5"
             min={4}
             max={9}
             defaultValue={7}
           />
-          <Field name="examDate" label={tr(fa, 'تاریخ آزمون', 'Exam date')} type="date" />
+          <Field name="examDate" label={translate(fa, 'legacyExamDate')} type="date" />
           <Field
             name="weakSkills"
-            label={tr(fa, 'مهارت‌های ضعیف با کاما', 'Weak skills, comma separated')}
+            label={translate(fa, 'legacyWeakSkillsCommaSeparated')}
             defaultValue="writing,speaking"
             dir="ltr"
           />
-          <Field name="milestone" label={tr(fa, 'اولین نقطه عطف', 'First milestone')} required />
-          <Field name="dueAt" label={tr(fa, 'مهلت', 'Due date')} type="date" />
+          <Field name="milestone" label={translate(fa, 'legacyFirstMilestone')} required />
+          <Field name="dueAt" label={translate(fa, 'legacyDueDate')} type="date" />
           <div className="md:col-span-2">
             <Submit fa={fa} busy={action.isPending}>
-              {tr(fa, 'ساخت برنامه', 'Create plan')}
+              {translate(fa, 'legacyCreatePlan')}
             </Submit>
           </div>
         </form>
         <Status fa={fa} error={action.error} ok={action.isSuccess} />
       </Shell>
-      <Shell title={tr(fa, 'افزودن تکلیف به برنامه', 'Add an assignment to a plan')}>
+      <Shell title={translate(fa, 'legacyAddAnAssignmentToAPlan')}>
         <form
           className="mt-4 grid gap-4"
           onSubmit={(event) => {
@@ -1302,15 +1270,11 @@ function PlanForm({ endpoint, fa }: { endpoint: string } & Localized) {
           }}
         >
           <LearningPlanSelect fa={fa} />
-          <Field name="assignmentTitle" label={tr(fa, 'عنوان تکلیف', 'Assignment title')} required />
-          <Area
-            name="instructions"
-            label={tr(fa, 'توضیحات و روش تحویل', 'Instructions and submission details')}
-            required
-          />
-          <Field name="assignmentDueAt" label={tr(fa, 'مهلت تحویل', 'Due date')} type="date" />
+          <Field name="assignmentTitle" label={translate(fa, 'legacyAssignmentTitle')} required />
+          <Area name="instructions" label={translate(fa, 'legacyInstructionsAndSubmissionDetails')} required />
+          <Field name="assignmentDueAt" label={translate(fa, 'legacydueDate2')} type="date" />
           <Submit fa={fa} busy={action.isPending}>
-            {tr(fa, 'ثبت تکلیف', 'Add assignment')}
+            {translate(fa, 'legacyAddAssignment')}
           </Submit>
         </form>
         <Status fa={fa} error={action.error} ok={action.isSuccess} />
@@ -1322,7 +1286,7 @@ function PlanForm({ endpoint, fa }: { endpoint: string } & Localized) {
 function ClassActions({ endpoint, fa }: { endpoint: string } & Localized) {
   const action = useAction(endpoint);
   return (
-    <Shell title={tr(fa, 'حضور، لینک جلسه و تکمیل کلاس', 'Attendance, meeting link and class completion')}>
+    <Shell title={translate(fa, 'legacyAttendanceMeetingLinkAndClassCompletion')}>
       <form
         className="mt-4 grid gap-4 md:grid-cols-2"
         onSubmit={(event) => {
@@ -1341,18 +1305,18 @@ function ClassActions({ endpoint, fa }: { endpoint: string } & Localized) {
         }}
       >
         <BookingSelect fa={fa} />
-        <Field name="meetingUrl" label={tr(fa, 'لینک جلسه', 'Meeting URL')} type="url" dir="ltr" />
+        <Field name="meetingUrl" label={translate(fa, 'legacyMeetingURL')} type="url" dir="ltr" />
         <label className="flex gap-2">
           <input name="student" type="checkbox" />
-          {tr(fa, 'حضور زبان‌آموز', 'Student attended')}
+          {translate(fa, 'legacyStudentAttended')}
         </label>
         <label className="flex gap-2">
           <input name="teacher" type="checkbox" defaultChecked />
-          {tr(fa, 'حضور مدرس', 'Teacher attended')}
+          {translate(fa, 'legacyTeacherAttended')}
         </label>
         <div className="md:col-span-2">
           <Submit fa={fa} busy={action.isPending}>
-            {tr(fa, 'ثبت حضور', 'Save attendance')}
+            {translate(fa, 'legacySaveAttendance')}
           </Submit>
         </div>
       </form>
@@ -1367,7 +1331,7 @@ function ClassActions({ endpoint, fa }: { endpoint: string } & Localized) {
         <BookingSelect fa={fa} />
         <div>
           <Submit fa={fa} busy={action.isPending}>
-            {tr(fa, 'تکمیل کلاس', 'Complete class')}
+            {translate(fa, 'legacyCompleteClass')}
           </Submit>
         </div>
       </form>
@@ -1391,7 +1355,7 @@ function AdminUserActions({ endpoint, fa }: { endpoint: string } & Localized) {
   const action = useAction(endpoint);
   return (
     <div className="grid gap-5 xl:grid-cols-2">
-      <Shell title={tr(fa, 'ساخت کاربر', 'Create user')}>
+      <Shell title={translate(fa, 'legacyCreateUser')}>
         <form
           className="mt-4 grid gap-4 md:grid-cols-2"
           onSubmit={(event) => {
@@ -1411,25 +1375,25 @@ function AdminUserActions({ endpoint, fa }: { endpoint: string } & Localized) {
             );
           }}
         >
-          <Field name="phone" label={tr(fa, 'شماره موبایل', 'Phone number')} pattern="09[0-9]{9}" required dir="ltr" />
-          <Field name="name" label={tr(fa, 'نام', 'Name')} required />
-          <Field name="email" label={tr(fa, 'ایمیل', 'Email')} type="email" dir="ltr" />
-          <Select name="locale" label={tr(fa, 'زبان', 'Language')}>
+          <Field name="phone" label={translate(fa, 'legacyPhoneNumber')} pattern="09[0-9]{9}" required dir="ltr" />
+          <Field name="name" label={translate(fa, 'legacyname2')} required />
+          <Field name="email" label={translate(fa, 'legacyemail2')} type="email" dir="ltr" />
+          <Select name="locale" label={translate(fa, 'legacyLanguage')}>
             <option value="fa">فارسی</option>
             <option value="en">English</option>
           </Select>
-          <Select name="role" label={tr(fa, 'نقش اولیه', 'Initial role')}>
+          <Select name="role" label={translate(fa, 'legacyInitialRole')}>
             <RoleOptions />
           </Select>
           <div className="md:col-span-2">
             <Submit fa={fa} busy={action.isPending}>
-              {tr(fa, 'ساخت کاربر', 'Create user')}
+              {translate(fa, 'legacycreateUser2')}
             </Submit>
           </div>
         </form>
         <Status fa={fa} error={action.error} ok={action.isSuccess} />
       </Shell>
-      <Shell title={tr(fa, 'تغییر وضعیت کاربر', 'Change user status')}>
+      <Shell title={translate(fa, 'legacyChangeUserStatus')}>
         <form
           className="mt-4 grid gap-4"
           onSubmit={(event) => {
@@ -1444,13 +1408,13 @@ function AdminUserActions({ endpoint, fa }: { endpoint: string } & Localized) {
           }}
         >
           <AdminUserSelect fa={fa} />
-          <Select name="status" label={tr(fa, 'وضعیت', 'Status')}>
+          <Select name="status" label={translate(fa, 'legacyStatus')}>
             <option>ACTIVE</option>
             <option>SUSPENDED</option>
             <option>DELETED</option>
           </Select>
           <Submit fa={fa} busy={action.isPending}>
-            {tr(fa, 'اعمال وضعیت', 'Update status')}
+            {translate(fa, 'legacyUpdateStatus')}
           </Submit>
         </form>
       </Shell>
@@ -1461,7 +1425,7 @@ function AdminUserActions({ endpoint, fa }: { endpoint: string } & Localized) {
 function AdminTeacherActions({ endpoint, fa }: { endpoint: string } & Localized) {
   const action = useAction(endpoint);
   return (
-    <Shell title={tr(fa, 'تغییر وضعیت درخواست مدرس', 'Review teacher application')}>
+    <Shell title={translate(fa, 'legacyReviewTeacherApplication')}>
       <form
         className="mt-4 grid gap-4 md:grid-cols-2"
         onSubmit={(event) => {
@@ -1476,17 +1440,17 @@ function AdminTeacherActions({ endpoint, fa }: { endpoint: string } & Localized)
         }}
       >
         <TeacherApplicationSelect fa={fa} />
-        <Select name="status" label={tr(fa, 'وضعیت بعدی', 'Next status')}>
+        <Select name="status" label={translate(fa, 'legacyNextStatus')}>
           <option>DOCUMENT_REVIEW</option>
           <option>INTERVIEW</option>
           <option>DEMO_REVIEW</option>
           <option>APPROVED</option>
           <option>REJECTED</option>
         </Select>
-        <Area name="note" label={tr(fa, 'یادداشت', 'Review note')} />
+        <Area name="note" label={translate(fa, 'legacyReviewNote')} />
         <div className="md:col-span-2">
           <Submit fa={fa} busy={action.isPending}>
-            {tr(fa, 'اعمال وضعیت', 'Apply status')}
+            {translate(fa, 'legacyApplyStatus')}
           </Submit>
         </div>
       </form>
@@ -1499,7 +1463,7 @@ function AdminSettingsActions({ endpoint, fa }: { endpoint: string } & Localized
   const action = useAction(endpoint);
   return (
     <div className="grid gap-5 xl:grid-cols-2">
-      <Shell title={tr(fa, 'تنظیم عمومی', 'General setting')}>
+      <Shell title={translate(fa, 'legacyGeneralSetting')}>
         <form
           className="mt-4 grid gap-4"
           onSubmit={(event) => {
@@ -1516,19 +1480,19 @@ function AdminSettingsActions({ endpoint, fa }: { endpoint: string } & Localized
             );
           }}
         >
-          <Field name="key" label={tr(fa, 'کلید', 'Key')} required dir="ltr" />
-          <Field name="settingValue" label={tr(fa, 'مقدار', 'Value')} required />
+          <Field name="key" label={translate(fa, 'legacyKey')} required dir="ltr" />
+          <Field name="settingValue" label={translate(fa, 'legacyValue')} required />
           <label className="flex gap-2">
             <input name="public" type="checkbox" />
-            {tr(fa, 'عمومی', 'Public')}
+            {translate(fa, 'legacyPublic')}
           </label>
           <Submit fa={fa} busy={action.isPending}>
-            {tr(fa, 'ذخیره تنظیم', 'Save setting')}
+            {translate(fa, 'legacySaveSetting')}
           </Submit>
         </form>
         <Status fa={fa} error={action.error} ok={action.isSuccess} />
       </Shell>
-      <Shell title={tr(fa, 'صفحه محتوایی دو‌زبانه', 'Bilingual CMS page')}>
+      <Shell title={translate(fa, 'legacyBilingualCMSPage')}>
         <form
           className="mt-4 grid gap-4"
           onSubmit={(event) => {
@@ -1549,12 +1513,12 @@ function AdminSettingsActions({ endpoint, fa }: { endpoint: string } & Localized
           }}
         >
           <Field name="slug" label="Slug" required dir="ltr" />
-          <Field name="titleFa" label={tr(fa, 'عنوان فارسی', 'Persian title')} required />
-          <Field name="titleEn" label={tr(fa, 'عنوان انگلیسی', 'English title')} required dir="ltr" />
-          <Area name="bodyFa" label={tr(fa, 'متن فارسی', 'Persian content')} required />
-          <Area name="bodyEn" label={tr(fa, 'متن انگلیسی', 'English content')} required dir="ltr" />
+          <Field name="titleFa" label={translate(fa, 'legacypersianTitle2')} required />
+          <Field name="titleEn" label={translate(fa, 'legacyenglishTitle2')} required dir="ltr" />
+          <Area name="bodyFa" label={translate(fa, 'legacyPersianContent')} required />
+          <Area name="bodyEn" label={translate(fa, 'legacyEnglishContent')} required dir="ltr" />
           <Submit fa={fa} busy={action.isPending}>
-            {tr(fa, 'ذخیره صفحه', 'Save page')}
+            {translate(fa, 'legacySavePage')}
           </Submit>
         </form>
       </Shell>
@@ -1565,7 +1529,7 @@ function AdminSettingsActions({ endpoint, fa }: { endpoint: string } & Localized
 function AdminBookingActions({ endpoint, fa }: { endpoint: string } & Localized) {
   const action = useAction(endpoint);
   return (
-    <Shell title={tr(fa, 'مسدودسازی تقویم توسط ادمین', 'Admin calendar block')}>
+    <Shell title={translate(fa, 'legacyAdminCalendarBlock')}>
       <form
         className="mt-4 grid gap-4 md:grid-cols-2"
         onSubmit={(event) => {
@@ -1585,12 +1549,12 @@ function AdminBookingActions({ endpoint, fa }: { endpoint: string } & Localized)
         }}
       >
         <ApprovedTeacherSelect fa={fa} />
-        <Field name="startsAt" label={tr(fa, 'شروع', 'Starts at')} type="datetime-local" required />
-        <Field name="endsAt" label={tr(fa, 'پایان', 'Ends at')} type="datetime-local" required />
-        <Field name="reason" label={tr(fa, 'دلیل', 'Reason')} />
+        <Field name="startsAt" label={translate(fa, 'legacystartsAt2')} type="datetime-local" required />
+        <Field name="endsAt" label={translate(fa, 'legacyendsAt2')} type="datetime-local" required />
+        <Field name="reason" label={translate(fa, 'legacyreason3')} />
         <div className="md:col-span-2">
           <Submit fa={fa} busy={action.isPending}>
-            {tr(fa, 'ثبت مسدودی', 'Create block')}
+            {translate(fa, 'legacyCreateBlock')}
           </Submit>
         </div>
       </form>
@@ -1603,7 +1567,7 @@ function AdminFinanceActions({ endpoint, fa }: { endpoint: string } & Localized)
   const action = useAction(endpoint);
   return (
     <div className="grid gap-5 xl:grid-cols-3">
-      <Shell title={tr(fa, 'بازپرداخت', 'Refund')}>
+      <Shell title={translate(fa, 'legacyRefund')}>
         <form
           className="mt-4 grid gap-4"
           onSubmit={(event) => {
@@ -1622,15 +1586,15 @@ function AdminFinanceActions({ endpoint, fa }: { endpoint: string } & Localized)
           }}
         >
           <PaymentSelect fa={fa} />
-          <Field name="amount" label={tr(fa, 'مبلغ', 'Amount')} type="number" min={1} required />
-          <Field name="reason" label={tr(fa, 'دلیل', 'Reason')} required />
+          <Field name="amount" label={translate(fa, 'legacyAmount')} type="number" min={1} required />
+          <Field name="reason" label={translate(fa, 'legacyreason4')} required />
           <Submit fa={fa} busy={action.isPending}>
-            {tr(fa, 'ثبت بازپرداخت', 'Create refund')}
+            {translate(fa, 'legacyCreateRefund')}
           </Submit>
         </form>
         <Status fa={fa} error={action.error} ok={action.isSuccess} />
       </Shell>
-      <Shell title={tr(fa, 'کد تخفیف', 'Discount code')}>
+      <Shell title={translate(fa, 'legacyDiscountCode')}>
         <form
           className="mt-4 grid gap-4"
           onSubmit={(event) => {
@@ -1649,19 +1613,19 @@ function AdminFinanceActions({ endpoint, fa }: { endpoint: string } & Localized)
             );
           }}
         >
-          <Field name="code" label={tr(fa, 'کد', 'Code')} required dir="ltr" />
-          <Select name="type" label={tr(fa, 'نوع', 'Type')}>
-            <option value="percent">{tr(fa, 'درصد', 'Percent')}</option>
-            <option value="fixed">{tr(fa, 'مبلغ ثابت', 'Fixed amount')}</option>
+          <Field name="code" label={translate(fa, 'legacyCode')} required dir="ltr" />
+          <Select name="type" label={translate(fa, 'legacyType')}>
+            <option value="percent">{translate(fa, 'legacyPercent')}</option>
+            <option value="fixed">{translate(fa, 'legacyFixedAmount')}</option>
           </Select>
-          <Field name="discountValue" label={tr(fa, 'مقدار', 'Value')} type="number" min={1} required />
-          <Field name="maxUses" label={tr(fa, 'حداکثر استفاده', 'Maximum uses')} type="number" min={1} />
+          <Field name="discountValue" label={translate(fa, 'legacyvalue2')} type="number" min={1} required />
+          <Field name="maxUses" label={translate(fa, 'legacyMaximumUses')} type="number" min={1} />
           <Submit fa={fa} busy={action.isPending}>
-            {tr(fa, 'ساخت تخفیف', 'Create discount')}
+            {translate(fa, 'legacyCreateDiscount')}
           </Submit>
         </form>
       </Shell>
-      <Shell title={tr(fa, 'تولید تسویه هفتگی', 'Generate weekly payout')}>
+      <Shell title={translate(fa, 'legacyGenerateWeeklyPayout')}>
         <form
           className="mt-4 grid gap-4"
           onSubmit={(event) => {
@@ -1675,10 +1639,10 @@ function AdminFinanceActions({ endpoint, fa }: { endpoint: string } & Localized)
             );
           }}
         >
-          <Field name="weekStart" label={tr(fa, 'شروع هفته', 'Week start')} type="date" required />
-          <Field name="weekEnd" label={tr(fa, 'پایان هفته', 'Week end')} type="date" required />
+          <Field name="weekStart" label={translate(fa, 'legacyWeekStart')} type="date" required />
+          <Field name="weekEnd" label={translate(fa, 'legacyWeekEnd')} type="date" required />
           <Submit fa={fa} busy={action.isPending}>
-            {tr(fa, 'تولید تسویه', 'Generate payout')}
+            {translate(fa, 'legacyGeneratePayout')}
           </Submit>
         </form>
       </Shell>
@@ -1709,13 +1673,13 @@ function AdminRoleActions({ endpoint, fa }: { endpoint: string } & Localized) {
       }}
     >
       <AdminUserSelect fa={fa} />
-      <Select name="role" label={tr(fa, 'نقش', 'Role')}>
+      <Select name="role" label={translate(fa, 'legacyRole')}>
         <RoleOptions />
       </Select>
       {mode === 'permission' && (
         <Field
           name="permission"
-          label={tr(fa, 'کلید مجوز', 'Permission key')}
+          label={translate(fa, 'legacyPermissionKey')}
           defaultValue="reports.read"
           required
           dir="ltr"
@@ -1723,21 +1687,21 @@ function AdminRoleActions({ endpoint, fa }: { endpoint: string } & Localized) {
       )}
       <Submit fa={fa} busy={action.isPending}>
         {mode === 'assign'
-          ? tr(fa, 'افزودن نقش', 'Assign role')
+          ? translate(fa, 'legacyAssignRole')
           : mode === 'revoke'
-            ? tr(fa, 'حذف نقش', 'Revoke role')
-            : tr(fa, 'اعطای مجوز', 'Grant permission')}
+            ? translate(fa, 'legacyRevokeRole')
+            : translate(fa, 'legacyGrantPermission')}
       </Submit>
     </form>
   );
   return (
     <div className="grid gap-5 xl:grid-cols-3">
-      <Shell title={tr(fa, 'افزودن نقش', 'Assign role')}>
+      <Shell title={translate(fa, 'legacyassignRole2')}>
         {form('assign')}
         <Status fa={fa} error={action.error} ok={action.isSuccess} />
       </Shell>
-      <Shell title={tr(fa, 'حذف نقش', 'Revoke role')}>{form('revoke')}</Shell>
-      <Shell title={tr(fa, 'اعطای مجوز به نقش کاربر', 'Grant permission to user role')}>{form('permission')}</Shell>
+      <Shell title={translate(fa, 'legacyrevokeRole2')}>{form('revoke')}</Shell>
+      <Shell title={translate(fa, 'legacyGrantPermissionToUserRole')}>{form('permission')}</Shell>
     </div>
   );
 }

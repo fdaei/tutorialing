@@ -1,5 +1,6 @@
 'use client';
 
+import { localized, isDefaultLocale, translate } from '@/lib/i18n';
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, Eye, Search, ShieldCheck, UserRound, X } from 'lucide-react';
@@ -65,7 +66,7 @@ const statusFa: Record<string, string> = {
 
 export function AdminUsersManager() {
   const { locale } = useTranslations(),
-    fa = locale === 'fa',
+    fa = isDefaultLocale(locale),
     qc = useQueryClient(),
     [page, setPage] = useState(1),
     [search, setSearch] = useState(''),
@@ -86,12 +87,10 @@ export function AdminUsersManager() {
   return (
     <section>
       <div className="mb-6">
-        <p className="text-sm font-bold text-purple">{fa ? 'مدیریت دسترسی و حساب‌ها' : 'Accounts and access'}</p>
-        <h1 className="mt-2 text-3xl font-black">{fa ? 'کاربران' : 'Users'}</h1>
+        <p className="text-sm font-bold text-purple">{translate(locale, 'adminadminUsersManagerAccountsAndAccess')}</p>
+        <h1 className="mt-2 text-3xl font-black">{translate(locale, 'adminadminUsersManagerUsers')}</h1>
         <p className="mt-2 text-sm text-muted">
-          {fa
-            ? 'اطلاعات کامل، نقش‌ها و فعالیت هر کاربر را بدون نمایش شناسه فنی مدیریت کنید.'
-            : 'Manage each user’s details, roles and activity without exposing technical IDs.'}
+          {translate(locale, 'adminadminUsersManagerManageEachUserSDetailsRolesAndActivity')}
         </p>
       </div>
       <div className="panel-card overflow-hidden">
@@ -102,7 +101,7 @@ export function AdminUsersManager() {
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               className="w-full bg-transparent py-3 outline-none"
-              placeholder={fa ? 'جستجو با نام، موبایل یا ایمیل' : 'Search name, phone or email'}
+              placeholder={translate(locale, 'adminadminUsersManagerSearchNamePhoneOrEmail')}
             />
           </label>
           <select
@@ -113,12 +112,14 @@ export function AdminUsersManager() {
             }}
             className="rounded-xl border hairline bg-white px-4 py-3"
           >
-            <option value="">{fa ? 'همه وضعیت‌ها' : 'All statuses'}</option>
-            <option value="ACTIVE">{fa ? 'فعال' : 'Active'}</option>
-            <option value="SUSPENDED">{fa ? 'تعلیق‌شده' : 'Suspended'}</option>
-            <option value="DELETED">{fa ? 'حذف‌شده' : 'Deleted'}</option>
+            <option value="">{translate(locale, 'commercepricingManagerAllStatuses')}</option>
+            <option value="ACTIVE">{translate(locale, 'admincountryManagerActive')}</option>
+            <option value="SUSPENDED">{translate(locale, 'adminadminUsersManagerSuspended')}</option>
+            <option value="DELETED">{translate(locale, 'adminadminUsersManagerDeleted')}</option>
           </select>
-          <button className="rounded-xl bg-navy px-6 py-3 font-black text-white">{fa ? 'جستجو' : 'Search'}</button>
+          <button className="rounded-xl bg-navy px-6 py-3 font-black text-white">
+            {translate(locale, 'adminadminUsersManagerSearch')}
+          </button>
         </form>
         {query.isLoading ? (
           <div className="grid gap-3 p-5">
@@ -133,12 +134,12 @@ export function AdminUsersManager() {
               <table className="w-full min-w-[850px] text-sm">
                 <thead className="bg-[#f8f9fd] text-muted">
                   <tr>
-                    <th className="p-4 text-start">{fa ? 'کاربر' : 'User'}</th>
-                    <th className="p-4 text-start">{fa ? 'راه ارتباطی' : 'Contact'}</th>
-                    <th className="p-4 text-start">{fa ? 'نقش‌ها' : 'Roles'}</th>
-                    <th className="p-4 text-start">{fa ? 'وضعیت' : 'Status'}</th>
-                    <th className="p-4 text-start">{fa ? 'عضویت' : 'Joined'}</th>
-                    <th className="p-4 text-start">{fa ? 'عملیات' : 'Actions'}</th>
+                    <th className="p-4 text-start">{translate(locale, 'adminadminUsersManagerUser')}</th>
+                    <th className="p-4 text-start">{translate(locale, 'adminadminUsersManagerContact')}</th>
+                    <th className="p-4 text-start">{translate(locale, 'adminadminUsersManagerRoles')}</th>
+                    <th className="p-4 text-start">{translate(locale, 'commercepricingManagerStatus')}</th>
+                    <th className="p-4 text-start">{translate(locale, 'adminadminUsersManagerJoined')}</th>
+                    <th className="p-4 text-start">{translate(locale, 'adminadminUsersManagerActions')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y hairline">
@@ -149,7 +150,7 @@ export function AdminUsersManager() {
                           <span className="brand-gradient grid size-10 place-items-center rounded-full font-black text-white">
                             {(user.name ?? 'U').slice(0, 1)}
                           </span>
-                          <strong>{user.name || (fa ? 'بدون نام' : 'Unnamed')}</strong>
+                          <strong>{user.name || translate(locale, 'adminadminUsersManagerUnnamed')}</strong>
                         </span>
                       </td>
                       <td className="p-4">
@@ -165,7 +166,7 @@ export function AdminUsersManager() {
                               key={role}
                               className="rounded-full bg-lavender px-2.5 py-1 text-xs font-bold text-purple"
                             >
-                              {fa ? roleFa[role] : roleLabel(role)}
+                              {localized({ fa: roleFa[role], en: roleLabel(role) }, locale)}
                             </span>
                           ))}
                         </div>
@@ -180,7 +181,7 @@ export function AdminUsersManager() {
                           className="inline-flex items-center gap-2 rounded-xl border hairline px-3 py-2 font-bold text-blue"
                         >
                           <Eye size={16} />
-                          {fa ? 'جزئیات' : 'Details'}
+                          {translate(locale, 'adminadminUsersManagerDetails')}
                         </button>
                       </td>
                     </tr>
@@ -191,7 +192,7 @@ export function AdminUsersManager() {
             <Pagination page={data.page} pages={data.totalPages} total={data.total} setPage={setPage} fa={fa} />
           </>
         ) : (
-          <div className="p-12 text-center text-muted">{fa ? 'کاربری پیدا نشد.' : 'No users found.'}</div>
+          <div className="p-12 text-center text-muted">{translate(locale, 'adminadminUsersManagerNoUsersFound')}</div>
         )}
       </div>
       {selected && (
@@ -221,6 +222,7 @@ function Pagination({
   setPage: (n: number) => void;
   fa: boolean;
 }) {
+  const { locale } = useTranslations();
   const visible = Array.from(
     { length: Math.min(5, pages) },
     (_, i) => Math.max(1, Math.min(page - 2, pages - 4)) + i,
@@ -228,16 +230,16 @@ function Pagination({
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 border-t hairline p-4">
       <p className="text-sm text-muted">
-        {fa ? `${new Intl.NumberFormat('fa-IR').format(total)} کاربر` : `${total} users`}
+        {localized({ fa: `${new Intl.NumberFormat('fa-IR').format(total)} کاربر`, en: `${total} users` }, fa)}
       </p>
       <div className="flex items-center gap-1">
         <button
-          aria-label={fa ? 'صفحه قبل' : 'Previous page'}
+          aria-label={translate(fa, 'adminadminUsersManagerPreviousPage')}
           disabled={page <= 1}
           onClick={() => setPage(page - 1)}
           className="grid size-9 place-items-center rounded-lg border hairline disabled:opacity-30"
         >
-          {fa ? <ChevronRight size={17} /> : <ChevronLeft size={17} />}
+          {localized({ fa: <ChevronRight size={17} />, en: <ChevronLeft size={17} /> }, fa)}
         </button>
         {visible.map((n) => (
           <button
@@ -245,16 +247,16 @@ function Pagination({
             onClick={() => setPage(n)}
             className={`grid size-9 place-items-center rounded-lg ${n === page ? 'bg-navy text-white' : 'border hairline bg-white'}`}
           >
-            {fa ? new Intl.NumberFormat('fa-IR').format(n) : n}
+            {localized({ fa: new Intl.NumberFormat('fa-IR').format(n), en: String(n) }, locale)}
           </button>
         ))}
         <button
-          aria-label={fa ? 'صفحه بعد' : 'Next page'}
+          aria-label={translate(fa, 'adminadminUsersManagerNextPage')}
           disabled={page >= pages}
           onClick={() => setPage(page + 1)}
           className="grid size-9 place-items-center rounded-lg border hairline disabled:opacity-30"
         >
-          {fa ? <ChevronLeft size={17} /> : <ChevronRight size={17} />}
+          {localized({ fa: <ChevronLeft size={17} />, en: <ChevronRight size={17} /> }, fa)}
         </button>
       </div>
     </div>
@@ -272,6 +274,7 @@ function UserDetails({
   fa: boolean;
   invalidate: () => Promise<void>;
 }) {
+  const { locale } = useTranslations();
   const qc = useQueryClient(),
     query = useQuery({ queryKey: ['admin-user-detail', id], queryFn: () => api<Detail>(`/admin/users/${id}`) }),
     [roles, setRoles] = useState<Role[]>([]),
@@ -301,13 +304,13 @@ function UserDetails({
   return (
     <div className="fixed inset-0 z-[80] bg-navy/35 p-3 backdrop-blur-sm" onClick={close}>
       <aside
-        className={`h-full w-full max-w-3xl overflow-y-auto bg-[#f8f9fd] p-5 shadow-2xl md:p-7 ${fa ? 'mr-auto rounded-l-[28px]' : 'ml-auto rounded-r-[28px]'}`}
+        className={`h-full w-full max-w-3xl overflow-y-auto bg-[#f8f9fd] p-5 shadow-2xl md:p-7 ${translate(fa, 'adminadminUsersManagerMlAutoRoundedR28px')}`}
         onClick={(e) => e.stopPropagation()}
       >
         <button
           onClick={close}
           className="grid size-10 place-items-center rounded-full border hairline bg-white"
-          aria-label={fa ? 'بستن' : 'Close'}
+          aria-label={translate(fa, 'adminadminUsersManagerClose')}
         >
           <X />
         </button>
@@ -323,8 +326,8 @@ function UserDetails({
                   {(user.name ?? 'U').slice(0, 1)}
                 </span>
                 <div>
-                  <h2 className="text-2xl font-black">{user.name || (fa ? 'بدون نام' : 'Unnamed')}</h2>
-                  <p dir="ltr" className={`${fa ? 'text-right' : 'text-left'} text-sm text-muted`}>
+                  <h2 className="text-2xl font-black">{user.name || translate(fa, 'adminadminUsersManagerUnnamed')}</h2>
+                  <p dir="ltr" className={`${translate(fa, 'adminadminUsersManagerTextLeft')} text-sm text-muted`}>
                     {user.phone}
                     {user.email ? ` · ${user.email}` : ''}
                   </p>
@@ -341,7 +344,7 @@ function UserDetails({
               <section className="panel-card mt-5 p-5">
                 <h3 className="flex items-center gap-2 font-black">
                   <ShieldCheck size={18} className="text-purple" />
-                  {fa ? 'نقش‌ها و وضعیت' : 'Roles and status'}
+                  {translate(fa, 'adminadminUsersManagerRolesAndStatus')}
                 </h3>
                 <div className="mt-4 flex flex-wrap gap-2">
                   {allRoles.map((role) => (
@@ -359,7 +362,7 @@ function UserDetails({
                           )
                         }
                       />
-                      {fa ? roleFa[role] : roleLabel(role)}
+                      {localized({ fa: roleFa[role], en: roleLabel(role) }, locale)}
                     </label>
                   ))}
                 </div>
@@ -369,23 +372,23 @@ function UserDetails({
                     onClick={() => saveRoles.mutate()}
                     className="brand-gradient rounded-xl px-5 py-3 font-black text-white disabled:opacity-40"
                   >
-                    {fa ? 'ذخیره نقش‌ها' : 'Save roles'}
+                    {translate(fa, 'adminadminUsersManagerSaveRoles')}
                   </button>
                   <select
                     value={status}
                     onChange={(e) => setStatus(e.target.value)}
                     className="rounded-xl border hairline bg-white px-4"
                   >
-                    <option value="ACTIVE">{fa ? 'فعال' : 'Active'}</option>
-                    <option value="SUSPENDED">{fa ? 'تعلیق‌شده' : 'Suspended'}</option>
-                    <option value="DELETED">{fa ? 'حذف‌شده' : 'Deleted'}</option>
+                    <option value="ACTIVE">{translate(fa, 'admincountryManagerActive')}</option>
+                    <option value="SUSPENDED">{translate(fa, 'adminadminUsersManagerSuspended')}</option>
+                    <option value="DELETED">{translate(fa, 'adminadminUsersManagerDeleted')}</option>
                   </select>
                   <button
                     disabled={saveStatus.isPending}
                     onClick={() => saveStatus.mutate()}
                     className="rounded-xl border hairline bg-white px-5 py-3 font-black"
                   >
-                    {fa ? 'ذخیره وضعیت' : 'Save status'}
+                    {translate(fa, 'adminadminUsersManagerSaveStatus')}
                   </button>
                 </div>
                 {(saveRoles.error || saveStatus.error) && (
@@ -394,27 +397,43 @@ function UserDetails({
               </section>
               {user.teacher && (
                 <section className="panel-card mt-5 p-5">
-                  <h3 className="font-black">{fa ? 'پروفایل مدرس' : 'Teacher profile'}</h3>
+                  <h3 className="font-black">{translate(fa, 'teacherteacherProfileHubTeacherProfile')}</h3>
                   <p className="mt-3">
-                    {fa ? user.teacher.nameFa : user.teacher.nameEn} · <Status value={user.teacher.status} fa={fa} />
+                    {localized({ fa: user.teacher.nameFa, en: user.teacher.nameEn }, fa)} ·{' '}
+                    <Status value={user.teacher.status} fa={fa} />
                   </p>
                   <p className="mt-2 text-sm text-muted">
-                    {fa ? 'امتیاز' : 'Rating'} {user.teacher.rating} · {user.teacher.reviewsCount}{' '}
-                    {fa ? 'نظر' : 'reviews'}
+                    {translate(fa, 'adminadminUsersManagerRating')} {user.teacher.rating} · {user.teacher.reviewsCount}{' '}
+                    {translate(fa, 'adminadminUsersManagerReviews')}
                   </p>
                 </section>
               )}
-              <DetailList title={fa ? 'آزمون‌های اخیر' : 'Recent tests'} rows={user.attempts} fa={fa} kind="attempt" />
-              <DetailList title={fa ? 'رزروهای اخیر' : 'Recent bookings'} rows={user.bookings} fa={fa} kind="booking" />
               <DetailList
-                title={fa ? 'پرداخت‌های اخیر' : 'Recent payments'}
+                title={translate(fa, 'adminadminUsersManagerRecentTests')}
+                rows={user.attempts}
+                fa={fa}
+                kind="attempt"
+              />
+              <DetailList
+                title={translate(fa, 'adminadminUsersManagerRecentBookings')}
+                rows={user.bookings}
+                fa={fa}
+                kind="booking"
+              />
+              <DetailList
+                title={translate(fa, 'adminadminUsersManagerRecentPayments')}
                 rows={user.payments}
                 fa={fa}
                 kind="payment"
               />
-              <DetailList title={fa ? 'تیکت‌های اخیر' : 'Recent tickets'} rows={user.tickets} fa={fa} kind="ticket" />
               <DetailList
-                title={fa ? 'برنامه‌های یادگیری' : 'Learning plans'}
+                title={translate(fa, 'adminadminUsersManagerRecentTickets')}
+                rows={user.tickets}
+                fa={fa}
+                kind="ticket"
+              />
+              <DetailList
+                title={translate(fa, 'adminadminUsersManagerLearningPlans')}
                 rows={user.learningPlans}
                 fa={fa}
                 kind="plan"
@@ -428,6 +447,7 @@ function UserDetails({
 }
 
 function DetailList({ title, rows, fa, kind }: { title: string; rows: Activity[]; fa: boolean; kind: string }) {
+  const { locale } = useTranslations();
   if (!rows.length) return null;
   return (
     <section className="panel-card mt-5 p-5">
@@ -451,7 +471,7 @@ function DetailList({ title, rows, fa, kind }: { title: string; rows: Activity[]
               {row.amount != null && <p>{money(row.amount, fa)}</p>}
               {row.overallBand != null && (
                 <p>
-                  {fa ? 'نمره' : 'Band'} {row.overallBand}
+                  {translate(locale, 'adminadminUsersManagerBand')} {row.overallBand}
                 </p>
               )}
               {row.status && <Status value={row.status} fa={fa} />}
@@ -463,15 +483,15 @@ function DetailList({ title, rows, fa, kind }: { title: string; rows: Activity[]
   );
 }
 function activityTitle(row: Activity, kind: string, fa: boolean) {
-  if (kind === 'attempt') return fa ? (row.test?.titleFa ?? 'آزمون') : (row.test?.titleEn ?? 'Test');
+  if (kind === 'attempt') return localized({ fa: row.test?.titleFa ?? 'آزمون', en: row.test?.titleEn ?? 'Test' }, fa);
   if (kind === 'booking')
-    return `${fa ? 'کلاس با' : 'Class with'} ${fa ? (row.teacher?.nameFa ?? '—') : (row.teacher?.nameEn ?? '—')}`;
-  return row.title ?? row.subject ?? row.purpose ?? (fa ? 'مورد ثبت‌شده' : 'Activity');
+    return `${translate(fa, 'adminadminUsersManagerClassWith')} ${localized({ fa: row.teacher?.nameFa ?? '—', en: row.teacher?.nameEn ?? '—' }, fa)}`;
+  return row.title ?? row.subject ?? row.purpose ?? translate(fa, 'adminadminUsersManagerActivity');
 }
 function Status({ value, fa }: { value: string; fa: boolean }) {
   return (
     <span className="inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">
-      {fa ? (statusFa[value] ?? value) : value.replaceAll('_', ' ').toLowerCase()}
+      {localized({ fa: statusFa[value] ?? value, en: value.replaceAll('_', ' ').toLowerCase() }, fa)}
     </span>
   );
 }
@@ -479,10 +499,12 @@ function roleLabel(role: Role) {
   return role[0] + role.slice(1).toLowerCase();
 }
 function date(value: string, fa: boolean) {
-  return new Intl.DateTimeFormat(fa ? 'fa-IR' : 'en-US', { dateStyle: 'medium' }).format(new Date(value));
+  return new Intl.DateTimeFormat(translate(fa, 'commercepricingManagerEnUS2'), { dateStyle: 'medium' }).format(
+    new Date(value),
+  );
 }
 function money(value: number, fa: boolean) {
-  return `${new Intl.NumberFormat(fa ? 'fa-IR' : 'en-US').format(value)} ${fa ? 'تومان' : 'IRR'}`;
+  return `${new Intl.NumberFormat(translate(fa, 'commercepricingManagerEnUS2')).format(value)} ${translate(fa, 'teacherteacherFinanceIrr')}`;
 }
 function countLabel(key: string, fa: boolean) {
   const labels: Record<string, [string, string]> = {
@@ -493,22 +515,18 @@ function countLabel(key: string, fa: boolean) {
     learningPlans: ['برنامه', 'Plans'],
     enrollments: ['بسته آموزشی', 'Enrollments'],
   };
-  return labels[key]?.[fa ? 0 : 1] ?? key;
+  return labels[key]?.[localized({ fa: 0, en: 1 }, fa)] ?? key;
 }
 function ErrorBox({ fa, error, retry }: { fa: boolean; error: unknown; retry: () => void }) {
   return (
     <div role="alert" className="m-5 rounded-2xl bg-red-50 p-4 text-red-700">
       {errorMessage(error, fa)}{' '}
       <button onClick={retry} className="font-black underline">
-        {fa ? 'تلاش دوباره' : 'Try again'}
+        {translate(fa, 'testsaudioRecorderTryAgain')}
       </button>
     </div>
   );
 }
 function errorMessage(error: unknown, fa: boolean) {
-  return error instanceof ApiError
-    ? error.message
-    : fa
-      ? 'دریافت یا ذخیره اطلاعات ناموفق بود.'
-      : 'Could not load or save data.';
+  return error instanceof ApiError ? error.message : translate(fa, 'adminadminUsersManagerCouldNotLoadOrSaveData');
 }

@@ -1,5 +1,6 @@
 'use client';
 
+import { localized, isDefaultLocale, translate } from '@/lib/i18n';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { CalendarDays, ChevronLeft, ChevronRight, Clock, X } from 'lucide-react';
 import { useTranslations } from '@/components/shared/locale-provider';
@@ -58,7 +59,7 @@ export function JalaliDateTimePicker({
   name,
 }: Props) {
   const { locale } = useTranslations(),
-    fa = locale === 'fa',
+    fa = isDefaultLocale(locale),
     root = useRef<HTMLDivElement>(null),
     today = startOfDay(new Date());
   const selected = value ?? null,
@@ -85,7 +86,7 @@ export function JalaliDateTimePicker({
   const selectedJ = selected ? toJalali(selected) : null;
   const min = startOfDay(minDate);
   const label = selected
-    ? new Intl.DateTimeFormat(fa ? 'fa-IR-u-ca-persian' : 'en-US-u-ca-persian', {
+    ? new Intl.DateTimeFormat(translate(locale, 'sharedjalaliDateTimePickerEnUSUCaPersian'), {
         year: 'numeric',
         month: 'long',
         day: 'numeric',
@@ -126,7 +127,7 @@ export function JalaliDateTimePicker({
     setOpen(false);
   }
   return (
-    <div ref={root} className={`relative ${className}`} dir={fa ? 'rtl' : 'ltr'}>
+    <div ref={root} className={`relative ${className}`} dir={translate(locale, 'supportmyTicketManagerLtr')}>
       {name && <input type="hidden" name={name} value={selected?.toISOString() ?? ''} />}
       <button
         type="button"
@@ -138,13 +139,13 @@ export function JalaliDateTimePicker({
       >
         <CalendarDays size={18} className="text-purple" />
         <span className={`min-w-0 flex-1 truncate ${label ? 'font-bold' : 'text-muted'}`}>
-          {label || placeholder || (fa ? 'انتخاب تاریخ و ساعت' : 'Select date and time')}
+          {label || placeholder || translate(locale, 'sharedjalaliDateTimePickerSelectDateAndTime')}
         </span>
         {selected && (
           <span
             role="button"
             tabIndex={0}
-            aria-label={fa ? 'پاک کردن' : 'Clear'}
+            aria-label={translate(locale, 'sharedasyncSearchSelectClear')}
             onClick={(event) => {
               event.stopPropagation();
               onChange(null);
@@ -158,33 +159,35 @@ export function JalaliDateTimePicker({
       {open && (
         <div
           role="dialog"
-          aria-label={fa ? 'تقویم شمسی' : 'Jalali calendar'}
+          aria-label={translate(locale, 'sharedjalaliDateTimePickerJalaliCalendar')}
           className="absolute z-[80] mt-2 w-[min(22rem,calc(100vw-2rem))] rounded-3xl border hairline bg-white p-4 shadow-2xl"
         >
           <div className="flex items-center justify-between">
             <button
               type="button"
-              onClick={() => move(fa ? 1 : -1)}
-              aria-label={fa ? 'ماه قبل' : 'Previous month'}
+              onClick={() => move(localized({ fa: 1, en: -1 }, locale))}
+              aria-label={translate(locale, 'sharedjalaliDateTimePickerPreviousMonth')}
               className="grid size-10 place-items-center rounded-xl hover:bg-[#f3f4f8]"
             >
-              {fa ? <ChevronRight /> : <ChevronLeft />}
+              {localized({ fa: <ChevronRight />, en: <ChevronLeft /> }, locale)}
             </button>
             <strong>
-              {(fa ? faMonths : enMonths)[view.jm - 1]}{' '}
-              {new Intl.NumberFormat(fa ? 'fa-IR' : 'en-US', { useGrouping: false }).format(view.jy)}
+              {localized({ fa: faMonths, en: enMonths }, locale)[view.jm - 1]}{' '}
+              {new Intl.NumberFormat(translate(locale, 'commercepricingManagerEnUS2'), { useGrouping: false }).format(
+                view.jy,
+              )}
             </strong>
             <button
               type="button"
-              onClick={() => move(fa ? -1 : 1)}
-              aria-label={fa ? 'ماه بعد' : 'Next month'}
+              onClick={() => move(localized({ fa: -1, en: 1 }, locale))}
+              aria-label={translate(locale, 'sharedjalaliDateTimePickerNextMonth')}
               className="grid size-10 place-items-center rounded-xl hover:bg-[#f3f4f8]"
             >
-              {fa ? <ChevronLeft /> : <ChevronRight />}
+              {localized({ fa: <ChevronLeft />, en: <ChevronRight /> }, locale)}
             </button>
           </div>
           <div className="mt-4 grid grid-cols-7 gap-1 text-center text-xs font-bold text-muted">
-            {(fa ? faWeek : enWeek).map((day) => (
+            {localized({ fa: faWeek, en: enWeek }, locale).map((day) => (
               <span key={day} className="py-2">
                 {day}
               </span>
@@ -211,11 +214,11 @@ export function JalaliDateTimePicker({
             <div className="mt-4 border-t hairline pt-4">
               <div className="mb-2 flex items-center gap-2 text-xs font-bold text-muted">
                 <Clock size={15} />
-                {fa ? 'ساعت و دقیقه' : 'Hour and minute'}
+                {translate(locale, 'sharedjalaliDateTimePickerHourAndMinute')}
               </div>
               <div dir="ltr" className="flex items-center gap-2">
                 <input
-                  aria-label={fa ? 'ساعت' : 'Hour'}
+                  aria-label={translate(locale, 'sharedjalaliDateTimePickerHour')}
                   inputMode="numeric"
                   value={hour}
                   onChange={(e) => setHour(e.target.value.replace(/\D/g, '').slice(0, 2))}
@@ -224,7 +227,7 @@ export function JalaliDateTimePicker({
                 />
                 <strong>:</strong>
                 <input
-                  aria-label={fa ? 'دقیقه' : 'Minute'}
+                  aria-label={translate(locale, 'sharedjalaliDateTimePickerMinute')}
                   inputMode="numeric"
                   value={minute}
                   onChange={(e) => setMinute(e.target.value.replace(/\D/g, '').slice(0, 2))}
@@ -236,15 +239,13 @@ export function JalaliDateTimePicker({
                   onClick={applyTime}
                   className="brand-gradient rounded-xl px-4 py-3 font-bold text-white"
                 >
-                  {fa ? 'تأیید' : 'Apply'}
+                  {translate(locale, 'sharedjalaliDateTimePickerApply')}
                 </button>
               </div>
             </div>
           )}
           <p className="mt-3 text-center text-[11px] text-muted">
-            {fa
-              ? 'تاریخ با تقویم جلالی نمایش داده و به UTC ارسال می‌شود.'
-              : 'Shown in Jalali calendar and submitted as UTC.'}
+            {translate(locale, 'sharedjalaliDateTimePickerShownInJalaliCalendarAndSubmittedAsUTC')}
           </p>
         </div>
       )}
@@ -274,7 +275,7 @@ function DayButton({
       onClick={onClick}
       className={`aspect-square rounded-xl text-sm transition ${selected ? 'brand-gradient font-black text-white' : today ? 'border border-purple font-black text-purple' : 'hover:bg-[#f0f2fa]'} disabled:cursor-not-allowed disabled:opacity-25`}
     >
-      {new Intl.NumberFormat(fa ? 'fa-IR' : 'en-US', { useGrouping: false }).format(day)}
+      {new Intl.NumberFormat(translate(fa, 'commercepricingManagerEnUS2'), { useGrouping: false }).format(day)}
     </button>
   );
 }
