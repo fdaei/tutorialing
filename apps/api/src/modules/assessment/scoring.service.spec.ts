@@ -1,5 +1,9 @@
 import { ScoringService } from './scoring.service';
 describe('ScoringService', () => {
+  it.each([[0, 'A1'], [25, 'A2'], [45, 'B1'], [60, 'B2'], [75, 'C1'], [90, 'C2']])(
+    'maps weighted percentage %s to CEFR %s',
+    (score, level) => expect(new ScoringService().cefr(score as number)).toBe(level),
+  );
   const service = new ScoringService();
   it('maps objective raw scores to IELTS bands deterministically', () => {
     expect(service.objective(40, 40)).toBe(9);

@@ -95,6 +95,7 @@ enum EarningStatus {
   ELIGIBLE
   HELD
   DISPUTED
+  REVERSED
   PAID
 }
 
@@ -176,6 +177,9 @@ enum TicketDirection {
 
 enum BlogPostStatus {
   DRAFT
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
   PUBLISHED
   ARCHIVED
 }
@@ -224,6 +228,7 @@ model User {
   teacher                 Teacher?
   bookings                Booking[]
   attempts                TestAttempt[]
+  placementResults        PlacementResult[]
   matches                 MatchingSession[]
   favorites               Favorite[]
   payments                Payment[]
@@ -243,9 +248,12 @@ model User {
   ticketStatusActions     TicketStatusHistory[]     @relation("TicketStatusActor")
   ticketAssignmentActions TicketAssignmentHistory[] @relation("TicketAssignmentActor")
   blogPosts               BlogPost[]                @relation("BlogAuthor")
+  reviewedBlogPosts       BlogPost[]                @relation("BlogReviewer")
   blogComments            BlogComment[]
   blogReactions           BlogReaction[]
   blogRatings             BlogRating[]
+  courseEnrollments       CourseEnrollment[]
+  courseReviews           CourseReview[]
 
   // PERF-304: the two user-listing paths use different chronological sorts:
   // AdminRepository orders by createdAt while SearchService orders by
@@ -351,6 +359,8 @@ model Teacher {
   languages             String[]
   targetBands           Float[]
   introVideoKey         String?
+  introVideoFileId      String?                  @unique
+  introVideoFile        StoredFile?              @relation("TeacherIntroVideo", fields: [introVideoFileId], references: [id], onDelete: SetNull)
   policyId              String?
   policy                CancellationPolicy?      @relation(fields: [policyId], references: [id])
   submittedAt           DateTime?
@@ -395,6 +405,60 @@ model Teacher {
   @@index([nameEn(ops: raw("gin_trgm_ops"))], type: Gin)
   @@index([bioFa(ops: raw("gin_trgm_ops"))], type: Gin)
   @@index([bioEn(ops: raw("gin_trgm_ops"))], type: Gin)
+}
+
+model Course {
+  id            String             @id @default(cuid())
+  slug          String             @unique
+  titleFa       String
+  titleEn       String
+  descriptionFa String
+  descriptionEn String
+  language      String
+  level         String
+  teacherName   String
+  lessonsCount  Int
+  price         Int
+  image         String?
+  published     Boolean            @default(false)
+  rating        Float              @default(0)
+  reviewsCount  Int                @default(0)
+  enrollments   CourseEnrollment[]
+  reviews       CourseReview[]
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  @@index([published, createdAt])
+  @@index([published, rating])
+}
+
+model CourseEnrollment {
+  id          String    @id @default(cuid())
+  userId      String
+  courseId    String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course      Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@unique([userId, courseId])
+}
+
+model CourseReview {
+  id         String   @id @default(cuid())
+  userId     String
+  courseId   String
+  rating     Int
+  comment    String
+  isVerified Boolean  @default(false)
+  published  Boolean  @default(true)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course     Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([userId, courseId])
+  @@index([courseId, published, createdAt])
 }
 
 model VerificationItem {
@@ -871,22 +935,23 @@ model WithdrawalRequest {
 }
 
 model TestDefinition {
-  id              String        @id @default(cuid())
-  slug            String        @unique
-  languageId      String        @default("lang-en")
-  language        Language      @relation(fields: [languageId], references: [id])
-  level           String?
-  titleFa         String
-  titleEn         String
-  descriptionFa   String
-  descriptionEn   String
-  version         Int           @default(1)
-  published       Boolean       @default(false)
-  durationMinutes Int
-  sections        TestSection[]
-  attempts        TestAttempt[]
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  id               String            @id @default(cuid())
+  slug             String            @unique
+  languageId       String            @default("lang-en")
+  language         Language          @relation(fields: [languageId], references: [id])
+  level            String?
+  titleFa          String
+  titleEn          String
+  descriptionFa    String
+  descriptionEn    String
+  version          Int               @default(1)
+  published        Boolean           @default(false)
+  durationMinutes  Int
+  sections         TestSection[]
+  attempts         TestAttempt[]
+  placementResults PlacementResult[]
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
 
   @@index([languageId, published])
 }
@@ -958,6 +1023,25 @@ model TestAttempt {
   updatedAt        DateTime              @updatedAt
 
   @@index([userId, createdAt])
+}
+
+/// Immediate, fully objective CEFR placement outcome. Kept separate from
+/// proctored TestAttempt because guests have no User row and examiner review is
+/// deliberately excluded from this flow.
+model PlacementResult {
+  id             String         @id @default(cuid())
+  userId         String?
+  user           User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+  testId         String
+  test           TestDefinition @relation(fields: [testId], references: [id], onDelete: Restrict)
+  score          Float
+  level          String
+  correctAnswers Int
+  totalQuestions Int
+  completedAt    DateTime       @default(now())
+
+  @@index([userId, completedAt])
+  @@index([testId, completedAt])
 }
 
 model AttemptSectionState {
@@ -1099,6 +1183,7 @@ model StoredFile {
   testAnswers       TestAnswer[]
   passageAudio      Passage[]          @relation("PassageAudio")
   questionAudio     Question[]         @relation("QuestionAudio")
+  teacherIntroVideo Teacher?           @relation("TeacherIntroVideo")
   createdAt         DateTime           @default(now())
 }
 
@@ -1439,9 +1524,14 @@ model BlogPost {
   seoDescriptionFa String?
   seoDescriptionEn String?
   publishedAt      DateTime?
+  submittedAt      DateTime?
+  reviewedAt       DateTime?
+  reviewedById     String?
+  rejectionReason  String?
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
   author           User           @relation("BlogAuthor", fields: [authorId], references: [id])
+  reviewer         User?          @relation("BlogReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
   category         BlogCategory?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   tags             BlogTag[]
   images           BlogImage[]
@@ -1451,6 +1541,8 @@ model BlogPost {
   views            BlogView[]
 
   @@index([status, publishedAt])
+  @@index([authorId, status, updatedAt])
+  @@index([status, submittedAt])
   @@index([categoryId])
 }
 
@@ -1469,14 +1561,18 @@ model BlogComment {
   id        String            @id @default(cuid())
   postId    String
   userId    String?
+  parentId  String?
   body      String
   status    BlogCommentStatus @default(PENDING)
   createdAt DateTime          @default(now())
   updatedAt DateTime          @updatedAt
   post      BlogPost          @relation(fields: [postId], references: [id], onDelete: Cascade)
   user      User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+  parent    BlogComment?      @relation("BlogCommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies   BlogComment[]     @relation("BlogCommentReplies")
 
   @@index([postId, status])
+  @@index([parentId, status, createdAt])
 }
 
 model BlogReaction {

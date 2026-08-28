@@ -2,7 +2,8 @@
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { Clock3, FileCheck, PlayCircle, RotateCcw } from 'lucide-react';
-import { api, apiMessage, type EducationalLanguage } from '@/lib/api';
+import { api, apiMessage } from '@/shared/services/api';
+import type { EducationalLanguage } from '@/features/languages';
 import { jalali } from '@/lib/format';
 import { PageHeading, EmptyState } from '@/components/shared/page-heading';
 type Attempt = {
@@ -16,6 +17,7 @@ type Attempt = {
   test: { titleFa: string; titleEn: string; level?: string; language?: EducationalLanguage | string };
   scores?: unknown[];
 };
+type PlacementResult = { id: string; score: number; level: string; correctAnswers: number; totalQuestions: number; completedAt: string; test: { titleFa: string; titleEn: string } };
 const labels: Record<string, string> = {
   IN_PROGRESS: 'در حال انجام',
   STARTED: 'در حال انجام',
@@ -27,6 +29,7 @@ const labels: Record<string, string> = {
 };
 export function StudentTests() {
   const q = useQuery({ queryKey: ['attempt-history'], queryFn: () => api<Attempt[]>('/tests/attempts/history') });
+  const placement = useQuery({ queryKey: ['placement-history'], queryFn: () => api<PlacementResult[]>('/placement/history') });
   return (
     <>
       <PageHeading
@@ -48,7 +51,7 @@ export function StudentTests() {
           </button>
         </div>
       )}
-      {q.data && !q.data.length && (
+      {q.data && !q.data.length && !placement.data?.length && (
         <EmptyState
           icon={<FileCheck />}
           title="هنوز آزمونی ندارید"
@@ -61,6 +64,20 @@ export function StudentTests() {
         />
       )}
       <div className="grid gap-4 lg:grid-cols-2">
+        {placement.data?.map((result) => (
+          <article key={result.id} className="panel-card p-5 md:p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div><span className="text-xs font-bold text-indigo-600">تعیین سطح فوری CEFR</span><h2 className="mt-2 text-lg font-black">{result.test.titleFa || result.test.titleEn}</h2></div>
+              <span className="status-pill status-success">نتیجه آماده</span>
+            </div>
+            <div className="mt-5 grid grid-cols-3 gap-3 text-center">
+              <Meta label="سطح" value={result.level} />
+              <Meta label="امتیاز" value={`${result.score.toLocaleString('fa-IR')}٪`} />
+              <Meta label="پاسخ درست" value={`${result.correctAnswers.toLocaleString('fa-IR')} از ${result.totalQuestions.toLocaleString('fa-IR')}`} />
+            </div>
+            <div className="mt-5 flex items-center justify-between"><span className="text-xs text-muted">{jalali(result.completedAt)}</span><Link href="/placement" className="secondary-button"><RotateCcw size={17}/>تکرار آزمون</Link></div>
+          </article>
+        ))}
         {q.data?.map((a) => {
           const done = ['APPROVED', 'COMPLETED'].includes(a.status),
             review = ['UNDER_REVIEW', 'SUBMITTED'].includes(a.status);

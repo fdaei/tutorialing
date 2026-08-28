@@ -1,6 +1,17 @@
 import { Injectable } from '@nestjs/common';
+export type CefrLevel = 'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2';
 @Injectable()
 export class ScoringService {
+  /** Weighted percentage thresholds are intentionally centralized and can be
+   * moved to managed settings later without changing the submission flow. */
+  cefr(score: number): CefrLevel {
+    if (score >= 90) return 'C2';
+    if (score >= 75) return 'C1';
+    if (score >= 60) return 'B2';
+    if (score >= 45) return 'B1';
+    if (score >= 25) return 'A2';
+    return 'A1';
+  }
   objective(correct: number, total: number) {
     if (!total) return 0;
     const raw = (correct / total) * 40;

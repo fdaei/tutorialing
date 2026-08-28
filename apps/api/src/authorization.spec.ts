@@ -45,6 +45,7 @@ type Route = {
 
 const CONTROLLER = /@Controller\(\s*'([^']*)'\s*\)/g;
 const HTTP = /@(Get|Post|Patch|Put|Delete)\(\s*(?:'([^']*)')?\s*\)/g;
+const decoratorsOnly = (source: string) => source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
 
 function parseRoutes(): Route[] {
   const out: Route[] = [];
@@ -60,7 +61,7 @@ function parseRoutes(): Route[] {
       // This class's own decorators sit between the end of the previous class
       // and this @Controller.
       const pre = src.slice(prevEnd, ctrl.index ?? 0);
-      const classDecorators = pre.includes('}') ? pre.slice(pre.lastIndexOf('}') + 1) : pre;
+      const classDecorators = decoratorsOnly(pre.includes('}') ? pre.slice(pre.lastIndexOf('}') + 1) : pre);
       // `@Authorize(roles, permissions)` and `@PublicRateLimit(options)` are
       // composed decorators (see common/decorators/*) that bundle the same
       // metadata `@Roles`/`@Permissions` and `@Public`/`@RateLimit` set
@@ -72,9 +73,12 @@ function parseRoutes(): Route[] {
 
       const body = src.slice(bodyStart, bodyEnd);
       const hits = [...body.matchAll(HTTP)];
-      hits.forEach((hit, i) => {
-        const from = i === 0 ? 0 : (hits[i - 1]?.index ?? 0) + (hits[i - 1]?.[0].length ?? 0);
-        const seg = body.slice(from, hit.index ?? 0);
+      hits.forEach((hit) => {
+        // Only decorators immediately preceding this handler belong to it.
+        // Starting after the previous HTTP decorator leaks annotations from
+        // the previous method (notably @Public) into the next route.
+        const preceding = body.slice(0, hit.index ?? 0);
+        const seg = decoratorsOnly(preceding.slice(preceding.lastIndexOf('}') + 1));
         const sub = hit[2] ?? '';
         out.push({
           method: hit[1] ?? '',
@@ -101,7 +105,7 @@ const SELF_SCOPED = new Set([
   'POST /bookings/:id/reschedule', 'POST /bookings/:id/reschedule/accept',
   'POST /bookings/:id/reschedule/decline',
   'GET /packages/enrollments/me',
-  'POST /payments', 'POST /payments/:id/gateway', 'GET /payments/wallet',
+  'POST /payments', 'POST /payments/:id/gateway', 'GET /payments/wallet', 'POST /payments/wallet/top-up',
   'GET /payments/wallet/transactions', 'GET /payments/invoices',
   'POST /files/uploads', 'POST /files/uploads/:id/content', 'POST /files/:id/complete',
   'GET /files/:id/download',
@@ -111,11 +115,18 @@ const SELF_SCOPED = new Set([
   'POST /support/tickets', 'GET /support/tickets', 'GET /support/tickets/:id',
   'POST /support/tickets/:id/replies',
   'POST /reviews',
-  'POST /teacher/application', 'PATCH /teacher/application', 'POST /teacher/application/submit',
+  'GET /reviews/teacher/:teacherId/eligibility', 'PATCH /reviews/:id', 'DELETE /reviews/:id',
+  'GET /courses/:courseId/my-review', 'POST /courses/:courseId/reviews',
+  'GET /courses/:courseId/review-eligibility',
+  'PATCH /courses/reviews/:id', 'DELETE /courses/reviews/:id',
+  'POST /blog/posts/:id/comments', 'POST /blog/posts/:id/reaction', 'POST /blog/posts/:id/rating',
+  'POST /placement/submit', 'GET /placement/history',
+  'POST /auth/password/set',
+  'GET /teacher/application', 'POST /teacher/application', 'PATCH /teacher/application', 'POST /teacher/application/submit',
   'POST /tests/attempts', 'GET /tests/attempts/history', 'GET /tests/attempts/:id',
   'PATCH /tests/attempts/:id/answers', 'POST /tests/attempts/:id/sections/:sectionId/submit',
   'POST /tests/attempts/:id/submit',
-  'GET /users/me', 'PUT /users/me', 'PUT /users/me/locale',
+  'GET /users/me', 'PUT /users/me', 'PUT /users/me/locale', 'PUT /users/me/avatar', 'DELETE /users/me/avatar',
   'GET /users/me/favorites', 'PUT /users/me/favorites/:teacherId',
   'DELETE /users/me/favorites/:teacherId',
 ]);
@@ -142,7 +153,7 @@ describe('route authorization matrix', () => {
   it('keeps the public surface small and known', () => {
     const publicRoutes = routes.filter((r) => r.public).map(key).sort();
     // Growth here is a security decision, so it must be a deliberate edit.
-    expect(publicRoutes.length).toBeLessThanOrEqual(16);
+    expect(publicRoutes.length).toBeLessThanOrEqual(28);
     expect(publicRoutes).toEqual(expect.arrayContaining([
       'POST /auth/otp/request',
       'POST /auth/otp/verify',

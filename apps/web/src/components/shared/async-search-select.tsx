@@ -4,7 +4,7 @@ import { localized, isDefaultLocale, translate } from '@/lib/i18n';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { Check, ChevronDown, LoaderCircle, Search, X } from 'lucide-react';
-import { api, type ItemsPage } from '@/lib/api';
+import { api, type ItemsPage } from '@/shared/services/api';
 import { useTranslations } from '@/components/shared/locale-provider';
 
 type Option = { id: string; label: string; description?: string };

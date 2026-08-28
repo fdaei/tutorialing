@@ -1,6 +1,6 @@
 'use client';
 
-import { api, ApiError, publicApi } from '@/lib/api';
+import { api, ApiError, publicApi } from '@/shared/services/api';
 import type { PanelIdentity } from '@/lib/panel-access';
 
 /**

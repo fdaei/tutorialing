@@ -33,27 +33,38 @@ export class EarningsService {
     return this.settings.numeric('commerce.escrowHoldDays', DEFAULT_HOLD_DAYS, 365, tx);
   }
 
-  /**
-   * Records the teacher's earning for a completed lesson and credits the net
-   * amount to their wallet. Both writes are keyed on the booking so replaying a
-   * completion cannot pay a teacher twice.
-   */
-  async accrue(tx: Tx, booking: Pick<Booking, 'id' | 'teacherId' | 'price'>) {
+  /** Snapshots the teacher/platform split when the student's wallet payment commits. */
+  async reserve(tx: Tx, booking: Pick<Booking, 'id' | 'teacherId' | 'price'>) {
     const percent = await this.commissionPercent(tx);
-    const holdDays = await this.escrowHoldDays(tx);
     const commissionAmount = Math.round((booking.price * percent) / 100);
-    const netAmount = booking.price - commissionAmount;
-    const earning = await tx.earning.upsert({
+    return tx.earning.upsert({
       where: { bookingId: booking.id },
       create: {
         teacherId: booking.teacherId,
         bookingId: booking.id,
         grossAmount: booking.price,
         commissionAmount,
-        netAmount,
-        eligibleAt: new Date(Date.now() + holdDays * DAY_MS),
+        netAmount: booking.price - commissionAmount,
+        status: 'PENDING',
+        // Payout eligibility starts only after completion; this placeholder is
+        // replaced by accrue() and cannot mature while the lesson is pending.
+        eligibleAt: new Date('9999-12-31T00:00:00.000Z'),
       },
       update: {},
+    });
+  }
+
+  /**
+   * Records the teacher's earning for a completed lesson and credits the net
+   * amount to their wallet. Both writes are keyed on the booking so replaying a
+   * completion cannot pay a teacher twice.
+   */
+  async accrue(tx: Tx, booking: Pick<Booking, 'id' | 'teacherId' | 'price'>) {
+    const holdDays = await this.escrowHoldDays(tx);
+    const reserved = await this.reserve(tx, booking);
+    const earning = await tx.earning.update({
+      where: { id: reserved.id },
+      data: { status: 'ELIGIBLE', eligibleAt: new Date(Date.now() + holdDays * DAY_MS) },
     });
     if (earning.netAmount > 0) {
       const teacher = await tx.teacher.findUniqueOrThrow({

@@ -4,7 +4,7 @@ import { localized, isDefaultLocale, translate } from '@/lib/i18n';
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CalendarDays, Clock, Plus, Trash2 } from 'lucide-react';
-import { api, apiField, apiMessage } from '@/lib/api';
+import { api, apiField, apiMessage } from '@/shared/services/api';
 import { useTranslations } from '@/components/shared/locale-provider';
 import { JalaliDateTimePicker } from '@/components/shared/jalali-date-time-picker';
 

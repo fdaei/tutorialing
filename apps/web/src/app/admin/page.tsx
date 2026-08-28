@@ -14,8 +14,8 @@ import {
   ShieldCheck,
   UserRoundCheck,
 } from 'lucide-react';
-import { PanelShell, adminNav } from '@/features/panel/components/panel-shell';
-import { api } from '@/lib/api';
+import { PanelShell, adminNav } from '@/features/panel';
+import { api } from '@/shared/services/api';
 import { useTranslations } from '@/components/shared/locale-provider';
 import { localePath, localized, isDefaultLocale, translate, type Locale } from '@/lib/i18n';
 import type { AdminDashboard } from '@lingospeak/contracts';

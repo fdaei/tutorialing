@@ -4,7 +4,7 @@ import { localized, isDefaultLocale, translate } from '@/lib/i18n';
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, Clock3, FileAudio, PenLine, RotateCcw, UserRound } from 'lucide-react';
-import { api, apiMessage, type ItemsPage } from '@/lib/api';
+import { api, apiMessage, type ItemsPage } from '@/shared/services/api';
 import { useTranslations } from '@/components/shared/locale-provider';
 
 type ReviewStatus = 'PENDING' | 'IN_REVIEW' | 'APPROVED' | 'NEEDS_REVISION';

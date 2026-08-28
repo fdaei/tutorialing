@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { CalendarPlus, Search, Star, Users } from 'lucide-react';
-import { api, apiMessage } from '@/lib/api';
+import { api, apiMessage } from '@/shared/services/api';
 import { toman } from '@/lib/format';
 import { PageHeading, EmptyState } from '@/components/shared/page-heading';
 type Teacher = {

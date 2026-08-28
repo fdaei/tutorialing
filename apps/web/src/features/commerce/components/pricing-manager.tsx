@@ -3,7 +3,7 @@
 import { localized, isDefaultLocale, translate } from '@/lib/i18n';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, apiMessage, type Paginated } from '@/lib/api';
+import { api, apiMessage, type Paginated } from '@/shared/services/api';
 import { useTranslations } from '@/components/shared/locale-provider';
 
 type TeacherPrice = {
@@ -30,44 +30,36 @@ function TeacherPricing({ fa }: { fa: boolean }) {
   const { locale } = useTranslations();
   const qc = useQueryClient(),
     query = useQuery({ queryKey: ['teacher-pricing'], queryFn: () => api<TeacherPrice>('/teacher/pricing') }),
-    [trial, setTrial] = useState(250000),
-    [regular, setRegular] = useState(500000);
-  const propose = useMutation({
-    mutationFn: () =>
-      api('/teacher/pricing/propose', {
-        method: 'POST',
-        body: JSON.stringify({ proposedTrialPrice: trial, proposedRegularPrice: regular }),
-      }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['teacher-pricing'] }),
-  });
+    [negotiationNote, setNegotiationNote] = useState('');
   const accept = useMutation({
     mutationFn: () => api('/teacher/pricing/accept-counter', { method: 'POST' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['teacher-pricing'] }),
+  });
+  const negotiate = useMutation({
+    mutationFn: () =>
+      api('/teacher/pricing/request-negotiation', {
+        method: 'POST',
+        body: JSON.stringify({ note: negotiationNote }),
+      }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['teacher-pricing'] }),
   });
   const data = query.data;
   return (
     <div className="grid gap-6 lg:grid-cols-2">
       <section className="rounded-3xl border hairline bg-white p-6">
-        <h2 className="text-2xl font-black">{translate(fa, 'commercepricingManagerPriceProposal')}</h2>
+        <h2 className="text-2xl font-black">{fa ? 'پیشنهاد قیمت مدیریت' : 'Management price offer'}</h2>
         <p className="mt-2 text-sm text-muted">
-          {translate(fa, 'commercepricingManagerPublicPricesAreShownOnlyAfterFinalManagement')}
+          {fa
+            ? 'قیمت جلسه توسط مدیریت پیشنهاد می‌شود و فقط پس از پذیرش شما در رزروها نمایش داده خواهد شد.'
+            : 'Management proposes the lesson price. It becomes bookable only after you accept it.'}
         </p>
-        <div className="mt-6 grid gap-4">
-          <Money label={translate(fa, 'commercepricingManagerProposedTrialPrice')} value={trial} onChange={setTrial} />
-          <Money
-            label={translate(fa, 'commercepricingManagerProposedRegularPrice')}
-            value={regular}
-            onChange={setRegular}
-          />
-          {propose.isError && <ErrorText error={propose.error} fa={fa} />}
-          <button
-            onClick={() => propose.mutate()}
-            disabled={propose.isPending}
-            className="brand-gradient rounded-xl py-3 font-black text-white"
-          >
-            {translate(fa, 'commercepricingManagerSubmitForReview')}
-          </button>
-        </div>
+        {data?.priceStatus !== 'COUNTER_OFFER' && (
+          <p className="mt-6 rounded-2xl bg-indigo-50 p-5 text-sm font-bold text-indigo-800">
+            {data?.priceStatus === 'APPROVED'
+              ? fa ? 'قیمت توافق‌شده فعال است.' : 'The agreed price is active.'
+              : fa ? 'در انتظار بررسی و پیشنهاد مبلغ توسط مدیریت.' : 'Waiting for management review and an offer.'}
+          </p>
+        )}
         {data?.priceStatus === 'COUNTER_OFFER' && (
           <div className="mt-6 rounded-2xl bg-amber-50 p-5">
             <strong>{translate(fa, 'commercepricingManagerManagementCounterOffer')}</strong>
@@ -76,6 +68,20 @@ function TeacherPricing({ fa }: { fa: boolean }) {
             </p>
             <button onClick={() => accept.mutate()} className="mt-4 rounded-xl bg-navy px-5 py-3 font-bold text-white">
               {translate(fa, 'commercepricingManagerAcceptCounterOffer')}
+            </button>
+            <textarea
+              value={negotiationNote}
+              onChange={(event) => setNegotiationNote(event.target.value)}
+              minLength={3}
+              className="input mt-4 min-h-24"
+              placeholder={fa ? 'دلیل یا توضیح درخواست مذاکره' : 'Reason or context for negotiation'}
+            />
+            <button
+              onClick={() => negotiate.mutate()}
+              disabled={negotiationNote.trim().length < 3 || negotiate.isPending}
+              className="mt-3 rounded-xl border border-navy px-5 py-3 font-bold text-navy disabled:opacity-50"
+            >
+              {fa ? 'درخواست مذاکره' : 'Request negotiation'}
             </button>
           </div>
         )}
@@ -179,7 +185,10 @@ function AdminPricing({ fa }: { fa: boolean }) {
                 <span className="text-xs font-black text-purple">{item.priceStatus}</span>
               </div>
               <p className="mt-2 text-sm text-muted">
-                {item.user.phone} · {money(item.proposedTrialPrice, fa)} / {money(item.proposedRegularPrice, fa)}
+                {item.user.phone} ·{' '}
+                {item.counterRegularPrice != null
+                  ? `${fa ? 'پیشنهاد مدیریت' : 'Management offer'}: ${money(item.counterTrialPrice, fa)} / ${money(item.counterRegularPrice, fa)}`
+                  : fa ? 'هنوز مبلغی پیشنهاد نشده' : 'No offer yet'}
               </p>
             </button>
           ))}
@@ -190,8 +199,8 @@ function AdminPricing({ fa }: { fa: boolean }) {
           <>
             <h2 className="text-2xl font-black">{localized({ fa: selected.nameFa, en: selected.nameEn }, fa)}</h2>
             <p className="mt-2 text-muted">
-              {translate(fa, 'commercepricingManagerTeacherProposal')}: {money(selected.proposedTrialPrice, fa)} /{' '}
-              {money(selected.proposedRegularPrice, fa)}
+              {fa ? 'آخرین مبلغ پیشنهادی مدیریت' : 'Latest management offer'}:{' '}
+              {money(selected.counterTrialPrice, fa)} / {money(selected.counterRegularPrice, fa)}
             </p>
             <div className="mt-5 grid gap-4">
               <select value={action} onChange={(e) => setAction(e.target.value as typeof action)} className="input">

@@ -2,6 +2,33 @@ import { PricingService } from './pricing.service';
 import { ReviewsService } from './reviews.service';
 
 describe('Teacher pricing approval', () => {
+  it('lets an authorized admin start review and make the first monetary offer', async () => {
+    const tx = {
+      teacher: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'teacher-1', userId: 'teacher-user', priceStatus: 'UNDER_REVIEW',
+          proposedTrialPrice: null, proposedRegularPrice: null,
+        }),
+        update: jest.fn().mockResolvedValue({ id: 'teacher-1', priceStatus: 'COUNTER_OFFER' }),
+      },
+      teacherPriceHistory: { create: jest.fn().mockResolvedValue({}) },
+      auditLog: { create: jest.fn().mockResolvedValue({}) },
+      notification: { create: jest.fn().mockResolvedValue({}) },
+    };
+    const service = new PricingService({ $transaction: jest.fn((callback) => callback(tx)) } as never);
+
+    await service.review('admin-1', ['ADMIN'], 'teacher-1', {
+      action: 'counter', counterTrialPrice: 250_000, counterRegularPrice: 500_000, note: 'پیشنهاد اولیه مدیریت',
+    });
+
+    expect(tx.teacher.update).toHaveBeenCalledWith({
+      where: { id: 'teacher-1' },
+      data: expect.objectContaining({
+        priceStatus: 'COUNTER_OFFER', counterTrialPrice: 250_000, counterRegularPrice: 500_000,
+      }),
+    });
+  });
+
   it('publishes only the final admin-approved prices and records history', async () => {
     const tx = {
       teacher: {
@@ -62,7 +89,7 @@ describe('Teacher review eligibility', () => {
 });
 
 describe('Teacher counter-offer acceptance', () => {
-  it('moves the counter prices into a new proposal, clears the counter, and records an audit event', async () => {
+  it('activates the agreed admin offer, clears the counter, and records an audit event', async () => {
     const tx = {
       teacher: {
         findUnique: jest.fn().mockResolvedValue({
@@ -72,7 +99,7 @@ describe('Teacher counter-offer acceptance', () => {
           counterTrialPrice: 260000,
           counterRegularPrice: 520000,
         }),
-        update: jest.fn().mockResolvedValue({ id: 'teacher-1', priceStatus: 'SUBMITTED' }),
+        update: jest.fn().mockResolvedValue({ id: 'teacher-1', priceStatus: 'APPROVED' }),
       },
       teacherPriceHistory: { create: jest.fn() },
       auditLog: { create: jest.fn() },
@@ -86,15 +113,51 @@ describe('Teacher counter-offer acceptance', () => {
       data: expect.objectContaining({
         proposedTrialPrice: 260000,
         proposedRegularPrice: 520000,
+        approvedTrialPrice: 260000,
+        approvedRegularPrice: 520000,
+        trialPrice: 260000,
+        regularPrice: 520000,
         counterTrialPrice: null,
         counterRegularPrice: null,
-        priceStatus: 'SUBMITTED',
+        priceStatus: 'APPROVED',
       }),
     });
     expect(tx.auditLog.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ action: 'teacher.price.counter.accepted', entityId: 'teacher-1' }),
       }),
+    );
+  });
+});
+
+describe('Teacher negotiation request', () => {
+  it('moves a platform counter-offer back under review and records the request', async () => {
+    const tx = {
+      teacher: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'teacher-1',
+          userId: 'teacher-user',
+          priceStatus: 'COUNTER_OFFER',
+          proposedTrialPrice: 250000,
+          proposedRegularPrice: 500000,
+          counterTrialPrice: 260000,
+          counterRegularPrice: 520000,
+        }),
+        update: jest.fn().mockResolvedValue({ id: 'teacher-1', priceStatus: 'UNDER_REVIEW' }),
+      },
+      teacherPriceHistory: { create: jest.fn() },
+      auditLog: { create: jest.fn() },
+    };
+    const service = new PricingService({ $transaction: jest.fn((callback) => callback(tx)) } as never);
+
+    await service.requestNegotiation('teacher-user', 'Please review my experience.');
+
+    expect(tx.teacher.update).toHaveBeenCalledWith({
+      where: { id: 'teacher-1' },
+      data: expect.objectContaining({ priceStatus: 'UNDER_REVIEW' }),
+    });
+    expect(tx.teacherPriceHistory.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ action: 'teacher.negotiation.requested' }) }),
     );
   });
 });

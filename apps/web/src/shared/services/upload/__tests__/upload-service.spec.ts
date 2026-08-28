@@ -1,10 +1,10 @@
 import { webcrypto } from 'node:crypto';
-import { api } from '@/lib/api';
+import { api } from '@/shared/services/api';
 import { calculateSha256 } from '../checksum';
 import { UploadError } from '../upload-errors';
 import { upload } from '../upload-service';
 
-jest.mock('@/lib/api', () => ({ api: jest.fn() }));
+jest.mock('@/shared/services/api', () => ({ api: jest.fn() }));
 
 const mockedApi = jest.mocked(api);
 const signedUrl = 'https://storage.invalid/private-signature';
@@ -19,12 +19,22 @@ function source() {
 }
 
 describe('shared upload workflow', () => {
-  beforeAll(() => Object.defineProperty(globalThis, 'crypto', { configurable: true, value: webcrypto }));
+  beforeAll(() => {
+    Object.defineProperty(globalThis, 'crypto', { configurable: true, value: webcrypto });
+    Blob.prototype.arrayBuffer = function arrayBuffer() {
+      return new Promise<ArrayBuffer>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result instanceof ArrayBuffer ? reader.result : new ArrayBuffer(0));
+        reader.onerror = () => reject(reader.error);
+        reader.readAsArrayBuffer(this);
+      });
+    };
+  });
 
   beforeEach(() => {
     mockedApi.mockReset();
     mockedApi.mockResolvedValueOnce({ fileId: 'file-1', uploadUrl: signedUrl });
-    global.fetch = jest.fn().mockResolvedValue(new Response(null, { status: 200 }));
+    global.fetch = jest.fn().mockResolvedValue({ ok: true });
   });
 
   it('produces a stable SHA-256 checksum compatible with the existing implementation', async () => {
@@ -43,9 +53,20 @@ describe('shared upload workflow', () => {
     expect(mockedApi).toHaveBeenLastCalledWith('/files/file-1/complete', expect.objectContaining({ method: 'POST' }));
   });
 
+  it('maps signed-upload preparation failures and rejects malformed API responses', async () => {
+    mockedApi.mockReset();
+    mockedApi.mockRejectedValueOnce(new Error('private API response'));
+    await expect(upload(source())).rejects.toMatchObject({ stage: 'create' });
+
+    mockedApi.mockReset();
+    mockedApi.mockResolvedValueOnce({ fileId: 'file-1' });
+    await expect(upload(source())).rejects.toMatchObject({ stage: 'create' });
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
   it.each([
     ['network failure', () => Promise.reject(new TypeError('network unavailable'))],
-    ['non-ok storage response', () => Promise.resolve(new Response(null, { status: 503 }))],
+    ['non-ok storage response', () => Promise.resolve({ ok: false })],
   ])('uses fallback after an allowed signed-upload %s', async (_label, result) => {
     global.fetch = jest.fn().mockImplementation(result);
     await upload(source());
@@ -64,7 +85,7 @@ describe('shared upload workflow', () => {
   });
 
   it('does not finalize after fallback failure', async () => {
-    global.fetch = jest.fn().mockResolvedValue(new Response(null, { status: 500 }));
+    global.fetch = jest.fn().mockResolvedValue({ ok: false });
     mockedApi.mockRejectedValueOnce(new Error('private fallback response'));
     await expect(upload(source())).rejects.toMatchObject({ stage: 'fallback' });
     expect(mockedApi).toHaveBeenCalledTimes(2);
@@ -80,7 +101,8 @@ describe('shared upload workflow', () => {
     mockedApi.mockRejectedValue(new Error(`${signedUrl}?token=secret internal response`));
     const error = await upload(source()).catch((reason: unknown) => reason);
     expect(error).toBeInstanceOf(UploadError);
-    expect((error as UploadError).message).not.toMatch(/signature|token|internal response/i);
+    if (!(error instanceof UploadError)) throw new Error('Expected UploadError');
+    expect(error.message).not.toMatch(/signature|token|internal response/i);
   });
 
   it('passes AbortSignal through every transport step', async () => {

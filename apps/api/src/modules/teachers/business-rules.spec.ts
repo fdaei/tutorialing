@@ -6,34 +6,43 @@ const settingsStub = (over: Record<string, number> = {}) => ({
 });
 
 describe('trial price is half the regular price', () => {
-  const propose = (trial: number, regular: number) => {
+  const counterOffer = (trial: number, regular: number) => {
     const tx = {
       teacher: {
-        findUnique: jest.fn().mockResolvedValue({ id: 'teacher-1', userId: 'teacher-user', priceStatus: 'DRAFT' }),
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'teacher-1', userId: 'teacher-user', priceStatus: 'DRAFT',
+          proposedTrialPrice: null, proposedRegularPrice: null,
+        }),
         update: jest.fn().mockResolvedValue({ id: 'teacher-1' }),
       },
       teacherPriceHistory: { create: jest.fn() },
       auditLog: { create: jest.fn() },
+      notification: { create: jest.fn() },
     };
     const svc = new PricingService({ $transaction: jest.fn((cb: (t: unknown) => unknown) => cb(tx)) } as never);
-    return { run: () => svc.propose('teacher-user', trial, regular), tx };
+    return {
+      run: () => svc.review('admin-1', ['ADMIN'], 'teacher-1', {
+        action: 'counter', counterTrialPrice: trial, counterRegularPrice: regular,
+      }),
+      tx,
+    };
   };
 
-  it('accepts a trial priced at exactly half', async () => {
-    const { run, tx } = propose(250_000, 500_000);
+  it('accepts an admin offer with a trial priced at exactly half', async () => {
+    const { run, tx } = counterOffer(250_000, 500_000);
     await run();
     expect(tx.teacher.update).toHaveBeenCalled();
   });
 
   it('rejects a trial priced at the full lesson rate', async () => {
     // Only `regular >= trial` was checked, so the trial discount could vanish.
-    await expect(propose(500_000, 500_000).run()).rejects.toMatchObject({
+    await expect(counterOffer(500_000, 500_000).run()).rejects.toMatchObject({
       response: { code: 'TRIAL_PRICE_NOT_HALF_REGULAR' },
     });
   });
 
   it('rejects a trial priced below half', async () => {
-    await expect(propose(100_000, 500_000).run()).rejects.toMatchObject({
+    await expect(counterOffer(100_000, 500_000).run()).rejects.toMatchObject({
       response: { code: 'TRIAL_PRICE_NOT_HALF_REGULAR' },
     });
   });

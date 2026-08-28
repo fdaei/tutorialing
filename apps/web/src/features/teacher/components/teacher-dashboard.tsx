@@ -12,7 +12,7 @@ import {
   FileCheck2,
   Users,
 } from 'lucide-react';
-import { api } from '@/lib/api';
+import { api } from '@/shared/services/api';
 import { localePath, localized, isDefaultLocale, translate } from '@/lib/i18n';
 import { useTranslations } from '@/components/shared/locale-provider';
 

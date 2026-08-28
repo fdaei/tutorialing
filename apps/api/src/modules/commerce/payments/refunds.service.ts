@@ -42,6 +42,10 @@ export class RefundsService {
         where: { id: payment.id },
         data: { status: already + amount === payment.amount ? 'REFUNDED' : 'PARTIALLY_REFUNDED' },
       });
+      await tx.auditLog.create({ data: {
+        actorId, action: 'finance.payment.refund', entity: 'Payment', entityId: payment.id,
+        before: { status: payment.status }, after: { amount, reason, refundId: refund.id },
+      } });
       return refund;
       // The over-refund guard above reads SUM(refund.amount) and then inserts a
       // row that changes that same sum. At READ COMMITTED two concurrent

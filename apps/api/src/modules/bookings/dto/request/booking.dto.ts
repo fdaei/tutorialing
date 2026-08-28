@@ -7,4 +7,6 @@ export class BookingDto {
   @IsOptional() @IsString() enrollmentId?: string;
   @IsBoolean() policyAccepted!: boolean;
   @IsString() timezone!: string;
+  @IsOptional() @IsString() discountCode?: string;
+  @IsString() idempotencyKey!: string;
 }

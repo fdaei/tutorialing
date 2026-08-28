@@ -12,8 +12,8 @@ import {
   MessageCircle,
   Target,
 } from 'lucide-react';
-import { api } from '@/lib/api';
-import { PanelShell, studentNav } from '@/features/panel/components/panel-shell';
+import { api } from '@/shared/services/api';
+import { PanelShell, studentNav } from '@/features/panel';
 import { useTranslations } from '@/components/shared/locale-provider';
 import { formatDate, localePath, localized } from '@/lib/i18n';
 type Me = { name?: string };
@@ -24,15 +24,18 @@ type Booking = {
   teacher?: { nameFa?: string; nameEn?: string };
 };
 type Attempt = { status: string; overallBand?: number };
+type PlacementResult = { score: number; level: string; completedAt: string };
 export default function Dashboard() {
   const { locale, t } = useTranslations(),
     p = (href: string) => localePath(href, locale),
     me = useQuery({ queryKey: ['me'], queryFn: () => api<Me>('/users/me') }),
     bookings = useQuery({ queryKey: ['bookings'], queryFn: () => api<Booking[]>('/bookings/me') }),
-    attempts = useQuery({ queryKey: ['attempt-history'], queryFn: () => api<Attempt[]>('/tests/attempts/history') });
+    attempts = useQuery({ queryKey: ['attempt-history'], queryFn: () => api<Attempt[]>('/tests/attempts/history') }),
+    placement = useQuery({ queryKey: ['placement-history'], queryFn: () => api<PlacementResult[]>('/placement/history') });
   const next = bookings.data?.find((b) => new Date(b.startsAt) > new Date() && b.status === 'CONFIRMED'),
     last = attempts.data?.find((a) => a.status === 'APPROVED'),
-    assessmentDone = Boolean(last),
+    latestPlacement = placement.data?.[0],
+    assessmentDone = Boolean(last || latestPlacement),
     hasClass = Boolean(next),
     teacherName = localized({ fa: next?.teacher?.nameFa, en: next?.teacher?.nameEn }, locale);
   const journey = [
@@ -82,12 +85,18 @@ export default function Dashboard() {
             </Link>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <Stat label={t('tests')} value={attempts.data?.length ?? 0} />
+            <Stat label={t('tests')} value={(attempts.data?.length ?? 0) + (placement.data?.length ?? 0)} />
             <Stat label={t('classes')} value={bookings.data?.length ?? 0} />
             {last && (
               <div className="panel-card col-span-2 p-5">
                 <small className="block text-muted">{t('latestApprovedBand')}</small>
                 <strong className="latin mt-2 block text-3xl text-purple">{last.overallBand}</strong>
+              </div>
+            )}
+            {!last && latestPlacement && (
+              <div className="panel-card col-span-2 p-5">
+                <small className="block text-muted">آخرین نتیجه تعیین سطح</small>
+                <strong className="latin mt-2 block text-3xl text-purple">{latestPlacement.level} · {latestPlacement.score}%</strong>
               </div>
             )}
           </div>

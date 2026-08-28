@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { FileText, History, Landmark, ReceiptText, WalletCards } from 'lucide-react';
-import { apiMessage } from '@/lib/api';
+import { apiMessage } from '@/shared/services/api';
 import { digitsOnly, faNumber, jalali, toman } from '@/lib/format';
 import { walletService, type Invoice, type Transaction } from '@/lib/wallet-service';
 import { EmptyState, PageHeading } from '@/components/shared/page-heading';

@@ -1,11 +1,11 @@
 'use client';
 import Link from 'next/link';
 import { BadgeCheck, Star, UserRound } from 'lucide-react';
-import type { PublicTeacher } from '@/lib/api';
-import { api } from '@/lib/api';
+import type { PublicTeacher } from '../types/public-teacher';
+import { api } from '@/shared/services/api';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslations } from '@/components/shared/locale-provider';
-import { localePath, localized, isDefaultLocale, translate } from '@/lib/i18n';
+import { localePath, localized, translate } from '@/lib/i18n';
 
 export function TeacherCard({ teacher, reason, score }: { teacher: PublicTeacher; reason?: string; score?: number }) {
   const me = useQuery({
@@ -14,14 +14,13 @@ export function TeacherCard({ teacher, reason, score }: { teacher: PublicTeacher
     retry: false,
   });
   const { locale } = useTranslations(),
-    fa = isDefaultLocale(locale),
     initials = teacher.nameEn
       .split(' ')
       .map((n) => n[0])
       .join('')
       .slice(0, 2),
     money =
-      new Intl.NumberFormat(translate(locale, 'commercepricingManagerEnUS2')).format(teacher.trialPrice) +
+      new Intl.NumberFormat(translate(locale, 'commercepricingManagerEnUS2')).format(teacher.approvedTrialPrice ?? 0) +
       translate(locale, 'commercepricingManagerIrr');
   return (
     <article className="surface-card lift relative overflow-hidden p-5">
@@ -45,8 +44,14 @@ export function TeacherCard({ teacher, reason, score }: { teacher: PublicTeacher
           </p>
           <p className="mt-3 flex items-center gap-1 text-sm font-bold">
             <Star size={15} fill="#f5a623" className="text-[#f5a623]" />
-            {teacher.rating}
-            <span className="font-normal text-muted">({teacher.reviewsCount})</span>
+            {teacher.reviewsCount ? (
+              <>
+                <span className="latin">{teacher.rating.toFixed(1)}</span>
+                <span className="font-normal text-muted">{teacher.reviewsCount.toLocaleString('fa-IR')} نظر</span>
+              </>
+            ) : (
+              <span className="font-normal text-muted">هنوز امتیازی ثبت نشده</span>
+            )}
           </p>
         </div>
       </div>

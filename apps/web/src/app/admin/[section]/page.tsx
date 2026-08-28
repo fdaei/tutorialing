@@ -13,6 +13,7 @@ import { PricingManager } from '@/features/commerce';
 import { requestLocale } from '@/lib/server-locale';
 import { TeacherPlannerCalendar } from '@/features/scheduling';
 import { FeatureErrorBoundary } from '@/shared/components/error-boundaries';
+import { AdminArticleReviewWorkspace } from '@/features/blog';
 
 const map: Record<string, [string, string, string]> = {
   users: ['کاربران', 'Users', '/admin/users'],
@@ -34,6 +35,7 @@ const map: Record<string, [string, string, string]> = {
   reports: ['گزارش‌های مدیریتی', 'Management reports', '/admin/reports'],
   audit: ['گزارش فعالیت', 'Audit log', '/admin/audit-logs'],
   cms: ['مدیریت محتوا', 'CMS', '/admin/cms'],
+  magazine: ['بررسی مجله', 'Magazine review', '/blog/review/queue'],
   settings: ['تنظیمات', 'Settings', '/admin/settings'],
   countries: ['کشورها و پیش‌شماره‌ها', 'Countries and calling codes', '/admin/countries'],
   search: ['جستجوی سراسری', 'Global search', '/admin/dashboard'],
@@ -67,6 +69,7 @@ export default async function Section({ params }: { params: Promise<{ section: s
   else if (section === 'countries') content = <CountryManager />;
   else if (section === 'teacher-prices') content = <PricingManager mode="admin" />;
   else if (section === 'finance' || section === 'payouts') content = <AdminFinanceCenter />;
+  else if (section === 'magazine') content = <AdminArticleReviewWorkspace />;
   else
     content = (
       <>

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { CheckCircle2, Headphones, Mic, Wifi, XCircle } from 'lucide-react';
-import { api, publicApi, ApiError } from '@/lib/api';
+import { api, publicApi, ApiError } from '@/shared/services/api';
 import { useTranslations } from '@/components/shared/locale-provider';
 import { localePath, localized, isDefaultLocale, translate } from '@/lib/i18n';
 export default function DeviceCheck() {

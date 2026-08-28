@@ -3,9 +3,13 @@ import { PriceStatus } from '@prisma/client';
 import { CurrentUser, Roles, type AuthUser } from '../../common';
 import { PermissionKeys, RequirePermissions } from '../auth/authorization';
 import { PricingService } from './pricing.service';
-import { ProposalDto } from './dto/request/proposal.dto';
 import { PriceReviewDto } from './dto/request/price-review.dto';
 import { ApiTags } from '@nestjs/swagger';
+import { IsString, Length } from 'class-validator';
+
+class NegotiationDto {
+  @IsString() @Length(3, 1000) note!: string;
+}
 
 @Roles('TEACHER')
 @Controller('teacher/pricing')
@@ -14,11 +18,11 @@ export class TeacherPricingController {
   @Get() mine(@CurrentUser() user: AuthUser) {
     return this.service.mine(user.id);
   }
-  @Post('propose') propose(@CurrentUser() user: AuthUser, @Body() body: ProposalDto) {
-    return this.service.propose(user.id, body.proposedTrialPrice, body.proposedRegularPrice);
-  }
   @Post('accept-counter') acceptCounter(@CurrentUser() user: AuthUser) {
     return this.service.acceptCounter(user.id);
+  }
+  @Post('request-negotiation') requestNegotiation(@CurrentUser() user: AuthUser, @Body() body: NegotiationDto) {
+    return this.service.requestNegotiation(user.id, body.note);
   }
 }
 

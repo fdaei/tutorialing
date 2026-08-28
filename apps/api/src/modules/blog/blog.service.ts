@@ -14,7 +14,10 @@ import { CreateBlogPostDto, ListBlogPostsDto, UpdateBlogPostDto } from './dto/re
  * nobody has taken.
  */
 export const BLOG_POST_TRANSITIONS: Readonly<Record<BlogPostStatus, readonly BlogPostStatus[]>> = {
-  DRAFT: ['PUBLISHED', 'ARCHIVED'],
+  DRAFT: ['PENDING_REVIEW', 'ARCHIVED'],
+  PENDING_REVIEW: ['APPROVED', 'REJECTED'],
+  APPROVED: ['PUBLISHED', 'REJECTED'],
+  REJECTED: ['PENDING_REVIEW', 'ARCHIVED'],
   PUBLISHED: ['ARCHIVED'],
   ARCHIVED: [],
 };
@@ -81,9 +84,39 @@ export class BlogService {
 
   comments(postId: string) {
     return this.db.blogComment.findMany({
-      where: { postId, status: 'APPROVED' },
-      orderBy: { createdAt: 'desc' },
-      include: { user: { select: { name: true } } },
+      where: { postId, status: 'APPROVED', parentId: null },
+      orderBy: { createdAt: 'asc' },
+      include: { user: { select: { id: true, name: true, avatarKey: true } }, replies: { where: { status: 'APPROVED' }, orderBy: { createdAt: 'asc' }, include: { user: { select: { id: true, name: true, avatarKey: true } } } } },
+    });
+  }
+
+  async comment(postId: string, userId: string, body: string, parentId?: string) {
+    await this.assertPublished(postId);
+    if (parentId) {
+      const parent = await this.db.blogComment.findFirst({ where: { id: parentId, postId, status: 'APPROVED' }, select: { id: true, parentId: true } });
+      if (!parent) throw notFound('BLOG_PARENT_COMMENT_NOT_FOUND');
+      if (parent.parentId) throw conflict('BLOG_COMMENT_REPLY_DEPTH_EXCEEDED');
+    }
+    return this.db.blogComment.create({ data: { postId, userId, parentId, body: body.trim(), status: 'PENDING' }, include: { user: { select: { id: true, name: true, avatarKey: true } } } });
+  }
+
+  moderateComment(id: string, status: 'APPROVED' | 'REJECTED') {
+    return this.db.blogComment.update({ where: { id }, data: { status } });
+  }
+
+  mine(authorId: string) {
+    return this.db.blogPost.findMany({
+      where: { authorId },
+      include: { category: true, tags: true },
+      orderBy: { updatedAt: 'desc' },
+    });
+  }
+
+  reviewQueue() {
+    return this.db.blogPost.findMany({
+      where: { status: 'PENDING_REVIEW' },
+      include: { category: true, tags: true, author: AUTHOR },
+      orderBy: { submittedAt: 'asc' },
     });
   }
 
@@ -122,9 +155,11 @@ export class BlogService {
   }
 
   /** Same field-by-field mapping as `create`, and the same fields — no more. */
-  async update(actorId: string, id: string, dto: UpdateBlogPostDto) {
+  async update(actorId: string, id: string, dto: UpdateBlogPostDto, canManageAll = true) {
     const before = await this.db.blogPost.findUnique({ where: { id } });
     if (!before) throw notFound('BLOG_POST_NOT_FOUND');
+    if (!canManageAll && before.authorId !== actorId) throw notFound('BLOG_POST_NOT_FOUND');
+    if (!canManageAll && !['DRAFT', 'REJECTED'].includes(before.status)) throw conflict('BLOG_POST_EDIT_NOT_ALLOWED');
 
     const data: Prisma.BlogPostUpdateInput = {};
     if (dto.slug !== undefined) data.slug = dto.slug;
@@ -168,6 +203,8 @@ export class BlogService {
       where: { id, status: before.status },
       data: {
         status: target,
+        ...(target === 'PENDING_REVIEW' ? { submittedAt: new Date(), rejectionReason: null, reviewedAt: null, reviewedById: null } : {}),
+        ...(['APPROVED', 'REJECTED'].includes(target) ? { reviewedAt: new Date(), reviewedById: actorId } : {}),
         // First publication stamps the date; re-publishing a post that already
         // has one must not backdate the archive of its original release.
         ...(target === 'PUBLISHED' && !before.publishedAt ? { publishedAt: new Date() } : {}),
@@ -183,6 +220,30 @@ export class BlogService {
       { status: before.status },
       { status: target },
     );
+    return this.db.blogPost.findUniqueOrThrow({ where: { id } });
+  }
+
+  async submit(authorId: string, id: string) {
+    const post = await this.db.blogPost.findFirst({ where: { id, authorId } });
+    if (!post) throw notFound('BLOG_POST_NOT_FOUND');
+    return this.transition(authorId, id, 'PENDING_REVIEW');
+  }
+
+  approve(reviewerId: string, id: string) {
+    return this.transition(reviewerId, id, 'APPROVED');
+  }
+
+  async reject(reviewerId: string, id: string, reason: string) {
+    const before = await this.db.blogPost.findUnique({ where: { id } });
+    if (!before) throw notFound('BLOG_POST_NOT_FOUND');
+    if (!BLOG_POST_TRANSITIONS[before.status].includes('REJECTED')) throw conflict('BLOG_POST_TRANSITION_INVALID');
+    const reviewedAt = new Date();
+    const claimed = await this.db.blogPost.updateMany({
+      where: { id, status: before.status },
+      data: { status: 'REJECTED', rejectionReason: reason.trim(), reviewedAt, reviewedById: reviewerId },
+    });
+    if (claimed.count !== 1) throw conflict('BLOG_POST_TRANSITION_INVALID');
+    await this.audit.write(reviewerId, 'blog.post.rejected', 'BlogPost', id, { status: before.status }, { status: 'REJECTED', reason: reason.trim() });
     return this.db.blogPost.findUniqueOrThrow({ where: { id } });
   }
 

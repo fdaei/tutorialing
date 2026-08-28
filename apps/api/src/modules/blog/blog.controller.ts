@@ -12,7 +12,8 @@ import {
 import { PermissionKeys, RequirePermissions } from '../auth/authorization';
 import { BlogService } from './blog.service';
 import { CreateBlogPostDto, ListBlogPostsDto, UpdateBlogPostDto } from './dto/request/blog-post.dto';
-import { BlogRatingDto, BlogReactionDto, BlogViewDto } from './dto/request/blog-interaction.dto';
+import { BlogCommentDto, BlogRatingDto, BlogReactionDto, BlogViewDto, ModerateBlogCommentDto } from './dto/request/blog-interaction.dto';
+import { RejectBlogPostDto } from './dto/request/blog-review.dto';
 
 /**
  * Three tiers of access, each stated on the route rather than inferred:
@@ -44,6 +45,20 @@ export class BlogController {
     return this.blog.comments(id);
   }
 
+  @RateLimit(RATE_LIMIT_TIERS.adminWrite)
+  @Post('posts/:id/comments')
+  comment(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: BlogCommentDto) {
+    return this.blog.comment(id, user.id, dto.body, dto.parentId);
+  }
+
+  @Roles('ADMIN', 'STAFF')
+  @RequirePermissions(PermissionKeys.Content.Manage)
+  @RateLimit(RATE_LIMIT_TIERS.adminWrite)
+  @Patch('comments/:id/moderate')
+  moderateComment(@Param('id') id: string, @Body() dto: ModerateBlogCommentDto) {
+    return this.blog.moderateComment(id, dto.status);
+  }
+
   @Roles('ADMIN', 'STAFF')
   @RequirePermissions(PermissionKeys.Content.Manage)
   @RateLimit(RATE_LIMIT_TIERS.adminWrite)
@@ -58,6 +73,48 @@ export class BlogController {
   @Patch('posts/:id')
   update(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: UpdateBlogPostDto) {
     return this.blog.update(user.id, id, dto);
+  }
+
+  @Roles('TEACHER')
+  @Get('instructor/posts')
+  mine(@CurrentUser() user: AuthUser) { return this.blog.mine(user.id); }
+
+  @Roles('TEACHER')
+  @RateLimit(RATE_LIMIT_TIERS.adminWrite)
+  @Post('instructor/posts')
+  instructorCreate(@CurrentUser() user: AuthUser, @Body() dto: CreateBlogPostDto) {
+    return this.blog.create(user.id, dto);
+  }
+
+  @Roles('TEACHER')
+  @RateLimit(RATE_LIMIT_TIERS.adminWrite)
+  @Patch('instructor/posts/:id')
+  instructorUpdate(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: UpdateBlogPostDto) {
+    return this.blog.update(user.id, id, dto, false);
+  }
+
+  @Roles('TEACHER')
+  @RateLimit(RATE_LIMIT_TIERS.adminWrite)
+  @Post('posts/:id/submit')
+  submit(@CurrentUser() user: AuthUser, @Param('id') id: string) { return this.blog.submit(user.id, id); }
+
+  @Roles('ADMIN', 'STAFF')
+  @RequirePermissions(PermissionKeys.Content.Manage)
+  @Get('review/queue')
+  reviewQueue() { return this.blog.reviewQueue(); }
+
+  @Roles('ADMIN', 'STAFF')
+  @RequirePermissions(PermissionKeys.Content.Manage)
+  @RateLimit(RATE_LIMIT_TIERS.adminWrite)
+  @Post('posts/:id/approve')
+  approve(@CurrentUser() user: AuthUser, @Param('id') id: string) { return this.blog.approve(user.id, id); }
+
+  @Roles('ADMIN', 'STAFF')
+  @RequirePermissions(PermissionKeys.Content.Manage)
+  @RateLimit(RATE_LIMIT_TIERS.adminWrite)
+  @Post('posts/:id/reject')
+  reject(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: RejectBlogPostDto) {
+    return this.blog.reject(user.id, id, dto.reason);
   }
 
   @Roles('ADMIN', 'STAFF')

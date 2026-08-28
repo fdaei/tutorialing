@@ -1,4 +1,4 @@
-import { PanelShell, teacherNav } from '@/features/panel/components/panel-shell';
+import { PanelShell, teacherNav } from '@/features/panel';
 import { TeacherDashboard } from '@/features/teacher/components/teacher-dashboard';
 export default function TeacherHome() {
   return (

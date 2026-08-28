@@ -4,7 +4,7 @@ import { localized, isDefaultLocale, translate } from '@/lib/i18n';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Clock3, Filter, MessageCircle, Search, UserRound } from 'lucide-react';
-import { api, apiMessage } from '@/lib/api';
+import { api, apiMessage } from '@/shared/services/api';
 import { useTranslations } from '@/components/shared/locale-provider';
 import { AsyncSearchSelect } from '@/components/shared/async-search-select';
 

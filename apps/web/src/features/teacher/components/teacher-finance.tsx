@@ -4,7 +4,7 @@ import { localized, isDefaultLocale, translate } from '@/lib/i18n';
 import { useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowDownToLine, CircleDollarSign, Clock3, ReceiptText, ShieldCheck, WalletCards } from 'lucide-react';
-import { api, apiField, apiMessage } from '@/lib/api';
+import { api, apiField, apiMessage } from '@/shared/services/api';
 import { useTranslations } from '@/components/shared/locale-provider';
 
 type Earning = {

@@ -24,6 +24,7 @@ import { SearchModule } from './application/search/search.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { ContentModule } from './modules/content/content.module';
 import { BlogModule } from './modules/blog/blog.module';
+import { CoursesModule } from './modules/courses/courses.module';
 @Module({
   imports: [
     ConfigModule,
@@ -45,6 +46,7 @@ import { BlogModule } from './modules/blog/blog.module';
     NotificationsModule,
     ContentModule,
     BlogModule,
+    CoursesModule,
     LearningModule,
     AdminDashboardModule,
   ],

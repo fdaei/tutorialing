@@ -7,7 +7,8 @@ describe('BookingsService concurrency protection', () => {
     const settings = {
       numeric: jest.fn().mockImplementation((_key: string, fallback: number) => Promise.resolve(fallback)),
     } as any;
-    const service = new BookingsService({} as any, {} as any, redis, {} as any, {} as any, {} as any, settings);
+    const db = { payment: { findUnique: jest.fn().mockResolvedValue(null) } } as any;
+    const service = new BookingsService(db, {} as any, redis, {} as any, {} as any, {} as any, settings, {} as any, {} as any, {} as any);
     await expect(
       service.create('student-1', {
         teacherId: 'teacher-1',

@@ -194,7 +194,7 @@ describe('LingoSpeak platform flows', () => {
   });
   it('exposes admin operations and rolls back wallet debits on failed gateway callbacks', async () => {
     const admin = await db.user.findUniqueOrThrow({
-      where: { phone: '09120000000' },
+      where: { phone: '+989120000000' },
       include: { roles: { include: { permissions: { include: { permission: true } } } } },
     });
     adminToken = await jwt.signAsync({

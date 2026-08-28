@@ -3,10 +3,15 @@
 import { localized, isDefaultLocale, translate } from '@/lib/i18n';
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, apiMessage } from '@/lib/api';
+import { api, apiMessage } from '@/shared/services/api';
 import { useTranslations } from '@/components/shared/locale-provider';
 import { CalendarDays, ChevronDown, LoaderCircle, Paperclip, Plus, Search, Trash2, Upload, X } from 'lucide-react';
-import { SUPPORT_ATTACHMENT_MAX_BYTES, SUPPORT_ATTACHMENT_TYPES, uploadFile } from '@/lib/file-upload';
+import { uploadErrorMessage } from '@/shared/services/upload';
+import {
+  SUPPORT_ATTACHMENT_MAX_BYTES,
+  SUPPORT_ATTACHMENT_TYPES,
+  uploadSupportAttachment,
+} from '../services/upload-support-attachment';
 
 type Ticket = {
   id: string;
@@ -268,7 +273,7 @@ export function MyTicketManager() {
                       </label>
                       {reply.isError && (
                         <p role="alert" className="text-sm text-red-700">
-                          {apiMessage(reply.error, translate(locale, 'supportmyTicketManagerCouldNotSendTheReply'))}
+                          {uploadErrorMessage(reply.error, translate(locale, 'supportmyTicketManagerCouldNotSendTheReply'))}
                         </p>
                       )}
                       <button
@@ -436,7 +441,7 @@ export function MyTicketManager() {
                 </label>
                 {create.isError && (
                   <p role="alert" className="sm:col-span-2 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">
-                    {apiMessage(create.error, 'تیکت ایجاد نشد. دوباره تلاش کنید.')}
+                    {uploadErrorMessage(create.error, 'تیکت ایجاد نشد. دوباره تلاش کنید.')}
                   </p>
                 )}
               </div>
@@ -491,14 +496,6 @@ function priorityClass(value: string) {
         ? 'bg-amber-50 text-amber-700'
         : 'bg-slate-100 text-slate-600';
   return `rounded-md px-2 py-1 ${tone}`;
-}
-
-async function uploadSupportAttachment(file: File, fa: boolean) {
-  if (!SUPPORT_ATTACHMENT_TYPES.includes(file.type))
-    throw new Error(translate(fa, 'supportmyTicketManagerOnlyPDFJPGAndPNGFilesAreAllowed'));
-  if (file.size > SUPPORT_ATTACHMENT_MAX_BYTES)
-    throw new Error(translate(fa, 'supportmyTicketManagerTheFileMustNotExceed10MB'));
-  return uploadFile(file, 'support-attachment');
 }
 
 function AttachmentLink({ fileId, fa }: { fileId: string; fa: boolean }) {

@@ -18,6 +18,7 @@ export class TeachersController {
     @Query('language') language?: string,
     @Query('minBand') band?: string,
     @Query('maxPrice') price?: string,
+    @Query('minRating') rating?: string,
     @Query('sort') sort?: string,
   ) {
     return this.service.directory({
@@ -28,6 +29,7 @@ export class TeachersController {
       language,
       minBand: band ? Number(band) : undefined,
       maxPrice: price ? Number(price) : undefined,
+      minRating: rating ? Number(rating) : undefined,
       sort,
     });
   }

@@ -1,17 +1,16 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { ArrowLeft, ArrowRight, BadgeCheck, CalendarDays, Clock, ShieldCheck, Star, Users } from 'lucide-react';
-import { api, publicApi, type PublicTeacher, ApiError, apiMessage } from '@/lib/api';
+import { api, publicApi, ApiError, apiMessage } from '@/shared/services/api';
+import type { PublicTeacher } from '@/features/teacher';
 import { useTranslations } from '@/components/shared/locale-provider';
 import { localePath, localized, isDefaultLocale, translate } from '@/lib/i18n';
 
 type Slot = { startsAt: string; endsAt: string; date: string; timezone: string; type: 'trial' | 'regular' };
-type Payment = { id: string; status?: string };
-
 export default function Checkout() {
   const params = useSearchParams(),
     router = useRouter(),
@@ -47,6 +46,11 @@ export default function Checkout() {
     queryFn: () => publicApi<PublicTeacher>(`/teachers/${encodeURIComponent(teacherId)}`),
     enabled: !!teacherId,
   });
+  const wallet = useQuery({
+    queryKey: ['wallet', 'checkout'],
+    queryFn: () => api<{ balance: number }>('/payments/wallet'),
+    enabled: !!me.data,
+  });
   const slots = useQuery({
     queryKey: ['slots', teacherId, lessonType, range.from, range.to],
     queryFn: () =>
@@ -55,50 +59,22 @@ export default function Checkout() {
       ),
     enabled: !!teacherId,
   });
-  // Checkout is two calls: reserve the booking, then start its payment. When the
-  // second one failed (a rejected discount code, say), pressing the button again
-  // used to reserve a *second* booking for the same slot — which the first one was
-  // already holding — so every retry died on SLOT_ALREADY_BOOKED until the 15
-  // minute payment window expired. Remembering the reserved booking makes a retry
-  // resume payment for it instead. It is cleared whenever the choice of slot or
-  // lesson type changes, since the reservation no longer matches what was picked.
-  const reservedRef = useRef<{ bookingId: string; startsAt: string; type: 'trial' | 'regular' } | null>(null);
   const checkout = useMutation({
     mutationFn: async () => {
       if (!slot) throw new Error(translate(locale, 'checkoutChooseATime'));
-      const held = reservedRef.current;
-      const bookingId =
-        held && held.startsAt === slot.startsAt && held.type === lessonType
-          ? held.bookingId
-          : (
-              await api<{ id: string }>('/bookings', {
-                method: 'POST',
-                body: JSON.stringify({
-                  teacherId,
-                  startsAt: slot.startsAt,
-                  type: lessonType,
-                  policyAccepted: accepted,
-                  timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-                }),
-              })
-            ).id;
-      reservedRef.current = { bookingId, startsAt: slot.startsAt, type: lessonType };
-      const payment = await api<Payment>('/payments', {
+      await api<{ id: string }>('/bookings', {
         method: 'POST',
         body: JSON.stringify({
-          purpose: 'booking',
-          referenceId: bookingId,
-          walletAmount: 0,
+          teacherId,
+          startsAt: slot.startsAt,
+          type: lessonType,
+          policyAccepted: accepted,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           discountCode: discount.trim() || undefined,
           idempotencyKey: crypto.randomUUID(),
         }),
       });
-      if (payment.status === 'PAID') {
-        location.href = p('/payment/success');
-        return;
-      }
-      const gateway = await api<{ url: string }>(`/payments/${payment.id}/gateway`, { method: 'POST' });
-      location.href = gateway.url;
+      location.href = p('/payment/success');
     },
   });
   const days = useMemo(() => {
@@ -114,9 +90,13 @@ export default function Checkout() {
     selectedDay = slot ? localKey(slot.startsAt) : (weekDays.find((day) => day.slots.length)?.key ?? weekDays[0]?.key),
     daySlots = weekDays.find((day) => day.key === selectedDay)?.slots ?? [];
   const t = teacher.data,
-    trialPrice = t?.approvedTrialPrice ?? t?.trialPrice ?? 0,
-    regularPrice = t?.approvedRegularPrice ?? t?.regularPrice ?? 0,
+    trialPrice = t?.approvedTrialPrice ?? 0,
+    regularPrice = t?.approvedRegularPrice ?? 0,
     price = lessonType === 'trial' ? trialPrice : regularPrice,
+    walletBalance = wallet.data?.balance ?? 0,
+    // A coupon is valued by the backend inside the booking transaction. Do not
+    // block a potentially affordable discounted booking using the list price.
+    walletInsufficient = wallet.isSuccess && !discount.trim() && walletBalance < price,
     duration = lessonType === 'trial' ? (t?.trialDuration ?? 30) : (t?.lessonDuration ?? 60),
     money = (value: number) =>
       new Intl.NumberFormat(translate(locale, 'commercepricingManagerEnUS2')).format(value) +
@@ -371,19 +351,31 @@ export default function Checkout() {
                 <span className="text-sm text-white/60">{translate(locale, 'checkoutFinalAmount')}</span>
                 <strong className="text-2xl">{money(price)}</strong>
               </div>
+              <div className="mt-5 rounded-2xl border border-white/15 bg-white/[0.06] p-4 text-sm">
+                <div className="flex justify-between"><span className="text-white/60">{fa ? 'روش پرداخت' : 'Payment method'}</span><b>{fa ? 'کیف پول' : 'Wallet'}</b></div>
+                <div className="mt-3 flex justify-between"><span className="text-white/60">{fa ? 'موجودی کیف پول' : 'Wallet balance'}</span><b>{wallet.isLoading ? '…' : money(walletBalance)}</b></div>
+                <div className="mt-3 flex justify-between"><span className="text-white/60">{fa ? 'موجودی پس از رزرو' : 'Balance after booking'}</span><b className={walletInsufficient ? 'text-red-300' : 'text-emerald-300'}>{money(Math.max(0, walletBalance - price))}</b></div>
+              </div>
+              {walletInsufficient && (
+                <div className="mt-5 rounded-xl bg-amber-400/15 p-4 text-sm text-amber-100">
+                  <b className="block">{fa ? 'موجودی ناکافی' : 'Insufficient balance'}</b>
+                  <span className="mt-1 block">{fa ? 'برای رزرو این نوبت ابتدا کیف پول خود را شارژ کنید.' : 'Top up your wallet before booking this lesson.'}</span>
+                  <Link href={p('/dashboard/wallet')} className="mt-3 inline-flex rounded-lg bg-white px-4 py-2 font-black text-navy">{fa ? 'شارژ کیف پول' : 'Top up wallet'}</Link>
+                </div>
+              )}
               {checkout.isError && (
                 <div role="alert" className="mt-5 rounded-xl bg-red-500/15 p-4 text-sm text-red-100">
                   {apiMessage(checkout.error, translate(locale, 'checkoutBookingFailedTheSlotMayHaveJustBeen'))}
                 </div>
               )}
               <button
-                disabled={!slot || !accepted || checkout.isPending || !price}
+                disabled={!slot || !accepted || checkout.isPending || !price || walletInsufficient || wallet.isLoading}
                 onClick={() => checkout.mutate()}
                 className="brand-gradient mt-7 flex w-full items-center justify-center gap-2 rounded-xl py-4 font-black text-white disabled:opacity-40"
               >
                 {checkout.isPending
                   ? translate(locale, 'checkoutFinalAvailabilityCheck')
-                  : translate(locale, 'checkoutContinueToPayment')}
+                  : (fa ? 'پرداخت از کیف پول و رزرو' : 'Pay from wallet and book')}
                 <ShieldCheck size={18} />
               </button>
               <p className="mt-4 text-center text-xs leading-6 text-white/45">

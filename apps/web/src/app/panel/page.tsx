@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { api, ApiError } from '@/lib/api';
+import { api, ApiError } from '@/shared/services/api';
 import { useTranslations } from '@/components/shared/locale-provider';
 import { localePath, localized, translate } from '@/lib/i18n';
 import { panelHome, type PanelIdentity } from '@/lib/panel-access';

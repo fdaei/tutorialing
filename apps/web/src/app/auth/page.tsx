@@ -6,12 +6,14 @@ import Script from 'next/script';
 import { useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, ArrowRight, Check, ChevronDown, ShieldCheck, Sparkles, Smartphone } from 'lucide-react';
-import { api, publicApi, ApiError, apiField } from '@/lib/api';
+import { api, publicApi, ApiError, apiField } from '@/shared/services/api';
 import { useTranslations } from '@/components/shared/locale-provider';
 import { localePath, localized, isDefaultLocale, translate } from '@/lib/i18n';
 import { LanguageSwitcher } from '@/components/shared/language-switcher';
 import { canOpenRequestedPanel, panelHome, safeInternalPath, type PanelIdentity } from '@/lib/panel-access';
 import { webConfig } from '@/config';
+import { storeAccessToken } from '@/shared/services/api';
+import { routeTo, routes } from '@/app/router/routes';
 
 type AuthCountry = {
   id: string;
@@ -211,7 +213,7 @@ export default function Auth() {
         credentials: 'include',
         body: JSON.stringify({ phone: internationalPhone, challengeId: challenge, code }),
       });
-      sessionStorage.setItem('access_token', response.accessToken);
+      storeAccessToken(response.accessToken);
       go(response.user ?? {});
     } catch (caught) {
       setError(caught);
@@ -228,7 +230,7 @@ export default function Auth() {
         credentials: 'include',
         body: JSON.stringify({ credential }),
       });
-      sessionStorage.setItem('access_token', response.accessToken);
+      storeAccessToken(response.accessToken);
       go(response.user ?? {});
     } catch (caught) {
       setError(caught);
@@ -292,6 +294,8 @@ export default function Auth() {
         secure: 'ورود امن و بدون رمز عبور',
         passwordLogin: 'ورود با رمز عبور',
         forgotPassword: 'رمز عبور را فراموش کرده‌اید؟',
+        noAccount: 'حساب کاربری ندارید؟',
+        register: 'ثبت‌نام کنید',
         otherWays: 'روش‌های دیگر ورود',
         terms: 'با ادامه، شرایط استفاده و سیاست حفظ حریم خصوصی را می‌پذیرید.',
         verified: 'مدرس‌های تأییدشده',
@@ -315,6 +319,8 @@ export default function Auth() {
         secure: 'Secure passwordless sign-in',
         passwordLogin: 'Sign in with password',
         forgotPassword: 'Forgot your password?',
+        noAccount: "Don't have an account?",
+        register: 'Create one',
         otherWays: 'Other sign-in options',
         terms: 'By continuing, you accept the Terms of Use and Privacy Policy.',
         verified: 'Verified teachers',
@@ -549,15 +555,26 @@ export default function Auth() {
             )}
             {step === 'phone' && (
               <div className="mt-6 border-t border-[#e4e7ef] pt-6">
+                <p className="mb-5 text-center text-sm text-[#667089]">
+                  {c.noAccount}{' '}
+                  <Link
+                    href={p(
+                      phone ? routeTo.withQuery(routes.register, { identity: internationalPhone }) : routes.register,
+                    )}
+                    className="font-black text-[#554ad3] underline-offset-4 hover:underline focus-visible:rounded focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#6257db]/15"
+                  >
+                    {c.register}
+                  </Link>
+                </p>
                 <p className="mb-4 text-center text-xs font-bold text-muted">{c.otherWays}</p>
                 <Link
-                  href={p('/login')}
+                  href={p(routes.login)}
                   className="flex min-h-14 w-full items-center justify-center rounded-[14px] border border-[#dce1eb] bg-white px-4 text-sm font-black text-[#28324d] transition hover:border-[#c9c3f2] hover:bg-[#faf9ff] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#6257db]/15"
                 >
                   {c.passwordLogin}
                 </Link>
                 <Link
-                  href={p('/forgot-password')}
+                  href={p(routes.forgotPassword)}
                   className="mt-4 block text-center text-sm font-bold text-blue hover:text-purple hover:underline"
                 >
                   {c.forgotPassword}

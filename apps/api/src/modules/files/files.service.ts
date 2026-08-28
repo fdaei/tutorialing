@@ -93,6 +93,7 @@ export class FilesService {
             ...(reviewer
               ? [
                   { verificationItems: { some: {} } },
+                  { purpose: 'teacher-intro-video' },
                   { testAnswers: { some: { attempt: { status: 'UNDER_REVIEW' as const } } } },
                 ]
               : []),

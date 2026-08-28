@@ -33,8 +33,13 @@ function harness(options: { settings?: Record<string, number>; counts?: Counts }
     },
     creditEntry: { create: jest.fn(), aggregate: jest.fn() },
     enrollment: { findFirst: jest.fn() },
+    discount: { findFirst: jest.fn(), update: jest.fn() },
+    payment: { create: jest.fn().mockResolvedValue({ id: 'payment-1' }) },
   };
-  const db = { $transaction: jest.fn().mockImplementation((fn: (t: unknown) => unknown) => fn(tx)) };
+  const db = {
+    payment: { findUnique: jest.fn().mockResolvedValue(null) },
+    $transaction: jest.fn().mockImplementation((fn: (t: unknown) => unknown) => fn(tx)),
+  };
   const availability = {
     assertSlotAvailable: jest.fn().mockResolvedValue({
       teacher: { approvedTrialPrice: 250_000, approvedRegularPrice: 500_000, policy: { rules: {} } },
@@ -48,8 +53,11 @@ function harness(options: { settings?: Record<string, number>; counts?: Counts }
     redis as never,
     queue as never,
     availability as never,
-    {} as never,
+    { reserve: jest.fn() } as never,
     settings as never,
+    { walletBalance: jest.fn().mockResolvedValue(1_000_000), ledger: jest.fn() } as never,
+    { evaluate: jest.fn().mockResolvedValue(null) } as never,
+    { enqueue: jest.fn() } as never,
   );
   return { svc, tx, redis, settings, availability };
 }

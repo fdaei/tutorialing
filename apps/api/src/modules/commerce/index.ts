@@ -10,4 +10,6 @@
  * Anything added here is a promise to other modules. Keep it small.
  */
 export { EarningsService } from './payouts/earnings.service';
+export { WalletService } from './payments/wallet.service';
+export { AutoDiscountsService } from './discounts/auto-discounts.service';
 export { releaseDiscount } from './discounts/discount-reservation';
