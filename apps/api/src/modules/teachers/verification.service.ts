@@ -125,10 +125,26 @@ export class VerificationService {
         id: fileId,
         ownerId: userId,
         status: 'SAFE',
+        purpose: 'teacher-intro-video',
         mimeType: { in: ['video/mp4', 'video/webm', 'video/quicktime'] },
       },
     });
     if (!file) throw badRequest('INTRO_VIDEO_INVALID');
-    return this.db.teacher.update({ where: { userId }, data: { introVideoKey: file.key } });
+    return this.db.$transaction(async (tx) => {
+      const teacher = await tx.teacher.update({
+        where: { userId },
+        data: { introVideoFileId: file.id, introVideoKey: file.key },
+      });
+      await tx.auditLog.create({
+        data: {
+          actorId: userId,
+          action: 'teacher.intro_video.attached',
+          entity: 'Teacher',
+          entityId: teacher.id,
+          after: { fileId },
+        },
+      });
+      return teacher;
+    });
   }
 }

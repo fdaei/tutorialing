@@ -1,13 +1,14 @@
 'use client';
 import Link from 'next/link';
-import { Headphones, Menu, MessageCircle, X } from 'lucide-react';
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/api';
+import { Clock3, Headphones, Mail, Menu, MessageCircle, Phone, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { api } from '@/shared/services/api';
 import { LanguageSwitcher } from '@/components/shared/language-switcher';
 import { useTranslations } from '@/components/shared/locale-provider';
 import { localePath, localized, translate } from '@/lib/i18n';
 import { webConfig } from '@/config';
+import { onAuthSessionChange } from '@/shared/services/api';
 
 export function Brand() {
   return (
@@ -23,8 +24,17 @@ export function Brand() {
 export function Header() {
   const { locale, t } = useTranslations(),
     p = (x: string) => localePath(x, locale),
-    [open, setOpen] = useState(false);
+    [open, setOpen] = useState(false),
+    queryClient = useQueryClient();
   const me = useQuery({ queryKey: ['header-me'], queryFn: () => api<{ roles: string[] }>('/users/me'), retry: false });
+  useEffect(
+    () =>
+      onAuthSessionChange((state) => {
+        if (state === 'anonymous') queryClient.setQueryData(['header-me'], null);
+        else void queryClient.invalidateQueries({ queryKey: ['header-me'] });
+      }),
+    [queryClient],
+  );
   const links: [string, string][] = [
     [p('/'), translate(locale, 'layoutsiteHome')],
     [p('/courses'), translate(locale, 'layoutsiteCourses')],
@@ -120,11 +130,15 @@ export function Footer() {
         </div>
         <div>
           <p className="font-black">{translate(locale, 'layoutsiteContact')}</p>
-          <p className="latin mt-4 text-lg" dir="ltr">
-            021 9109 4200
-          </p>
-          <p className="latin mt-2 text-sm text-muted">support@lingospeak.ir</p>
-          <p className="mt-2 text-sm text-muted">{translate(locale, 'layoutsiteSaturdayThursday9002000')}</p>
+          <div className="mt-4 grid gap-3 text-sm text-muted">
+            <a href="tel:+982191094200" className="flex items-center gap-3 rounded-xl py-1 hover:text-purple" dir="ltr">
+              <Phone size={17} aria-hidden="true" /> <span className="latin whitespace-nowrap">021 9109 4200</span>
+            </a>
+            <a href="mailto:support@lingospeak.ir" className="flex items-center gap-3 rounded-xl py-1 hover:text-purple" dir="ltr">
+              <Mail size={17} aria-hidden="true" /> <span className="latin break-all">support@lingospeak.ir</span>
+            </a>
+            <p className="flex items-start gap-3"><Clock3 className="mt-0.5 shrink-0" size={17} aria-hidden="true" />{translate(locale, 'layoutsiteSaturdayThursday9002000')}</p>
+          </div>
           <TrustSeals />
         </div>
       </div>

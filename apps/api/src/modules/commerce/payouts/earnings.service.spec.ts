@@ -3,6 +3,7 @@ import { EarningsService } from './earnings.service';
 const BOOKING = { id: 'booking-1', teacherId: 'teacher-1', price: 500_000 };
 
 function harness(options: { commission?: unknown; holdDays?: unknown } = {}) {
+  let earningState: Record<string, unknown> = {};
   const settings: Record<string, unknown> = {
     'commerce.commissionPercent': options.commission,
     'commerce.escrowHoldDays': options.holdDays,
@@ -11,9 +12,13 @@ function harness(options: { commission?: unknown; holdDays?: unknown } = {}) {
     earning: {
       upsert: jest
         .fn()
-        .mockImplementation(({ create }: { create: Record<string, unknown> }) =>
-          Promise.resolve({ id: 'earning-1', ...create }),
-        ),
+        .mockImplementation(({ create }: { create: Record<string, unknown> }) => {
+          earningState = { id: 'earning-1', ...create };
+          return Promise.resolve(earningState);
+        }),
+      update: jest.fn().mockImplementation(({ data }: { data: Record<string, unknown> }) =>
+        Promise.resolve(Object.assign(earningState, data)),
+      ),
     },
     teacher: { findUniqueOrThrow: jest.fn().mockResolvedValue({ userId: 'teacher-user-1' }) },
     walletEntry: { upsert: jest.fn().mockResolvedValue({}) },

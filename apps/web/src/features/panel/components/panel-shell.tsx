@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { api, ApiError } from '@/lib/api';
+import { api, ApiError } from '@/shared/services/api';
 import {
   Bell,
   BookOpen,
@@ -11,6 +11,7 @@ import {
   ChevronDown,
   CreditCard,
   FileCheck,
+  FileEdit,
   Grid2X2,
   HelpCircle,
   Home,
@@ -30,6 +31,7 @@ import { LanguageSwitcher } from '@/components/shared/language-switcher';
 import { useTranslations } from '@/components/shared/locale-provider';
 import { localePath, localized, isDefaultLocale, translate } from '@/lib/i18n';
 import type { AdminDashboard } from '@lingospeak/contracts';
+import { clearAuthSession } from '@/shared/services/api';
 
 export type NavItem = {
   href: string;
@@ -329,7 +331,7 @@ export function PanelShell({ title, items, children }: { title: string; items: N
       <button
         onClick={async () => {
           await api('/auth/logout', { method: 'POST' }).catch(() => undefined);
-          sessionStorage.removeItem('access_token');
+          clearAuthSession();
           router.replace(p('/'));
         }}
         className={`mt-2 flex items-center gap-3 rounded-xl px-4 py-3 text-sm ${adminMode ? 'text-white/55 hover:bg-white/10' : 'text-red-500'}`}
@@ -426,11 +428,13 @@ export const teacherNav: NavItem[] = [
   { href: '/teacher-panel/availability', label: 'برنامه کاری', labelEn: 'Schedule', icon: CalendarDays },
   { href: '/teacher-panel/classes', label: 'کلاس‌ها', labelEn: 'Classes', icon: BookOpen },
   { href: '/teacher-panel/students', label: 'زبان‌آموزان', labelEn: 'Students', icon: Users },
+  { href: '/teacher-panel/magazine', label: 'مجله', labelEn: 'Magazine', icon: FileEdit },
   { href: '/teacher-panel/earnings', label: 'مالی', labelEn: 'Finance', icon: CreditCard },
   { href: '/teacher-panel/more', label: 'بیشتر', labelEn: 'More', icon: MoreHorizontal },
 ];
 export const adminNav: NavItem[] = [
   { href: '/admin', label: 'داشبورد', labelEn: 'Dashboard', icon: Grid2X2, roles: ['ADMIN', 'STAFF'] },
+  { href: '/admin/magazine', label: 'بررسی مجله', labelEn: 'Magazine review', icon: FileEdit, roles: ['ADMIN', 'STAFF'], permission: 'cms.manage' },
   { href: '/admin/search', label: 'جستجوی سراسری', labelEn: 'Global search', icon: Search, roles: ['ADMIN', 'STAFF'] },
   {
     href: '/admin/users',

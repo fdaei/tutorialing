@@ -8,7 +8,8 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { ArrowLeft, ArrowRight, BadgeCheck, CalendarDays, Sparkles, Star } from 'lucide-react';
 import { Header, Footer } from '@/components/layout/site';
-import { api, publicApi, type EducationalLanguage, ApiError, apiMessage } from '@/lib/api';
+import { api, publicApi, ApiError, apiMessage } from '@/shared/services/api';
+import type { EducationalLanguage } from '@/features/languages';
 import { useTranslations } from '@/components/shared/locale-provider';
 import { localePath, localized, isDefaultLocale, translate } from '@/lib/i18n';
 

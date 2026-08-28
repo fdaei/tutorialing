@@ -4,7 +4,8 @@ import { localized, isDefaultLocale, translate } from '@/lib/i18n';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Trash2 } from 'lucide-react';
-import { api, apiMessage, type EducationalLanguage, type Paginated } from '@/lib/api';
+import { api, apiMessage, type Paginated } from '@/shared/services/api';
+import type { EducationalLanguage } from '@/features/languages';
 import { useTranslations } from '@/components/shared/locale-provider';
 
 export function LanguageManager() {

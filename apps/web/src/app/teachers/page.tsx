@@ -1,26 +1,28 @@
 'use client';
 
-import { localized, isDefaultLocale, translate } from '@/lib/i18n';
+import { translate } from '@/lib/i18n';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Search, RotateCcw } from 'lucide-react';
 import { Header, Footer, Empty } from '@/components/layout/site';
 import { TeacherCard } from '@/features/teacher/components/teacher-card';
-import { publicApi, type Paginated, type PublicTeacher } from '@/lib/api';
+import { publicApi, type Paginated } from '@/shared/services/api';
+import type { PublicTeacher } from '@/features/teacher';
 import { useTranslations } from '@/components/shared/locale-provider';
 export default function Directory() {
   const { locale } = useTranslations(),
-    fa = isDefaultLocale(locale),
     [q, setQ] = useState(''),
     [search, setSearch] = useState(''),
     [skill, setSkill] = useState(''),
+    [language, setLanguage] = useState(''),
+    [minRating, setMinRating] = useState(''),
     [sort, setSort] = useState('rating'),
     [page, setPage] = useState(1);
   const query = useQuery({
-    queryKey: ['teachers', search, skill, sort, page],
+    queryKey: ['teachers', search, skill, language, minRating, sort, page],
     queryFn: () =>
       publicApi<Paginated<PublicTeacher>>(
-        `/teachers?page=${page}&limit=9&search=${encodeURIComponent(search)}&skill=${skill}&sort=${sort}`,
+        `/teachers?page=${page}&limit=9&search=${encodeURIComponent(search)}&skill=${skill}&language=${language}&minRating=${minRating}&sort=${sort}`,
       ),
   });
   return (
@@ -37,7 +39,7 @@ export default function Directory() {
             setSearch(q);
             setPage(1);
           }}
-          className="sticky top-24 z-20 mt-10 grid gap-3 rounded-3xl border hairline bg-white/95 p-4 shadow-soft md:grid-cols-[1fr_200px_180px]"
+          className="sticky top-20 z-20 mt-8 grid gap-3 rounded-3xl border hairline bg-white/95 p-4 shadow-soft sm:grid-cols-2 xl:grid-cols-[1fr_150px_150px_135px_170px]"
         >
           <label className="flex items-center gap-3 rounded-2xl bg-ivory px-4">
             <Search />
@@ -48,6 +50,21 @@ export default function Directory() {
               placeholder={translate(locale, 'teachersTeacherNameOrSpecialty')}
             />
           </label>
+          <select
+            aria-label="زبان"
+            value={language}
+            onChange={(e) => {
+              setLanguage(e.target.value);
+              setPage(1);
+            }}
+            className="min-h-13 rounded-2xl border hairline px-4"
+          >
+            <option value="">همه زبان‌ها</option>
+            <option value="en">انگلیسی</option>
+            <option value="de">آلمانی</option>
+            <option value="fr">فرانسوی</option>
+            <option value="es">اسپانیایی</option>
+          </select>
           <select
             aria-label={translate(locale, 'teachersSkill')}
             value={skill}
@@ -60,12 +77,26 @@ export default function Directory() {
             ))}
           </select>
           <select
+            aria-label="حداقل امتیاز"
+            value={minRating}
+            onChange={(e) => {
+              setMinRating(e.target.value);
+              setPage(1);
+            }}
+            className="min-h-13 rounded-2xl border hairline px-4"
+          >
+            <option value="">همه امتیازها</option>
+            <option value="4">۴ ستاره به بالا</option>
+            <option value="4.5">۴٫۵ به بالا</option>
+          </select>
+          <select
             aria-label={translate(locale, 'teachersSort')}
             value={sort}
             onChange={(e) => setSort(e.target.value)}
             className="rounded-2xl border hairline px-4"
           >
             <option value="rating">{translate(locale, 'teachersHighestRating')}</option>
+            <option value="reviews">بیشترین نظر</option>
             <option value="price_asc">{translate(locale, 'teachersLowestPrice')}</option>
             <option value="newest">{translate(locale, 'teachersNewest')}</option>
           </select>

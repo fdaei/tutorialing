@@ -1,7 +1,7 @@
 'use client';
 import { Languages } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { api } from '@/lib/api';
+import { api } from '@/shared/services/api';
 import { localePath, type Locale, localized, translate } from '@/lib/i18n';
 import { useTranslations } from '@/components/shared/locale-provider';
 

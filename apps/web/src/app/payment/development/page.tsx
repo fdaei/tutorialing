@@ -1,7 +1,7 @@
 'use client';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useMutation } from '@tanstack/react-query';
-import { publicApi } from '@/lib/api';
+import { publicApi } from '@/shared/services/api';
 import { useTranslations } from '@/components/shared/locale-provider';
 import { localePath } from '@/lib/i18n';
 export default function DevelopmentPayment() {

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PriceStatus, Role } from '@prisma/client';
-import { PrismaService, type Tx } from '../../infrastructure/database/prisma.service';
+import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { badRequest, forbidden, notFound } from '../../common';
 
 /**
@@ -53,65 +53,6 @@ export class PricingService {
     }
   }
 
-  /**
-   * Puts a pair of prices in front of the reviewers.
-   *
-   * Both routes into review land here — the teacher naming their own price and
-   * the teacher accepting the reviewer's counter — and both have to leave the
-   * record in exactly the same shape: the counter cleared (it has either been
-   * superseded or consumed) and the previous verdict wiped, so a stale note or
-   * reviewer id cannot be read as a decision on the new proposal. Keeping that
-   * reset in one place is what stops the two paths from drifting.
-   */
-  private submitForReview(tx: Tx, teacherId: string, trialPrice: number, regularPrice: number) {
-    return tx.teacher.update({
-      where: { id: teacherId },
-      data: {
-        proposedTrialPrice: trialPrice,
-        proposedRegularPrice: regularPrice,
-        counterTrialPrice: null,
-        counterRegularPrice: null,
-        priceStatus: 'SUBMITTED',
-        priceReviewNote: null,
-        priceReviewedAt: null,
-        priceReviewedById: null,
-      },
-    });
-  }
-
-  async propose(userId: string, trialPrice: number, regularPrice: number) {
-    this.validatePrices(trialPrice, regularPrice);
-    return this.db.$transaction(async (tx) => {
-      const teacher = await tx.teacher.findUnique({ where: { userId } });
-      if (!teacher) throw notFound('TEACHER_NOT_FOUND');
-      if (['SUBMITTED', 'UNDER_REVIEW'].includes(teacher.priceStatus)) {
-        throw badRequest('PRICE_ALREADY_UNDER_REVIEW');
-      }
-      const updated = await this.submitForReview(tx, teacher.id, trialPrice, regularPrice);
-      await tx.teacherPriceHistory.create({
-        data: {
-          teacherId: teacher.id,
-          actorId: userId,
-          actorRole: 'TEACHER',
-          action: 'teacher.proposed',
-          status: 'SUBMITTED',
-          proposedTrialPrice: trialPrice,
-          proposedRegularPrice: regularPrice,
-        },
-      });
-      await tx.auditLog.create({
-        data: {
-          actorId: userId,
-          action: 'teacher.price.proposed',
-          entity: 'Teacher',
-          entityId: teacher.id,
-          after: { trialPrice, regularPrice },
-        },
-      });
-      return updated;
-    });
-  }
-
   async acceptCounter(userId: string) {
     return this.db.$transaction(async (tx) => {
       const teacher = await tx.teacher.findUnique({ where: { userId } });
@@ -128,12 +69,15 @@ export class PricingService {
         data: {
           proposedTrialPrice: teacher.counterTrialPrice,
           proposedRegularPrice: teacher.counterRegularPrice,
+          approvedTrialPrice: teacher.counterTrialPrice,
+          approvedRegularPrice: teacher.counterRegularPrice,
+          trialPrice: teacher.counterTrialPrice,
+          regularPrice: teacher.counterRegularPrice,
           counterTrialPrice: null,
           counterRegularPrice: null,
-          priceStatus: 'SUBMITTED',
+          priceStatus: 'APPROVED',
           priceReviewNote: null,
-          priceReviewedAt: null,
-          priceReviewedById: null,
+          priceReviewedAt: new Date(),
         },
       });
       await tx.teacherPriceHistory.create({
@@ -142,11 +86,13 @@ export class PricingService {
           actorId: userId,
           actorRole: 'TEACHER',
           action: 'teacher.counter.accepted',
-          status: 'SUBMITTED',
+          status: 'APPROVED',
           proposedTrialPrice: teacher.counterTrialPrice,
           proposedRegularPrice: teacher.counterRegularPrice,
           counterTrialPrice: teacher.counterTrialPrice,
           counterRegularPrice: teacher.counterRegularPrice,
+          approvedTrialPrice: teacher.counterTrialPrice,
+          approvedRegularPrice: teacher.counterRegularPrice,
         },
       });
       await tx.auditLog.create({
@@ -161,10 +107,49 @@ export class PricingService {
             counterRegularPrice: teacher.counterRegularPrice,
           },
           after: {
-            status: 'SUBMITTED',
+            status: 'APPROVED',
             proposedTrialPrice: teacher.counterTrialPrice,
             proposedRegularPrice: teacher.counterRegularPrice,
+            approvedTrialPrice: teacher.counterTrialPrice,
+            approvedRegularPrice: teacher.counterRegularPrice,
           },
+        },
+      });
+      return updated;
+    });
+  }
+
+  async requestNegotiation(userId: string, note: string) {
+    return this.db.$transaction(async (tx) => {
+      const teacher = await tx.teacher.findUnique({ where: { userId } });
+      if (!teacher) throw notFound('TEACHER_NOT_FOUND');
+      if (teacher.priceStatus !== 'COUNTER_OFFER') throw badRequest('COUNTER_OFFER_NOT_AVAILABLE');
+      const updated = await tx.teacher.update({
+        where: { id: teacher.id },
+        data: { priceStatus: 'UNDER_REVIEW', priceReviewNote: note, priceReviewedAt: null },
+      });
+      await tx.teacherPriceHistory.create({
+        data: {
+          teacherId: teacher.id,
+          actorId: userId,
+          actorRole: 'TEACHER',
+          action: 'teacher.negotiation.requested',
+          status: 'UNDER_REVIEW',
+          proposedTrialPrice: teacher.proposedTrialPrice,
+          proposedRegularPrice: teacher.proposedRegularPrice,
+          counterTrialPrice: teacher.counterTrialPrice,
+          counterRegularPrice: teacher.counterRegularPrice,
+          note,
+        },
+      });
+      await tx.auditLog.create({
+        data: {
+          actorId: userId,
+          action: 'teacher.price.negotiation.requested',
+          entity: 'Teacher',
+          entityId: teacher.id,
+          before: { status: teacher.priceStatus },
+          after: { status: 'UNDER_REVIEW', note },
         },
       });
       return updated;
@@ -213,7 +198,10 @@ export class PricingService {
     return this.db.$transaction(async (tx) => {
       const teacher = await tx.teacher.findUnique({ where: { id: teacherId } });
       if (!teacher) throw notFound('TEACHER_NOT_FOUND');
-      if (teacher.proposedTrialPrice == null || teacher.proposedRegularPrice == null) {
+      if (
+        ['recommend_approval', 'approve'].includes(input.action) &&
+        (teacher.proposedTrialPrice == null || teacher.proposedRegularPrice == null)
+      ) {
         throw badRequest('PRICE_PROPOSAL_MISSING');
       }
 

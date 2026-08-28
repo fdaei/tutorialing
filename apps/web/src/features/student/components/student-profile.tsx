@@ -15,8 +15,8 @@ import {
   Trash2,
   UserRound,
 } from 'lucide-react';
-import { api, apiField, apiMessage } from '@/lib/api';
-import { uploadFile } from '@/lib/file-upload';
+import { api, apiField, apiMessage } from '@/shared/services/api';
+import { upload } from '@/shared/services/upload';
 import { PageHeading } from '@/components/shared/page-heading';
 
 type Profile = {
@@ -57,8 +57,13 @@ export function StudentProfile() {
   });
   const avatar = useMutation({
     mutationFn: async (file: File) => {
-      const fileId = await uploadFile(file, 'avatar');
-      return api('/users/me/avatar', { method: 'PUT', body: JSON.stringify({ fileId }) });
+      const uploaded = await upload({
+        body: file,
+        originalName: file.name,
+        mimeType: file.type,
+        purpose: 'avatar',
+      });
+      return api('/users/me/avatar', { method: 'PUT', body: JSON.stringify({ fileId: uploaded.fileId }) });
     },
     onSuccess: async () => {
       setPreview(null);

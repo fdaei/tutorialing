@@ -80,6 +80,42 @@ describe('AvailabilityService blocked periods', () => {
     expect(slots[0]?.startsAt).toBe('2027-01-03T21:30:00.000Z');
   });
 
+  it('deduplicates slots produced by overlapping availability rules', async () => {
+    const tomorrow = new Date(Date.now() + 2 * 86_400_000);
+    tomorrow.setUTCHours(0, 0, 0, 0);
+    const rule = {
+      weekday: tomorrow.getUTCDay(),
+      startMinute: 600,
+      endMinute: 660,
+      timezone: 'UTC',
+      breakMinutes: 0,
+    };
+    const db = {
+      teacher: {
+        findFirst: jest.fn().mockResolvedValue({
+          trialDuration: 30,
+          lessonDuration: 60,
+          breakMinutes: 0,
+          availabilityRules: [rule, { ...rule }],
+          availabilityOverrides: [],
+          blockedPeriods: [],
+          bookings: [],
+        }),
+      },
+    } as any;
+    const service = new AvailabilityService(db, settings);
+
+    const slots = await service.slots(
+      'teacher-1',
+      tomorrow,
+      new Date(tomorrow.getTime() + 86_400_000 - 1),
+      'regular',
+    );
+
+    expect(slots).toHaveLength(1);
+    expect(slots[0]?.startsAt).toBe(new Date(tomorrow.getTime() + 600 * 60_000).toISOString());
+  });
+
   it('does not advertise slots inside the configured booking lead time', async () => {
     const soon = new Date(Date.now() + 60 * 60_000);
     soon.setUTCSeconds(0, 0);

@@ -7,13 +7,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { AuthDivider, AuthError, AuthFooter, AuthHeading, AuthNotice, AuthShell, PrimaryButton } from './auth-shell';
 import { AuthInput, PasswordInput, TermsCheckbox } from './auth-fields';
 import { GoogleAuthButton } from './google-auth-button';
-import {
-  authMessage,
-  googleAuth,
-  loginWithPassword,
-  registerWithPassword,
-  sendRecoveryCode,
-} from '../auth-service';
+import { authMessage, googleAuth, loginWithPassword, registerWithPassword, sendRecoveryCode } from '../auth-service';
 
 type Errors = Record<string, string>;
 
@@ -102,12 +96,7 @@ export function LoginPage() {
         <PrimaryButton busy={busy}>{busy ? 'در حال ورود...' : 'ورود'}</PrimaryButton>
       </form>
       <AuthDivider />
-      <GoogleAuthButton
-        label="ورود با گوگل"
-        disabled={busy}
-        onCredential={onGoogleCredential}
-        onError={setError}
-      />
+      <GoogleAuthButton label="ورود با گوگل" disabled={busy} onCredential={onGoogleCredential} onError={setError} />
       <OtpFallbackHint />
       <AuthFooter question="حساب کاربری ندارید؟" href="/register" action="ثبت نام" />
     </AuthShell>
@@ -116,7 +105,14 @@ export function LoginPage() {
 
 export function RegisterPage() {
   const router = useRouter();
-  const [values, setValues] = useState({ name: '', identity: '', password: '', confirm: '', terms: false });
+  const params = useSearchParams();
+  const [values, setValues] = useState({
+    name: '',
+    identity: params.get('identity') ?? '',
+    password: '',
+    confirm: '',
+    terms: false,
+  });
   const [errors, setErrors] = useState<Errors>({});
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -159,11 +155,7 @@ export function RegisterPage() {
   }
 
   return (
-    <AuthShell
-      illustration="/images/auth/register.png"
-      illustrationAlt="تصویر سه‌بعدی کارت ساخت حساب کاربری"
-      compact
-    >
+    <AuthShell illustration="/images/auth/register.png" illustrationAlt="تصویر سه‌بعدی کارت ساخت حساب کاربری" compact>
       <AuthHeading title="ثبت نام" description="برای ایجاد حساب کاربری اطلاعات خود را وارد کنید" />
       <form onSubmit={submit} noValidate className="space-y-4">
         <AuthInput
@@ -210,12 +202,7 @@ export function RegisterPage() {
         <PrimaryButton busy={busy}>{busy ? 'در حال ایجاد حساب...' : 'ایجاد حساب'}</PrimaryButton>
       </form>
       <AuthDivider />
-      <GoogleAuthButton
-        label="ثبت نام با گوگل"
-        disabled={busy}
-        onCredential={onGoogleCredential}
-        onError={setError}
-      />
+      <GoogleAuthButton label="ثبت نام با گوگل" disabled={busy} onCredential={onGoogleCredential} onError={setError} />
       <OtpFallbackHint />
       <AuthFooter question="حساب کاربری دارید؟" href="/login" action="ورود" />
     </AuthShell>

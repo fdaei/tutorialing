@@ -11,6 +11,13 @@ export class ReviewsService {
     private readonly settings: SettingsService,
   ) {}
 
+  private reviewInput(rating: number, comment?: string) {
+    const normalized = comment?.trim();
+    if (!Number.isInteger(rating) || rating < 1 || rating > 5) throw badRequest('REVIEW_RATING_INVALID');
+    if (normalized && (normalized.length < 2 || normalized.length > 3_000)) throw badRequest('REVIEW_COMMENT_INVALID');
+    return normalized || null;
+  }
+
   private async refreshTeacherRating(teacherId: string, tx: DbClient = this.db) {
     const approved = await tx.review.aggregate({
       where: { teacherId, moderationStatus: 'APPROVED', published: true },
@@ -67,9 +74,7 @@ export class ReviewsService {
   }
 
   async create(studentId: string, bookingId: string, rating: number, comment?: string) {
-    if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
-      throw badRequest('REVIEW_RATING_INVALID');
-    }
+    const normalizedComment = this.reviewInput(rating, comment);
     const booking = await this.db.booking.findUnique({ where: { id: bookingId }, include: { review: true } });
     if (!booking || booking.studentId !== studentId) throw notFound('BOOKING_NOT_FOUND');
     if (booking.review) throw conflict('REVIEW_ALREADY_EXISTS');
@@ -83,7 +88,7 @@ export class ReviewsService {
           studentId,
           bookingId,
           rating,
-          comment: comment?.trim() || null,
+          comment: normalizedComment,
           moderationStatus: 'PENDING',
           published: false,
         },
@@ -100,6 +105,57 @@ export class ReviewsService {
       });
       return review;
     });
+  }
+
+  async eligibility(studentId: string, teacherId: string) {
+    const [review, booking] = await this.db.$transaction([
+      this.db.review.findFirst({ where: { studentId, teacherId }, orderBy: { updatedAt: 'desc' } }),
+      this.db.booking.findFirst({
+        where: {
+          studentId,
+          teacherId,
+          status: 'COMPLETED',
+          attendanceTeacher: true,
+          attendanceStudent: { not: false },
+          review: null,
+        },
+        select: { id: true, startsAt: true },
+        orderBy: { startsAt: 'desc' },
+      }),
+    ]);
+    return { eligible: Boolean(booking), booking, review };
+  }
+
+  async update(studentId: string, reviewId: string, rating: number, comment?: string) {
+    const normalizedComment = this.reviewInput(rating, comment);
+    const current = await this.db.review.findUnique({ where: { id: reviewId } });
+    if (!current || current.studentId !== studentId) throw notFound('REVIEW_NOT_FOUND');
+    return this.db.$transaction(async (tx) => {
+      const review = await tx.review.update({
+        where: { id: reviewId },
+        data: {
+          rating,
+          comment: normalizedComment,
+          moderationStatus: 'PENDING',
+          published: false,
+          moderatedById: null,
+          moderatedAt: null,
+          rejectionReason: null,
+        },
+      });
+      await this.refreshTeacherRating(current.teacherId, tx);
+      return review;
+    });
+  }
+
+  async remove(studentId: string, reviewId: string) {
+    const current = await this.db.review.findUnique({ where: { id: reviewId } });
+    if (!current || current.studentId !== studentId) throw notFound('REVIEW_NOT_FOUND');
+    await this.db.$transaction(async (tx) => {
+      await tx.review.delete({ where: { id: reviewId } });
+      await this.refreshTeacherRating(current.teacherId, tx);
+    });
+    return { deleted: true };
   }
 
   async adminList(page: number, limit: number, status?: ReviewStatus, search = '') {

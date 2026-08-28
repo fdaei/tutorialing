@@ -29,81 +29,94 @@ const at = (days: number, hour: number, minute = 0) => {
   return date;
 };
 
+/**
+ * Every sign-in path stores and looks phones up in E.164, so the seed must too.
+ * The web client posts `+98` + the local number and `RequestOtpDto` rejects
+ * anything that is not `+<digits>`, after which `AuthService.requestOtp` upserts
+ * on that exact string. A row written as `09120000000` is therefore never
+ * matched: signing in with a demo number quietly created a *second*,
+ * STUDENT-only account under `+989120000000` and the seeded ADMIN/STAFF roles
+ * stayed unreachable. Numbers stay in the readable local form at the call sites
+ * because that is what the login form asks for — it strips the leading zero and
+ * prepends the country's dial code itself.
+ */
+const e164 = (local: string) => `+98${local.replace(/^0+/, '')}`;
+
 const users = {
-  admin: { id: 'user-admin', phone: '09120000000', name: 'مدیر کل', email: 'admin@local.test', role: Role.ADMIN },
+  admin: { id: 'user-admin', phone: e164('09120000000'), name: 'مدیر کل', email: 'admin@local.test', role: Role.ADMIN },
   verifier: {
     id: 'user-verifier',
-    phone: '09120000010',
+    phone: e164('09120000010'),
     name: 'کارشناس تأیید مدرس',
     email: 'verifier@local.test',
     role: Role.STAFF,
   },
   support: {
     id: 'user-support',
-    phone: '09120000011',
+    phone: e164('09120000011'),
     name: 'کارشناس پشتیبانی',
     email: 'support@local.test',
     role: Role.SUPPORT,
   },
   finance: {
     id: 'user-finance',
-    phone: '09120000012',
+    phone: e164('09120000012'),
     name: 'کارشناس مالی',
     email: 'finance@local.test',
     role: Role.FINANCE,
   },
   examiner: {
     id: 'user-examiner',
-    phone: '09120000013',
+    phone: e164('09120000013'),
     name: 'ارزیاب آزمون',
     email: 'examiner@local.test',
     role: Role.EXAMINER,
   },
   approvedTeacher: {
     id: 'user-teacher-approved',
-    phone: '09120000001',
+    phone: e164('09120000001'),
     name: 'سارا دادخواه',
     email: 'sara@local.test',
     role: Role.TEACHER,
   },
   germanTeacher: {
     id: 'user-teacher-german',
-    phone: '09120000002',
+    phone: e164('09120000002'),
     name: 'آرمان نیک‌روش',
     email: 'arman@local.test',
     role: Role.TEACHER,
   },
   pendingTeacher: {
     id: 'user-teacher-pending',
-    phone: '09120000004',
+    phone: e164('09120000004'),
     name: 'نیلوفر آذری',
     email: 'niloofar@local.test',
     role: Role.TEACHER,
   },
   completedStudent: {
     id: 'user-student-completed',
-    phone: '09121111111',
+    phone: e164('09121111111'),
     name: 'نازنین کاظمی',
     email: 'nazanin@local.test',
     role: Role.STUDENT,
   },
   futureStudent: {
     id: 'user-student-future',
-    phone: '09121111112',
+    phone: e164('09121111112'),
     name: 'علی رضایی',
     email: 'ali@local.test',
     role: Role.STUDENT,
   },
   ticketStudent: {
     id: 'user-student-ticket',
-    phone: '09121111113',
+    phone: e164('09121111113'),
     name: 'مریم احمدی',
     email: 'maryam@local.test',
     role: Role.STUDENT,
   },
   demoStudent: {
     id: 'user-student-demo-09390315707',
-    phone: '09390315707',
+    phone: e164('09390315707'),
     name: 'کاربر نمایشی لینگواسپیک',
     email: 'demo.student@local.test',
     role: Role.STUDENT,
@@ -125,6 +138,7 @@ const permissionKeys = [
   'tickets.manage',
   'payments.read',
   'payments.refund',
+  'payments.adjust-wallet',
   'payouts.manage',
   'reviews.manage',
   'audit.read',
@@ -136,7 +150,39 @@ const permissionKeys = [
   'availability.manage',
 ];
 
+/**
+ * Repairs databases seeded while phones were still stored in the local
+ * `09xxxxxxxxx` form (see the `e164` note above). Signing in with a demo number
+ * created a duplicate STUDENT account under the E.164 spelling, so the two rows
+ * now sit side by side and the seed's own upsert would collide on the primary
+ * key when it reconciles ids.
+ *
+ * The seeded row wins the number: every later upsert here keys its teacher,
+ * booking and ticket fixtures off that deterministic id. The duplicate is parked
+ * on a marker instead of being deleted or blanked — most of its relations are
+ * `Restrict` so a delete would fail on any row a developer built on it, and the
+ * `User_has_identity` check forbids clearing the column outright. The marker is
+ * unique, keeps the constraint satisfied, and can never be signed in to because
+ * `RequestOtpDto` only accepts `+<digits>`. It also fails the `^0\d{10}$` test
+ * below, so a second run skips it rather than swapping the two rows back.
+ */
+async function normalizeLegacyPhones() {
+  const legacy = await db.user.findMany({ where: { phone: { startsWith: '0' } }, select: { id: true, phone: true } });
+  for (const row of legacy) {
+    if (!row.phone || !/^0\d{10}$/.test(row.phone)) continue;
+    const phone = e164(row.phone);
+    const duplicate = await db.user.findUnique({ where: { phone }, select: { id: true } });
+    if (duplicate && duplicate.id !== row.id) {
+      const parked = `${row.phone}.duplicate.${duplicate.id}`;
+      await db.user.update({ where: { id: duplicate.id }, data: { phone: parked } });
+      console.warn(`[seed] ${row.phone} -> ${phone}: parked duplicate account left by OTP sign-in as ${parked}`);
+    }
+    await db.user.update({ where: { id: row.id }, data: { phone } });
+  }
+}
+
 async function seedUsersAndPermissions() {
+  await normalizeLegacyPhones();
   for (const user of Object.values(users)) {
     await db.user.upsert({
       where: { phone: user.phone },
@@ -162,13 +208,29 @@ async function seedUsersAndPermissions() {
     });
   }
 
+  // Reconcile demo-role grants instead of only adding them: older seeds gave
+  // every staff role every permission, allowing SUPPORT to adjust balances.
+  await db.rolePermission.deleteMany({
+    where: { userId: { in: [users.admin.id, users.verifier.id, users.support.id, users.finance.id, users.examiner.id] } },
+  });
   for (const key of permissionKeys) {
     const permission = await db.permission.upsert({
       where: { key },
       create: { key, description: key },
       update: { description: key },
     });
-    for (const actor of [users.admin, users.verifier, users.support, users.finance, users.examiner]) {
+    const financeKeys = new Set(['payments.read', 'payments.refund', 'payments.adjust-wallet', 'payouts.manage', 'reports.read', 'audit.read']);
+    const supportKeys = new Set(['users.read', 'bookings.read', 'tickets.read', 'tickets.manage', 'payments.read']);
+    const examinerKeys = new Set(['tests.manage', 'tests.review']);
+    const verifierKeys = new Set(['users.read', 'teachers.read', 'teachers.verify', 'teacher-prices.manage', 'reviews.manage']);
+    const actors = [
+      users.admin,
+      ...(financeKeys.has(key) ? [users.finance] : []),
+      ...(supportKeys.has(key) ? [users.support] : []),
+      ...(examinerKeys.has(key) ? [users.examiner] : []),
+      ...(verifierKeys.has(key) ? [users.verifier] : []),
+    ];
+    for (const actor of actors) {
       await db.rolePermission.upsert({
         where: { userId_role_permissionId: { userId: actor.id, role: actor.role, permissionId: permission.id } },
         create: { userId: actor.id, role: actor.role, permissionId: permission.id },
@@ -1137,12 +1199,13 @@ async function seedDemoExperience() {
     const [key, nameFa, nameEn, gender, languageId, nativeName, specialties, levels, trial, regular, rating] =
       demoTeachers[index]!;
     const userId = `user-teacher-demo-${key}`,
-      teacherId = `teacher-demo-${key}`;
+      teacherId = `teacher-demo-${key}`,
+      phone = e164(`091300001${String(index).padStart(2, '0')}`);
     await db.user.upsert({
-      where: { phone: `091300001${String(index).padStart(2, '0')}` },
+      where: { phone },
       create: {
         id: userId,
-        phone: `091300001${String(index).padStart(2, '0')}`,
+        phone,
         name: nameFa,
         email: `${key}@demo.local`,
         profileComplete: true,
@@ -1971,6 +2034,20 @@ async function seedBlog() {
   for (const p of posts) await db.blogPost.upsert({ where: { slug: p.slug }, update: { ...p, tagIds: undefined, status: BlogPostStatus.PUBLISHED, publishedAt: now }, create: { ...p, tagIds: undefined, authorId: users.admin.id, status: BlogPostStatus.PUBLISHED, publishedAt: now, tags: { connect: p.tagIds!.map(id => ({ id })) } } } as any);
 }
 
+async function seedCourses() {
+  const rows = [
+    { id: 'course-english-conversation', slug: 'english-conversation', titleFa: 'مکالمه روان انگلیسی', titleEn: 'Fluent English conversation', descriptionFa: 'مسیر تمرین‌محور مکالمه با بازخورد منظم و تمرین‌های واقعی.', descriptionEn: 'A practice-led speaking course with structured feedback.', language: 'انگلیسی', level: 'B1', teacherName: 'سارا دادخواه', lessonsCount: 16, price: 2_980_000, image: '/images/lingospeak-student.png' },
+    { id: 'course-german-zero', slug: 'german-zero', titleFa: 'آلمانی از صفر تا مکالمه', titleEn: 'German from zero to conversation', descriptionFa: 'پایه‌های زبان آلمانی برای شروع مطمئن مکالمه روزمره.', descriptionEn: 'German foundations for confident everyday conversations.', language: 'آلمانی', level: 'A1', teacherName: 'آرمان نیک‌روش', lessonsCount: 20, price: 3_490_000, image: '/images/auth/register.png' },
+    { id: 'course-french-travel', slug: 'french-travel', titleFa: 'فرانسوی برای سفر', titleEn: 'French for travel', descriptionFa: 'واژگان و موقعیت‌های ضروری برای یک سفر روان‌تر.', descriptionEn: 'Essential language and scenarios for smoother travel.', language: 'فرانسوی', level: 'A2', teacherName: 'تیم لینگواسپیک', lessonsCount: 12, price: 2_490_000, image: '/images/auth/login.png' },
+    { id: 'course-spanish-everyday', slug: 'spanish-everyday', titleFa: 'اسپانیایی برای زندگی روزمره', titleEn: 'Everyday Spanish', descriptionFa: 'مکالمه کاربردی برای موقعیت‌های واقعی زندگی روزانه.', descriptionEn: 'Practical conversations for everyday situations.', language: 'اسپانیایی', level: 'A2', teacherName: 'تیم لینگواسپیک', lessonsCount: 14, price: 2_690_000, image: '/images/auth/forgot.png' },
+  ];
+  for (const row of rows) await db.course.upsert({ where: { slug: row.slug }, create: { ...row, published: true }, update: { ...row, published: true } });
+  await db.courseEnrollment.upsert({
+    where: { userId_courseId: { userId: users.demoStudent.id, courseId: rows[0]!.id } },
+    create: { userId: users.demoStudent.id, courseId: rows[0]!.id, completedAt: now }, update: {},
+  });
+}
+
 async function main() {
   await seedUsersAndPermissions();
   await seedLanguages();
@@ -1982,6 +2059,7 @@ async function main() {
   await seedDemoExperience();
   await seedTicketsCmsAndSettings();
   await seedBlog();
+  await seedCourses();
   await seedAudit();
   console.log('Seed completed successfully with multilingual workflow data.');
 }

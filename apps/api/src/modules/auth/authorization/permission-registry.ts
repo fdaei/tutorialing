@@ -13,7 +13,7 @@ export const PermissionKeys = {
   Roles: { Manage: 'roles.manage' },
   Reports: { Read: 'reports.read' },
   Audit: { Read: 'audit.read' },
-  Payments: { Read: 'payments.read', Refund: 'payments.refund' },
+  Payments: { Read: 'payments.read', Refund: 'payments.refund', AdjustWallet: 'payments.adjust-wallet' },
   Payouts: { Manage: 'payouts.manage' },
   Settings: { Manage: 'settings.manage' },
   Content: { Manage: 'cms.manage' },

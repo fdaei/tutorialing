@@ -7,7 +7,9 @@ import { BookingJobsService } from './booking-jobs.service';
 import { AvailabilityService } from './availability.service';
 import { RedisService } from '../../infrastructure/redis/redis.service';
 import { EarningsService } from '../commerce';
+import { AutoDiscountsService, WalletService } from '../commerce';
 import { SettingsService } from '../settings/settings.service';
+import { bookingConfirmedKey, OutboxService, OUTBOX_EVENT_TYPES } from '../../infrastructure/database/outbox/outbox.service';
 
 type RefundTier = { beforeHours: number; refundPercent: number };
 
@@ -47,6 +49,9 @@ export class BookingsService {
     private availability: AvailabilityService,
     private earnings: EarningsService,
     private settings: SettingsService,
+    private wallet: WalletService,
+    private autoDiscounts: AutoDiscountsService,
+    private outbox: OutboxService,
   ) {}
 
   adminList() { return this.repo.adminList(); }
@@ -60,9 +65,23 @@ export class BookingsService {
       enrollmentId?: string;
       policyAccepted: boolean;
       timezone: string;
+      discountCode?: string;
+      idempotencyKey?: string;
     },
   ) {
     if (!data.policyAccepted) throw badRequest('CANCELLATION_POLICY_NOT_ACCEPTED');
+    const idempotencyKey = data.idempotencyKey ?? `booking:${studentId}:${data.teacherId}:${data.startsAt}:${data.type}`;
+    const replay = await this.db.payment.findUnique({
+      where: { idempotencyKey },
+      include: { booking: true },
+    });
+    if (replay) {
+      if (replay.userId !== studentId || replay.purpose !== 'booking' || !replay.booking) {
+        throw conflict('BOOKING_IDEMPOTENCY_KEY_CONFLICT');
+      }
+      return replay.booking;
+    }
+    if (data.enrollmentId) throw badRequest('BOOKING_WALLET_PAYMENT_REQUIRED');
     const startsAt = new Date(data.startsAt);
     if (!Number.isFinite(startsAt.getTime()) || startsAt <= new Date()) throw badRequest('BOOKING_START_INVALID');
     await this.assertWithinBookingWindow(startsAt);
@@ -89,58 +108,89 @@ export class BookingsService {
 
           if (data.type === 'trial') await this.assertTrialNotUsed(tx, studentId, data.teacherId);
 
-          let enrollmentId: string | undefined;
-          let creditBased = false;
-          if (data.enrollmentId) {
-            const enrollment = await tx.enrollment.findFirst({
-              where: { id: data.enrollmentId, studentId, active: true, package: { teacherId: data.teacherId } },
-            });
-            if (!enrollment) throw badRequest('ENROLLMENT_INVALID');
-            const credits = await tx.creditEntry.aggregate({
-              where: { enrollmentId: data.enrollmentId },
-              _sum: { amount: true },
-            });
-            if ((credits._sum.amount ?? 0) < 1) throw badRequest('LESSON_CREDIT_INSUFFICIENT');
-            enrollmentId = data.enrollmentId;
-            creditBased = true;
-          }
           const approvedPrice = data.type === 'trial' ? teacher.approvedTrialPrice : teacher.approvedRegularPrice;
           if (approvedPrice == null || approvedPrice <= 0) {
             throw domainError(DOMAIN_ERRORS.TEACHER_PRICE_NOT_APPROVED);
           }
-          const pendingPayment = !creditBased;
-          const paymentExpiresAt = pendingPayment ? new Date(Date.now() + 15 * 60_000) : undefined;
+          let discountAmount = 0;
+          let discountId: string | undefined;
+          let discountRuleId: string | undefined;
+          let codeDiscount: { id: string; amount: number } | undefined;
+          if (data.discountCode?.trim()) {
+            const discount = await tx.discount.findFirst({
+              where: {
+                code: data.discountCode.trim().toUpperCase(),
+                active: true,
+                OR: [{ startsAt: null }, { startsAt: { lte: new Date() } }],
+                AND: [{ OR: [{ endsAt: null }, { endsAt: { gte: new Date() } }] }],
+              },
+            });
+            if (!discount) throw badRequest('DISCOUNT_INVALID');
+            if (discount.maxUses != null && discount.usedCount >= discount.maxUses) throw badRequest('DISCOUNT_LIMIT_REACHED');
+            codeDiscount = {
+              id: discount.id,
+              amount: Math.min(approvedPrice, discount.type === 'percent'
+                ? Math.round((approvedPrice * discount.value) / 100)
+                : discount.value),
+            };
+          }
+          const automatic = await this.autoDiscounts.evaluate(tx, studentId, approvedPrice);
+          if (automatic && automatic.amount > (codeDiscount?.amount ?? 0)) {
+            discountAmount = automatic.amount;
+            discountRuleId = automatic.ruleId;
+          } else if (codeDiscount) {
+            discountAmount = codeDiscount.amount;
+            discountId = codeDiscount.id;
+            await tx.discount.update({ where: { id: codeDiscount.id }, data: { usedCount: { increment: 1 } } });
+          }
+          const finalPrice = approvedPrice - discountAmount;
+          const balance = await this.wallet.walletBalance(studentId, tx);
+          if (balance < finalPrice) throw badRequest('INSUFFICIENT_WALLET_BALANCE', {
+            balance: String(balance),
+            required: String(finalPrice),
+          });
           const created = await tx.booking.create({
             data: {
               studentId,
               teacherId: data.teacherId,
-              enrollmentId,
               startsAt,
               endsAt,
               timezone: data.timezone,
               type: data.type,
-              price: approvedPrice,
+              price: finalPrice,
               policySnapshot: teacher.policy?.rules ?? {},
-              paymentExpiresAt,
-              status: pendingPayment ? 'PENDING_PAYMENT' : 'CONFIRMED',
+              status: 'CONFIRMED',
             },
           });
-          if (creditBased)
-            await tx.creditEntry.create({
-              data: {
-                enrollmentId: enrollmentId!,
-                bookingId: created.id,
-                type: 'RESERVE',
-                amount: -1,
-                idempotencyKey: `reserve:${created.id}`,
-              },
-            });
+          const payment = await tx.payment.create({
+            data: {
+              bookingId: created.id,
+              userId: studentId,
+              purpose: 'booking',
+              referenceId: created.id,
+              subtotal: approvedPrice,
+              discountAmount,
+              discountId,
+              discountRuleId,
+              walletAmount: finalPrice,
+              gatewayAmount: 0,
+              amount: finalPrice,
+              status: 'PAID',
+              verifiedAt: new Date(),
+              idempotencyKey,
+            },
+          });
+          if (finalPrice > 0) {
+            await this.wallet.ledger(tx, studentId, 'DEBIT', finalPrice, 'teacher booking payment', 'Payment', payment.id, `wallet:${payment.id}`);
+            if (await this.wallet.walletBalance(studentId, tx) < 0) throw conflict('WALLET_BALANCE_CONFLICT');
+          }
+          await this.earnings.reserve(tx, created);
+          await this.outbox.enqueue(tx, OUTBOX_EVENT_TYPES.bookingConfirmed, bookingConfirmedKey(created.id), { bookingId: created.id });
           return created;
         },
         { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
       );
-      if (booking.paymentExpiresAt) await this.queue.scheduleExpiration(booking.id, booking.paymentExpiresAt);
-      else await this.queue.scheduleBooking(booking.id, booking.startsAt);
+      await this.queue.scheduleBooking(booking.id, booking.startsAt);
       return booking;
     } finally {
       await lock.release();
@@ -196,6 +246,7 @@ export class BookingsService {
         where: { id },
         data: { status: 'CANCELLED', cancelledAt: new Date(), cancellationReason: reason.trim() },
       });
+      await tx.earning.updateMany({ where: { bookingId: booking.id, status: 'PENDING' }, data: { status: 'REVERSED' } });
       if (booking.enrollmentId)
         await tx.creditEntry.upsert({
           where: { idempotencyKey: `cancel-restore:${booking.id}` },

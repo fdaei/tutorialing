@@ -26,12 +26,18 @@ export class TeachersService {
     private readonly audit: AuditService,
   ) {}
 
-  adminApplications() {
-    return this.db.teacher.findMany({
+  async adminApplications() {
+    const applications = await this.db.teacher.findMany({
       where: { status: { notIn: ['DRAFT', 'APPROVED'] } },
-      include: { user: { select: { phone: true, email: true } }, verificationItems: { include: { file: true } }, verificationHistory: { orderBy: { createdAt: 'desc' } } },
+      include: {
+        user: { select: { phone: true, email: true } },
+        verificationItems: { include: { file: true } },
+        verificationHistory: { orderBy: { createdAt: 'desc' } },
+        introVideoFile: { select: { id: true, key: true, originalName: true, mimeType: true, size: true } },
+      },
       orderBy: { submittedAt: 'asc' },
     });
+    return applications;
   }
 
   async directory(query: {
@@ -42,6 +48,7 @@ export class TeachersService {
     language?: string;
     minBand?: number;
     maxPrice?: number;
+    minRating?: number;
     sort?: string;
   }) {
     const where: Prisma.TeacherWhereInput = {
@@ -72,13 +79,16 @@ export class TeachersService {
       }),
       ...(query.minBand && { targetBands: { has: query.minBand } }),
       ...(query.maxPrice && { approvedTrialPrice: { lte: query.maxPrice } }),
+      ...(query.minRating && { rating: { gte: query.minRating } }),
     };
     const orderBy: Prisma.TeacherOrderByWithRelationInput =
       query.sort === 'price_asc'
         ? { approvedTrialPrice: 'asc' }
         : query.sort === 'rating'
           ? { rating: 'desc' }
-          : { approvedAt: 'desc' };
+          : query.sort === 'reviews'
+            ? { reviewsCount: 'desc' }
+            : { approvedAt: 'desc' };
     const [data, total] = await this.db.$transaction([
       this.db.teacher.findMany({
         where,
@@ -146,7 +156,14 @@ export class TeachersService {
         select: { studentId: true },
       }),
     ]);
-    return { ...teacher, successfulClasses, studentsCount: students.length };
+    const distributionRows = await this.db.review.groupBy({
+      by: ['rating'],
+      where: { teacherId: teacher.id, published: true, moderationStatus: 'APPROVED' },
+      orderBy: { rating: 'asc' },
+      _count: { rating: true },
+    });
+    const distribution = Object.fromEntries(distributionRows.map((row) => [row.rating, row._count.rating]));
+    return { ...teacher, successfulClasses, studentsCount: students.length, distribution };
   }
 
   private publicSelect() {
@@ -270,14 +287,10 @@ export class TeachersService {
         verificationItems: { include: { file: true }, orderBy: { createdAt: 'desc' } },
         verificationHistory: { orderBy: { createdAt: 'desc' } },
         priceHistory: { orderBy: { createdAt: 'desc' }, take: 20 },
+        introVideoFile: { select: { id: true } },
       },
     });
-    if (!teacher?.introVideoKey) return teacher;
-    const file = await this.db.storedFile.findFirst({
-      where: { ownerId: userId, key: teacher.introVideoKey, status: 'SAFE' },
-      select: { id: true },
-    });
-    return { ...teacher, introVideoFileId: file?.id };
+    return teacher;
   }
 
   async submit(userId: string) {
@@ -296,6 +309,9 @@ export class TeachersService {
     );
     if (!approvedKinds.has('identity') || !approvedKinds.has('certificate')) {
       throw badRequest('TEACHER_DOCUMENTS_REQUIRED');
+    }
+    if (!(await this.hasValidIntroVideo(teacher.userId, teacher.introVideoFileId))) {
+      throw badRequest('TEACHER_INTRO_VIDEO_REQUIRED');
     }
     if (!teacher.languageLinks.length) throw badRequest('TEACHER_LANGUAGE_REQUIRED');
     return this.transition(teacher.id, 'SUBMITTED', userId);
@@ -316,6 +332,9 @@ export class TeachersService {
       };
       if (!valid[teacher.status].includes(to)) {
         throw badRequest('TEACHER_STATUS_TRANSITION_INVALID');
+      }
+      if (to === 'APPROVED' && !(await this.hasValidIntroVideo(teacher.userId, teacher.introVideoFileId, tx))) {
+        throw badRequest('TEACHER_INTRO_VIDEO_REQUIRED');
       }
       const output = await tx.teacher.update({
         where: { id },
@@ -340,5 +359,24 @@ export class TeachersService {
       });
       return output;
     });
+  }
+
+  private async hasValidIntroVideo(
+    userId: string,
+    fileId: string | null,
+    db: Pick<PrismaService, 'storedFile'> = this.db,
+  ) {
+    if (!fileId) return false;
+    const file = await db.storedFile.findFirst({
+      where: {
+        ownerId: userId,
+        id: fileId,
+        status: 'SAFE',
+        purpose: 'teacher-intro-video',
+        mimeType: { in: ['video/mp4', 'video/webm', 'video/quicktime'] },
+      },
+      select: { id: true },
+    });
+    return Boolean(file);
   }
 }

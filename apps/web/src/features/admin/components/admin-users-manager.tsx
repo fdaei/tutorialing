@@ -4,7 +4,7 @@ import { localized, isDefaultLocale, translate } from '@/lib/i18n';
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, Eye, Search, ShieldCheck, UserRound, X } from 'lucide-react';
-import { api, ApiError, Paginated } from '@/lib/api';
+import { api, ApiError, Paginated } from '@/shared/services/api';
 import { useTranslations } from '@/components/shared/locale-provider';
 
 type Role = 'STUDENT' | 'TEACHER' | 'ADMIN' | 'STAFF' | 'EXAMINER' | 'SUPPORT' | 'FINANCE';

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/api';
+import { api } from '@/shared/services/api';
 import { localePath, localized, isDefaultLocale, translate } from '@/lib/i18n';
 import { useTranslations } from '@/components/shared/locale-provider';
 

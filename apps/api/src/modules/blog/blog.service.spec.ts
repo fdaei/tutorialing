@@ -41,6 +41,7 @@ function harness(post?: Record<string, unknown>) {
 }
 
 const DRAFT = { id: 'post-1', slug: 'hello-world', titleFa: 'سلام', titleEn: 'Hello', status: 'DRAFT', publishedAt: null };
+const APPROVED = { ...DRAFT, status: 'APPROVED', reviewedAt: new Date('2026-01-01T00:00:00Z') };
 const PUBLISHED = { ...DRAFT, status: 'PUBLISHED', publishedAt: new Date('2026-01-01T00:00:00Z') };
 
 describe('BlogService write mapping (SEC-213)', () => {
@@ -102,23 +103,26 @@ describe('BlogService write mapping (SEC-213)', () => {
 });
 
 describe('BlogService status transitions (SEC-213)', () => {
-  it('declares archive as terminal and draft as the only entry point', () => {
+  it('requires instructor review before publication and keeps archive terminal', () => {
     expect(BLOG_POST_TRANSITIONS).toEqual({
-      DRAFT: ['PUBLISHED', 'ARCHIVED'],
+      DRAFT: ['PENDING_REVIEW', 'ARCHIVED'],
+      PENDING_REVIEW: ['APPROVED', 'REJECTED'],
+      APPROVED: ['PUBLISHED', 'REJECTED'],
+      REJECTED: ['PENDING_REVIEW', 'ARCHIVED'],
       PUBLISHED: ['ARCHIVED'],
       ARCHIVED: [],
     });
   });
 
-  it('publishes a draft and stamps publishedAt', async () => {
-    const { svc, db } = harness(DRAFT);
+  it('publishes only an approved post and stamps publishedAt', async () => {
+    const { svc, db } = harness(APPROVED);
     await svc.transition('editor-1', 'post-1', 'PUBLISHED');
     const { where, data } = db.blogPost.updateMany.mock.calls[0]![0] as {
       where: Record<string, unknown>;
       data: Record<string, unknown>;
     };
     // Guarded on the status the decision was made against.
-    expect(where).toEqual({ id: 'post-1', status: 'DRAFT' });
+    expect(where).toEqual({ id: 'post-1', status: 'APPROVED' });
     expect(data.status).toBe('PUBLISHED');
     expect(data.publishedAt).toBeInstanceOf(Date);
   });
@@ -131,6 +135,7 @@ describe('BlogService status transitions (SEC-213)', () => {
   });
 
   it.each([
+    ['DRAFT', 'PUBLISHED', DRAFT],
     ['PUBLISHED', 'PUBLISHED', PUBLISHED],
     ['ARCHIVED', 'PUBLISHED', { ...DRAFT, status: 'ARCHIVED' }],
     ['ARCHIVED', 'ARCHIVED', { ...DRAFT, status: 'ARCHIVED' }],
@@ -145,7 +150,7 @@ describe('BlogService status transitions (SEC-213)', () => {
   it('refuses the transition when another editor moved the post first', async () => {
     const { svc, db } = harness(DRAFT);
     db.blogPost.updateMany.mockResolvedValue({ count: 0 });
-    await expect(svc.transition('editor-1', 'post-1', 'PUBLISHED')).rejects.toMatchObject({
+    await expect(svc.transition('editor-1', 'post-1', 'PENDING_REVIEW')).rejects.toMatchObject({
       response: expect.objectContaining({ code: 'BLOG_POST_TRANSITION_INVALID' }),
     });
   });
@@ -165,10 +170,10 @@ describe('BlogService audit trail (SEC-213)', () => {
       'editor-2', 'blog.post.updated', 'BlogPost', 'post-1', expect.any(Object), { fields: ['titleFa'] },
     );
 
-    const published = harness(DRAFT);
+    const published = harness(APPROVED);
     await published.svc.transition('editor-3', 'post-1', 'PUBLISHED');
     expect(published.audit.write).toHaveBeenCalledWith(
-      'editor-3', 'blog.post.published', 'BlogPost', 'post-1', { status: 'DRAFT' }, { status: 'PUBLISHED' },
+      'editor-3', 'blog.post.published', 'BlogPost', 'post-1', { status: 'APPROVED' }, { status: 'PUBLISHED' },
     );
 
     const archived = harness(PUBLISHED);

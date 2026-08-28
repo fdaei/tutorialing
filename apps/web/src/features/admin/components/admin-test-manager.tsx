@@ -4,7 +4,7 @@ import { localized, isDefaultLocale, translate } from '@/lib/i18n';
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { BookOpen, ChevronDown, ChevronUp, Plus, Trash2 } from 'lucide-react';
-import { api, ApiError } from '@/lib/api';
+import { api, ApiError } from '@/shared/services/api';
 import { useTranslations } from '@/components/shared/locale-provider';
 
 type Question = { id: string; prompt: { fa?: string; en?: string }; type: string; points: number; order: number };

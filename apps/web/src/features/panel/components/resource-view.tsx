@@ -2,7 +2,7 @@
 
 import { localized, isDefaultLocale, translate } from '@/lib/i18n';
 import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/api';
+import { api } from '@/shared/services/api';
 import { useTranslations } from '@/components/shared/locale-provider';
 
 type Locale = 'fa' | 'en';

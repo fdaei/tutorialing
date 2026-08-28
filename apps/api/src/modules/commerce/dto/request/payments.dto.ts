@@ -21,3 +21,10 @@ export class WalletTopUpDto {
   @IsOptional() @IsString() discountCode?: string;
   @IsOptional() @IsString() idempotencyKey?: string;
 }
+
+export class WalletAdjustmentDto {
+  @IsInt() @Min(1) amount!: number;
+  @IsIn(['CREDIT', 'DEBIT']) direction!: 'CREDIT' | 'DEBIT';
+  @IsString() reason!: string;
+  @IsString() idempotencyKey!: string;
+}

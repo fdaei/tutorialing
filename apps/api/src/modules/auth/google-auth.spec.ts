@@ -45,10 +45,15 @@ const PROFILE = {
 function harness(payload: unknown) {
   mockVerifyIdToken.mockResolvedValue({ getPayload: () => payload });
   const db = {
-    user: { upsert: jest.fn().mockResolvedValue({ id: 'user-1' }), findUniqueOrThrow: jest.fn().mockResolvedValue({
-      id: 'user-1', phone: null, name: 'Student', locale: 'fa', timezone: 'Asia/Tehran',
-      profileComplete: false, status: 'ACTIVE', roles: [],
-    }) },
+    user: {
+      findFirst: jest.fn().mockResolvedValue(null),
+      create: jest.fn().mockResolvedValue({ id: 'user-1' }),
+      update: jest.fn().mockResolvedValue({ id: 'user-1' }),
+      findUniqueOrThrow: jest.fn().mockResolvedValue({
+        id: 'user-1', phone: null, name: 'Student', locale: 'fa', timezone: 'Asia/Tehran',
+        profileComplete: false, status: 'ACTIVE', roles: [],
+      }),
+    },
     refreshSession: { create: jest.fn().mockResolvedValue({}) },
   };
   const jwt = { signAsync: jest.fn().mockResolvedValue('access-token') };
@@ -103,7 +108,7 @@ describe('AuthService.verifyGoogle (SEC-214)', () => {
     await expect(h.svc.verifyGoogle('an.id.token', {})).rejects.toMatchObject({
       response: expect.objectContaining({ code: 'GOOGLE_TOKEN_INVALID' }),
     });
-    expect(h.db.user.upsert).not.toHaveBeenCalled();
+    expect(h.db.user.findFirst).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -117,15 +122,31 @@ describe('AuthService.verifyGoogle (SEC-214)', () => {
     await expect(h.svc.verifyGoogle('an.id.token', {})).rejects.toMatchObject({
       response: expect.objectContaining({ code: 'GOOGLE_TOKEN_INVALID' }),
     });
-    expect(h.db.user.upsert).not.toHaveBeenCalled();
+    expect(h.db.user.findFirst).not.toHaveBeenCalled();
   });
 
   it('keys the account on the Google subject, not the email', async () => {
     const h = harness(PROFILE);
     await h.svc.verifyGoogle('an.id.token', {});
-    expect(h.db.user.upsert).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { googleSubject: 'google-sub-1' } }),
+    expect(h.db.user.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { OR: expect.arrayContaining([{ googleSubject: 'google-sub-1' }]) } }),
     );
+    expect(h.db.user.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ googleSubject: 'google-sub-1' }) }),
+    );
+  });
+
+  it('links an existing account through the matched user instead of creating a duplicate', async () => {
+    const h = harness(PROFILE);
+    h.db.user.findFirst.mockResolvedValueOnce({ id: 'user-1', googleSubject: null });
+
+    await h.svc.verifyGoogle('an.id.token', {});
+
+    expect(h.db.user.update).toHaveBeenCalledWith({
+      where: { id: 'user-1' },
+      data: { googleSubject: 'google-sub-1', email: 'student@example.com', name: 'Student' },
+    });
+    expect(h.db.user.create).not.toHaveBeenCalled();
   });
 });
 

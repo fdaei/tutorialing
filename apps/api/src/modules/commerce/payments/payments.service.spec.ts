@@ -62,88 +62,13 @@ const pay = (over: Record<string, unknown> = {}) => ({
 const lastCreated = (h: Harness) => h.created[h.created.length - 1];
 
 describe('PaymentsService.createPayment', () => {
-  it('charges the price snapshotted on the booking', async () => {
-    // Reading the teacher's live rate here re-quoted the student whenever the
-    // teacher edited their price, and used the unapproved draft value.
+  it('rejects every legacy booking checkout before creating a payment', async () => {
     const h = harness();
-    await h.svc.createPayment(USER, pay());
-    expect(lastCreated(h)).toMatchObject({ subtotal: BOOKING.price, amount: BOOKING.price });
-    expect(h.tx.booking.findUnique).toHaveBeenCalledWith({ where: { id: BOOKING.id } });
-  });
-
-  it('returns the original payment when an idempotency key is replayed', async () => {
-    const h = harness({ existingByKey: { id: 'payment-old', userId: USER, status: 'PENDING', bookingId: BOOKING.id } });
-    await expect(h.svc.createPayment(USER, pay())).resolves.toMatchObject({ id: 'payment-old' });
-    expect(h.db.$transaction).not.toHaveBeenCalled();
-  });
-
-  it('does not hand another user their payment via a guessed key', async () => {
-    const h = harness({ existingByKey: { id: 'payment-old', userId: 'someone-else', status: 'PENDING' } });
     await expect(h.svc.createPayment(USER, pay())).rejects.toMatchObject({
-      response: { code: 'PAYMENT_KEY_CONFLICT' },
+      response: { code: 'BOOKING_WALLET_PAYMENT_REQUIRED' },
     });
-  });
-
-  it('frees the unique booking slot held by a failed attempt so the student can retry', async () => {
-    // Payment.bookingId is unique: without detaching the failed row every retry
-    // collided with the index and the booking became unpayable.
-    const h = harness({ heldPayment: { id: 'payment-failed', status: 'FAILED', bookingId: BOOKING.id } });
-    await h.svc.createPayment(USER, pay());
-    expect(h.tx.payment.update).toHaveBeenCalledWith({ where: { id: 'payment-failed' }, data: { bookingId: null } });
-    expect(h.tx.payment.create).toHaveBeenCalled();
-  });
-
-  it('refuses to start a second payment while one is still live', async () => {
-    const h = harness({ heldPayment: { id: 'payment-pending', status: 'PENDING', bookingId: BOOKING.id } });
-    await expect(h.svc.createPayment(USER, pay({ idempotencyKey: 'key-2' }))).rejects.toMatchObject({
-      response: { code: 'BOOKING_PAYMENT_EXISTS' },
-    });
+    expect(h.db.$transaction).not.toHaveBeenCalled();
     expect(h.tx.payment.create).not.toHaveBeenCalled();
-  });
-
-  it('refuses to re-charge a booking that is already paid', async () => {
-    const h = harness({ heldPayment: { id: 'payment-paid', status: 'PAID', bookingId: BOOKING.id } });
-    await expect(h.svc.createPayment(USER, pay({ idempotencyKey: 'key-3' }))).rejects.toMatchObject({
-      response: { code: 'BOOKING_PAYMENT_EXISTS' },
-    });
-  });
-
-  it('records which discount it reserved so the use can be released later', async () => {
-    const h = harness();
-    h.tx.discount.findFirst.mockResolvedValue({
-      id: 'discount-1',
-      type: 'percent',
-      value: 10,
-      maxUses: 5,
-      usedCount: 0,
-    });
-    await h.svc.createPayment(USER, pay({ discountCode: 'WELCOME' }));
-    expect(h.tx.discount.update).toHaveBeenCalledWith({
-      where: { id: 'discount-1' },
-      data: { usedCount: { increment: 1 } },
-    });
-    expect(lastCreated(h)).toMatchObject({ discountId: 'discount-1', discountAmount: 25_000, amount: 225_000 });
-  });
-
-  it('refuses to spend wallet funds a concurrent payment already took', async () => {
-    // The balance read and the debit are separate statements. Serializable
-    // isolation is the primary guard; this asserts the ledger backstop that
-    // refuses to leave the balance negative regardless of isolation.
-    const h = harness();
-    h.wallet.walletBalance
-      .mockResolvedValueOnce(100_000) // pre-flight check passes
-      .mockResolvedValueOnce(-50_000); // re-read after the debit: funds were taken
-    await expect(h.svc.createPayment(USER, pay({ walletAmount: 100_000 }))).rejects.toMatchObject({
-      response: { code: 'WALLET_BALANCE_CONFLICT' },
-    });
-  });
-
-  it('rejects a wallet amount above the balance with a field-level message', async () => {
-    const h = harness();
-    h.wallet.walletBalance.mockResolvedValue(10_000);
-    await expect(h.svc.createPayment(USER, pay({ walletAmount: 50_000 }))).rejects.toMatchObject({
-      response: { code: 'WALLET_AMOUNT_INVALID' },
-    });
   });
 });
 
@@ -398,6 +323,7 @@ function gatewayRedirectHarness(
   payment: Record<string, unknown>,
   lockResult: unknown = { token: 't', release: jest.fn() },
 ) {
+  payment = { purpose: 'wallet_top_up', gatewayAmount: 100_000, ...payment };
   const db = {
     payment: {
       // Mirrors real Prisma `findFirstOrThrow` semantics: the row is only
@@ -433,8 +359,8 @@ describe('PaymentsService.gatewayRedirect', () => {
     expect(result).toEqual({ authority: 'existing-authority', url: 'https://gateway.example/existing-authority' });
   });
 
-  it('requests a new authority and persists it when none exists yet', async () => {
-    const h = gatewayRedirectHarness({ id: 'payment-1', authority: null, gatewayAmount: 100_000, purpose: 'booking' });
+  it('requests a new authority and persists it for a wallet top-up', async () => {
+    const h = gatewayRedirectHarness({ id: 'payment-1', authority: null });
     const result = await h.svc.gatewayRedirect('user-1', 'payment-1');
     expect(h.gateway.request).toHaveBeenCalledTimes(1);
     expect(h.db.payment.update).toHaveBeenCalledWith({
@@ -455,12 +381,20 @@ describe('PaymentsService.gatewayRedirect', () => {
   it('always releases the lock, even when the gateway call fails', async () => {
     const release = jest.fn();
     const h = gatewayRedirectHarness(
-      { id: 'payment-1', authority: null, gatewayAmount: 100_000, purpose: 'booking' },
+      { id: 'payment-1', authority: null },
       { token: 't', release },
     );
     h.gateway.request.mockRejectedValue(new Error('zarinpal down'));
     await expect(h.svc.gatewayRedirect('user-1', 'payment-1')).rejects.toThrow('zarinpal down');
     expect(release).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects a booking gateway even if a legacy authority exists', async () => {
+    const h = gatewayRedirectHarness({ id: 'payment-1', authority: 'legacy-authority', purpose: 'booking' });
+    await expect(h.svc.gatewayRedirect('user-1', 'payment-1')).rejects.toMatchObject({
+      response: { code: 'GATEWAY_ONLY_FOR_WALLET_TOP_UP' },
+    });
+    expect(h.gateway.request).not.toHaveBeenCalled();
   });
 
   /** SEC-210. User A owns the payment; User B (a different authenticated

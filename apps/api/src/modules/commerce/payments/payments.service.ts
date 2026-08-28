@@ -83,6 +83,10 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
   }
 
   async createPayment(userId: string, d: PayDto) {
+    // Teacher bookings are settled atomically by BookingsService. Keeping the
+    // legacy checkout endpoint capable of creating a booking gateway session
+    // would provide a trivial bypass of the wallet-only rule.
+    if (d.purpose === 'booking') throw badRequest('BOOKING_WALLET_PAYMENT_REQUIRED');
     // Replaying an idempotency key must return the original payment rather than
     // hitting the unique index and surfacing as an error, so a client that
     // retries after a dropped response converges instead of getting stuck.
@@ -211,6 +215,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
         }
         const amount = subtotal - discountAmount;
         const balance = await this.wallet.walletBalance(userId, tx);
+        if (d.walletAmount !== amount) throw badRequest('GATEWAY_ONLY_FOR_WALLET_TOP_UP');
         if (d.walletAmount < 0 || d.walletAmount > balance || d.walletAmount > amount)
           throw badRequest('WALLET_AMOUNT_INVALID');
         const gatewayAmount = amount - d.walletAmount;
@@ -285,6 +290,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     if (!lock) throw conflict('PAYMENT_GATEWAY_BUSY');
     try {
       const payment = await this.db.payment.findFirstOrThrow({ where: { id: paymentId, userId, status: 'PENDING' } });
+      if (payment.purpose !== 'wallet_top_up') throw badRequest('GATEWAY_ONLY_FOR_WALLET_TOP_UP');
       if (payment.authority) return { authority: payment.authority, url: this.gateway.resumeUrl(payment.authority) };
       const result = await this.gateway.request(
         payment.gatewayAmount,

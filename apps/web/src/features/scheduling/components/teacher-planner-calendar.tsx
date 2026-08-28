@@ -4,7 +4,7 @@ import { localized, isDefaultLocale, translate } from '@/lib/i18n';
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { CalendarPlus, ChevronLeft, ChevronRight, Clock3, Plus, Trash2, X } from 'lucide-react';
-import { api } from '@/lib/api';
+import { api } from '@/shared/services/api';
 import { useTranslations } from '@/components/shared/locale-provider';
 
 type Rule = { weekday: number; startMinute: number; endMinute: number };

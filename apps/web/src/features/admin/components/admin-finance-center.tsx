@@ -13,7 +13,7 @@ import {
   Search,
   WalletCards,
 } from 'lucide-react';
-import { api, apiMessage } from '@/lib/api';
+import { api, apiMessage } from '@/shared/services/api';
 import { useTranslations } from '@/components/shared/locale-provider';
 
 type Aggregate = { status: string; _count: { _all: number }; _sum: Record<string, number | null> };

@@ -3,21 +3,12 @@
 import { localized, isDefaultLocale, translate } from '@/lib/i18n';
 import { useEffect, useRef, useState } from 'react';
 import { Mic, RotateCcw, Square, UploadCloud } from 'lucide-react';
-import { api } from '@/lib/api';
+import { api } from '@/shared/services/api';
 import { useTranslations } from '@/components/shared/locale-provider';
+import { uploadSpeakingAudio } from '../services/upload-speaking-audio';
 
 type Props = { value?: string; onUploaded: (fileId: string) => Promise<void> | void };
-type Upload = { fileId: string; uploadUrl: string };
 type Download = { url: string; expiresIn: number };
-
-const extensions: Record<string, string> = {
-  'audio/webm': 'webm',
-  'audio/mp4': 'm4a',
-  'audio/mpeg': 'mp3',
-  'audio/ogg': 'ogg',
-  'audio/wav': 'wav',
-  'audio/x-m4a': 'm4a',
-};
 
 export function AudioRecorder({ value, onUploaded }: Props) {
   const { locale } = useTranslations(),
@@ -116,43 +107,10 @@ export function AudioRecorder({ value, onUploaded }: Props) {
     setStatus('uploading');
     setError('');
     try {
-      const bytes = await blob.arrayBuffer();
-      const checksum = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)))
-        .map((x) => x.toString(16).padStart(2, '0'))
-        .join('');
-      const mimeType = blob.type.split(';')[0] || 'audio/webm',
-        extension = extensions[mimeType] ?? 'webm';
-      const signed = await api<Upload>('/files/uploads', {
-        method: 'POST',
-        body: JSON.stringify({
-          originalName: `speaking-answer.${extension}`,
-          mimeType,
-          size: blob.size,
-          checksum,
-          purpose: 'speaking-answer',
-        }),
-      });
-      let uploaded = false;
-      try {
-        const response = await fetch(signed.uploadUrl, {
-          method: 'PUT',
-          headers: { 'content-type': mimeType, 'x-amz-meta-checksum': checksum },
-          body: blob,
-        });
-        uploaded = response.ok;
-      } catch {
-        uploaded = false;
-      }
-      if (!uploaded)
-        await api(`/files/uploads/${signed.fileId}/content`, {
-          method: 'POST',
-          headers: { 'content-type': mimeType, 'x-content-checksum': checksum },
-          body: blob,
-        });
-      await api(`/files/${signed.fileId}/complete`, { method: 'POST' });
-      pendingFileId.current = signed.fileId;
+      const fileId = await uploadSpeakingAudio(blob);
+      pendingFileId.current = fileId;
       replaceUrl(URL.createObjectURL(blob), true);
-      await attach(signed.fileId);
+      await attach(fileId);
     } catch {
       setError(translate(locale, 'testsaudioRecorderTheRecordingWasNotFullySavedYourLocal'));
       setStatus('error');

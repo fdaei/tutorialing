@@ -16,6 +16,7 @@ function harness(payment: Record<string, unknown>) {
       findUniqueOrThrow: jest.fn().mockResolvedValue(payment),
       update: jest.fn().mockResolvedValue({}),
     },
+    auditLog: { create: jest.fn().mockResolvedValue({}) },
   };
   const db = { $transaction: jest.fn().mockImplementation((fn: (t: unknown) => unknown) => fn(tx)) };
   const wallet = { ledger: jest.fn() };

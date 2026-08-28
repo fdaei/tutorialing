@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { Check } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/api';
+import { api } from '@/shared/services/api';
 import { useTranslations } from '@/components/shared/locale-provider';
 import { localePath, localized, isDefaultLocale, translate } from '@/lib/i18n';
 

@@ -33,6 +33,7 @@ apps/*/node_modules/
 
 # Next.js build output
 .next
+.next-dev
 out
 
 # Nuxt.js build / generate output

@@ -338,6 +338,7 @@ export class AvailabilityService {
     const timezone = params.availabilityRules[0]?.timezone ?? 'Asia/Tehran';
     const overrides = new Map(params.availabilityOverrides.map((row) => [dateKey(row.date), row]));
     const result: AvailabilitySlot[] = [];
+    const seenStartsAt = new Set<string>();
     const firstLocalDay = utcDate(zonedDateKey(from, timezone));
     const lastLocalDay = utcDate(zonedDateKey(new Date(to.getTime() - 1), timezone));
     for (let cursor = firstLocalDay; cursor <= lastLocalDay; cursor = new Date(cursor.getTime() + DAY_MS)) {
@@ -373,8 +374,13 @@ export class AvailabilityService {
           if (startsAt < from || endsAt > to || startsAt < firstBookable || startsAt > lastBookable) continue;
           if (this.overlapsAny(startsAt, endsAt, blockedPeriods) || this.overlapsAny(startsAt, endsAt, bookings))
             continue;
+          const startsAtIso = startsAt.toISOString();
+          // Multiple active rules can overlap. A start instant represents one
+          // bookable slot regardless of how many rules produced it.
+          if (seenStartsAt.has(startsAtIso)) continue;
+          seenStartsAt.add(startsAtIso);
           result.push({
-            startsAt: startsAt.toISOString(),
+            startsAt: startsAtIso,
             endsAt: endsAt.toISOString(),
             date: day,
             timezone: rule.timezone,
