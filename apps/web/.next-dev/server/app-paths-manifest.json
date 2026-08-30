@@ -1,10 +1,1 @@
-{
-  "/[slug]/page": "app/[slug]/page.js",
-  "/register/page": "app/register/page.js",
-  "/blog/page": "app/blog/page.js",
-  "/languages/page": "app/languages/page.js",
-  "/teachers/page": "app/teachers/page.js",
-  "/page": "app/page.js",
-  "/languages/[slug]/page": "app/languages/[slug]/page.js",
-  "/courses/page": "app/courses/page.js"
-}
+{}
