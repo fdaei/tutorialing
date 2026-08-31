@@ -3,7 +3,7 @@
 
 type AppRoutes = "/" | "/[slug]" | "/admin" | "/admin/[section]" | "/auth" | "/blog" | "/blog/[slug]" | "/checkout" | "/courses" | "/courses/[slug]" | "/dashboard" | "/dashboard/[section]" | "/en" | "/en/[slug]" | "/forgot-password" | "/languages" | "/languages/[slug]" | "/login" | "/matching" | "/panel" | "/payment/development" | "/payment/failure" | "/payment/pending" | "/payment/success" | "/placement" | "/register" | "/reset-password" | "/teach" | "/teach/register" | "/teacher-apply" | "/teacher-panel" | "/teacher-panel/[section]" | "/teachers" | "/teachers/[id]" | "/test/device-check" | "/test/session" | "/verify-code"
 type PageRoutes = never
-type LayoutRoutes = "/" | "/auth" | "/checkout" | "/payment/development" | "/test/session"
+type LayoutRoutes = "/" | "/auth" | "/blog" | "/checkout" | "/courses" | "/languages" | "/payment/development" | "/teachers" | "/test/session"
 type RedirectRoutes = never
 type RewriteRoutes = never
 type Routes = AppRoutes | PageRoutes | LayoutRoutes | RedirectRoutes | RewriteRoutes
@@ -55,8 +55,12 @@ export type ParamsOf<Route extends Routes> = ParamMap[Route]
 interface LayoutSlotMap {
   "/": never
   "/auth": never
+  "/blog": never
   "/checkout": never
+  "/courses": never
+  "/languages": never
   "/payment/development": never
+  "/teachers": never
   "/test/session": never
 }
 

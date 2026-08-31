@@ -1,11 +1,11 @@
-import { CourseCard } from '@/components/marketplace/cards';
 import { Footer, Header } from '@/components/layout/site';
 import { publicApi } from '@/shared/services/api';
 import type { Course } from '@/lib/marketplace-data';
 import { BookOpen } from 'lucide-react';
+import { CourseDirectory } from '@/features/courses/components/course-directory';
 export const dynamic = 'force-dynamic';
 export default async function CoursesPage() {
-  const courses = await publicApi<Course[]>('/courses').catch(() => []);
+  const courses = await publicApi<Course[]>('/courses');
   return (
     <>
       <Header />
@@ -15,22 +15,8 @@ export default async function CoursesPage() {
         <p className="mt-4 max-w-2xl leading-8 text-muted">
           مسیرهای آموزشی منظم، با امتیازهای واقعی زبان‌آموزانی که در دوره شرکت کرده‌اند.
         </p>
-        <div className="mt-8 flex flex-wrap gap-2">
-          {['همه دوره‌ها', 'انگلیسی', 'آلمانی', 'فرانسوی', 'اسپانیایی'].map((x, i) => (
-            <span
-              key={x}
-              className={`rounded-full px-5 py-2 text-sm font-bold ${i ? 'border hairline' : 'bg-purple text-white'}`}
-            >
-              {x}
-            </span>
-          ))}
-        </div>
         {courses.length ? (
-          <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {courses.map((x) => (
-              <CourseCard key={x.slug} course={x} />
-            ))}
-          </div>
+          <CourseDirectory courses={courses} />
         ) : (
           <div className="review-empty mt-10">
             <BookOpen />

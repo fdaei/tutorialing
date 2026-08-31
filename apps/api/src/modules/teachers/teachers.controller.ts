@@ -36,6 +36,13 @@ export class TeachersController {
 
   @Public()
   @RateLimit(RATE_LIMIT_TIERS.publicRead)
+  @Get(':slug/intro-video')
+  introVideo(@Param('slug') slug: string) {
+    return this.service.publicIntroVideo(slug);
+  }
+
+  @Public()
+  @RateLimit(RATE_LIMIT_TIERS.publicRead)
   @Get(':slug')
   async profile(@Param('slug') slug: string) {
     const teacher = await this.service.profile(slug);

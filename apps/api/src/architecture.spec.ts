@@ -79,7 +79,12 @@ describe('module boundaries', () => {
     const exported = [...barrel.matchAll(/export\s*\{\s*([^}]+)\}/g)].flatMap((m) =>
       (m[1] ?? '').split(',').map((s) => s.trim()),
     );
-    expect(exported.sort()).toEqual(['EarningsService', 'releaseDiscount']);
+    expect(exported.sort()).toEqual([
+      'AutoDiscountsService',
+      'EarningsService',
+      'WalletService',
+      'releaseDiscount',
+    ]);
   });
 
   /**

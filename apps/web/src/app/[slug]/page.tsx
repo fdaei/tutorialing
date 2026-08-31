@@ -2,7 +2,7 @@ import { localized } from '@/lib/i18n';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { Header, Footer } from '@/components/layout/site';
-import { publicApi } from '@/shared/services/api';
+import { ApiError, publicApi } from '@/shared/services/api';
 import { requestLocale } from '@/lib/server-locale';
 import Link from 'next/link';
 import {
@@ -38,7 +38,12 @@ const allowed = [
 ];
 async function load(slug: string) {
   if (!allowed.includes(slug)) return null;
-  return publicApi<Page | null>(`/support/pages/${slug}`, { cache: 'no-store' }).catch(() => null);
+  try {
+    return await publicApi<Page | null>(`/support/pages/${slug}`, { cache: 'no-store' });
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) return null;
+    throw error;
+  }
 }
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params,

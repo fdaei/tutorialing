@@ -3,7 +3,7 @@
 import { translate } from '@/lib/i18n';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Search, RotateCcw } from 'lucide-react';
+import { Search, RotateCcw, SlidersHorizontal } from 'lucide-react';
 import { Header, Footer, Empty } from '@/components/layout/site';
 import { TeacherCard } from '@/features/teacher/components/teacher-card';
 import { publicApi, type Paginated } from '@/shared/services/api';
@@ -18,6 +18,16 @@ export default function Directory() {
     [minRating, setMinRating] = useState(''),
     [sort, setSort] = useState('rating'),
     [page, setPage] = useState(1);
+  const hasFilters = Boolean(q || search || skill || language || minRating || sort !== 'rating');
+  const resetFilters = () => {
+    setQ('');
+    setSearch('');
+    setSkill('');
+    setLanguage('');
+    setMinRating('');
+    setSort('rating');
+    setPage(1);
+  };
   const query = useQuery({
     queryKey: ['teachers', search, skill, language, minRating, sort, page],
     queryFn: () =>
@@ -39,7 +49,7 @@ export default function Directory() {
             setSearch(q);
             setPage(1);
           }}
-          className="sticky top-20 z-20 mt-8 grid gap-3 rounded-3xl border hairline bg-white/95 p-4 shadow-soft sm:grid-cols-2 xl:grid-cols-[1fr_150px_150px_135px_170px]"
+          className="sticky top-20 z-20 mt-8 grid gap-3 rounded-3xl border hairline bg-white/95 p-4 shadow-soft sm:grid-cols-2 xl:grid-cols-[minmax(220px,1fr)_140px_140px_130px_160px_auto]"
         >
           <label className="flex items-center gap-3 rounded-2xl bg-ivory px-4">
             <Search />
@@ -100,6 +110,20 @@ export default function Directory() {
             <option value="price_asc">{translate(locale, 'teachersLowestPrice')}</option>
             <option value="newest">{translate(locale, 'teachersNewest')}</option>
           </select>
+          <button type="submit" className="brand-gradient flex min-h-13 items-center justify-center gap-2 rounded-2xl px-5 font-black text-white">
+            <Search size={18} aria-hidden="true" />
+            جست‌وجو
+          </button>
+          {hasFilters && (
+            <button
+              type="button"
+              onClick={resetFilters}
+              className="flex min-h-11 items-center justify-center gap-2 rounded-xl text-sm font-bold text-muted hover:bg-canvas hover:text-purple sm:col-span-2 xl:col-span-6"
+            >
+              <SlidersHorizontal size={17} aria-hidden="true" />
+              پاک کردن جست‌وجو و همه فیلترها
+            </button>
+          )}
         </form>
         {query.isLoading && (
           <div aria-label={translate(locale, 'teachersLoading')} className="mt-8 grid gap-6 lg:grid-cols-3">

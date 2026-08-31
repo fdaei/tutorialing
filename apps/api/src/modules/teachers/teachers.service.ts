@@ -3,6 +3,7 @@ import { Prisma, TeacherStatus } from '@prisma/client';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { AuditService } from '../../system/audit/audit.service';
 import { badRequest, notFound } from '../../common';
+import { FilesService } from '../files/files.service';
 
 export type TeacherApplicationInput = {
   nameFa: string;
@@ -24,7 +25,30 @@ export class TeachersService {
   constructor(
     private readonly db: PrismaService,
     private readonly audit: AuditService,
+    private readonly files?: FilesService,
   ) {}
+
+  async publicIntroVideo(slug: string) {
+    const teacher = await this.db.teacher.findFirst({
+      where: {
+        OR: [{ id: slug }, { slug }],
+        status: 'APPROVED',
+        introVideoFile: {
+          is: {
+            status: 'SAFE',
+            purpose: 'teacher-intro-video',
+            mimeType: { in: ['video/mp4', 'video/webm', 'video/quicktime'] },
+          },
+        },
+      },
+      select: { introVideoFile: { select: { key: true, mimeType: true } } },
+    });
+    if (!teacher?.introVideoFile || !this.files) throw notFound('TEACHER_INTRO_VIDEO_NOT_FOUND');
+    return {
+      url: await this.files.createDownloadUrl(teacher.introVideoFile.key),
+      mimeType: teacher.introVideoFile.mimeType,
+    };
+  }
 
   async adminApplications() {
     const applications = await this.db.teacher.findMany({

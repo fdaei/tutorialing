@@ -1,4 +1,5 @@
 import Image from 'next/image';
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import {
@@ -17,7 +18,8 @@ import { Footer, Header } from '@/components/layout/site';
 import { CourseCard } from '@/components/marketplace/cards';
 import { ReviewSection, type PublicReview } from '@/components/reviews/review-section';
 import type { Course } from '@/lib/marketplace-data';
-import { publicApi } from '@/shared/services/api';
+import { ApiError, publicApi } from '@/shared/services/api';
+import { publicPageMetadata } from '@/lib/public-metadata';
 
 export const dynamic = 'force-dynamic';
 const outcomes = [
@@ -28,10 +30,28 @@ const outcomes = [
 ];
 type CourseDetail = Course & { id: string; reviews: PublicReview[]; distribution: Record<string, number> };
 
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const { slug } = await params;
+  try {
+    const course = await publicApi<CourseDetail>(`/courses/${slug}`);
+    const title = course.titleFa ?? course.title ?? 'دوره زبان';
+    const description = course.descriptionFa || `اطلاعات، سرفصل‌ها و ثبت‌نام دوره ${title}`;
+    return publicPageMetadata(`/courses/${slug}`, { fa: title, en: course.titleEn || title }, { fa: description, en: description });
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) return {};
+    throw error;
+  }
+}
+
 export default async function CoursePage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const course = await publicApi<CourseDetail>(`/courses/${slug}`).catch(() => null);
-  if (!course) notFound();
+  let course: CourseDetail;
+  try {
+    course = await publicApi<CourseDetail>(`/courses/${slug}`);
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) notFound();
+    throw error;
+  }
   const courses = await publicApi<Course[]>('/courses').catch(() => []);
   const related = courses.filter((item) => item.slug !== slug).slice(0, 3);
   const title = course.titleFa ?? course.title ?? 'دوره زبان';

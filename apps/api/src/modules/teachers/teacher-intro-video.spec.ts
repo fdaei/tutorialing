@@ -66,4 +66,39 @@ describe('required teacher introduction video', () => {
       data: { introVideoFileId: 'file-1', introVideoKey: 'teacher/user-1/intro.mp4' },
     });
   });
+
+  it('signs only the safe canonical video of an approved public teacher', async () => {
+    const db = {
+      teacher: {
+        findFirst: jest.fn().mockResolvedValue({
+          introVideoFile: { key: 'teacher/user-1/intro.mp4', mimeType: 'video/mp4' },
+        }),
+      },
+    };
+    const files = { createDownloadUrl: jest.fn().mockResolvedValue('https://storage/signed') };
+    const service = new TeachersService(db as never, {} as never, files as never);
+
+    await expect(service.publicIntroVideo('sara')).resolves.toEqual({
+      url: 'https://storage/signed',
+      mimeType: 'video/mp4',
+    });
+    expect(db.teacher.findFirst).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        OR: [{ id: 'sara' }, { slug: 'sara' }],
+        status: 'APPROVED',
+        introVideoFile: { is: expect.objectContaining({ status: 'SAFE', purpose: 'teacher-intro-video' }) },
+      }),
+      select: { introVideoFile: { select: { key: true, mimeType: true } } },
+    });
+    expect(files.createDownloadUrl).toHaveBeenCalledWith('teacher/user-1/intro.mp4');
+  });
+
+  it('does not issue a URL when no eligible public video exists', async () => {
+    const db = { teacher: { findFirst: jest.fn().mockResolvedValue(null) } };
+    const service = new TeachersService(db as never, {} as never, { createDownloadUrl: jest.fn() } as never);
+
+    await expect(service.publicIntroVideo('missing')).rejects.toMatchObject({
+      response: { code: 'TEACHER_INTRO_VIDEO_NOT_FOUND' },
+    });
+  });
 });

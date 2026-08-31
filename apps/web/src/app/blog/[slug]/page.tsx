@@ -1,4 +1,4 @@
-import { publicApi } from '@/shared/services/api';
+import { ApiError, publicApi } from '@/shared/services/api';
 import { ViewTracker } from '../view-tracker';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
@@ -6,14 +6,36 @@ import { requestLocale } from '@/lib/server-locale';
 import { formatNumber, localePath, localized, translate } from '@/lib/i18n';
 import { Footer, Header } from '@/components/layout/site';
 import { BlogDiscussion } from './blog-discussion';
+import type { Metadata } from 'next';
+import type { BlogPostDetail } from '@/features/blog/types';
+import { publicPageMetadata } from '@/lib/public-metadata';
+
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const { slug } = await params;
+  try {
+    const post = await publicApi<BlogPostDetail>(`/blog/posts/${encodeURIComponent(slug)}`);
+    return publicPageMetadata(
+      `/blog/${slug}`,
+      { fa: post.seoTitleFa || post.titleFa, en: post.seoTitleEn || post.titleEn },
+      {
+        fa: post.seoDescriptionFa || post.excerptFa,
+        en: post.seoDescriptionEn || post.excerptEn,
+      },
+    );
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) return {};
+    throw error;
+  }
+}
 
 export default async function BlogDetail({ params }: { params: Promise<{ slug: string }> }) {
   const [{ slug }, locale] = await Promise.all([params, requestLocale()]);
-  let p: any;
+  let p: BlogPostDetail;
   try {
-    p = await publicApi<any>(`/blog/posts/${encodeURIComponent(slug)}`);
-  } catch {
-    notFound();
+    p = await publicApi<BlogPostDetail>(`/blog/posts/${encodeURIComponent(slug)}`);
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) notFound();
+    throw error;
   }
   if (!p) return <main className="p-12">{translate(locale, 'blogEmpty')}</main>;
   const title = localized({ fa: p.titleFa, en: p.titleEn }, locale);

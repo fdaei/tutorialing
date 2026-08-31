@@ -446,8 +446,10 @@ export default function Auth() {
               </div>
             )}
             {step === 'phone' ? (
-              <label className="block">
-                <span className="mb-2 block text-sm font-bold text-[#28324d]">{c.phone}</span>
+              <div className="block">
+                <label htmlFor="auth-phone" className="mb-2 block text-sm font-bold text-[#28324d]">
+                  {c.phone}
+                </label>
                 <div
                   dir="ltr"
                   className={`grid min-h-[60px] grid-cols-[minmax(145px,42%)_1px_minmax(0,1fr)] items-center overflow-hidden rounded-[16px] border bg-[#fbfcfe] shadow-[0_5px_16px_rgba(24,35,66,.035)] transition hover:border-[#cfd5e3] hover:bg-white focus-within:border-[#6257db] focus-within:bg-white focus-within:ring-4 focus-within:ring-[#6257db]/10 ${field ? 'border-red-400' : 'border-[#dce1eb]'}`}
@@ -485,8 +487,11 @@ export default function Auth() {
                   <div className="flex min-w-0 items-center px-3">
                     <Smartphone aria-hidden size={19} className="shrink-0 text-[#8b94aa]" />
                     <input
+                      id="auth-phone"
                       inputMode="tel"
                       autoComplete="tel"
+                      aria-invalid={field ? true : undefined}
+                      aria-describedby={field ? 'auth-phone-error' : undefined}
                       value={phone}
                       onChange={(event) => {
                         let digits = event.target.value.replace(/\D/g, '');
@@ -507,9 +512,13 @@ export default function Auth() {
                     />
                   </div>
                 </div>
-                {field && <span className="mt-2 block text-xs text-red-700">{field}</span>}
+                {field && (
+                  <span id="auth-phone-error" role="alert" className="mt-2 block text-xs text-red-700">
+                    {field}
+                  </span>
+                )}
                 <ResendCountdown wait={wait} total={resendWindow} fa={fa} />
-              </label>
+              </div>
             ) : (
               <div className="mt-8">
                 <div dir="ltr" className="grid grid-cols-6 gap-2" onPaste={paste}>
