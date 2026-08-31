@@ -8,8 +8,10 @@ import { AdminPricingController, TeacherPricingController } from './pricing.cont
 import { ReviewsService } from './reviews.service';
 import { AdminReviewsController, ReviewsController } from './reviews.controller';
 import { AdminTeachersController } from './admin-teachers.controller';
+import { FilesModule } from '../files/files.module';
 
 @Module({
+  imports: [FilesModule],
   controllers: [
     TeachersController,
     TeacherApplicationController,

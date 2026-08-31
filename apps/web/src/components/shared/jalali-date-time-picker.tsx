@@ -315,9 +315,9 @@ function jalCal(jy: number) {
   const breaks = [
     -61, 9, 38, 199, 426, 686, 756, 818, 1111, 1181, 1210, 1635, 2060, 2097, 2192, 2262, 2324, 2394, 2456, 3178,
   ];
-  let bl = breaks.length,
-    gy = jy + 621,
-    leapJ = -14,
+  const bl = breaks.length;
+  const gy = jy + 621;
+  let leapJ = -14,
     jp = breaks[0]!,
     jm = 0,
     jump = 0;

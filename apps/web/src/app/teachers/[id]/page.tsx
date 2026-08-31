@@ -1,21 +1,44 @@
 import { localized } from '@/lib/i18n';
+import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { BadgeCheck, Languages, Play, Star, UserRound, Users } from 'lucide-react';
 import { Header, Footer } from '@/components/layout/site';
-import { publicApi } from '@/shared/services/api';
+import { ApiError, publicApi } from '@/shared/services/api';
 import type { PublicTeacher } from '@/features/teacher';
 import { requestLocale } from '@/lib/server-locale';
 import { TeacherBookingCard } from '@/features/teacher/components/teacher-booking-card';
 import { ReviewSection } from '@/components/reviews/review-section';
+import { publicPageMetadata } from '@/lib/public-metadata';
+import { TeacherIntroVideoDialog } from '@/features/teacher/components/teacher-intro-video-dialog';
 export const dynamic = 'force-dynamic';
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  try {
+    const teacher = await publicApi<PublicTeacher>(`/teachers/${id}`, { cache: 'no-store' });
+    return publicPageMetadata(
+      `/teachers/${id}`,
+      { fa: `مدرس زبان ${teacher.nameFa}`, en: `${teacher.nameEn} — language teacher` },
+      {
+        fa: teacher.bioFa || `پروفایل، تخصص‌ها، امتیاز و زمان‌های تدریس ${teacher.nameFa}`,
+        en: teacher.bioEn || `Profile, specialties, ratings, and availability for ${teacher.nameEn}.`,
+      },
+    );
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) return {};
+    throw error;
+  }
+}
+
 export default async function Profile({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params,
     locale = await requestLocale();
   let t: PublicTeacher;
   try {
     t = await publicApi<PublicTeacher>(`/teachers/${id}`, { cache: 'no-store' });
-  } catch {
-    notFound();
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) notFound();
+    throw error;
   }
   return (
     <>
@@ -53,12 +76,10 @@ export default async function Profile({ params }: { params: Promise<{ id: string
                 </div>
               </div>
               {t.introVideoKey && (
-                <button
-                  aria-label="پخش ویدیوی معرفی مدرس"
-                  className="relative grid size-16 shrink-0 place-items-center rounded-full bg-white text-purple shadow-brand"
-                >
-                  <Play />
-                </button>
+                <TeacherIntroVideoDialog
+                  teacherSlug={t.slug}
+                  teacherName={localized({ fa: t.nameFa, en: t.nameEn }, locale)}
+                />
               )}
             </div>
             {!t.introVideoKey && (
@@ -84,7 +105,7 @@ export default async function Profile({ params }: { params: Promise<{ id: string
             </div>
           </div>
           <aside className="lg:sticky lg:top-24 lg:self-start">
-            <TeacherBookingCard teacherId={t.id} trialPrice={t.approvedTrialPrice ?? 0} />
+            <TeacherBookingCard teacherId={t.id} trialPrice={t.approvedTrialPrice} />
           </aside>
         </div>
         <ReviewSection

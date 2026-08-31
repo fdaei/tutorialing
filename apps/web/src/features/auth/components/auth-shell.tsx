@@ -87,7 +87,7 @@ export function AuthShell({
             aria-hidden
             className="absolute bottom-8 right-8 hidden -rotate-6 rounded-2xl border border-white/20 bg-white/10 px-4 py-3 backdrop-blur-md lg:block"
           >
-            <span className="block text-[10px] text-white/55">TODAY'S WORD</span>
+            <span className="block text-[10px] text-white/55">TODAY&apos;S WORD</span>
             <strong className="mt-1 block text-xl" dir="ltr">
               progress
             </strong>

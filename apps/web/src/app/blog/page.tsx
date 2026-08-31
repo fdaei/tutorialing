@@ -1,26 +1,27 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
-import { api } from '@/shared/services/api';
+import { useQuery } from '@tanstack/react-query';
+import { publicApi } from '@/shared/services/api';
 import { useTranslations } from '@/components/shared/locale-provider';
 import { localePath, localized } from '@/lib/i18n';
 import { Footer, Header } from '@/components/layout/site';
-import { BookOpenText, Search } from 'lucide-react';
+import { BookOpenText, RotateCcw, Search } from 'lucide-react';
+import { useDebouncedValue } from '@/shared/hooks/use-debounced-value';
+import type { BlogPostsPage } from '@/features/blog/types';
 
 export default function BlogPage() {
-  const [data, setData] = useState<any>();
   const [q, setQ] = useState('');
-  const [error, setError] = useState(false);
   const { locale, t } = useTranslations();
-  useEffect(() => {
-    setError(false);
-    api<any>('/blog/posts?' + (q ? `search=${encodeURIComponent(q)}&` : '') + 'pageSize=12')
-      .then(setData)
-      .catch(() => {
-        setError(true);
-        setData({ items: [] });
-      });
-  }, [q]);
+  const search = useDebouncedValue(q.trim(), 350);
+  const posts = useQuery({
+    queryKey: ['public-blog-posts', search],
+    queryFn: ({ signal }) =>
+      publicApi<BlogPostsPage>(`/blog/posts?${search ? `search=${encodeURIComponent(search)}&` : ''}pageSize=12`, {
+        signal,
+      }),
+    placeholderData: (previous) => previous,
+  });
   return (
     <>
       <Header />
@@ -33,6 +34,7 @@ export default function BlogPage() {
           <label className="flex min-w-0 items-center gap-3 rounded-2xl border hairline bg-white px-4 shadow-sm md:w-80">
             <Search size={19} className="text-muted" />
             <input
+              aria-label={t('blogSearch')}
               className="w-full bg-transparent py-3.5 outline-none"
               placeholder={t('blogSearch')}
               value={q}
@@ -40,32 +42,44 @@ export default function BlogPage() {
             />
           </label>
         </div>
-        {!data ? (
+        {posts.isPending ? (
           <div aria-label={t('blogLoading')} className="grid gap-5 md:grid-cols-3">
             {[1, 2, 3].map((x) => (
               <div key={x} className="skeleton h-72 rounded-3xl" />
             ))}
           </div>
-        ) : error ? (
+        ) : posts.isError ? (
           <div className="review-empty">
-            <BookOpenText />
+            <BookOpenText aria-hidden="true" />
             <strong>دریافت مقاله‌ها ناموفق بود</strong>
-            <p>اتصال خود را بررسی و صفحه را دوباره بارگذاری کنید.</p>
+            <p>اتصال خود را بررسی کنید و دوباره تلاش کنید.</p>
+            <button type="button" className="secondary-button mt-2" onClick={() => posts.refetch()}>
+              <RotateCcw size={17} aria-hidden="true" />
+              تلاش دوباره
+            </button>
           </div>
-        ) : !data.items?.length ? (
+        ) : !posts.data?.items.length ? (
           <div className="review-empty min-h-[320px]">
             <span className="grid size-16 place-items-center rounded-2xl bg-lavender text-purple">
               <BookOpenText size={30} />
             </span>
-            <strong className="text-xl">هنوز مقاله‌ای منتشر نشده</strong>
-            <p>به‌زودی مطالب آموزشی و راهنمای یادگیری زبان را اینجا می‌بینید.</p>
-            <Link href={localePath('/courses', locale)} className="primary-button mt-2">
-              مشاهده دوره‌ها
-            </Link>
+            <strong className="text-xl">{search ? 'مقاله‌ای با این عبارت پیدا نشد' : 'هنوز مقاله‌ای منتشر نشده'}</strong>
+            <p>
+              {search ? 'عبارت کوتاه‌تر یا موضوع دیگری را امتحان کنید.' : 'به‌زودی مطالب آموزشی را اینجا می‌بینید.'}
+            </p>
+            {search ? (
+              <button type="button" className="secondary-button mt-2" onClick={() => setQ('')}>
+                پاک کردن جست‌وجو
+              </button>
+            ) : (
+              <Link href={localePath('/courses', locale)} className="primary-button mt-2">
+                مشاهده دوره‌ها
+              </Link>
+            )}
           </div>
         ) : (
-          <div className="grid gap-6 md:grid-cols-3">
-            {data.items.map((p: any) => (
+          <div className="relative grid gap-6 md:grid-cols-3" aria-busy={posts.isFetching}>
+            {posts.data.items.map((p) => (
               <Link
                 href={localePath(`/blog/${p.slug}`, locale)}
                 key={p.id}

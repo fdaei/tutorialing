@@ -2,6 +2,7 @@
 import Link from 'next/link';
 import { Clock3, Headphones, Mail, Menu, MessageCircle, Phone, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/shared/services/api';
 import { LanguageSwitcher } from '@/components/shared/language-switcher';
@@ -25,7 +26,8 @@ export function Header() {
   const { locale, t } = useTranslations(),
     p = (x: string) => localePath(x, locale),
     [open, setOpen] = useState(false),
-    queryClient = useQueryClient();
+    queryClient = useQueryClient(),
+    pathname = usePathname();
   const me = useQuery({ queryKey: ['header-me'], queryFn: () => api<{ roles: string[] }>('/users/me'), retry: false });
   useEffect(
     () =>
@@ -35,6 +37,14 @@ export function Header() {
       }),
     [queryClient],
   );
+  useEffect(() => {
+    if (!open) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [open]);
   const links: [string, string][] = [
     [p('/'), translate(locale, 'layoutsiteHome')],
     [p('/courses'), translate(locale, 'layoutsiteCourses')],
@@ -51,7 +61,12 @@ export function Header() {
         </Link>
         <nav aria-label={t('mainNavigation')} className="hidden items-center gap-9 text-sm font-bold lg:flex">
           {links.map(([href, label]) => (
-            <Link key={href} href={href} className="hover:text-blue">
+            <Link
+              key={href}
+              href={href}
+              aria-current={isActiveNavigationPath(pathname, href) ? 'page' : undefined}
+              className="hover:text-blue aria-[current=page]:text-purple"
+            >
               {label}
             </Link>
           ))}
@@ -74,19 +89,22 @@ export function Header() {
             className="grid size-10 place-items-center lg:hidden"
             onClick={() => setOpen((x) => !x)}
             aria-label={t('openMenu')}
+            aria-expanded={open}
+            aria-controls="mobile-main-navigation"
           >
             {open ? <X /> : <Menu />}
           </button>
         </div>
       </div>
       {open && (
-        <nav className="grid gap-2 border-t hairline bg-white p-5 lg:hidden">
+        <nav id="mobile-main-navigation" className="grid gap-2 border-t hairline bg-white p-5 lg:hidden">
           {links.map(([href, label]) => (
             <Link
               key={href}
               onClick={() => setOpen(false)}
               href={href}
-              className="rounded-xl px-4 py-3 font-bold hover:bg-lavender"
+              aria-current={isActiveNavigationPath(pathname, href) ? 'page' : undefined}
+              className="rounded-xl px-4 py-3 font-bold hover:bg-lavender aria-[current=page]:bg-lavender aria-[current=page]:text-purple"
             >
               {label}
             </Link>
@@ -95,6 +113,12 @@ export function Header() {
       )}
     </header>
   );
+}
+
+export function isActiveNavigationPath(pathname: string, href: string) {
+  const normalizedPath = pathname.replace(/^\/en(?=\/|$)/, '') || '/';
+  const normalizedHref = href.replace(/^\/en(?=\/|$)/, '') || '/';
+  return normalizedHref === '/' ? normalizedPath === '/' : normalizedPath === normalizedHref || normalizedPath.startsWith(`${normalizedHref}/`);
 }
 
 export function Footer() {
