@@ -14,6 +14,7 @@ export type Course = {
   titleFa?: string;
   titleEn?: string;
   descriptionFa?: string;
+  descriptionEn?: string;
   language: string;
   flag?: string;
   level: string;

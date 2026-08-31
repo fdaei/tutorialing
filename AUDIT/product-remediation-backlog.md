@@ -10,10 +10,10 @@ functional and state review. `Batch done` never means the project is done.
 
 | Route / area | Access | Status | Current evidence / next check | Priority |
 |---|---|---|---|---|
-| `/`, `/en` | Public | Not audited | Landing journey, locale links, responsive hero, SEO | P1 |
-| `/[slug]`, `/en/[slug]` | Public | Not audited | CMS fallback routes, 404 vs API failure, metadata | P1 |
-| `/courses` | Public | Needs follow-up | Functional language filter added; API failure still collapses into empty state | P1 |
-| `/courses/[slug]` | Public | Not audited | Detail, purchase CTA, missing/API error distinction, metadata | P1 |
+| `/`, `/en` | Public | Audited | Live catalogue, locale-specific copy/cards/links, metadata and production rendering verified; browser execution pending local services | P1 |
+| `/[slug]`, `/en/[slug]` | Public | Audited | 404/outage semantics, localized content/navigation, empty content and full social metadata covered; browser execution pending services | P1 |
+| `/courses` | Public | Audited | Live language filters, localized loading/empty/error states and full metadata covered | P1 |
+| `/courses/[slug]` | Public | Audited with blocker | Localized detail/reviews, 404/outage distinction and metadata covered; enrollment remains blocked by PAY-001 | P1 |
 | `/teachers` | Public | Not audited | Search/filter/sort/pagination states and mobile sticky controls | P1 |
 | `/teachers/[id]` | Public | Not audited | Booking journey, media fallback, metadata | P1 |
 | `/languages`, `/languages/[slug]` | Public | Not audited | Static/API data consistency and intent-specific CTA | P1 |
@@ -41,7 +41,14 @@ functional and state review. `Batch done` never means the project is done.
 | CONV-001 | Guest visitors see no booking card or CTA on teacher profiles | Teacher booking card | P1 | Primary conversion path disappears before sign-in | S | Preserve checkout destination through auth | Render price/CTA for guests with safe `next`, plus loading/unpriced states | Done (batch 10) |
 | TOOL-001 | Next build does not detect the Next.js ESLint plugin | Web lint config | P2 | Framework-specific mistakes can pass lint | S | ESLint 9 flat-config compatibility | Extend the supported Next flat presets without losing hook rules | Done (batch 11) |
 | DATA-002 | Language catalogue and detail use four static records and fabricated course counts | `/languages` ecosystem | P1 | Public discovery contradicts live catalogue of ten languages | M | Public language/course APIs | Render real languages and courses; preserve legacy URLs | Done (batch 12) |
-| TRUST-001 | Homepage uses fixtures, unsupported platform metrics and named testimonials | Homepage | P1 | Public trust claims contradict live product state | M | Public catalogue APIs | Use live counts/content and remove unsupported claims | In progress (batch 13) |
+| TRUST-001 | Homepage uses fixtures, unsupported platform metrics and named testimonials | Homepage | P1 | Public trust claims contradict live product state | M | Public catalogue APIs | Use live counts/content and remove unsupported claims | Done (batch 13) |
+| I18N-001 | `/en` rewrites to a homepage whose product copy is hard-coded in Persian | Homepage | P1 | English visitors receive an LTR document with Persian content | M | Localized landing-page content | Drive all homepage copy and links from the request locale and add browser coverage | Done (batch 15; browser execution pending services) |
+| I18N-002 | English CMS pages mixed English body content with Persian chrome and non-localized links | CMS catch-all | P1 | Legal/support journeys changed language and lost `/en`; share metadata was incomplete | S | Existing CMS bilingual fields | Localize page chrome and empty state; use canonical, alternates, Open Graph and Twitter metadata | Done (batch 16; browser execution pending services) |
+| I18N-003 | Course discovery/detail and shared review states were Persian-only under `/en` | Courses/reviews | P1 | English learners could not understand filtering, course evidence or review recovery states | M | Existing bilingual course fields | Localize the complete journey, number/date formats, links, loading and errors | Done (batch 17; browser execution pending services) |
+| DATA-003 | Course filter options were a static four-language list while the language catalogue supports ten | Course directory | P1 | Published courses in other languages could not be filtered | S | Course catalogue | Derive unique filter values from the live course response and localize display names centrally | Done (batch 17) |
+| TRUST-002 | Course purchase card claimed a seven-day refund guarantee and completion certificate with no supporting product contract | Course detail | P1 | Unsupported conversion claims create legal and customer-trust risk | XS | Product policy absent | Remove unsupported claims without changing enrollment/payment behavior | Done (batch 17) |
+| UX-002 | Shared error boundaries always rendered Persian recovery UI | Route/feature errors | P1 | Every English outage broke locale consistency | S | Locale provider | Localize safe error copy and retry controls once in the shared boundary | Done (batch 17) |
+| TOOL-002 | Typecheck mixed generated `.next` and `.next-dev` route types; local Prisma/dependencies could also be stale | Build tooling | P1 | Clean source appeared to have dozens of type errors and the gate was unusable | S | Generated artifacts and lockfile install | Keep production route types isolated, regenerate Prisma, and verify installed dependencies | Done (batch 14) |
 | PAY-001 | Course CTA has no purchase/enrollment flow and returns to the same page after auth | Course detail/API | P1 | Misleading dead-end conversion | L | Product/payment decision and new financial workflow | Define course purchase entitlement before implementation | Blocked by payment/business approval |
 | PAY-002 | Teacher checkout redirects to payment success immediately after booking creation | Checkout/payment flow | P0 | UI can claim payment success without creating/verifying payment | L | Payment behavior; requires explicit approval | Design and implement booking→payment→gateway→verified result flow | Blocked by payment approval |
 | ARCH-001 | Architecture gate expected an obsolete commerce public surface | API architecture test | P1 | Full test gate red; false regression signal | XS | Confirm consumers use barrel | Update exact allowlist to the four intentional exports | Done (batch 2) |
@@ -132,5 +139,33 @@ functional and state review. `Batch done` never means the project is done.
 
 ### Batch 13 — Evidence-based homepage
 
-- In progress: replace fixture catalogue, unsupported metrics, fictional personal-state cards and unsourced testimonials.
+- Replaced fixture catalogue, unsupported metrics, fictional personal-state cards and unsourced testimonials.
 - Decision: public trust evidence comes only from live catalogue APIs; remove claims that cannot be traced to product data.
+
+### Batch 14 — Restore trustworthy repository gates
+
+- Regenerated the Prisma Client from the current schema and restored the dependency tree from the lockfile.
+- Isolated production Next route types from the separate development dist directory, removing cross-artifact type conflicts.
+- Removed the nonexistent `community` module from a stale architecture allowlist; the source tree and application graph have never exposed that feature.
+- Repository lint, typecheck and production build pass; 110 web tests pass and the repaired architecture suite passes.
+
+### Batch 15 — Complete the English landing journey
+
+- Localized every homepage section, evidence-backed statistic, accessible image description and number format from the request locale.
+- Preserved `/en` across homepage CTAs, discovery links, teacher/course cards and article links; localized shared course, article and teacher review states.
+- Added desktop/mobile browser coverage for English document language, direction, copy and route continuity.
+- Web lint, typecheck, 110 tests and production build pass; Playwright discovers all 34 checks, but execution awaits the local API/database stack.
+
+### Batch 16 — Honest, localized CMS pages
+
+- Preserved English context across breadcrumbs, quick links, supporting copy, contact location and directional icons.
+- Added a visible localized state for published pages with no body paragraphs instead of rendering a blank article.
+- Reused the shared public metadata builder for canonical URLs, language alternates, Open Graph and Twitter data.
+- Kept genuine 404 responses distinct from upstream API failures; web lint, typecheck and production build pass, and Playwright discovers 36 desktop/mobile checks.
+
+### Batch 17 — Complete course discovery and evidence
+
+- Replaced the static four-language filter with values derived from the live course catalogue; a focused domain helper localizes all ten active language names and preserves unknown future values.
+- Localized course listing, detail, metadata, review dialog, dates, numbers, loading, errors and deep links without altering enrollment or payment behavior.
+- Removed unsupported seven-day-refund and completion-certificate claims from the purchase card.
+- Added English unit and browser coverage; web lint, typecheck, 115 tests and production build pass, and Playwright discovers 38 desktop/mobile checks.

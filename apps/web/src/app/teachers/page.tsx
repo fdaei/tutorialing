@@ -9,6 +9,7 @@ import { TeacherCard } from '@/features/teacher/components/teacher-card';
 import { publicApi, type Paginated } from '@/shared/services/api';
 import type { PublicTeacher } from '@/features/teacher';
 import { useTranslations } from '@/components/shared/locale-provider';
+import type { EducationalLanguage } from '@/features/languages';
 export default function Directory() {
   const { locale } = useTranslations(),
     [q, setQ] = useState(''),
@@ -18,6 +19,12 @@ export default function Directory() {
     [minRating, setMinRating] = useState(''),
     [sort, setSort] = useState('rating'),
     [page, setPage] = useState(1);
+  const english = locale === 'en';
+  const languages = useQuery({
+    queryKey: ['public-languages'],
+    queryFn: () => publicApi<EducationalLanguage[]>('/languages'),
+    staleTime: 10 * 60 * 1000,
+  });
   const hasFilters = Boolean(q || search || skill || language || minRating || sort !== 'rating');
   const resetFilters = () => {
     setQ('');
@@ -61,7 +68,7 @@ export default function Directory() {
             />
           </label>
           <select
-            aria-label="زبان"
+            aria-label={english ? 'Language' : 'زبان'}
             value={language}
             onChange={(e) => {
               setLanguage(e.target.value);
@@ -69,11 +76,11 @@ export default function Directory() {
             }}
             className="min-h-13 rounded-2xl border hairline px-4"
           >
-            <option value="">همه زبان‌ها</option>
-            <option value="en">انگلیسی</option>
-            <option value="de">آلمانی</option>
-            <option value="fr">فرانسوی</option>
-            <option value="es">اسپانیایی</option>
+            disabled={languages.isLoading || languages.isError}
+            <option value="">{languages.isError ? (english ? 'Languages unavailable' : 'زبان‌ها در دسترس نیستند') : (english ? 'All languages' : 'همه زبان‌ها')}</option>
+            {languages.data?.map((item) => (
+              <option key={item.id} value={item.code}>{locale === 'en' ? item.nameEn : item.nameFa}</option>
+            ))}
           </select>
           <select
             aria-label={translate(locale, 'teachersSkill')}
@@ -87,7 +94,7 @@ export default function Directory() {
             ))}
           </select>
           <select
-            aria-label="حداقل امتیاز"
+            aria-label={english ? 'Minimum rating' : 'حداقل امتیاز'}
             value={minRating}
             onChange={(e) => {
               setMinRating(e.target.value);
@@ -95,9 +102,9 @@ export default function Directory() {
             }}
             className="min-h-13 rounded-2xl border hairline px-4"
           >
-            <option value="">همه امتیازها</option>
-            <option value="4">۴ ستاره به بالا</option>
-            <option value="4.5">۴٫۵ به بالا</option>
+            <option value="">{english ? 'Any rating' : 'همه امتیازها'}</option>
+            <option value="4">{english ? '4 stars and up' : '۴ ستاره به بالا'}</option>
+            <option value="4.5">{english ? '4.5 and up' : '۴٫۵ به بالا'}</option>
           </select>
           <select
             aria-label={translate(locale, 'teachersSort')}
@@ -106,13 +113,13 @@ export default function Directory() {
             className="rounded-2xl border hairline px-4"
           >
             <option value="rating">{translate(locale, 'teachersHighestRating')}</option>
-            <option value="reviews">بیشترین نظر</option>
+            <option value="reviews">{english ? 'Most reviewed' : 'بیشترین نظر'}</option>
             <option value="price_asc">{translate(locale, 'teachersLowestPrice')}</option>
             <option value="newest">{translate(locale, 'teachersNewest')}</option>
           </select>
           <button type="submit" className="brand-gradient flex min-h-13 items-center justify-center gap-2 rounded-2xl px-5 font-black text-white">
             <Search size={18} aria-hidden="true" />
-            جست‌وجو
+            {english ? 'Search' : 'جست‌وجو'}
           </button>
           {hasFilters && (
             <button
@@ -121,7 +128,7 @@ export default function Directory() {
               className="flex min-h-11 items-center justify-center gap-2 rounded-xl text-sm font-bold text-muted hover:bg-canvas hover:text-purple sm:col-span-2 xl:col-span-6"
             >
               <SlidersHorizontal size={17} aria-hidden="true" />
-              پاک کردن جست‌وجو و همه فیلترها
+              {english ? 'Clear search and all filters' : 'پاک کردن جست‌وجو و همه فیلترها'}
             </button>
           )}
         </form>
@@ -167,7 +174,7 @@ export default function Directory() {
                 {translate(locale, 'admincountryManagerPrevious')}
               </button>
               <span className="px-3 py-2">
-                {page} / {query.data.totalPages || 1}
+                {page.toLocaleString(english ? 'en-US' : 'fa-IR')} / {(query.data.totalPages || 1).toLocaleString(english ? 'en-US' : 'fa-IR')}
               </span>
               <button
                 disabled={page >= query.data.totalPages}

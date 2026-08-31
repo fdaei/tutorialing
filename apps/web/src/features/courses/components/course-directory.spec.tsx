@@ -2,6 +2,7 @@ import '@testing-library/jest-dom';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { CourseDirectory } from './course-directory';
 import type { Course } from '@/lib/marketplace-data';
+import { LocaleProvider } from '@/components/shared/locale-provider';
 
 jest.mock('next/image', () => ({ __esModule: true, default: (props: React.ImgHTMLAttributes<HTMLImageElement>) => <img {...props} /> }));
 
@@ -44,14 +45,20 @@ describe('CourseDirectory', () => {
     expect(screen.getByText('۱ دوره')).toBeInTheDocument();
   });
 
-  it('guides users back to all courses when a language has no results', () => {
+  it('only offers filters backed by the live catalogue', () => {
     render(<CourseDirectory courses={courses} />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'فرانسوی' }));
-    expect(screen.getByText('برای این زبان هنوز دوره‌ای منتشر نشده است')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'انگلیسی' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'آلمانی' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'فرانسوی' })).not.toBeInTheDocument();
+  });
 
-    fireEvent.click(screen.getByRole('button', { name: 'نمایش همه دوره‌ها' }));
-    expect(screen.getByText('مکالمه انگلیسی')).toBeInTheDocument();
-    expect(screen.getByText('شروع آلمانی')).toBeInTheDocument();
+  it('localizes filters, results, course cards, and links in English', () => {
+    render(<LocaleProvider locale="en"><CourseDirectory courses={courses} /></LocaleProvider>);
+
+    fireEvent.click(screen.getByRole('button', { name: 'German' }));
+    expect(screen.getByRole('heading', { name: 'German courses' })).toBeInTheDocument();
+    expect(screen.getByText('1 courses')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'View course' })).toHaveAttribute('href', '/en/courses/german-start');
   });
 });

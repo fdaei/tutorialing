@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { AppErrorBoundary, FeatureErrorBoundary, RouteErrorFallback } from './index';
+import { LocaleProvider } from '@/components/shared/locale-provider';
 
 function Broken({ fail = true }: { fail?: boolean }) {
   if (fail) throw new Error('sensitive implementation detail');
@@ -36,7 +37,7 @@ describe('error boundaries', () => {
         <Broken />
       </AppErrorBoundary>,
     );
-    expect(screen.getByText('برنامه با خطا روبه‌رو شد')).toBeInTheDocument();
+    expect(screen.getByText('این بخش موقتاً در دسترس نیست')).toBeInTheDocument();
   });
 
   it('lets a route retry through the Next reset callback', () => {
@@ -44,5 +45,17 @@ describe('error boundaries', () => {
     render(<RouteErrorFallback error={new Error('route failed')} reset={reset} name="test-route" />);
     fireEvent.click(screen.getByRole('button', { name: 'تلاش دوباره' }));
     expect(reset).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses the active English locale for route recovery', () => {
+    render(
+      <LocaleProvider locale="en">
+        <RouteErrorFallback error={new Error('private failure')} reset={jest.fn()} name="english-route" />
+      </LocaleProvider>,
+    );
+
+    expect(screen.getByRole('alert')).toHaveTextContent('This section is temporarily unavailable');
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
+    expect(screen.queryByText('private failure')).not.toBeInTheDocument();
   });
 });

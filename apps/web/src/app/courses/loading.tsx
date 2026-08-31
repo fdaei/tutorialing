@@ -1,10 +1,12 @@
 import { Footer, Header } from '@/components/layout/site';
+import { requestLocale } from '@/lib/server-locale';
 
-export default function CoursesLoading() {
+export default async function CoursesLoading() {
+  const locale = await requestLocale();
   return (
     <>
       <Header />
-      <main aria-busy="true" aria-label="در حال دریافت دوره‌ها" className="page-shell section-space min-h-[60vh]">
+      <main aria-busy="true" aria-label={locale === 'en' ? 'Loading courses' : 'در حال دریافت دوره‌ها'} className="page-shell section-space min-h-[60vh]">
         <div className="skeleton h-4 w-36 rounded-full" />
         <div className="skeleton mt-4 h-12 max-w-sm rounded-2xl" />
         <div className="skeleton mt-4 h-6 max-w-2xl rounded-xl" />

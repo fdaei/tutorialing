@@ -13,7 +13,7 @@ import ts from 'typescript';
 
 const MODULES_DIR = join(__dirname, 'modules');
 const FEATURES = [
-  'assessment', 'auth', 'blog', 'bookings', 'commerce', 'community', 'content', 'courses',
+  'assessment', 'auth', 'blog', 'bookings', 'commerce', 'content', 'courses',
   'files', 'languages', 'learning', 'matching', 'notifications', 'settings', 'support', 'teachers', 'users',
 ] as const;
 const MODULES = readdirSync(MODULES_DIR).filter((name) => statSync(join(MODULES_DIR, name)).isDirectory());

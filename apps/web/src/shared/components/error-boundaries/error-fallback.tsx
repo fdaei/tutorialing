@@ -1,5 +1,7 @@
 'use client';
 
+import { useTranslations } from '@/components/shared/locale-provider';
+
 type ErrorFallbackProps = {
   onRetry: () => void;
   title?: string;
@@ -8,15 +10,17 @@ type ErrorFallbackProps = {
 
 export function ErrorFallback({
   onRetry,
-  title = 'این بخش موقتاً در دسترس نیست',
-  description = 'مشکلی پیش آمده است. اطلاعات حساس خطا نمایش داده نمی‌شود؛ دوباره تلاش کنید.',
+  title,
+  description,
 }: ErrorFallbackProps) {
+  const { locale } = useTranslations();
+  const english = locale === 'en';
   return (
     <section role="alert" className="panel-card mx-auto my-6 max-w-xl p-6 text-center">
-      <h2 className="text-lg font-black">{title}</h2>
-      <p className="mt-3 text-sm leading-7 text-muted">{description}</p>
+      <h2 className="text-lg font-black">{title ?? (english ? 'This section is temporarily unavailable' : 'این بخش موقتاً در دسترس نیست')}</h2>
+      <p className="mt-3 text-sm leading-7 text-muted">{description ?? (english ? 'The request could not be completed. Try again; sensitive error details are never shown here.' : 'درخواست انجام نشد. دوباره تلاش کنید؛ اطلاعات حساس خطا در اینجا نمایش داده نمی‌شود.')}</p>
       <button type="button" onClick={onRetry} className="primary-button mt-5">
-        تلاش دوباره
+        {english ? 'Try again' : 'تلاش دوباره'}
       </button>
     </section>
   );

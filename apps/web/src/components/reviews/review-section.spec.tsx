@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import '@testing-library/jest-dom';
 import { ReviewSection } from './review-section';
 import { api, readAccessToken } from '@/shared/services/api';
+import { LocaleProvider } from '@/components/shared/locale-provider';
 
 jest.mock('@/shared/services/api', () => ({
   api: jest.fn(),
@@ -37,6 +38,18 @@ function renderCourseReviews() {
 }
 
 describe('ReviewSection', () => {
+  it('localizes the empty review and action states in English', () => {
+    render(
+      <LocaleProvider locale="en">
+        <ReviewSection subject="course" subjectId="course-1" title="Learner reviews" rating={0} count={0} reviews={[]} />
+      </LocaleProvider>,
+    );
+
+    expect(screen.getByText('Experiences from real learners')).toBeInTheDocument();
+    expect(screen.getByText('No reviews yet')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Leave a rating and review' })).toBeInTheDocument();
+  });
+
   it('keeps an unenrolled student disabled using server eligibility', async () => {
     apiMock.mockResolvedValueOnce({ eligible: false, review: null });
     renderCourseReviews();

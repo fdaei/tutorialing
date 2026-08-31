@@ -1,9 +1,17 @@
+'use client';
+
 import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowLeft, BookOpen, Clock3, Star, Users } from 'lucide-react';
 import type { BlogPost, Course, Language, Teacher } from '@/lib/marketplace-data';
+import { useTranslations } from '@/components/shared/locale-provider';
+import { localePath } from '@/lib/i18n';
+import { localizedCourseLanguage } from '@/features/courses/course-localization';
 
-const money = (value: number) => `${value.toLocaleString('fa-IR')} تومان`;
+const money = (value: number, locale: 'fa' | 'en') =>
+  locale === 'fa'
+    ? `${value.toLocaleString('fa-IR')} تومان`
+    : `${value.toLocaleString('en-US')} Toman`;
 
 export function LanguageCard({ language }: { language: Language }) {
   return (
@@ -44,6 +52,7 @@ export function LanguageCard({ language }: { language: Language }) {
 }
 
 export function TeacherMarketCard({ teacher }: { teacher: Teacher }) {
+  const { locale } = useTranslations();
   return (
     <article className="market-card lift overflow-hidden">
       <div className="relative h-48 bg-indigo-50">
@@ -76,7 +85,7 @@ export function TeacherMarketCard({ teacher }: { teacher: Teacher }) {
         </div>
         <div className="mt-5 flex items-center justify-between border-t hairline pt-4">
           <span className="text-sm font-black">
-            {money(teacher.price)} <small className="font-normal text-muted">/ جلسه</small>
+            {money(teacher.price, locale)} <small className="font-normal text-muted">/ {locale === 'en' ? 'lesson' : 'جلسه'}</small>
           </span>
           <Link href={`/teachers/${teacher.slug}`} className="text-sm font-black text-purple">
             مشاهده پروفایل
@@ -88,8 +97,10 @@ export function TeacherMarketCard({ teacher }: { teacher: Teacher }) {
 }
 
 export function CourseCard({ course }: { course: Course }) {
-  const title = course.titleFa ?? course.title ?? 'دوره زبان',
-    teacher = course.teacherName ?? course.teacher ?? 'لینگواسپیک',
+  const { locale } = useTranslations();
+  const english = locale === 'en';
+  const title = (english ? course.titleEn : course.titleFa) ?? course.title ?? (english ? 'Language course' : 'دوره زبان'),
+    teacher = course.teacherName ?? course.teacher ?? (english ? 'LingoSpeak' : 'لینگواسپیک'),
     lessons = course.lessonsCount ?? course.lessons ?? 0;
   return (
     <article className="market-card lift overflow-hidden">
@@ -97,14 +108,14 @@ export function CourseCard({ course }: { course: Course }) {
         {course.image && (
           <Image
             src={course.image}
-            alt={`تصویر دوره ${title}`}
+            alt={english ? `Course cover for ${title}` : `تصویر دوره ${title}`}
             fill
             sizes="(min-width:1024px) 25vw, 100vw"
             className="object-cover"
           />
         )}
         <span className="absolute right-3 top-3 rounded-full bg-white/95 px-3 py-1 text-xs font-black">
-          {course.flag} {course.language}
+          {course.flag} {localizedCourseLanguage(course.language, locale)}
         </span>
         <span className="absolute left-3 top-3 rounded-full bg-purple px-3 py-1 text-xs font-bold text-white">
           {course.level}
@@ -112,28 +123,28 @@ export function CourseCard({ course }: { course: Course }) {
       </div>
       <div className="p-5">
         <h3 className="font-black">{title}</h3>
-        <p className="mt-2 text-xs text-muted">مدرس: {teacher}</p>
+        <p className="mt-2 text-xs text-muted">{english ? 'Teacher' : 'مدرس'}: {teacher}</p>
         <div className="mt-4 flex flex-wrap gap-4 text-xs text-muted">
           <span className="flex items-center gap-1 font-bold text-navy">
             <Star size={14} className="fill-amber-400 text-amber-400" />
             {course.reviewsCount ? (
               <>
                 {course.rating}{' '}
-                <span className="font-normal text-muted">({course.reviewsCount.toLocaleString('fa-IR')} نظر)</span>
+                <span className="font-normal text-muted">({course.reviewsCount.toLocaleString(english ? 'en-US' : 'fa-IR')} {english ? 'reviews' : 'نظر'})</span>
               </>
             ) : (
-              'هنوز امتیازی ثبت نشده'
+              english ? 'No ratings yet' : 'هنوز امتیازی ثبت نشده'
             )}
           </span>
           <span className="flex items-center gap-1">
             <BookOpen size={14} />
-            {lessons.toLocaleString('fa-IR')} جلسه
+            {lessons.toLocaleString(english ? 'en-US' : 'fa-IR')} {english ? 'lessons' : 'جلسه'}
           </span>
         </div>
         <div className="mt-5 flex items-center justify-between border-t hairline pt-4">
-          <strong className="text-sm">{money(course.price)}</strong>
-          <Link href={`/courses/${course.slug}`} className="text-sm font-black text-purple">
-            مشاهده دوره
+          <strong className="text-sm">{money(course.price, locale)}</strong>
+          <Link href={localePath(`/courses/${course.slug}`, locale)} className="text-sm font-black text-purple">
+            {english ? 'View course' : 'مشاهده دوره'}
           </Link>
         </div>
       </div>
@@ -142,12 +153,14 @@ export function CourseCard({ course }: { course: Course }) {
 }
 
 export function BlogCard({ post }: { post: BlogPost }) {
+  const { locale } = useTranslations();
+  const english = locale === 'en';
   return (
     <article className="market-card lift overflow-hidden">
       <div className="relative h-40 bg-indigo-50">
         <Image
           src={post.image}
-          alt={`تصویر مقاله ${post.title}`}
+          alt={english ? `Cover for ${post.title}` : `تصویر مقاله ${post.title}`}
           fill
           sizes="(min-width:768px) 33vw, 100vw"
           className="object-cover"
@@ -167,10 +180,10 @@ export function BlogCard({ post }: { post: BlogPost }) {
           </span>
         </div>
         <Link
-          href={`/blog/${post.slug}`}
+          href={localePath(`/blog/${post.slug}`, locale)}
           className="mt-4 inline-flex items-center gap-2 text-sm font-black text-purple"
         >
-          مطالعه مقاله <ArrowLeft size={15} />
+          {english ? 'Read article' : 'مطالعه مقاله'} <ArrowLeft className={english ? 'rotate-180' : undefined} size={15} />
         </Link>
       </div>
     </article>
