@@ -42,3 +42,39 @@ test('mobile layout has no horizontal overflow', async ({ page }) => {
   );
   expect(overflow).toBe(false);
 });
+
+test('English homepage keeps its language, direction, and navigation context', async ({ page }) => {
+  await page.goto('/en');
+
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+  await expect(page.locator('html')).toHaveAttribute('dir', 'ltr');
+  await expect(page.getByRole('heading', { level: 1 })).toContainText('A complete route to fluency');
+  await expect(page.getByText('Active languages', { exact: true }).last()).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Browse courses' }).first()).toHaveAttribute('href', '/en/courses');
+  await expect(page.getByText('زبان فعال')).toHaveCount(0);
+});
+
+test('English CMS pages preserve localized navigation and metadata', async ({ page }) => {
+  await page.goto('/en/about');
+
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('About us');
+  await expect(page.getByText('The LingoSpeak story')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Quick links' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Privacy' })).toHaveAttribute('href', '/en/privacy');
+  await expect(page).toHaveTitle(/About us/);
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', /\/en\/about$/);
+});
+
+test('English course discovery and detail remain localized', async ({ page }) => {
+  await page.goto('/en/courses');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Language courses');
+  await expect(page.getByRole('button', { name: 'German' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'View course' }).first()).toHaveAttribute('href', /\/en\/courses\//);
+
+  await page.goto('/en/courses/english-conversation');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Fluent English conversation');
+  await expect(page.getByRole('heading', { name: 'What will you learn?' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Leave a rating and review' })).toBeVisible();
+  await expect(page.getByText('ضمانت بازگشت وجه تا ۷ روز')).toHaveCount(0);
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', /\/en\/courses\/english-conversation$/);
+});

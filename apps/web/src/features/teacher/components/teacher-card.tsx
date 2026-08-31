@@ -47,10 +47,12 @@ export function TeacherCard({ teacher, reason, score }: { teacher: PublicTeacher
             {teacher.reviewsCount ? (
               <>
                 <span className="latin">{teacher.rating.toFixed(1)}</span>
-                <span className="font-normal text-muted">{teacher.reviewsCount.toLocaleString('fa-IR')} نظر</span>
+                <span className="font-normal text-muted">
+                  {teacher.reviewsCount.toLocaleString(locale === 'en' ? 'en-US' : 'fa-IR')} {locale === 'en' ? 'reviews' : 'نظر'}
+                </span>
               </>
             ) : (
-              <span className="font-normal text-muted">هنوز امتیازی ثبت نشده</span>
+              <span className="font-normal text-muted">{locale === 'en' ? 'No ratings yet' : 'هنوز امتیازی ثبت نشده'}</span>
             )}
           </p>
         </div>

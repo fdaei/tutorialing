@@ -21,6 +21,6 @@ export class AppErrorBoundary extends Component<Props, State> {
   private retry = () => this.setState({ failed: false });
 
   render() {
-    return this.state.failed ? <ErrorFallback onRetry={this.retry} title="برنامه با خطا روبه‌رو شد" /> : this.props.children;
+    return this.state.failed ? <ErrorFallback onRetry={this.retry} /> : this.props.children;
   }
 }

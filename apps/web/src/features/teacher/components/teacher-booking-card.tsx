@@ -15,7 +15,7 @@ export function TeacherBookingCard({ teacherId, trialPrice }: { teacherId: strin
     retry: false,
   });
 
-  if (me.isPending) return <div aria-label="در حال آماده‌سازی رزرو" className="skeleton h-56 rounded-4xl" />;
+  if (me.isPending) return <div aria-label={locale === 'en' ? 'Preparing booking options' : 'در حال آماده‌سازی رزرو'} className="skeleton h-56 rounded-4xl" />;
 
   const hasApprovedPrice = typeof trialPrice === 'number' && trialPrice > 0;
   const price = hasApprovedPrice
@@ -35,7 +35,7 @@ export function TeacherBookingCard({ teacherId, trialPrice }: { teacherId: strin
         </Link>
       ) : (
         <p className="mt-6 rounded-xl bg-slate-200 py-4 text-center font-bold text-slate-600">
-          رزرو این مدرس موقتاً در دسترس نیست
+          {localized({ fa: 'رزرو این مدرس موقتاً در دسترس نیست', en: 'Booking is temporarily unavailable for this teacher' }, locale)}
         </p>
       )}
       <p className="mt-5 flex gap-2 text-xs text-muted">
@@ -47,8 +47,8 @@ export function TeacherBookingCard({ teacherId, trialPrice }: { teacherId: strin
 }
 
 export function teacherCheckoutHref(teacherId: string, authenticated: boolean, locale: 'fa' | 'en') {
-  const checkoutPath = `/checkout?teacher=${encodeURIComponent(teacherId)}`;
+  const checkoutPath = localePath(`/checkout?teacher=${encodeURIComponent(teacherId)}`, locale);
   return authenticated
-    ? localePath(checkoutPath, locale)
+    ? checkoutPath
     : localePath(`/auth?next=${encodeURIComponent(checkoutPath)}`, locale);
 }

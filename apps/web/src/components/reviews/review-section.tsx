@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { BadgeCheck, MessageSquareText, Star, Trash2, X } from 'lucide-react';
 import { api, apiMessage, readAccessToken } from '@/shared/services/api';
 import { applyRatingChange } from './review-state';
+import { useTranslations } from '@/components/shared/locale-provider';
+import type { Locale } from '@/lib/i18n';
 
 export type PublicReview = {
   id: string;
@@ -26,14 +28,15 @@ type Props = {
   distribution?: Record<string, number>;
 };
 
-const formatDate = (value: string) => new Intl.DateTimeFormat('fa-IR', { dateStyle: 'medium' }).format(new Date(value));
+const formatDate = (value: string, locale: Locale) =>
+  new Intl.DateTimeFormat(locale === 'en' ? 'en-US' : 'fa-IR', { dateStyle: 'medium' }).format(new Date(value));
 
-function Stars({ value, label = true }: { value: number; label?: boolean }) {
+function Stars({ value, locale, label = true }: { value: number; locale: Locale; label?: boolean }) {
   return (
     <span
       className="inline-flex gap-0.5"
       dir="ltr"
-      aria-label={label ? `${value} ستاره از ۵` : undefined}
+      aria-label={label ? (locale === 'en' ? `${value} out of 5 stars` : `${value} ستاره از ۵`) : undefined}
       aria-hidden={label ? undefined : true}
     >
       {[1, 2, 3, 4, 5].map((star) => (
@@ -47,10 +50,10 @@ function Stars({ value, label = true }: { value: number; label?: boolean }) {
   );
 }
 
-function StarInput({ value, onChange }: { value: number; onChange: (rating: number) => void }) {
+function StarInput({ value, locale, onChange }: { value: number; locale: Locale; onChange: (rating: number) => void }) {
   return (
     <fieldset>
-      <legend className="mb-3 font-bold">امتیاز شما</legend>
+      <legend className="mb-3 font-bold">{locale === 'en' ? 'Your rating' : 'امتیاز شما'}</legend>
       <div className="flex w-fit gap-1" dir="ltr">
         {[1, 2, 3, 4, 5].map((star) => (
           <label key={star} className="cursor-pointer rounded-lg p-1 focus-within:ring-2 focus-within:ring-purple">
@@ -67,7 +70,7 @@ function StarInput({ value, onChange }: { value: number; onChange: (rating: numb
               aria-hidden="true"
               className={star <= value ? 'fill-amber-400 text-amber-400' : 'text-slate-300'}
             />
-            <span className="sr-only">{star} ستاره از ۵</span>
+            <span className="sr-only">{locale === 'en' ? `${star} out of 5 stars` : `${star} ستاره از ۵`}</span>
           </label>
         ))}
       </div>
@@ -76,6 +79,9 @@ function StarInput({ value, onChange }: { value: number; onChange: (rating: numb
 }
 
 export function ReviewSection({ subject, subjectId, title, rating, count, reviews, distribution }: Props) {
+  const { locale } = useTranslations();
+  const english = locale === 'en';
+  const t = (fa: string, en: string) => english ? en : fa;
   const dialog = useRef<HTMLDialogElement>(null);
   const [mine, setMine] = useState<PublicReview | null>(null);
   const [bookingId, setBookingId] = useState<string>();
@@ -107,7 +113,7 @@ export function ReviewSection({ subject, subjectId, title, rating, count, review
       window.location.href = `/auth?next=${encodeURIComponent(window.location.pathname)}`;
       return;
     }
-    setStatus('در حال بررسی امکان ثبت نظر…');
+    setStatus(t('در حال بررسی امکان ثبت نظر…', 'Checking whether you can leave a review…'));
     setScore(0);
     setComment('');
     setMine(null);
@@ -126,7 +132,7 @@ export function ReviewSection({ subject, subjectId, title, rating, count, review
           setComment(result.review.comment ?? '');
         }
         setStatus(
-          result.review ? '' : result.eligible ? '' : 'پس از برگزاری موفق کلاس می‌توانید برای این مدرس نظر ثبت کنید.',
+          result.review ? '' : result.eligible ? '' : t('پس از برگزاری موفق کلاس می‌توانید برای این مدرس نظر ثبت کنید.', 'You can review this teacher after a completed lesson.'),
         );
       } else {
         const result = await api<{ eligible: boolean; review: PublicReview | null }>(
@@ -138,14 +144,16 @@ export function ReviewSection({ subject, subjectId, title, rating, count, review
           setScore(result.review.rating);
           setComment(result.review.comment ?? '');
         }
-        setStatus(result.eligible ? '' : 'برای ثبت نظر باید در این دوره ثبت‌نام کرده باشید.');
+        setStatus(result.eligible ? '' : t('برای ثبت نظر باید در این دوره ثبت‌نام کرده باشید.', 'You must be enrolled in this course to leave a review.'));
       }
     } catch (error) {
       setEligible(false);
       setStatus(
         apiMessage(
           error,
-          subject === 'course' ? 'برای ثبت نظر باید در این دوره ثبت‌نام کرده باشید.' : 'امکان ثبت نظر بررسی نشد.',
+          subject === 'course'
+            ? t('برای ثبت نظر باید در این دوره ثبت‌نام کرده باشید.', 'You must be enrolled in this course to leave a review.')
+            : t('امکان ثبت نظر بررسی نشد.', 'We could not check review eligibility.'),
         ),
       );
     }
@@ -153,7 +161,7 @@ export function ReviewSection({ subject, subjectId, title, rating, count, review
 
   async function save() {
     if (!score || comment.trim().length < (subject === 'course' ? 10 : 2)) {
-      setStatus('یک امتیاز و نظر کامل وارد کنید.');
+      setStatus(t('یک امتیاز و نظر کامل وارد کنید.', 'Choose a rating and write a complete review.'));
       return;
     }
     setBusy(true);
@@ -180,20 +188,20 @@ export function ReviewSection({ subject, subjectId, title, rating, count, review
       setComment(saved.comment ?? '');
       setStatus(
         subject === 'teacher'
-          ? 'نظر شما ثبت شد و پس از بررسی منتشر می‌شود.'
+          ? t('نظر شما ثبت شد و پس از بررسی منتشر می‌شود.', 'Your review was submitted and will appear after moderation.')
           : mine
-            ? 'نظر شما ویرایش شد.'
-            : 'نظر شما با موفقیت ثبت شد.',
+            ? t('نظر شما ویرایش شد.', 'Your review was updated.')
+            : t('نظر شما با موفقیت ثبت شد.', 'Your review was submitted.'),
       );
     } catch (error) {
-      setStatus(apiMessage(error, 'ثبت نظر ناموفق بود.'));
+      setStatus(apiMessage(error, t('ثبت نظر ناموفق بود.', 'The review could not be saved.')));
     } finally {
       setBusy(false);
     }
   }
 
   async function remove() {
-    if (!mine || !window.confirm('آیا از حذف این نظر مطمئن هستید؟')) return;
+    if (!mine || !window.confirm(t('آیا از حذف این نظر مطمئن هستید؟', 'Delete this review?'))) return;
     setBusy(true);
     try {
       await api(subject === 'teacher' ? `/reviews/${mine.id}` : `/courses/reviews/${mine.id}`, { method: 'DELETE' });
@@ -204,9 +212,9 @@ export function ReviewSection({ subject, subjectId, title, rating, count, review
       setMine(null);
       setScore(0);
       setComment('');
-      setStatus('نظر شما حذف شد.');
+      setStatus(t('نظر شما حذف شد.', 'Your review was deleted.'));
     } catch (error) {
-      setStatus(apiMessage(error, 'حذف نظر ناموفق بود.'));
+      setStatus(apiMessage(error, t('حذف نظر ناموفق بود.', 'The review could not be deleted.')));
     } finally {
       setBusy(false);
     }
@@ -216,21 +224,21 @@ export function ReviewSection({ subject, subjectId, title, rating, count, review
     <section className="review-section" aria-labelledby={`${subject}-reviews-title`}>
       <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
         <div>
-          <p className="text-sm font-black text-purple">تجربه واقعی زبان‌آموزها</p>
+          <p className="text-sm font-black text-purple">{t('تجربه واقعی زبان‌آموزها', 'Experiences from real learners')}</p>
           <h2 id={`${subject}-reviews-title`} className="mt-2 text-2xl font-black md:text-3xl">
             {title}
           </h2>
         </div>
         <button onClick={open} className="primary-button justify-center">
           <MessageSquareText size={18} />
-          ثبت نظر و امتیاز
+          {t('ثبت نظر و امتیاز', 'Leave a rating and review')}
         </button>
       </div>
       <div className="mt-7 grid gap-6 lg:grid-cols-[280px_1fr]">
         <div className="rating-summary">
           <strong className="latin text-5xl font-black">{summary.count ? summary.rating.toFixed(1) : '—'}</strong>
-          <Stars value={summary.rating} />
-          <p className="text-sm text-muted">بر اساس {summary.count.toLocaleString('fa-IR')} نظر</p>
+          <Stars value={summary.rating} locale={locale} />
+          <p className="text-sm text-muted">{t('بر اساس', 'Based on')} {summary.count.toLocaleString(english ? 'en-US' : 'fa-IR')} {t('نظر', 'reviews')}</p>
           <div className="mt-5 grid gap-2">
             {rows.map((row) => (
               <div key={row.star} className="grid grid-cols-[34px_1fr_32px] items-center gap-2 text-xs">
@@ -241,7 +249,7 @@ export function ReviewSection({ subject, subjectId, title, rating, count, review
                     style={{ width: `${summary.count ? (row.count / summary.count) * 100 : 0}%` }}
                   />
                 </span>
-                <span className="text-muted">{summary.count ? Math.round((row.count / summary.count) * 100) : 0}٪</span>
+                <span className="text-muted">{summary.count ? Math.round((row.count / summary.count) * 100) : 0}{english ? '%' : '٪'}</span>
               </div>
             ))}
           </div>
@@ -254,18 +262,18 @@ export function ReviewSection({ subject, subjectId, title, rating, count, review
                 <article key={review.id} className="review-card">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
-                      <strong>{person?.name || 'زبان‌آموز لینگواسپیک'}</strong>
+                      <strong>{person?.name || t('زبان‌آموز لینگواسپیک', 'LingoSpeak learner')}</strong>
                       {(review.isVerified ?? subject === 'teacher') && (
                         <span className="ms-2 inline-flex items-center gap-1 text-xs font-bold text-green">
                           <BadgeCheck size={14} />
-                          تجربه تأییدشده
+                          {t('تجربه تأییدشده', 'Verified experience')}
                         </span>
                       )}
                     </div>
-                    <time className="text-xs text-muted">{formatDate(review.createdAt)}</time>
+                    <time className="text-xs text-muted">{formatDate(review.createdAt, locale)}</time>
                   </div>
                   <div className="mt-3">
-                    <Stars value={review.rating} />
+                    <Stars value={review.rating} locale={locale} />
                   </div>
                   <p className="mt-3 leading-8 text-slate-700">{review.comment}</p>
                 </article>
@@ -274,8 +282,8 @@ export function ReviewSection({ subject, subjectId, title, rating, count, review
           ) : (
             <div className="review-empty">
               <MessageSquareText size={30} />
-              <strong>هنوز نظری ثبت نشده</strong>
-              <p>اولین تجربه مفید را شما با دیگر زبان‌آموزها به اشتراک بگذارید.</p>
+              <strong>{t('هنوز نظری ثبت نشده', 'No reviews yet')}</strong>
+              <p>{t('اولین تجربه مفید را شما با دیگر زبان‌آموزها به اشتراک بگذارید.', 'Be the first to share a useful experience with other learners.')}</p>
             </div>
           )}
         </div>
@@ -283,16 +291,16 @@ export function ReviewSection({ subject, subjectId, title, rating, count, review
       <dialog ref={dialog} className="review-dialog" aria-labelledby="review-dialog-title">
         <form method="dialog" className="flex items-center justify-between border-b hairline p-5">
           <h3 id="review-dialog-title" className="text-xl font-black">
-            {mine ? 'ویرایش نظر شما' : 'ثبت نظر و امتیاز'}
+            {mine ? t('ویرایش نظر شما', 'Edit your review') : t('ثبت نظر و امتیاز', 'Leave a rating and review')}
           </h3>
-          <button aria-label="بستن" className="rounded-lg p-2 hover:bg-slate-100">
+          <button aria-label={t('بستن', 'Close')} className="rounded-lg p-2 hover:bg-slate-100">
             <X />
           </button>
         </form>
         <div className="grid gap-5 p-5">
-          <StarInput value={score} onChange={setScore} />
+          <StarInput value={score} locale={locale} onChange={setScore} />
           <label className="grid gap-2 font-bold">
-            نظر شما
+            {t('نظر شما', 'Your review')}
             <textarea
               value={comment}
               onChange={(e) => setComment(e.target.value)}
@@ -302,8 +310,8 @@ export function ReviewSection({ subject, subjectId, title, rating, count, review
               className="input resize-none font-normal"
               placeholder={
                 subject === 'teacher'
-                  ? 'تجربه شما از کلاس با این مدرس چطور بود؟'
-                  : 'این دوره چطور به یادگیری شما کمک کرد؟'
+                  ? t('تجربه شما از کلاس با این مدرس چطور بود؟', 'What was your lesson with this teacher like?')
+                  : t('این دوره چطور به یادگیری شما کمک کرد؟', 'How did this course help your learning?')
               }
             />
           </label>
@@ -319,12 +327,12 @@ export function ReviewSection({ subject, subjectId, title, rating, count, review
               disabled={busy || (!eligible && !mine)}
               className="primary-button disabled:cursor-not-allowed disabled:opacity-45"
             >
-              {busy ? 'در حال ثبت…' : mine ? 'ذخیره تغییرات' : 'ثبت نظر'}
+              {busy ? t('در حال ثبت…', 'Saving…') : mine ? t('ذخیره تغییرات', 'Save changes') : t('ثبت نظر', 'Submit review')}
             </button>
             {mine && (
               <button type="button" onClick={remove} disabled={busy} className="secondary-button text-red-600">
                 <Trash2 size={17} />
-                حذف نظر
+                {t('حذف نظر', 'Delete review')}
               </button>
             )}
           </div>

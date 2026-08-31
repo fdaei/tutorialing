@@ -4,32 +4,39 @@ import { useState } from 'react';
 import { BookOpen, RotateCcw } from 'lucide-react';
 import { CourseCard } from '@/components/marketplace/cards';
 import type { Course } from '@/lib/marketplace-data';
-
-const languageOptions = ['انگلیسی', 'آلمانی', 'فرانسوی', 'اسپانیایی'] as const;
+import { useTranslations } from '@/components/shared/locale-provider';
+import { localizedCourseLanguage } from '../course-localization';
 
 export function CourseDirectory({ courses }: { courses: Course[] }) {
   const [language, setLanguage] = useState<string>('');
+  const { locale } = useTranslations();
+  const english = locale === 'en';
+  const languageOptions = [...new Set(courses.map((course) => course.language))];
   const filteredCourses = language ? courses.filter((course) => course.language === language) : courses;
 
   return (
     <section aria-labelledby="course-results-heading" className="mt-8">
-      <div className="flex flex-wrap items-center gap-2" aria-label="فیلتر دوره‌ها بر اساس زبان">
+      <div className="flex flex-wrap items-center gap-2" aria-label={english ? 'Filter courses by language' : 'فیلتر دوره‌ها بر اساس زبان'}>
         <FilterButton active={!language} onClick={() => setLanguage('')}>
-          همه دوره‌ها
+          {english ? 'All courses' : 'همه دوره‌ها'}
         </FilterButton>
         {languageOptions.map((option) => (
           <FilterButton key={option} active={language === option} onClick={() => setLanguage(option)}>
-            {option}
+            {localizedCourseLanguage(option, locale)}
           </FilterButton>
         ))}
       </div>
 
       <div className="mt-8 flex items-center justify-between gap-4">
         <h2 id="course-results-heading" className="text-lg font-black">
-          {language ? `دوره‌های ${language}` : 'همه دوره‌ها'}
+          {language
+            ? english
+              ? `${localizedCourseLanguage(language, locale)} courses`
+              : `دوره‌های ${language}`
+            : english ? 'All courses' : 'همه دوره‌ها'}
         </h2>
         <p aria-live="polite" className="text-sm text-muted">
-          {filteredCourses.length.toLocaleString('fa-IR')} دوره
+          {filteredCourses.length.toLocaleString(english ? 'en-US' : 'fa-IR')} {english ? 'courses' : 'دوره'}
         </p>
       </div>
 
@@ -42,11 +49,11 @@ export function CourseDirectory({ courses }: { courses: Course[] }) {
       ) : (
         <div className="review-empty mt-5">
           <BookOpen aria-hidden="true" />
-          <strong>برای این زبان هنوز دوره‌ای منتشر نشده است</strong>
-          <p>زبان دیگری را انتخاب کنید یا همه دوره‌ها را ببینید.</p>
+          <strong>{english ? 'No courses have been published for this language yet' : 'برای این زبان هنوز دوره‌ای منتشر نشده است'}</strong>
+          <p>{english ? 'Choose another language or return to all courses.' : 'زبان دیگری را انتخاب کنید یا همه دوره‌ها را ببینید.'}</p>
           <button className="secondary-button mt-2" onClick={() => setLanguage('')}>
             <RotateCcw size={17} aria-hidden="true" />
-            نمایش همه دوره‌ها
+            {english ? 'Show all courses' : 'نمایش همه دوره‌ها'}
           </button>
         </div>
       )}
