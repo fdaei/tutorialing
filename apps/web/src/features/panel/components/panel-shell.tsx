@@ -42,11 +42,70 @@ export type NavItem = {
   permission?: string;
 };
 
+export const adminNavigationGroups = [
+  { id: 'overview', label: 'نمای کلی', labelEn: 'Overview', icon: Grid2X2, hrefs: ['/admin', '/admin/search'] },
+  {
+    id: 'users',
+    label: 'کاربران',
+    labelEn: 'Users',
+    icon: Users,
+    hrefs: [
+      '/admin/users',
+      '/admin/teachers',
+      '/admin/teacher-applications',
+      '/admin/teacher-documents',
+      '/admin/teacher-prices',
+    ],
+  },
+  {
+    id: 'learning',
+    label: 'آموزش',
+    labelEn: 'Learning',
+    icon: BookOpen,
+    hrefs: [
+      '/admin/languages',
+      '/admin/countries',
+      '/admin/tests',
+      '/admin/test-reviews',
+      '/admin/bookings',
+      '/admin/availability-blocks',
+    ],
+  },
+  {
+    id: 'content',
+    label: 'محتوا',
+    labelEn: 'Content',
+    icon: FileEdit,
+    hrefs: ['/admin/magazine', '/admin/cms', '/admin/reviews'],
+  },
+  {
+    id: 'operations',
+    label: 'عملیات',
+    labelEn: 'Operations',
+    icon: LifeBuoy,
+    hrefs: [
+      '/admin/tickets',
+      '/admin/finance',
+      '/admin/discounts',
+      '/admin/refunds',
+      '/admin/teacher-earnings',
+      '/admin/payouts',
+      '/admin/notifications',
+    ],
+  },
+  {
+    id: 'system',
+    label: 'سیستم',
+    labelEn: 'System',
+    icon: Settings,
+    hrefs: ['/admin/roles', '/admin/audit', '/admin/settings'],
+  },
+] as const;
+
 export function PanelShell({ title, items, children }: { title: string; items: NavItem[]; children: React.ReactNode }) {
   const router = useRouter(),
     path = usePathname(),
     [open, setOpen] = useState(false),
-    [moreOpen, setMoreOpen] = useState(false),
     { locale } = useTranslations(),
     fa = isDefaultLocale(locale),
     p = (href: string) => localePath(href, locale);
@@ -62,11 +121,7 @@ export function PanelShell({ title, items, children }: { title: string; items: N
   }, [me.error, router]);
   const adminMode = path.includes('/admin'),
     teacherMode = path.includes('/teacher-panel'),
-    allowed = adminMode
-      ? ['ADMIN', 'STAFF', 'SUPPORT', 'FINANCE', 'EXAMINER']
-      : teacherMode
-        ? ['TEACHER', 'ADMIN']
-        : [];
+    allowed = adminMode ? ['ADMIN', 'SUPPORT'] : teacherMode ? ['INSTRUCTOR', 'ADMIN'] : [];
   const roles = Array.isArray(me.data?.roles) ? me.data.roles : [];
   const permissions = Array.isArray(me.data?.permissions) ? me.data.permissions : [];
   const canSee = (item: NavItem) =>
@@ -87,33 +142,24 @@ export function PanelShell({ title, items, children }: { title: string; items: N
     });
   const primaryRole = roles.includes('ADMIN')
     ? 'ADMIN'
-    : roles.includes('STAFF')
-      ? 'STAFF'
-      : roles.includes('SUPPORT')
-        ? 'SUPPORT'
-        : roles.includes('FINANCE')
-          ? 'FINANCE'
-          : roles.includes('EXAMINER')
-            ? 'EXAMINER'
-            : roles.includes('TEACHER')
-              ? 'TEACHER'
-              : 'STUDENT';
+    : roles.includes('SUPPORT')
+      ? 'SUPPORT'
+      : roles.includes('INSTRUCTOR')
+        ? 'INSTRUCTOR'
+        : 'STUDENT';
   const roleLabels: Record<string, [string, string]> = {
     ADMIN: ['مدیر کل', 'Administrator'],
-    STAFF: ['کارشناس مدیریت', 'Staff'],
     SUPPORT: ['پشتیبان', 'Support'],
-    FINANCE: ['کارشناس مالی', 'Finance'],
-    EXAMINER: ['ارزیاب آزمون', 'Examiner'],
-    TEACHER: ['مدرس', 'Teacher'],
+    INSTRUCTOR: ['مدرس', 'Instructor'],
     STUDENT: ['زبان‌آموز', 'Student'],
   };
   const roleLabel: [string, string] = roleLabels[primaryRole] ?? ['زبان‌آموز', 'Student'];
   const notificationItem = visibleItems.find((item) => item.href.endsWith('/notifications'));
-  const showAdminSearch = adminMode && roles.some((role) => ['ADMIN', 'STAFF'].includes(role));
+  const showAdminSearch = adminMode && roles.some((role) => ['ADMIN'].includes(role));
   const adminSummary = useQuery({
     queryKey: ['admin-dashboard'],
     queryFn: () => api<AdminDashboard>('/admin/dashboard'),
-    enabled: adminMode && roles.some((role) => ['ADMIN', 'STAFF'].includes(role)),
+    enabled: adminMode && roles.some((role) => ['ADMIN'].includes(role)),
   });
   // Never render account navigation or page content until authentication has
   // been confirmed. In particular, a 401 used to trigger the redirect above
@@ -132,14 +178,17 @@ export function PanelShell({ title, items, children }: { title: string; items: N
       </main>
     );
 
+  const supportTitle = permissions.includes('tests.review')
+    ? translate(locale, 'panelpanelShellExaminerWorkspace')
+    : permissions.some((permission) =>
+          ['payouts.manage', 'payments.refund', 'teacher-prices.manage'].includes(permission),
+        )
+      ? translate(locale, 'panelpanelShellFinanceWorkspace')
+      : translate(locale, 'panelpanelShellSupportWorkspace');
   const displayTitle = adminMode
     ? primaryRole === 'SUPPORT'
-      ? translate(locale, 'panelpanelShellSupportWorkspace')
-      : primaryRole === 'FINANCE'
-        ? translate(locale, 'panelpanelShellFinanceWorkspace')
-        : primaryRole === 'EXAMINER'
-          ? translate(locale, 'panelpanelShellExaminerWorkspace')
-          : translate(locale, 'panelpanelShellLingospeakAdministration')
+      ? supportTitle
+      : translate(locale, 'panelpanelShellLingospeakAdministration')
     : teacherMode
       ? translate(locale, 'panelpanelShellTeacherPanel')
       : translate(locale, 'panelpanelShellStudentDashboard');
@@ -148,44 +197,18 @@ export function PanelShell({ title, items, children }: { title: string; items: N
       const localized = p(value);
       return path === localized || (value !== '/admin' && path.startsWith(`${localized}/`));
     });
-  const adminWorkspace = [
-    { href: '/admin', label: 'نمای کلی', labelEn: 'Overview', icon: Grid2X2, children: [] },
-    { href: '/admin/users', label: 'کاربران و مدرس‌ها', labelEn: 'People', icon: Users, children: ['/admin/teachers'] },
-    {
-      href: '/admin/teacher-applications',
-      label: 'تأیید و محتوا',
-      labelEn: 'Approvals & content',
-      icon: FileCheck,
-      children: ['/admin/teacher-documents', '/admin/teacher-prices', '/admin/tests', '/admin/test-reviews'],
-      badge: adminSummary.data?.pendingTeachers,
-    },
-    {
-      href: '/admin/bookings',
-      label: 'رزرو و تقویم',
-      labelEn: 'Bookings & calendar',
-      icon: CalendarDays,
-      children: ['/admin/availability-blocks'],
-    },
-    {
-      href: '/admin/finance',
-      label: 'مالی و تسویه',
-      labelEn: 'Finance & payouts',
-      icon: CreditCard,
-      children: ['/admin/payments', '/admin/discounts', '/admin/refunds', '/admin/teacher-earnings', '/admin/payouts'],
-    },
-    {
-      href: '/admin/tickets',
-      label: 'پشتیبانی',
-      labelEn: 'Support',
-      icon: LifeBuoy,
-      children: [],
-      badge: adminSummary.data?.openTickets,
-    },
-  ].filter((group) => visibleItems.some((item) => item.href === group.href || group.children.includes(item.href)));
-  const workspaceHrefs = new Set(adminWorkspace.flatMap((group) => [group.href, ...group.children]));
-  const moreItems = visibleItems.filter(
-    (item) => !workspaceHrefs.has(item.href) && item.href !== '/admin/notifications',
-  );
+  const adminGroups = adminNavigationGroups
+    .map((group) => ({
+      ...group,
+      items: group.hrefs.map((href) => visibleItems.find((item) => item.href === href)).filter(Boolean) as NavItem[],
+    }))
+    .filter((group) => group.items.length);
+  const badgeFor = (href: string) =>
+    href === '/admin/teacher-applications'
+      ? adminSummary.data?.pendingTeachers
+      : href === '/admin/tickets'
+        ? adminSummary.data?.openTickets
+        : undefined;
   const Sidebar = () => (
     <aside className={`flex h-full flex-col p-4 ${adminMode ? 'admin-sidebar text-white' : 'bg-white text-navy'}`}>
       <Link href={p('/')} className="flex items-center gap-3 px-2 py-2">
@@ -200,62 +223,43 @@ export function PanelShell({ title, items, children }: { title: string; items: N
         </span>
       </Link>
       {adminMode ? (
-        <nav className="mt-7 flex min-h-0 flex-1 flex-col">
-          <small className="px-3 pb-2 text-[11px] font-bold text-white/45">
-            {translate(locale, 'panelpanelShellWorkspace')}
-          </small>
-          <div className="grid gap-1.5">
-            {adminWorkspace.map((group) => {
-              const Icon = group.icon,
-                active = isActive(group.href, group.children);
-              return (
-                <Link
-                  onClick={() => setOpen(false)}
-                  key={group.href}
-                  href={p(group.href)}
-                  className={`admin-nav-item ${active ? 'admin-nav-active' : ''}`}
-                >
-                  <Icon size={18} />
-                  <span className="flex-1">{localized({ fa: group.label, en: group.labelEn }, locale)}</span>
-                  {Boolean(group.badge) && (
-                    <span className="admin-nav-badge">
-                      {Number(group.badge).toLocaleString(translate(locale, 'commercepricingManagerEnUS2'))}
-                    </span>
-                  )}
-                </Link>
-              );
-            })}
-          </div>
-          <div className="mt-auto pt-4">
-            <button
-              type="button"
-              aria-expanded={moreOpen}
-              onClick={() => setMoreOpen((value) => !value)}
-              className="admin-nav-item w-full border border-white/15"
-            >
-              <MoreHorizontal size={18} />
-              <span className="flex-1 text-start">{translate(locale, 'teacherteacherMoreMore')}</span>
-              <ChevronDown size={16} className={`transition-transform ${moreOpen ? 'rotate-180' : ''}`} />
-            </button>
-            {moreOpen && (
-              <div className="admin-more-menu">
-                {moreItems.map((item) => {
-                  const Icon = item.icon ?? Home;
-                  return (
-                    <Link
-                      onClick={() => setOpen(false)}
-                      key={item.href}
-                      href={p(item.href)}
-                      className={isActive(item.href) ? 'text-white' : 'text-white/60'}
-                    >
-                      <Icon size={16} />
-                      <span>{localized({ fa: item.label, en: item.labelEn }, locale)}</span>
-                    </Link>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+        <nav className="admin-nav-groups mt-6 min-h-0 flex-1 overflow-y-auto" aria-label="ناوبری مدیریت">
+          {adminGroups.map((group) => {
+            const GroupIcon = group.icon;
+            const active = group.items.some((item) => isActive(item.href));
+            return (
+              <details key={group.id} className="admin-nav-group" open={active || undefined}>
+                <summary>
+                  <GroupIcon size={17} />
+                  <span>{localized({ fa: group.label, en: group.labelEn }, locale)}</span>
+                  <ChevronDown className="admin-group-chevron" size={15} />
+                </summary>
+                <div className="admin-nav-children">
+                  {group.items.map((item) => {
+                    const Icon = item.icon ?? Home;
+                    const itemActive = isActive(item.href);
+                    const badge = badgeFor(item.href);
+                    return (
+                      <Link
+                        onClick={() => setOpen(false)}
+                        key={item.href}
+                        href={p(item.href)}
+                        className={`admin-nav-item ${itemActive ? 'admin-nav-active' : ''}`}
+                      >
+                        <Icon size={17} />
+                        <span className="flex-1">{localized({ fa: item.label, en: item.labelEn }, locale)}</span>
+                        {Boolean(badge) && (
+                          <span className="admin-nav-badge">
+                            {Number(badge).toLocaleString(translate(locale, 'commercepricingManagerEnUS2'))}
+                          </span>
+                        )}
+                      </Link>
+                    );
+                  })}
+                </div>
+              </details>
+            );
+          })}
         </nav>
       ) : (
         <nav className="mt-8 grid gap-1.5">
@@ -278,7 +282,7 @@ export function PanelShell({ title, items, children }: { title: string; items: N
           })}
         </nav>
       )}
-      {me.data && (roles.includes('TEACHER') || roles.includes('ADMIN')) && (
+      {me.data && (roles.includes('INSTRUCTOR') || roles.includes('ADMIN')) && (
         <div className={`mt-5 rounded-2xl p-3 ${adminMode ? 'bg-white/[.07]' : 'bg-[#f7f8fc]'}`}>
           <small className={`mb-2 block px-1 text-[11px] font-bold ${adminMode ? 'text-white/45' : 'text-muted'}`}>
             {translate(locale, 'panelpanelShellSwitchWorkspace')}
@@ -290,7 +294,7 @@ export function PanelShell({ title, items, children }: { title: string; items: N
             >
               <Home size={15} /> {translate(locale, 'panelpanelShellUserDashboard')}
             </Link>
-            {roles.includes('TEACHER') && (
+            {roles.includes('INSTRUCTOR') && (
               <Link
                 href={p('/teacher-panel')}
                 className="flex items-center gap-2 rounded-lg px-2 py-2 text-xs font-bold hover:bg-blue/10"
@@ -414,6 +418,7 @@ export function PanelShell({ title, items, children }: { title: string; items: N
 
 export const studentNav: NavItem[] = [
   { href: '/dashboard', label: 'داشبورد', labelEn: 'Dashboard', icon: Grid2X2 },
+  { href: '/dashboard/courses', label: 'دوره‌های من', labelEn: 'My courses', icon: BookOpen },
   { href: '/dashboard/plan', label: 'برنامه یادگیری', labelEn: 'Learning plan', icon: BookOpen },
   { href: '/dashboard/classes', label: 'کلاس‌ها', labelEn: 'Classes', icon: CalendarDays },
   { href: '/dashboard/matches', label: 'مدرس‌ها', labelEn: 'Teachers', icon: Users },
@@ -424,6 +429,7 @@ export const studentNav: NavItem[] = [
 ];
 export const teacherNav: NavItem[] = [
   { href: '/teacher-panel', label: 'داشبورد', labelEn: 'Dashboard', icon: Grid2X2 },
+  { href: '/teacher-panel/courses', label: 'دوره‌های من', labelEn: 'My courses', icon: BookOpen },
   { href: '/teacher-panel/profile', label: 'پروفایل و تأیید', labelEn: 'Profile & verification', icon: FileCheck },
   { href: '/teacher-panel/availability', label: 'برنامه کاری', labelEn: 'Schedule', icon: CalendarDays },
   { href: '/teacher-panel/classes', label: 'کلاس‌ها', labelEn: 'Classes', icon: BookOpen },
@@ -433,15 +439,22 @@ export const teacherNav: NavItem[] = [
   { href: '/teacher-panel/more', label: 'بیشتر', labelEn: 'More', icon: MoreHorizontal },
 ];
 export const adminNav: NavItem[] = [
-  { href: '/admin', label: 'داشبورد', labelEn: 'Dashboard', icon: Grid2X2, roles: ['ADMIN', 'STAFF'] },
-  { href: '/admin/magazine', label: 'بررسی مجله', labelEn: 'Magazine review', icon: FileEdit, roles: ['ADMIN', 'STAFF'], permission: 'cms.manage' },
-  { href: '/admin/search', label: 'جستجوی سراسری', labelEn: 'Global search', icon: Search, roles: ['ADMIN', 'STAFF'] },
+  { href: '/admin', label: 'داشبورد', labelEn: 'Dashboard', icon: Grid2X2, roles: ['ADMIN'] },
+  {
+    href: '/admin/magazine',
+    label: 'بررسی مجله',
+    labelEn: 'Magazine review',
+    icon: FileEdit,
+    roles: ['ADMIN'],
+    permission: 'cms.manage',
+  },
+  { href: '/admin/search', label: 'جستجوی سراسری', labelEn: 'Global search', icon: Search, roles: ['ADMIN'] },
   {
     href: '/admin/users',
     label: 'کاربران',
     labelEn: 'Users',
     icon: Users,
-    roles: ['ADMIN', 'STAFF'],
+    roles: ['ADMIN'],
     permission: 'users.read',
   },
   {
@@ -449,7 +462,7 @@ export const adminNav: NavItem[] = [
     label: 'مدرس‌ها',
     labelEn: 'Teachers',
     icon: Users,
-    roles: ['ADMIN', 'STAFF'],
+    roles: ['ADMIN'],
     permission: 'teachers.verify',
   },
   {
@@ -457,7 +470,7 @@ export const adminNav: NavItem[] = [
     label: 'درخواست‌های مدرس',
     labelEn: 'Teacher applications',
     icon: FileCheck,
-    roles: ['ADMIN', 'STAFF'],
+    roles: ['ADMIN'],
     permission: 'teachers.verify',
   },
   {
@@ -465,7 +478,7 @@ export const adminNav: NavItem[] = [
     label: 'مدارک مدرس',
     labelEn: 'Teacher documents',
     icon: FileCheck,
-    roles: ['ADMIN', 'STAFF'],
+    roles: ['ADMIN'],
     permission: 'teachers.verify',
   },
   {
@@ -473,21 +486,21 @@ export const adminNav: NavItem[] = [
     label: 'تأیید قیمت مدرس',
     labelEn: 'Teacher price approvals',
     icon: CreditCard,
-    roles: ['ADMIN', 'STAFF', 'FINANCE'],
+    roles: ['ADMIN', 'SUPPORT'],
     permission: 'teacher-prices.manage',
   },
   {
     href: '/admin/languages',
     label: 'زبان‌ها',
     labelEn: 'Languages',
-    roles: ['ADMIN', 'STAFF'],
+    roles: ['ADMIN'],
     permission: 'languages.manage',
   },
   {
     href: '/admin/countries',
     label: 'کشورها',
     labelEn: 'Countries',
-    roles: ['ADMIN', 'STAFF'],
+    roles: ['ADMIN'],
     permission: 'languages.manage',
   },
   {
@@ -495,7 +508,7 @@ export const adminNav: NavItem[] = [
     label: 'آزمون‌ها',
     labelEn: 'Tests',
     icon: BookOpen,
-    roles: ['ADMIN', 'STAFF'],
+    roles: ['ADMIN'],
     permission: 'tests.manage',
   },
   {
@@ -503,14 +516,15 @@ export const adminNav: NavItem[] = [
     label: 'تصحیح آزمون',
     labelEn: 'Test reviews',
     icon: FileCheck,
-    roles: ['ADMIN', 'EXAMINER'],
+    roles: ['ADMIN', 'SUPPORT'],
+    permission: 'tests.review',
   },
   {
     href: '/admin/bookings',
     label: 'رزروها',
     labelEn: 'Bookings',
     icon: CalendarDays,
-    roles: ['ADMIN', 'STAFF'],
+    roles: ['ADMIN'],
     permission: 'bookings.read',
   },
   {
@@ -518,7 +532,7 @@ export const adminNav: NavItem[] = [
     label: 'مسدودی‌های زمان',
     labelEn: 'Availability blocks',
     icon: CalendarDays,
-    roles: ['ADMIN', 'STAFF'],
+    roles: ['ADMIN'],
     permission: 'availability.manage',
   },
   {
@@ -526,7 +540,7 @@ export const adminNav: NavItem[] = [
     label: 'تیکت‌ها',
     labelEn: 'Tickets',
     icon: TicketCheck,
-    roles: ['ADMIN', 'STAFF', 'SUPPORT'],
+    roles: ['ADMIN', 'SUPPORT'],
     permission: 'tickets.read',
   },
   {
@@ -534,42 +548,42 @@ export const adminNav: NavItem[] = [
     label: 'امور مالی',
     labelEn: 'Finance',
     icon: CreditCard,
-    roles: ['ADMIN', 'STAFF'],
+    roles: ['ADMIN'],
     permission: 'payments.read',
   },
   {
     href: '/admin/discounts',
     label: 'کدهای تخفیف',
     labelEn: 'Discounts',
-    roles: ['ADMIN', 'FINANCE'],
+    roles: ['ADMIN', 'SUPPORT'],
     permission: 'payouts.manage',
   },
   {
     href: '/admin/refunds',
     label: 'بازپرداخت‌ها',
     labelEn: 'Refunds',
-    roles: ['ADMIN', 'FINANCE'],
+    roles: ['ADMIN', 'SUPPORT'],
     permission: 'payments.refund',
   },
   {
     href: '/admin/teacher-earnings',
     label: 'درآمد مدرس‌ها',
     labelEn: 'Teacher earnings',
-    roles: ['ADMIN', 'STAFF'],
+    roles: ['ADMIN'],
     permission: 'reports.read',
   },
   {
     href: '/admin/payouts',
     label: 'تسویه‌ها',
     labelEn: 'Payouts',
-    roles: ['ADMIN', 'FINANCE'],
+    roles: ['ADMIN', 'SUPPORT'],
     permission: 'payouts.manage',
   },
   {
     href: '/admin/reviews',
     label: 'نظرات',
     labelEn: 'Reviews',
-    roles: ['ADMIN', 'STAFF'],
+    roles: ['ADMIN'],
     permission: 'reviews.manage',
   },
   {
@@ -577,23 +591,23 @@ export const adminNav: NavItem[] = [
     label: 'نقش‌ها و مجوزها',
     labelEn: 'Roles & permissions',
     icon: ShieldCheck,
-    roles: ['ADMIN', 'STAFF'],
+    roles: ['ADMIN'],
     permission: 'roles.manage',
   },
-  { href: '/admin/cms', label: 'مدیریت محتوا', labelEn: 'CMS', roles: ['ADMIN', 'STAFF'], permission: 'cms.manage' },
+  { href: '/admin/cms', label: 'مدیریت محتوا', labelEn: 'CMS', roles: ['ADMIN'], permission: 'cms.manage' },
   {
     href: '/admin/notifications',
     label: 'اعلان‌ها',
     labelEn: 'Notifications',
     icon: Bell,
-    roles: ['ADMIN', 'STAFF'],
+    roles: ['ADMIN'],
     permission: 'notifications.read',
   },
   {
     href: '/admin/audit',
     label: 'لاگ فعالیت',
     labelEn: 'Audit logs',
-    roles: ['ADMIN', 'STAFF'],
+    roles: ['ADMIN'],
     permission: 'audit.read',
   },
   {
@@ -601,7 +615,7 @@ export const adminNav: NavItem[] = [
     label: 'تنظیمات',
     labelEn: 'Settings',
     icon: Settings,
-    roles: ['ADMIN', 'STAFF'],
+    roles: ['ADMIN'],
     permission: 'settings.manage',
   },
 ];

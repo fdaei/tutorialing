@@ -11,7 +11,7 @@ class NegotiationDto {
   @IsString() @Length(3, 1000) note!: string;
 }
 
-@Roles('TEACHER')
+@Roles('INSTRUCTOR')
 @Controller('teacher/pricing')
 export class TeacherPricingController {
   constructor(private readonly service: PricingService) {}
@@ -26,7 +26,7 @@ export class TeacherPricingController {
   }
 }
 
-@Roles('ADMIN', 'STAFF', 'FINANCE')
+@Roles('ADMIN', 'SUPPORT')
 @RequirePermissions(PermissionKeys.TeacherPrices.Manage)
 @Controller('admin/teacher-prices')
 @ApiTags('admin')

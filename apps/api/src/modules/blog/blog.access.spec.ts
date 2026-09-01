@@ -9,7 +9,7 @@ import { CreateBlogPostDto, UpdateBlogPostDto } from './dto/request/blog-post.dt
 import { BlogViewDto } from './dto/request/blog-interaction.dto';
 
 /**
- * SEC-213. The blog write routes carried `@Roles('ADMIN','STAFF')` and nothing
+ * SEC-213. The blog write routes carried `@Roles('ADMIN','ADMIN')` and nothing
  * else, so holding the STAFF role was the whole check — the `cms.manage`
  * permission that gates every other content write was never consulted. These
  * read the decorators actually on `BlogController` (via a real `Reflector`)
@@ -31,11 +31,11 @@ function context(method: keyof BlogController, roles: string[], permissions: str
 
 describe('blog editorial authorization (SEC-213)', () => {
   it.each(EDITORIAL)('allows STAFF holding cms.manage to %s', (method) => {
-    expect(guard.canActivate(context(method, ['STAFF'], ['cms.manage']))).toBe(true);
+    expect(guard.canActivate(context(method, ['ADMIN'], ['cms.manage']))).toBe(true);
   });
 
   it.each(EDITORIAL)('denies STAFF without cms.manage on %s', (method) => {
-    expect(() => guard.canActivate(context(method, ['STAFF'], []))).toThrow(
+    expect(() => guard.canActivate(context(method, ['ADMIN'], []))).toThrow(
       expect.objectContaining({ response: expect.objectContaining({ code: 'PERMISSION_NOT_GRANTED' }) }),
     );
   });

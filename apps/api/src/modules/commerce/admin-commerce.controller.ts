@@ -5,7 +5,7 @@ import { AdminCommerceService } from './admin-commerce.service';
 import { ApiTags } from '@nestjs/swagger';
 import { WalletAdjustmentDto } from './dto/request/payments.dto';
 
-@Roles('ADMIN', 'STAFF', 'FINANCE')
+@Roles('ADMIN', 'SUPPORT')
 @ApiTags('admin')
 @Controller('admin')
 export class AdminCommerceController {

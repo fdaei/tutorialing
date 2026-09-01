@@ -5,7 +5,7 @@ import { PayoutsService } from './payouts.service';
 import { DiscountsService } from '../discounts/discounts.service';
 import { DiscountDto, PayoutApprovalDto, PayoutWindowDto } from '../dto/request/payouts.dto';
 
-@Roles('ADMIN', 'FINANCE')
+@Roles('ADMIN', 'SUPPORT')
 @RequirePermissions(PermissionKeys.Payouts.Manage)
 @RateLimit(RATE_LIMIT_TIERS.moneyAdjacent)
 @Controller('payouts')

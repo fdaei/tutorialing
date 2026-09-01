@@ -5,7 +5,7 @@ import { ContentService } from './content.service';
 import { CmsPageDto } from './dto/cms-page.dto';
 import { ApiTags } from '@nestjs/swagger';
 
-@Roles('ADMIN', 'STAFF')
+@Roles('ADMIN')
 @ApiTags('admin')
 @RequirePermissions(PermissionKeys.Content.Manage)
 @Controller('admin')

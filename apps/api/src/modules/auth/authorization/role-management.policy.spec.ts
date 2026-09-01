@@ -3,20 +3,22 @@ import { ELEVATED_PERMISSIONS, PRIVILEGED_ROLES, RoleManagementPolicy } from './
 const ACTOR = 'actor-1';
 
 function policy(actorRoles: string[] = []) {
-  const findUnique = jest.fn().mockImplementation(({ where }: { where: { userId_role: { userId: string; role: string } } }) =>
-    Promise.resolve(
-      where.userId_role.userId === ACTOR && actorRoles.includes(where.userId_role.role)
-        ? { userId: ACTOR, role: where.userId_role.role }
-        : null,
-    ),
-  );
+  const findUnique = jest
+    .fn()
+    .mockImplementation(({ where }: { where: { userId_role: { userId: string; role: string } } }) =>
+      Promise.resolve(
+        where.userId_role.userId === ACTOR && actorRoles.includes(where.userId_role.role)
+          ? { userId: ACTOR, role: where.userId_role.role }
+          : null,
+      ),
+    );
   const db = { userRole: { findUnique } };
   return { p: new RoleManagementPolicy(db as never), findUnique };
 }
 
 describe('RoleManagementPolicy hierarchy constants', () => {
-  it('treats FINANCE, and only FINANCE, as a privileged role (ADMIN is handled separately)', () => {
-    expect(PRIVILEGED_ROLES).toEqual(['FINANCE']);
+  it('keeps authority in permissions instead of creating another privileged role', () => {
+    expect(PRIVILEGED_ROLES).toEqual([]);
   });
 
   it('lists exactly the financial and security-sensitive permissions as elevated', () => {
@@ -34,20 +36,13 @@ describe('RoleManagementPolicy.assertMayGrantRole', () => {
     });
   });
 
-  it('rejects granting FINANCE when the actor is not ADMIN, even if the actor is FINANCE', async () => {
-    const { p } = policy(['FINANCE']);
-    await expect(p.assertMayGrantRole(ACTOR, 'FINANCE')).rejects.toMatchObject({
-      response: { code: 'PRIVILEGED_ROLE_GRANT_REQUIRES_ADMIN' },
-    });
-  });
-
-  it('allows granting ADMIN or FINANCE when the actor is ADMIN', async () => {
+  it('allows an ADMIN to grant every canonical role', async () => {
     const { p } = policy(['ADMIN']);
     await expect(p.assertMayGrantRole(ACTOR, 'ADMIN')).resolves.toBeUndefined();
-    await expect(p.assertMayGrantRole(ACTOR, 'FINANCE')).resolves.toBeUndefined();
+    await expect(p.assertMayGrantRole(ACTOR, 'SUPPORT')).resolves.toBeUndefined();
   });
 
-  it.each(['STAFF', 'SUPPORT', 'EXAMINER', 'TEACHER', 'STUDENT'])(
+  it.each(['SUPPORT', 'INSTRUCTOR', 'STUDENT'])(
     'allows granting the standard role %s without the actor holding ADMIN',
     async (role) => {
       const { p, findUnique } = policy([]);
@@ -60,7 +55,7 @@ describe('RoleManagementPolicy.assertMayGrantRole', () => {
 
 describe('RoleManagementPolicy.assertMayGrantPermission', () => {
   it.each(ELEVATED_PERMISSIONS)('rejects granting %s when the actor is not ADMIN', async (permission) => {
-    const { p } = policy(['FINANCE', 'STAFF']);
+    const { p } = policy(['SUPPORT']);
     await expect(p.assertMayGrantPermission(ACTOR, permission)).rejects.toMatchObject({
       response: { code: 'ELEVATED_PERMISSION_GRANT_REQUIRES_ADMIN' },
     });

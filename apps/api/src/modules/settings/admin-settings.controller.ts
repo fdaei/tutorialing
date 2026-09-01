@@ -5,7 +5,7 @@ import { SettingDto } from './dto/setting.dto';
 import { SettingsService } from './settings.service';
 import { ApiTags } from '@nestjs/swagger';
 
-@Roles('ADMIN', 'STAFF')
+@Roles('ADMIN')
 @ApiTags('admin')
 @RequirePermissions(PermissionKeys.Settings.Manage)
 @Controller('admin')

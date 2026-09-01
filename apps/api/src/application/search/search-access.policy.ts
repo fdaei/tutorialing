@@ -7,7 +7,7 @@ import type { SearchEntity } from './search.service';
  * endpoint — see ROLE_MANAGEMENT_POLICY.md's neighbour, AUDIT/SEC-208-design.md,
  * for the reasoning behind each choice.
  *
- * `@Roles('ADMIN','STAFF','FINANCE','SUPPORT','EXAMINER')` on the controller
+ * `@Roles('ADMIN','ADMIN','SUPPORT','SUPPORT','SUPPORT')` on the controller
  * only established that the caller is staff-tier; it never implied they may
  * read every entity. This map is what does that (SEC-208).
  */

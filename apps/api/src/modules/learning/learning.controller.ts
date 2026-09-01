@@ -12,22 +12,22 @@ export class LearningController {
 
   @Get('plans')
   plans(@CurrentUser() u: AuthUser) {
-    return this.s.plans(u.id, u.roles.includes('TEACHER'));
+    return this.s.plans(u.id, u.roles.includes('INSTRUCTOR'));
   }
 
-  @Roles('TEACHER')
+  @Roles('INSTRUCTOR')
   @Post('trial-evaluations')
   evaluate(@CurrentUser() u: AuthUser, @Body() d: EvaluationDto) {
     return this.s.evaluate(u.id, d);
   }
 
-  @Roles('TEACHER')
+  @Roles('INSTRUCTOR')
   @Post('plans')
   plan(@CurrentUser() u: AuthUser, @Body() d: PlanDto) {
     return this.s.createPlan(u.id, d);
   }
 
-  @Roles('TEACHER')
+  @Roles('INSTRUCTOR')
   @Post('plans/:id/assignments')
   assignment(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() d: AssignmentDto) {
     return this.s.assignment(u.id, id, d);

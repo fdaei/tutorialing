@@ -5,19 +5,18 @@ const permissionsOf = (identity: PanelIdentity) => (Array.isArray(identity.permi
 
 const hasRole = (identity: PanelIdentity, ...roles: string[]) => rolesOf(identity).some((role) => roles.includes(role));
 const hasPermission = (identity: PanelIdentity, permission: string) => permissionsOf(identity).includes(permission);
-/** ADMIN and STAFF reach every admin section, so every admin rule starts here. */
-const isAdmin = (identity: PanelIdentity) => hasRole(identity, 'ADMIN', 'STAFF');
+const isAdmin = (identity: PanelIdentity) => hasRole(identity, 'ADMIN');
 
 export function panelHome(identity: PanelIdentity) {
   if (isAdmin(identity)) return '/admin';
-  if (hasRole(identity, 'SUPPORT') && hasPermission(identity, 'tickets.read')) return '/admin/tickets';
-  if (hasRole(identity, 'FINANCE')) {
+  if (hasRole(identity, 'SUPPORT')) {
+    if (hasPermission(identity, 'tests.review')) return '/admin/test-reviews';
     if (hasPermission(identity, 'teacher-prices.manage')) return '/admin/teacher-prices';
     if (hasPermission(identity, 'payouts.manage')) return '/admin/payouts';
     if (hasPermission(identity, 'payments.refund')) return '/admin/refunds';
+    if (hasPermission(identity, 'tickets.read')) return '/admin/tickets';
   }
-  if (hasRole(identity, 'EXAMINER')) return '/admin/test-reviews';
-  if (hasRole(identity, 'TEACHER')) return '/teacher-panel';
+  if (hasRole(identity, 'INSTRUCTOR')) return '/teacher-panel';
   return '/dashboard';
 }
 
@@ -37,19 +36,22 @@ const ROUTE_RULES: ReadonlyArray<{ pattern: RegExp; allow: (identity: PanelIdent
   },
   {
     pattern: /^\/admin\/teacher-prices(?:\/|$)/,
-    allow: (i) => isAdmin(i) || (hasRole(i, 'FINANCE') && hasPermission(i, 'teacher-prices.manage')),
+    allow: (i) => isAdmin(i) || (hasRole(i, 'SUPPORT') && hasPermission(i, 'teacher-prices.manage')),
   },
   {
     pattern: /^\/admin\/payouts(?:\/|$)/,
-    allow: (i) => isAdmin(i) || (hasRole(i, 'FINANCE') && hasPermission(i, 'payouts.manage')),
+    allow: (i) => isAdmin(i) || (hasRole(i, 'SUPPORT') && hasPermission(i, 'payouts.manage')),
   },
   {
     pattern: /^\/admin\/refunds(?:\/|$)/,
-    allow: (i) => isAdmin(i) || (hasRole(i, 'FINANCE') && hasPermission(i, 'payments.refund')),
+    allow: (i) => isAdmin(i) || (hasRole(i, 'SUPPORT') && hasPermission(i, 'payments.refund')),
   },
-  { pattern: /^\/admin\/test-reviews(?:\/|$)/, allow: (i) => isAdmin(i) || hasRole(i, 'EXAMINER') },
+  {
+    pattern: /^\/admin\/test-reviews(?:\/|$)/,
+    allow: (i) => isAdmin(i) || (hasRole(i, 'SUPPORT') && hasPermission(i, 'tests.review')),
+  },
   { pattern: /^\/admin(?:\/|$)/, allow: isAdmin },
-  { pattern: /^\/teacher-panel(?:\/|$)/, allow: (i) => hasRole(i, 'TEACHER', 'ADMIN') },
+  { pattern: /^\/teacher-panel(?:\/|$)/, allow: (i) => hasRole(i, 'INSTRUCTOR', 'ADMIN') },
   // Signed-in areas with no role requirement beyond having an account.
   { pattern: /^\/(?:dashboard|panel|checkout|matching|placement|teacher-apply|teachers)(?:\/|$)/, allow: () => true },
   { pattern: /^\/payment\/(?:success|failure|pending|development)(?:\/|$)/, allow: () => true },

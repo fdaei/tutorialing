@@ -20,10 +20,10 @@ export class BookingsController {
     return plainToInstance(BookingResponseDto, b, { excludeExtraneousValues: true });
   }
   @Get('me') async mine(@CurrentUser() u: AuthUser) {
-    const list = await this.s.list(u.id, u.roles.includes('TEACHER') ? 'teacher' : 'student');
+    const list = await this.s.list(u.id, u.roles.includes('INSTRUCTOR') ? 'teacher' : 'student');
     return plainToInstance(BookingResponseDto, list, { excludeExtraneousValues: true });
   }
-  @Roles('TEACHER') @Get('students') students(@CurrentUser() u: AuthUser) {
+  @Roles('INSTRUCTOR') @Get('students') students(@CurrentUser() u: AuthUser) {
     return this.s.students(u.id);
   }
   @RateLimit(RATE_LIMIT_TIERS.moneyAdjacent)
@@ -50,14 +50,14 @@ export class BookingsController {
   ) {
     return this.s.declineReschedule(u.id, id, d.reason);
   }
-  @Roles('TEACHER', 'ADMIN', 'STAFF') @Put(':id/attendance') attendance(
+  @Roles('INSTRUCTOR', 'ADMIN') @Put(':id/attendance') attendance(
     @CurrentUser() u: AuthUser,
     @Param('id') id: string,
     @Body() d: AttendanceDto,
   ) {
     return this.s.attendance(u.id, u.roles, id, d);
   }
-  @Roles('TEACHER', 'ADMIN', 'STAFF') @Post(':id/complete') complete(
+  @Roles('INSTRUCTOR', 'ADMIN') @Post(':id/complete') complete(
     @CurrentUser() u: AuthUser,
     @Param('id') id: string,
   ) {

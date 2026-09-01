@@ -4,7 +4,10 @@ import { CourseDirectory } from './course-directory';
 import type { Course } from '@/lib/marketplace-data';
 import { LocaleProvider } from '@/components/shared/locale-provider';
 
-jest.mock('next/image', () => ({ __esModule: true, default: (props: React.ImgHTMLAttributes<HTMLImageElement>) => <img {...props} /> }));
+jest.mock('next/image', () => ({
+  __esModule: true,
+  default: (props: React.ImgHTMLAttributes<HTMLImageElement>) => <img {...props} />,
+}));
 
 const courses: Course[] = [
   {
@@ -54,7 +57,11 @@ describe('CourseDirectory', () => {
   });
 
   it('localizes filters, results, course cards, and links in English', () => {
-    render(<LocaleProvider locale="en"><CourseDirectory courses={courses} /></LocaleProvider>);
+    render(
+      <LocaleProvider locale="en">
+        <CourseDirectory courses={courses} />
+      </LocaleProvider>,
+    );
 
     fireEvent.click(screen.getByRole('button', { name: 'German' }));
     expect(screen.getByRole('heading', { name: 'German courses' })).toBeInTheDocument();

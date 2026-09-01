@@ -5,6 +5,6 @@ export class RoleDto {
   @IsString()
   userId!: string;
 
-  @IsIn(['STUDENT', 'TEACHER', 'ADMIN', 'STAFF', 'EXAMINER', 'SUPPORT', 'FINANCE'])
+  @IsIn(['STUDENT', 'INSTRUCTOR', 'SUPPORT', 'ADMIN'])
   role!: Role;
 }

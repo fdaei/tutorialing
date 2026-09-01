@@ -21,7 +21,14 @@ import { RoleManagementPolicy } from './authorization/role-management.policy';
     }),
   ],
   controllers: [AuthController, AdminAuthorizationController],
-  providers: [AuthService, SmsService, AccessGuard, TokenRevocationService, AuthorizationManagementService, RoleManagementPolicy],
+  providers: [
+    AuthService,
+    SmsService,
+    AccessGuard,
+    TokenRevocationService,
+    AuthorizationManagementService,
+    RoleManagementPolicy,
+  ],
   exports: [AuthService, AccessGuard, TokenRevocationService, AuthorizationManagementService],
 })
 export class AuthModule {}

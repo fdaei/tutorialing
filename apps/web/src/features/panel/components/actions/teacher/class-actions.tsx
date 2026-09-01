@@ -2,7 +2,19 @@
 
 import { translate } from '@/lib/i18n';
 import { api } from '@/shared/services/api';
-import { Area, BookingSelect, Field, Localized, Select, Shell, Status, StudentSelect, Submit, useAction, value } from '../shared/action-controls';
+import {
+  Area,
+  BookingSelect,
+  Field,
+  Localized,
+  Select,
+  Shell,
+  Status,
+  StudentSelect,
+  Submit,
+  useAction,
+  value,
+} from '../shared/action-controls';
 export function ClassActions({ endpoint, fa }: { endpoint: string } & Localized) {
   const action = useAction(endpoint);
   return (

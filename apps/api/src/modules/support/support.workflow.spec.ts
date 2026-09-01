@@ -14,7 +14,7 @@ describe('SupportService status and assignment history', () => {
       smsProvider,
     );
 
-    await service.list('student-1', ['STUDENT'], { page: 1, pageSize: 20 });
+    await service.list('student-1', ['STUDENT'], [], { page: 1, pageSize: 20 });
 
     expect(findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { userId: 'student-1' } }));
     expect(count).toHaveBeenCalledWith({ where: { userId: 'student-1' } });
@@ -33,7 +33,7 @@ describe('SupportService status and assignment history', () => {
       notification: { create: jest.fn() },
     };
     const service = new SupportService({ $transaction: jest.fn((callback) => callback(tx)) } as any, smsProvider);
-    await service.changeStatus('support-1', ['SUPPORT'], 'ticket-1', 'IN_PROGRESS');
+    await service.changeStatus('support-1', ['SUPPORT'], ['tickets.manage'], 'ticket-1', 'IN_PROGRESS');
     expect(tx.ticketStatusHistory.create).toHaveBeenCalledWith({
       data: expect.objectContaining({ fromStatus: 'OPEN', toStatus: 'IN_PROGRESS', actorId: 'support-1' }),
     });
@@ -66,7 +66,7 @@ describe('SupportService status and assignment history', () => {
       notificationPreference: { findUnique: jest.fn().mockResolvedValue({ sms: false }) },
     } as any;
     const service = new SupportService(db, smsProvider);
-    await service.assign('admin-1', ['ADMIN'], 'ticket-1', 'support-2');
+    await service.assign('admin-1', ['ADMIN'], [], 'ticket-1', 'support-2');
     expect(tx.ticketAssignmentHistory.create).toHaveBeenCalledWith({
       data: expect.objectContaining({ fromAssigneeId: null, toAssigneeId: 'support-2', actorId: 'admin-1' }),
     });
@@ -100,18 +100,27 @@ describe('SupportService.detail (SEC-210)', () => {
 
   it('rejects a different (non-staff) user requesting another user’s ticket', async () => {
     const { service } = harness();
-    await expect(service.detail('user-b', ['STUDENT'], TICKET.id)).rejects.toMatchObject({
+    await expect(service.detail('user-b', ['STUDENT'], [], TICKET.id)).rejects.toMatchObject({
       response: { code: 'TICKET_NOT_FOUND' },
     });
   });
 
   it('still lets the owning user read their own ticket', async () => {
     const { service } = harness();
-    await expect(service.detail('user-a', ['STUDENT'], TICKET.id)).resolves.toMatchObject({ id: TICKET.id });
+    await expect(service.detail('user-a', ['STUDENT'], [], TICKET.id)).resolves.toMatchObject({ id: TICKET.id });
   });
 
   it('lets staff read a ticket they do not own', async () => {
     const { service } = harness();
-    await expect(service.detail('support-1', ['SUPPORT'], TICKET.id)).resolves.toMatchObject({ id: TICKET.id });
+    await expect(service.detail('support-1', ['SUPPORT'], ['tickets.read'], TICKET.id)).resolves.toMatchObject({
+      id: TICKET.id,
+    });
+  });
+
+  it('does not treat an unrelated SUPPORT permission set as ticket authority', async () => {
+    const { service } = harness();
+    await expect(service.detail('finance-1', ['SUPPORT'], ['payments.read'], TICKET.id)).rejects.toMatchObject({
+      response: { code: 'TICKET_NOT_FOUND' },
+    });
   });
 });

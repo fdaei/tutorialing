@@ -5,7 +5,18 @@ import { useQuery } from '@tanstack/react-query';
 import { api, ApiError } from '@/shared/services/api';
 import type { EducationalLanguage } from '@/features/languages';
 import { useTranslations } from '@/components/shared/locale-provider';
-import { Area, Field, Localized, Shell, Status, Submit, list, numeric, useAction, value } from '../shared/action-controls';
+import {
+  Area,
+  Field,
+  Localized,
+  Shell,
+  Status,
+  Submit,
+  list,
+  numeric,
+  useAction,
+  value,
+} from '../shared/action-controls';
 export function TeacherApplicationForm({ endpoint, fa }: { endpoint: string } & Localized) {
   const { locale } = useTranslations();
   const action = useAction(endpoint);

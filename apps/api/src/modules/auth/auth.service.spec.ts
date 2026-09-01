@@ -57,12 +57,19 @@ describe('OTP hashing', () => {
     const code = h.sms.sendOtp.mock.calls[0][1] as string;
     const stored = h.challenges[0]!.codeHash as string;
     h.db.otpChallenge.findUnique.mockResolvedValue({
-      id: 'challenge-1', phone: PHONE, userId: 'user-1', codeHash: stored,
-      attempts: 0, verifiedAt: null, expiresAt: new Date(Date.now() + 60e3),
+      id: 'challenge-1',
+      phone: PHONE,
+      userId: 'user-1',
+      codeHash: stored,
+      attempts: 0,
+      verifiedAt: null,
+      expiresAt: new Date(Date.now() + 60e3),
     });
     // Reaches session creation, which this harness does not stub — proof the
     // digest comparison itself passed.
-    await expect(h.svc.verifyOtp('challenge-1', PHONE, code, {})).rejects.not.toMatchObject({ message: 'Incorrect OTP' });
+    await expect(h.svc.verifyOtp('challenge-1', PHONE, code, {})).rejects.not.toMatchObject({
+      message: 'Incorrect OTP',
+    });
   });
 
   it('rejects a wrong code', async () => {
@@ -70,8 +77,13 @@ describe('OTP hashing', () => {
     await h.svc.requestOtp(PHONE);
     const stored = h.challenges[0]!.codeHash as string;
     h.db.otpChallenge.findUnique.mockResolvedValue({
-      id: 'challenge-1', phone: PHONE, userId: 'user-1', codeHash: stored,
-      attempts: 0, verifiedAt: null, expiresAt: new Date(Date.now() + 60e3),
+      id: 'challenge-1',
+      phone: PHONE,
+      userId: 'user-1',
+      codeHash: stored,
+      attempts: 0,
+      verifiedAt: null,
+      expiresAt: new Date(Date.now() + 60e3),
     });
     await expect(h.svc.verifyOtp('challenge-1', PHONE, '000000', {})).rejects.toMatchObject({
       response: expect.objectContaining({ code: 'OTP_INCORRECT' }),
@@ -99,7 +111,9 @@ describe('password authentication', () => {
     expect(saved.email).toBe('user@example.com');
     expect(saved.passwordHash).not.toBe('correct-horse');
     expect(String(saved.passwordHash)).toMatch(/^scrypt\$/);
-    await expect(svc.loginWithPassword('USER@example.com', 'correct-horse', {})).resolves.toMatchObject({ accessToken: 'token' });
+    await expect(svc.loginWithPassword('USER@example.com', 'correct-horse', {})).resolves.toMatchObject({
+      accessToken: 'token',
+    });
     await expect(svc.loginWithPassword('user@example.com', 'wrong-password', {})).rejects.toMatchObject({
       response: expect.objectContaining({ code: 'INVALID_CREDENTIALS' }),
     });
@@ -115,8 +129,14 @@ describe('password authentication', () => {
  * could never hit: a stored hash of a different length than the computed one.
  */
 const ACTIVE_USER = {
-  id: 'user-1', phone: PHONE, name: null, locale: 'fa', timezone: 'Asia/Tehran',
-  profileComplete: false, status: 'ACTIVE', roles: [],
+  id: 'user-1',
+  phone: PHONE,
+  name: null,
+  locale: 'fa',
+  timezone: 'Asia/Tehran',
+  profileComplete: false,
+  status: 'ACTIVE',
+  roles: [],
 };
 
 /** The `where` shape of the atomic rotation claim, as opposed to a family revoke. */
@@ -130,9 +150,11 @@ function refreshHarness(session: unknown, claimedRows = 1) {
       update: jest.fn().mockResolvedValue({}),
       // Both the rotation claim and `revokeFamily` are `updateMany`; the claim
       // is the one filtered by session id, so assertions match on `where`.
-      updateMany: jest.fn().mockImplementation(({ where }: { where: { familyId?: string } }) =>
-        Promise.resolve({ count: where.familyId ? 1 : claimedRows }),
-      ),
+      updateMany: jest
+        .fn()
+        .mockImplementation(({ where }: { where: { familyId?: string } }) =>
+          Promise.resolve({ count: where.familyId ? 1 : claimedRows }),
+        ),
     },
     user: { findUniqueOrThrow: jest.fn().mockResolvedValue(ACTIVE_USER) },
   };
@@ -141,11 +163,15 @@ function refreshHarness(session: unknown, claimedRows = 1) {
   db.$transaction = jest.fn((run: (tx: unknown) => unknown) => run(db));
   const jwt = { signAsync: jest.fn().mockResolvedValue('new-access-token') };
   const svc = new AuthService(db as never, jwt as never, {} as never);
-  return { svc, db: db as never as {
-    refreshSession: Record<'findUnique' | 'create' | 'update' | 'updateMany', jest.Mock>;
-    user: { findUniqueOrThrow: jest.Mock };
-    $transaction: jest.Mock;
-  }, jwt };
+  return {
+    svc,
+    db: db as never as {
+      refreshSession: Record<'findUnique' | 'create' | 'update' | 'updateMany', jest.Mock>;
+      user: { findUniqueOrThrow: jest.Mock };
+      $transaction: jest.Mock;
+    },
+    jwt,
+  };
 }
 
 function refreshSecretAndHash() {
@@ -157,8 +183,12 @@ describe('AuthService.refresh (SEC-209)', () => {
   it('1. succeeds with a valid, unexpired, unrevoked refresh token and rotates it', async () => {
     const { secret, tokenHash } = refreshSecretAndHash();
     const { svc, db } = refreshHarness({
-      id: 'session-1', userId: 'user-1', familyId: 'family-1', tokenHash,
-      revokedAt: null, expiresAt: new Date(Date.now() + 60_000),
+      id: 'session-1',
+      userId: 'user-1',
+      familyId: 'family-1',
+      tokenHash,
+      revokedAt: null,
+      expiresAt: new Date(Date.now() + 60_000),
     });
     const result = await svc.refresh(`session-1.${secret}`, {});
     expect(result.accessToken).toBe('new-access-token');
@@ -182,8 +212,12 @@ describe('AuthService.refresh (SEC-209)', () => {
   it('2. rejects an invalid refresh token (wrong secret) and revokes the family', async () => {
     const { tokenHash } = refreshSecretAndHash();
     const { svc, db } = refreshHarness({
-      id: 'session-1', userId: 'user-1', familyId: 'family-1', tokenHash,
-      revokedAt: null, expiresAt: new Date(Date.now() + 60_000),
+      id: 'session-1',
+      userId: 'user-1',
+      familyId: 'family-1',
+      tokenHash,
+      revokedAt: null,
+      expiresAt: new Date(Date.now() + 60_000),
     });
     await expect(svc.refresh('session-1.wrong-secret', {})).rejects.toMatchObject({
       response: { code: 'REFRESH_TOKEN_EXPIRED_OR_REUSED' },
@@ -206,8 +240,12 @@ describe('AuthService.refresh (SEC-209)', () => {
   it('3. rejects an expired refresh token and revokes the family', async () => {
     const { secret, tokenHash } = refreshSecretAndHash();
     const { svc, db } = refreshHarness({
-      id: 'session-1', userId: 'user-1', familyId: 'family-1', tokenHash,
-      revokedAt: null, expiresAt: new Date(Date.now() - 1_000),
+      id: 'session-1',
+      userId: 'user-1',
+      familyId: 'family-1',
+      tokenHash,
+      revokedAt: null,
+      expiresAt: new Date(Date.now() - 1_000),
     });
     await expect(svc.refresh(`session-1.${secret}`, {})).rejects.toMatchObject({
       response: { code: 'REFRESH_TOKEN_EXPIRED_OR_REUSED' },
@@ -221,8 +259,12 @@ describe('AuthService.refresh (SEC-209)', () => {
   it('3. rejects an already-revoked refresh token and revokes the family', async () => {
     const { secret, tokenHash } = refreshSecretAndHash();
     const { svc, db } = refreshHarness({
-      id: 'session-1', userId: 'user-1', familyId: 'family-1', tokenHash,
-      revokedAt: new Date(), expiresAt: new Date(Date.now() + 60_000),
+      id: 'session-1',
+      userId: 'user-1',
+      familyId: 'family-1',
+      tokenHash,
+      revokedAt: new Date(),
+      expiresAt: new Date(Date.now() + 60_000),
     });
     await expect(svc.refresh(`session-1.${secret}`, {})).rejects.toMatchObject({
       response: { code: 'REFRESH_TOKEN_EXPIRED_OR_REUSED' },
@@ -241,8 +283,12 @@ describe('AuthService.refresh (SEC-209)', () => {
     const { tokenHash: currentHash } = refreshSecretAndHash();
     const staleSecret = randomBytes(32).toString('base64url');
     const { svc, db } = refreshHarness({
-      id: 'session-1', userId: 'user-1', familyId: 'family-shared', tokenHash: currentHash,
-      revokedAt: null, expiresAt: new Date(Date.now() + 60_000),
+      id: 'session-1',
+      userId: 'user-1',
+      familyId: 'family-shared',
+      tokenHash: currentHash,
+      revokedAt: null,
+      expiresAt: new Date(Date.now() + 60_000),
     });
     await expect(svc.refresh(`session-1.${staleSecret}`, {})).rejects.toMatchObject({
       response: { code: 'REFRESH_TOKEN_EXPIRED_OR_REUSED' },
@@ -260,8 +306,12 @@ describe('AuthService.refresh (SEC-209)', () => {
     // digest), but defends against corrupt/legacy data.
     const { secret } = refreshSecretAndHash();
     const { svc, db } = refreshHarness({
-      id: 'session-1', userId: 'user-1', familyId: 'family-1', tokenHash: 'too-short',
-      revokedAt: null, expiresAt: new Date(Date.now() + 60_000),
+      id: 'session-1',
+      userId: 'user-1',
+      familyId: 'family-1',
+      tokenHash: 'too-short',
+      revokedAt: null,
+      expiresAt: new Date(Date.now() + 60_000),
     });
     await expect(svc.refresh(`session-1.${secret}`, {})).rejects.toMatchObject({
       response: { code: 'REFRESH_TOKEN_EXPIRED_OR_REUSED' },
@@ -286,8 +336,12 @@ type Conflict = 'serialization-failure' | 'no-rows';
 
 function racingHarness(tokenHash: string, conflict: Conflict) {
   const row = {
-    id: 'session-1', userId: 'user-1', familyId: 'family-1', tokenHash,
-    revokedAt: null as Date | null, expiresAt: new Date(Date.now() + 60_000),
+    id: 'session-1',
+    userId: 'user-1',
+    familyId: 'family-1',
+    tokenHash,
+    revokedAt: null as Date | null,
+    expiresAt: new Date(Date.now() + 60_000),
   };
   const createdSessionIds: string[] = [];
   const db: Record<string, unknown> = {
@@ -318,7 +372,12 @@ function racingHarness(tokenHash: string, conflict: Conflict) {
   db.$transaction = jest.fn((run: (tx: unknown) => unknown) => run(db));
   const jwt = { signAsync: jest.fn().mockResolvedValue('new-access-token') };
   const svc = new AuthService(db as never, jwt as never, {} as never);
-  return { svc, row, createdSessionIds, db: db as never as { refreshSession: { create: jest.Mock; updateMany: jest.Mock } } };
+  return {
+    svc,
+    row,
+    createdSessionIds,
+    db: db as never as { refreshSession: { create: jest.Mock; updateMany: jest.Mock } },
+  };
 }
 
 describe.each<Conflict>(['serialization-failure', 'no-rows'])(
@@ -361,8 +420,13 @@ describe.each<Conflict>(['serialization-failure', 'no-rows'])(
  */
 function otpRaceHarness(codeHash: string) {
   const challenge = {
-    id: 'challenge-1', phone: PHONE, userId: 'user-1', codeHash,
-    attempts: 0, verifiedAt: null as Date | null, expiresAt: new Date(Date.now() + 60_000),
+    id: 'challenge-1',
+    phone: PHONE,
+    userId: 'user-1',
+    codeHash,
+    attempts: 0,
+    verifiedAt: null as Date | null,
+    expiresAt: new Date(Date.now() + 60_000),
   };
   const createdSessionIds: string[] = [];
   const db: Record<string, unknown> = {

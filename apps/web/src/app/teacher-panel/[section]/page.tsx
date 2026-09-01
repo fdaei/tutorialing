@@ -8,6 +8,7 @@ import { TeacherPlannerCalendar } from '@/features/scheduling';
 import { redirect } from 'next/navigation';
 import { FeatureErrorBoundary } from '@/shared/components/error-boundaries';
 import { InstructorArticleWorkspace } from '@/features/blog';
+import { InstructorCourseWorkspace } from '@/features/courses';
 
 const map: Record<string, [string, string, string]> = {
   profile: ['پروفایل عمومی', 'Public profile', '/teacher/application'],
@@ -26,6 +27,7 @@ const map: Record<string, [string, string, string]> = {
   notifications: ['اعلان‌ها', 'Notifications', '/notifications'],
   settings: ['تنظیمات', 'Settings', '/users/me'],
   magazine: ['مجله', 'Magazine', '/blog/instructor/posts'],
+  courses: ['دوره‌های من', 'My courses', '/instructor/courses'],
 };
 
 export default async function Section({ params }: { params: Promise<{ section: string }> }) {
@@ -50,6 +52,8 @@ export default async function Section({ params }: { params: Promise<{ section: s
       <TeacherFinance />
     ) : section === 'magazine' ? (
       <InstructorArticleWorkspace />
+    ) : section === 'courses' ? (
+      <InstructorCourseWorkspace />
     ) : section === 'more' ? (
       <TeacherMore locale={locale} />
     ) : section === 'tickets' ? (

@@ -9,7 +9,7 @@ import { assertMaySearch } from './search-access.policy';
 // authenticated user could scrape users/payments/bookings/support-agents.
 // `@Roles` only establishes staff-tier; `assertMaySearch` below is what
 // scopes which entity a given staff-tier account may actually read (SEC-208).
-@Roles('ADMIN', 'STAFF', 'FINANCE', 'SUPPORT', 'EXAMINER')
+@Roles('ADMIN', 'SUPPORT')
 @RateLimit(RATE_LIMIT_TIERS.search)
 @Controller('search')
 export class SearchController {

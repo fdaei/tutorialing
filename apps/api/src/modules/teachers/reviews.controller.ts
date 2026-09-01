@@ -27,7 +27,7 @@ export class ReviewsController {
   @Delete(':id') remove(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.service.remove(user.id, id);
   }
-  @Roles('TEACHER') @Post(':id/reply') reply(
+  @Roles('INSTRUCTOR') @Post(':id/reply') reply(
     @CurrentUser() user: AuthUser,
     @Param('id') id: string,
     @Body() body: ReplyReviewDto,
@@ -36,7 +36,7 @@ export class ReviewsController {
   }
 }
 
-@Roles('ADMIN', 'STAFF')
+@Roles('ADMIN')
 @RequirePermissions(PermissionKeys.Reviews.Manage)
 @Controller('admin/reviews')
 @ApiTags('admin')

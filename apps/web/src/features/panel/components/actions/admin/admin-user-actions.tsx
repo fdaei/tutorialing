@@ -2,7 +2,17 @@
 
 import { translate } from '@/lib/i18n';
 import { api } from '@/shared/services/api';
-import { AdminUserSelect, Field, Localized, Select, Shell, Status, Submit, useAction, value } from '../shared/action-controls';
+import {
+  AdminUserSelect,
+  Field,
+  Localized,
+  Select,
+  Shell,
+  Status,
+  Submit,
+  useAction,
+  value,
+} from '../shared/action-controls';
 import { RoleOptions } from './role-options';
 export function AdminUserActions({ endpoint, fa }: { endpoint: string } & Localized) {
   const action = useAction(endpoint);

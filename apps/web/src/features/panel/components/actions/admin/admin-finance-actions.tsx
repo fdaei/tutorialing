@@ -2,7 +2,18 @@
 
 import { translate } from '@/lib/i18n';
 import { api } from '@/shared/services/api';
-import { Field, Localized, PaymentSelect, Select, Shell, Status, Submit, numeric, useAction, value } from '../shared/action-controls';
+import {
+  Field,
+  Localized,
+  PaymentSelect,
+  Select,
+  Shell,
+  Status,
+  Submit,
+  numeric,
+  useAction,
+  value,
+} from '../shared/action-controls';
 export function AdminFinanceActions({ endpoint, fa }: { endpoint: string } & Localized) {
   const action = useAction(endpoint);
   return (

@@ -24,9 +24,15 @@ function context(isPublic = false) {
 function guard(payload: Record<string, unknown>, revokedAt: number | Error = 0) {
   const jwt = { verifyAsync: jest.fn().mockResolvedValue(payload) };
   const revocation = {
-    revokedAt: jest.fn().mockImplementation(() => (revokedAt instanceof Error ? Promise.reject(revokedAt) : Promise.resolve(revokedAt))),
+    revokedAt: jest
+      .fn()
+      .mockImplementation(() => (revokedAt instanceof Error ? Promise.reject(revokedAt) : Promise.resolve(revokedAt))),
   };
-  return { jwt, revocation, build: (reflector: unknown) => new AccessGuard(reflector as never, jwt as never, revocation as never) };
+  return {
+    jwt,
+    revocation,
+    build: (reflector: unknown) => new AccessGuard(reflector as never, jwt as never, revocation as never),
+  };
 }
 
 const student = { id: 'user-1', roles: ['STUDENT'], permissions: [], sessionId: 's1', iat: NOW };

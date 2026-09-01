@@ -3,7 +3,7 @@ import { CurrentUser, RateLimit, RATE_LIMIT_TIERS, Roles, type AuthUser } from '
 import { PayoutsService } from './payouts.service';
 import { WithdrawalRequestDto } from '../dto/request/payouts.dto';
 
-@Roles('TEACHER')
+@Roles('INSTRUCTOR')
 @Controller('teacher/finance')
 export class TeacherFinanceController {
   constructor(private s: PayoutsService) {}

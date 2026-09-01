@@ -464,7 +464,7 @@ export class BookingsService {
   ) {
     const booking = await this.db.booking.findUnique({ where: { id }, include: { teacher: true } });
     if (!booking) throw notFound('BOOKING_NOT_FOUND');
-    if (roles.includes('TEACHER') && booking.teacher.userId !== actorId) throw forbidden('BOOKING_OWNERSHIP_REQUIRED');
+    if (roles.includes('INSTRUCTOR') && booking.teacher.userId !== actorId) throw forbidden('BOOKING_OWNERSHIP_REQUIRED');
     if (booking.status !== 'CONFIRMED') throw badRequest('ATTENDANCE_STATUS_INVALID');
     return this.db.booking.update({
       where: { id },
@@ -477,7 +477,7 @@ export class BookingsService {
       async (tx) => {
         const booking = await tx.booking.findUnique({ where: { id }, include: { teacher: true } });
         if (!booking) throw notFound('BOOKING_NOT_FOUND');
-        const isStaff = roles.some((role) => ['ADMIN', 'STAFF'].includes(role));
+        const isStaff = roles.some((role) => ['ADMIN'].includes(role));
         if (!isStaff && booking.teacher.userId !== actorId) throw forbidden('BOOKING_OWNERSHIP_REQUIRED');
         if (booking.status !== 'CONFIRMED') throw badRequest('BOOKING_NOT_COMPLETABLE');
         if (booking.endsAt > new Date()) throw badRequest('BOOKING_NOT_ENDED');

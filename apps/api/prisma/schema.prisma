@@ -9,12 +9,9 @@ datasource db {
 
 enum Role {
   STUDENT
-  TEACHER
+  INSTRUCTOR
   ADMIN
-  STAFF
-  EXAMINER
   SUPPORT
-  FINANCE
 }
 
 enum UserStatus {
@@ -193,6 +190,13 @@ enum BlogCommentStatus {
 enum BlogReactionType {
   LIKE
   DISLIKE
+}
+
+enum CourseLessonType {
+  VIDEO
+  AUDIO
+  TEXT
+  QUIZ
 }
 
 /// A user is identified by a phone number, a Google subject, or both. Both
@@ -379,6 +383,7 @@ model Teacher {
   earnings              Earning[]
   withdrawalRequests    WithdrawalRequest[]
   learningPlans         LearningPlan[]
+  courses               Course[]
   createdAt             DateTime                 @default(now())
   updatedAt             DateTime                 @updatedAt
 
@@ -417,6 +422,8 @@ model Course {
   language      String
   level         String
   teacherName   String
+  teacherId     String?
+  teacher       Teacher?           @relation(fields: [teacherId], references: [id], onDelete: SetNull)
   lessonsCount  Int
   price         Int
   image         String?
@@ -425,23 +432,96 @@ model Course {
   reviewsCount  Int                @default(0)
   enrollments   CourseEnrollment[]
   reviews       CourseReview[]
+  chapters      CourseChapter[]
   createdAt     DateTime           @default(now())
   updatedAt     DateTime           @updatedAt
 
   @@index([published, createdAt])
   @@index([published, rating])
+  @@index([teacherId, createdAt])
 }
 
 model CourseEnrollment {
-  id          String    @id @default(cuid())
-  userId      String
-  courseId    String
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  course      Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  completedAt DateTime?
-  createdAt   DateTime  @default(now())
+  id           String                 @id @default(cuid())
+  userId       String
+  courseId     String
+  user         User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course       Course                 @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  completedAt  DateTime?
+  lastLessonId String?
+  lastLesson   CourseLesson?          @relation("LastCourseLesson", fields: [lastLessonId], references: [id], onDelete: SetNull)
+  progress     CourseLessonProgress[]
+  createdAt    DateTime               @default(now())
 
   @@unique([userId, courseId])
+}
+
+model CourseChapter {
+  id        String         @id @default(cuid())
+  courseId  String
+  course    Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  titleFa   String
+  titleEn   String
+  order     Int
+  published Boolean        @default(true)
+  lessons   CourseLesson[]
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@unique([courseId, order])
+}
+
+model CourseLesson {
+  id              String                   @id @default(cuid())
+  chapterId       String
+  chapter         CourseChapter            @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  titleFa         String
+  titleEn         String
+  descriptionFa   String?
+  descriptionEn   String?
+  type            CourseLessonType
+  content         Json?
+  mediaUrl        String?
+  durationSeconds Int                      @default(0)
+  order           Int
+  preview         Boolean                  @default(false)
+  published       Boolean                  @default(true)
+  attachments     CourseLessonAttachment[]
+  progress        CourseLessonProgress[]
+  resumedBy       CourseEnrollment[]       @relation("LastCourseLesson")
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+
+  @@unique([chapterId, order])
+  @@index([chapterId, published, order])
+}
+
+model CourseLessonAttachment {
+  id        String       @id @default(cuid())
+  lessonId  String
+  lesson    CourseLesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  title     String
+  url       String
+  mimeType  String?
+  createdAt DateTime     @default(now())
+
+  @@index([lessonId])
+}
+
+model CourseLessonProgress {
+  id              String           @id @default(cuid())
+  enrollmentId    String
+  enrollment      CourseEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  lessonId        String
+  lesson          CourseLesson     @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  positionSeconds Int              @default(0)
+  completedAt     DateTime?
+  lastViewedAt    DateTime         @default(now())
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@unique([enrollmentId, lessonId])
+  @@index([enrollmentId, completedAt])
 }
 
 model CourseReview {

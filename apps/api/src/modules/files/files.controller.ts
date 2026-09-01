@@ -33,6 +33,6 @@ export class FilesController {
 
   @Get(':id/download')
   download(@CurrentUser() u: AuthUser, @Param('id') id: string) {
-    return this.s.download(u.id, u.roles, id);
+    return this.s.download(u.id, u.roles, u.permissions, id);
   }
 }

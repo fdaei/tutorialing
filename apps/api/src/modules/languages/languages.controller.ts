@@ -23,7 +23,7 @@ export class CountriesController {
   }
 }
 
-@Roles('ADMIN', 'STAFF')
+@Roles('ADMIN')
 @RequirePermissions(PermissionKeys.Languages.Manage)
 @Controller('admin/languages')
 @ApiTags('admin')
@@ -55,7 +55,7 @@ export class AdminLanguagesController {
   }
 }
 
-@Roles('ADMIN', 'STAFF')
+@Roles('ADMIN')
 @RequirePermissions(PermissionKeys.Languages.Manage)
 @Controller('admin/countries')
 @ApiTags('admin')

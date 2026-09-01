@@ -8,15 +8,19 @@ import { PermissionDto } from './permission.dto';
 import { UserRolesDto } from './user-roles.dto';
 import { ApiTags } from '@nestjs/swagger';
 
-@Roles('ADMIN', 'STAFF')
+@Roles('ADMIN')
 @ApiTags('admin')
 @RequirePermissions(PermissionKeys.Roles.Manage)
 @Controller('admin')
 export class AdminAuthorizationController {
   constructor(private readonly authorization: AuthorizationManagementService) {}
 
-  @Get('roles') roles() { return this.authorization.roles(); }
-  @Get('permissions') permissions() { return this.authorization.permissions(); }
+  @Get('roles') roles() {
+    return this.authorization.roles();
+  }
+  @Get('permissions') permissions() {
+    return this.authorization.permissions();
+  }
 
   @RateLimit(RATE_LIMIT_TIERS.adminWrite)
   @Patch('users/:id/roles')

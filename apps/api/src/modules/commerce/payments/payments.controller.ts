@@ -77,7 +77,7 @@ export class PaymentsController {
     return this.walletSvc.invoices(u.id);
   }
 
-  @Roles('ADMIN', 'FINANCE')
+  @Roles('ADMIN', 'SUPPORT')
   @RequirePermissions(PermissionKeys.Payments.Refund)
   @RateLimit(RATE_LIMIT_TIERS.moneyAdjacent)
   @Post(':id/refunds')
