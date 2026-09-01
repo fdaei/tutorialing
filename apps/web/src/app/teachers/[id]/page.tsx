@@ -40,6 +40,8 @@ export default async function Profile({ params }: { params: Promise<{ id: string
     if (error instanceof ApiError && error.status === 404) notFound();
     throw error;
   }
+  const english = locale === 'en';
+  const copy = (fa: string, en: string) => english ? en : fa;
   return (
     <>
       <Header />
@@ -51,7 +53,7 @@ export default async function Profile({ params }: { params: Promise<{ id: string
                 <UserRound size={58} />
               </div>
               <div className="relative min-w-0 flex-1">
-                <p className="mb-2 text-sm font-bold text-white/65">مدرس تأییدشده لینگواسپیک</p>
+                <p className="mb-2 text-sm font-bold text-white/65">{copy('مدرس تأییدشده لینگواسپیک', 'Verified LingoSpeak teacher')}</p>
                 <h1 className="flex flex-wrap items-center gap-3 text-3xl font-black text-white md:text-4xl">
                   {localized({ fa: t.nameFa, en: t.nameEn }, locale)} <BadgeCheck className="text-sky-300" />
                 </h1>
@@ -61,17 +63,17 @@ export default async function Profile({ params }: { params: Promise<{ id: string
                 <div className="mt-5 flex flex-wrap gap-4 text-sm text-white/80">
                   <span className="flex items-center gap-2">
                     <Star className="fill-amber-400 text-amber-400" size={18} />
-                    <b className="latin">{t.rating || '—'}</b> ({t.reviewsCount.toLocaleString('fa-IR')} نظر)
+                    <b className="latin">{t.rating || '—'}</b> ({t.reviewsCount.toLocaleString(english ? 'en-US' : 'fa-IR')} {copy('نظر', 'reviews')})
                   </span>
                   <span className="flex items-center gap-2">
                     <Users size={18} />
-                    {(t.studentsCount ?? 0).toLocaleString('fa-IR')} زبان‌آموز
+                    {(t.studentsCount ?? 0).toLocaleString(english ? 'en-US' : 'fa-IR')} {copy('زبان‌آموز', 'learners')}
                   </span>
                   <span className="flex items-center gap-2">
                     <Languages size={18} />
                     {t.languageLinks
                       ?.map((x) => localized({ fa: x.language.nameFa, en: x.language.nameEn }, locale))
-                      .join('، ')}
+                      .join(english ? ', ' : '، ')}
                   </span>
                 </div>
               </div>
@@ -87,11 +89,11 @@ export default async function Profile({ params }: { params: Promise<{ id: string
                 <span className="grid size-10 place-items-center rounded-xl bg-lavender text-purple">
                   <Play size={18} />
                 </span>
-                ویدیوی معرفی این مدرس هنوز منتشر نشده است.
+                {copy('ویدیوی معرفی این مدرس هنوز منتشر نشده است.', 'This teacher has not published an introduction video yet.')}
               </div>
             )}
             <div className="mt-7 rounded-3xl border hairline bg-white p-6 md:p-8">
-              <h2 className="text-xl font-black">درباره مدرس</h2>
+              <h2 className="text-xl font-black">{copy('درباره مدرس', 'About the teacher')}</h2>
               <p className="mt-4 text-base leading-9 text-muted">
                 {localized({ fa: t.bioFa, en: t.bioEn ?? t.bioFa }, locale)}
               </p>
@@ -111,7 +113,7 @@ export default async function Profile({ params }: { params: Promise<{ id: string
         <ReviewSection
           subject="teacher"
           subjectId={t.id}
-          title="نظر دانشجویان درباره این مدرس"
+          title={copy('نظر دانشجویان درباره این مدرس', 'Learner reviews of this teacher')}
           rating={t.rating}
           count={t.reviewsCount}
           reviews={t.reviews ?? []}

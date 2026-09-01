@@ -7,6 +7,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import { api, apiMessage, type Paginated } from '@/shared/services/api';
 import type { Country } from '@/features/languages';
 import { useTranslations } from '@/components/shared/locale-provider';
+import { adminDeleteConfirmation } from '../admin-confirmation';
 
 const emptyForm = {
   code: '',
@@ -123,14 +124,21 @@ export function CountryManager() {
                     <td className="p-3">
                       <div className="flex justify-end gap-2">
                         <button
+                          type="button"
                           onClick={() => edit(item)}
                           className="rounded-lg border hairline px-3 py-2 font-bold text-blue"
                         >
                           {translate(locale, 'admincountryManagerEdit')}
                         </button>
                         <button
+                          type="button"
                           aria-label={translate(locale, 'admincountryManagerDeleteCountry')}
-                          onClick={() => remove.mutate(item.id)}
+                          disabled={remove.isPending}
+                          onClick={() =>
+                            window.confirm(
+                              adminDeleteConfirmation(localized({ fa: item.nameFa, en: item.nameEn }, locale), locale),
+                            ) && remove.mutate(item.id)
+                          }
                           className="grid size-9 place-items-center rounded-lg text-red-600 hover:bg-red-50"
                         >
                           <Trash2 size={17} />
@@ -142,6 +150,11 @@ export function CountryManager() {
               </tbody>
             </table>
           </div>
+        )}
+        {remove.isError && (
+          <p role="alert" className="mt-4 rounded-xl bg-red-50 p-3 text-red-800">
+            {apiMessage(remove.error, localized({ fa: 'حذف کشور انجام نشد.', en: 'The country could not be deleted.' }, locale))}
+          </p>
         )}
         <div className="mt-5 flex items-center justify-between">
           <button
@@ -169,7 +182,13 @@ export function CountryManager() {
             ? translate(locale, 'admincountryManagerEditCountry')
             : translate(locale, 'admincountryManagerAddCountry')}
         </h2>
-        <div className="mt-5 grid gap-4">
+        <form
+          className="mt-5 grid gap-4"
+          onSubmit={(event) => {
+            event.preventDefault();
+            save.mutate();
+          }}
+        >
           <div className="grid grid-cols-[90px_1fr] gap-3">
             <Field label="ISO">
               <input
@@ -184,6 +203,8 @@ export function CountryManager() {
                   })
                 }
                 className="input latin"
+                required
+                pattern="[A-Z]{2}"
               />
             </Field>
             <Field label={translate(locale, 'admincountryManagerFlag')}>
@@ -191,6 +212,9 @@ export function CountryManager() {
                 value={form.flag}
                 onChange={(e) => setForm({ ...form, flag: e.target.value })}
                 className="input text-center"
+                required
+                minLength={2}
+                maxLength={8}
               />
             </Field>
           </div>
@@ -199,6 +223,8 @@ export function CountryManager() {
               value={form.nameFa}
               onChange={(e) => setForm({ ...form, nameFa: e.target.value })}
               className="input"
+              required
+              maxLength={100}
             />
           </Field>
           <Field label={translate(locale, 'admincountryManagerEnglishName')}>
@@ -207,6 +233,8 @@ export function CountryManager() {
               value={form.nameEn}
               onChange={(e) => setForm({ ...form, nameEn: e.target.value })}
               className="input"
+              required
+              maxLength={100}
             />
           </Field>
           <Field label={translate(locale, 'admincountryManagerCallingCode')}>
@@ -215,6 +243,8 @@ export function CountryManager() {
               value={form.dialCode}
               onChange={(e) => setForm({ ...form, dialCode: `+${e.target.value.replace(/\D/g, '').slice(0, 4)}` })}
               className="input"
+              required
+              pattern="\+[1-9][0-9]{0,3}"
             />
           </Field>
           <div className="grid grid-cols-2 gap-3">
@@ -242,6 +272,8 @@ export function CountryManager() {
           <Field label={translate(locale, 'admincountryManagerOrder')}>
             <input
               type="number"
+              min={0}
+              max={10000}
               value={form.order}
               onChange={(e) => setForm({ ...form, order: Number(e.target.value) })}
               className="input"
@@ -263,8 +295,8 @@ export function CountryManager() {
           )}
           <div className="flex gap-3">
             <button
+              type="submit"
               disabled={save.isPending}
-              onClick={() => save.mutate()}
               className="brand-gradient flex flex-1 items-center justify-center gap-2 rounded-xl py-3 font-black text-white"
             >
               <Plus size={18} />
@@ -272,6 +304,7 @@ export function CountryManager() {
             </button>
             {editing && (
               <button
+                type="button"
                 onClick={() => {
                   setEditing(null);
                   setForm(emptyForm);
@@ -282,7 +315,7 @@ export function CountryManager() {
               </button>
             )}
           </div>
-        </div>
+        </form>
       </section>
     </div>
   );

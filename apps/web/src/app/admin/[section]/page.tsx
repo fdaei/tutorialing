@@ -1,4 +1,5 @@
 import { localized, isDefaultLocale } from '@/lib/i18n';
+import { notFound } from 'next/navigation';
 import { PanelActions, PanelShell, ResourceView, adminNav } from '@/features/panel';
 import {
   AdminFinanceCenter,
@@ -7,6 +8,9 @@ import {
   CountryManager,
   ExaminerReviewManager,
   LanguageManager,
+  adminSectionConfig,
+  isAdminSection,
+  TeacherDocumentsManager,
 } from '@/features/admin';
 import { TicketManager } from '@/features/support';
 import { PricingManager } from '@/features/commerce';
@@ -15,37 +19,12 @@ import { TeacherPlannerCalendar } from '@/features/scheduling';
 import { FeatureErrorBoundary } from '@/shared/components/error-boundaries';
 import { AdminArticleReviewWorkspace } from '@/features/blog';
 
-const map: Record<string, [string, string, string]> = {
-  users: ['کاربران', 'Users', '/admin/users'],
-  teachers: ['مدرس‌ها', 'Teachers', '/admin/teacher-applications'],
-  'teacher-applications': ['درخواست‌های مدرس', 'Teacher applications', '/admin/teacher-applications'],
-  'teacher-documents': ['مدارک مدرس', 'Teacher documents', '/admin/teacher-applications'],
-  tests: ['آزمون‌ها', 'Tests', '/admin/tests'],
-  bookings: ['رزروها', 'Bookings', '/admin/bookings'],
-  'availability-blocks': ['مسدودی‌های زمان', 'Availability blocks', '/admin/bookings'],
-  finance: ['امور مالی', 'Finance', '/admin/payments'],
-  payments: ['پرداخت‌ها و بازپرداخت', 'Payments and refunds', '/admin/payments'],
-  discounts: ['کدهای تخفیف', 'Discounts', '/admin/payments'],
-  refunds: ['بازپرداخت‌ها', 'Refunds', '/admin/payments'],
-  'teacher-earnings': ['درآمد مدرس‌ها', 'Teacher earnings', '/admin/reports'],
-  payouts: ['تسویه‌ها', 'Payouts', '/admin/reports'],
-  reviews: ['نظرات مدرس‌ها', 'Teacher reviews', '/admin/reviews'],
-  notifications: ['لاگ ارسال پیامک و اعلان', 'Notification deliveries', '/admin/notification-deliveries'],
-  roles: ['نقش‌ها و مجوزها', 'Roles and permissions', '/admin/roles'],
-  reports: ['گزارش‌های مدیریتی', 'Management reports', '/admin/reports'],
-  audit: ['گزارش فعالیت', 'Audit log', '/admin/audit-logs'],
-  cms: ['مدیریت محتوا', 'CMS', '/admin/cms'],
-  magazine: ['بررسی مجله', 'Magazine review', '/blog/review/queue'],
-  settings: ['تنظیمات', 'Settings', '/admin/settings'],
-  countries: ['کشورها و پیش‌شماره‌ها', 'Countries and calling codes', '/admin/countries'],
-  search: ['جستجوی سراسری', 'Global search', '/admin/dashboard'],
-};
-
 export default async function Section({ params }: { params: Promise<{ section: string }> }) {
   const { section } = await params;
+  if (!isAdminSection(section)) notFound();
   const locale = await requestLocale(),
     fa = isDefaultLocale(locale);
-  const [titleFa, titleEn, endpoint] = map[section] ?? ['مدیریت', 'Administration', '/admin/dashboard'];
+  const [titleFa, titleEn, endpoint] = adminSectionConfig[section];
   let content: React.ReactNode;
   if (section === 'tests') content = <AdminTestManager />;
   else if (section === 'bookings')
@@ -68,7 +47,15 @@ export default async function Section({ params }: { params: Promise<{ section: s
   else if (section === 'languages') content = <LanguageManager />;
   else if (section === 'countries') content = <CountryManager />;
   else if (section === 'teacher-prices') content = <PricingManager mode="admin" />;
-  else if (section === 'finance' || section === 'payouts') content = <AdminFinanceCenter />;
+  else if (section === 'teacher-documents') content = <TeacherDocumentsManager />;
+  else if (section === 'finance' || section === 'teacher-earnings') content = <AdminFinanceCenter />;
+  else if (section === 'payouts')
+    content = (
+      <div className="grid gap-6">
+        <PanelActions role="admin" section={section} endpoint={endpoint} />
+        <AdminFinanceCenter />
+      </div>
+    );
   else if (section === 'magazine') content = <AdminArticleReviewWorkspace />;
   else
     content = (

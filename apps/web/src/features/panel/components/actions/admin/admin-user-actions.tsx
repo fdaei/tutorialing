@@ -15,7 +15,8 @@ import {
 } from '../shared/action-controls';
 import { RoleOptions } from './role-options';
 export function AdminUserActions({ endpoint, fa }: { endpoint: string } & Localized) {
-  const action = useAction(endpoint);
+  const createAction = useAction(endpoint);
+  const statusAction = useAction(endpoint);
   return (
     <div className="grid gap-5 xl:grid-cols-2">
       <Shell title={translate(fa, 'legacyCreateUser')}>
@@ -24,7 +25,7 @@ export function AdminUserActions({ endpoint, fa }: { endpoint: string } & Locali
           onSubmit={(event) => {
             event.preventDefault();
             const form = new FormData(event.currentTarget);
-            action.mutate(() =>
+            createAction.mutate(() =>
               api('/admin/users', {
                 method: 'POST',
                 body: JSON.stringify({
@@ -49,12 +50,12 @@ export function AdminUserActions({ endpoint, fa }: { endpoint: string } & Locali
             <RoleOptions />
           </Select>
           <div className="md:col-span-2">
-            <Submit fa={fa} busy={action.isPending}>
+            <Submit fa={fa} busy={createAction.isPending}>
               {translate(fa, 'legacycreateUser2')}
             </Submit>
           </div>
         </form>
-        <Status fa={fa} error={action.error} ok={action.isSuccess} />
+        <Status fa={fa} error={createAction.error} ok={createAction.isSuccess} />
       </Shell>
       <Shell title={translate(fa, 'legacyChangeUserStatus')}>
         <form
@@ -62,7 +63,7 @@ export function AdminUserActions({ endpoint, fa }: { endpoint: string } & Locali
           onSubmit={(event) => {
             event.preventDefault();
             const form = new FormData(event.currentTarget);
-            action.mutate(() =>
+            statusAction.mutate(() =>
               api(`/admin/users/${value(form, 'userId')}/status`, {
                 method: 'PATCH',
                 body: JSON.stringify({ status: value(form, 'status') }),
@@ -76,10 +77,11 @@ export function AdminUserActions({ endpoint, fa }: { endpoint: string } & Locali
             <option>SUSPENDED</option>
             <option>DELETED</option>
           </Select>
-          <Submit fa={fa} busy={action.isPending}>
+          <Submit fa={fa} busy={statusAction.isPending}>
             {translate(fa, 'legacyUpdateStatus')}
           </Submit>
         </form>
+        <Status fa={fa} error={statusAction.error} ok={statusAction.isSuccess} />
       </Shell>
     </div>
   );

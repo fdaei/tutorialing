@@ -40,6 +40,12 @@ export function localePath(pathname: string, locale: Locale) {
   return prefix ? (clean === '/' ? prefix : `${prefix}${clean}`) : clean;
 }
 
+/** Builds a localized sign-in URL while preserving a safe, encoded in-app destination. */
+export function authPath(returnTo: string, locale: Locale) {
+  const localizedReturnTo = localePath(returnTo, locale);
+  return `${localePath('/auth', locale)}?next=${encodeURIComponent(localizedReturnTo)}`;
+}
+
 export const messages = {
   fa: {
     ...generatedMessages.fa,

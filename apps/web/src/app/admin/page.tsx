@@ -19,6 +19,7 @@ import { api } from '@/shared/services/api';
 import { useTranslations } from '@/components/shared/locale-provider';
 import { localePath, localized, isDefaultLocale, translate, type Locale } from '@/lib/i18n';
 import type { AdminDashboard } from '@lingospeak/contracts';
+import { formatMoney } from '@/lib/money';
 
 const clampPercent = (value: number) => Math.min(100, Math.max(0, Math.round(value)));
 
@@ -32,9 +33,9 @@ export default function Admin() {
     queryFn: () => api<AdminDashboard>('/admin/dashboard'),
   });
   const data = query.data;
-  const number = (value = 0) => value.toLocaleString(translate(locale, 'commercepricingManagerEnUS2'));
-  const money = (value = 0) =>
-    localized({ fa: `${number(value)} تومان`, en: new Intl.NumberFormat('en-US').format(value) }, locale);
+  const number = (value?: number) =>
+    value == null ? '—' : value.toLocaleString(translate(locale, 'commercepricingManagerEnUS2'));
+  const money = (value?: number) => (value == null ? '—' : formatMoney(value, locale));
 
   const cards = [
     {
@@ -109,12 +110,12 @@ export default function Admin() {
     },
   ];
 
-  const teacherHealth = clampPercent(
-    ((data?.activeTeachers ?? 0) / Math.max(1, (data?.activeTeachers ?? 0) + (data?.pendingTeachers ?? 0))) * 100,
-  );
-  const reviewHealth = clampPercent(
-    (((data?.testAttempts ?? 0) - (data?.pendingReviews ?? 0)) / Math.max(1, data?.testAttempts ?? 0)) * 100,
-  );
+  const teacherHealth = data
+    ? clampPercent((data.activeTeachers / Math.max(1, data.activeTeachers + data.pendingTeachers)) * 100)
+    : null;
+  const reviewHealth = data
+    ? clampPercent(((data.testAttempts - data.pendingReviews) / Math.max(1, data.testAttempts)) * 100)
+    : null;
 
   return (
     <PanelShell title="مدیریت لینگواسپیک" items={adminNav}>
@@ -149,7 +150,7 @@ export default function Admin() {
         </header>
 
         {query.isError && (
-          <div className="mt-5 rounded-2xl border border-red-100 bg-red-50 p-4 text-sm text-red-700">
+          <div role="alert" className="mt-5 rounded-2xl border border-red-100 bg-red-50 p-4 text-sm text-red-700">
             {translate(locale, 'adminCouldNotLoadDashboardMetricsCheckTheAPI')}
           </div>
         )}
@@ -238,15 +239,15 @@ export default function Admin() {
   );
 }
 
-function HealthBar({ label, value, color, locale }: { label: string; value: number; color: string; locale: Locale }) {
+function HealthBar({ label, value, color, locale }: { label: string; value: number | null; color: string; locale: Locale }) {
   return (
     <div>
       <div className="mb-2 flex items-center justify-between text-xs">
-        <strong>{value.toLocaleString(translate(locale, 'commercepricingManagerEnUS2'))}٪</strong>
+        <strong>{value == null ? '—' : `${value.toLocaleString(translate(locale, 'commercepricingManagerEnUS2'))}٪`}</strong>
         <span className="text-muted">{label}</span>
       </div>
       <div className="h-2 overflow-hidden rounded-full bg-[#ebedf7]">
-        <div className={`h-full rounded-full ${color}`} style={{ width: `${value}%` }} />
+        <div className={`h-full rounded-full ${color}`} style={{ width: `${value ?? 0}%` }} />
       </div>
     </div>
   );

@@ -10,4 +10,10 @@ describe('teacherCheckoutHref', () => {
   it('sends an authenticated user directly to localized checkout', () => {
     expect(teacherCheckoutHref('teacher-1', true, 'en')).toBe('/en/checkout?teacher=teacher-1');
   });
+
+  it('preserves the English checkout destination through guest authentication', () => {
+    expect(teacherCheckoutHref('teacher-1', false, 'en')).toBe(
+      '/en/auth?next=%2Fen%2Fcheckout%3Fteacher%3Dteacher-1',
+    );
+  });
 });

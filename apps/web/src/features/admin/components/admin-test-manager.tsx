@@ -37,13 +37,13 @@ export function AdminTestManager() {
     },
   });
   const message = mutation.error ? (
-    <p className="mt-3 rounded-xl bg-red-50 p-3 text-sm text-red-700">
+    <p role="alert" className="mt-3 rounded-xl bg-red-50 p-3 text-sm text-red-700">
       {mutation.error instanceof ApiError
         ? mutation.error.message
         : translate(locale, 'commercepricingManagerTheOperationFailed')}
     </p>
   ) : mutation.isSuccess ? (
-    <p className="mt-3 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-700">
+    <p role="status" className="mt-3 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-700">
       {translate(locale, 'adminadminTestManagerChangesSaved')}
     </p>
   ) : null;
@@ -83,8 +83,21 @@ export function AdminTestManager() {
               {translate(locale, 'adminadminTestManagerEnterTheTitlesAndTheStructureWillBe')}
             </p>
             <div className="mt-4 grid gap-3">
-              <input className={input} name="titleFa" placeholder="عنوان فارسی" required />
-              <input className={input} name="titleEn" dir="ltr" placeholder="English title" required />
+              <input
+                className={input}
+                name="titleFa"
+                placeholder="عنوان فارسی"
+                aria-label="عنوان فارسی"
+                required
+              />
+              <input
+                className={input}
+                name="titleEn"
+                dir="ltr"
+                placeholder="English title"
+                aria-label="English title"
+                required
+              />
               <input
                 className={input}
                 name="durationMinutes"
@@ -105,6 +118,17 @@ export function AdminTestManager() {
             </p>
             {query.isLoading ? (
               <div className="skeleton h-24 rounded-xl" />
+            ) : query.isError ? (
+              <div role="alert" className="m-2 rounded-xl bg-red-50 p-4 text-sm text-red-700">
+                <p>
+                  {query.error instanceof ApiError
+                    ? query.error.message
+                    : translate(locale, 'panelresourceViewCouldNotLoadData')}
+                </p>
+                <button type="button" onClick={() => query.refetch()} className="mt-2 font-black underline">
+                  {translate(locale, 'testsaudioRecorderTryAgain')}
+                </button>
+              </div>
             ) : tests.length ? (
               tests.map((test) => (
                 <button
@@ -215,7 +239,12 @@ function SectionCard({
   const { locale } = useTranslations();
   return (
     <article className="panel-card overflow-hidden">
-      <button onClick={toggle} className="flex w-full items-center gap-4 p-5 text-start">
+      <button
+        type="button"
+        onClick={toggle}
+        aria-expanded={open}
+        className="flex w-full items-center gap-4 p-5 text-start"
+      >
         <span className="brand-gradient grid size-11 place-items-center rounded-xl font-black text-white">
           {section.order}
         </span>
