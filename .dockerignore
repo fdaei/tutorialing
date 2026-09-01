@@ -1,0 +1,43 @@
+# Build context برای ایمیج‌های production.
+# بدون این فایل، node_modules ۱.۲ گیگی و خروجی‌های build وارد context می‌شوند و
+# هر بیلد را کند و ایمیج را بزرگ می‌کنند.
+
+node_modules
+*/node_modules
+apps/*/node_modules
+packages/*/node_modules
+
+# خروجی build — داخل ایمیج از نو ساخته می‌شود.
+.next
+.next-dev
+apps/*/.next
+apps/*/.next-dev
+apps/*/dist
+packages/*/dist
+test-results
+playwright-report
+apps/*/playwright-report
+
+# راز. هیچ‌وقت نباید داخل لایه‌های ایمیج برود؛ env در زمان اجرا تزریق می‌شود.
+.env
+.env.*
+!.env.example
+apps/*/.env
+apps/*/.env.*
+
+.git
+.github
+.claude
+.agents
+.code-review-graph
+
+# اسکریپت‌های دیپلوی خودشان بخشی از اپ نیستند.
+deploy
+docker
+docs
+AUDIT
+load
+scripts/dev.mjs
+
+*.md
+!README.md
