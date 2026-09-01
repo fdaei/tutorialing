@@ -74,3 +74,4 @@ apps/*/dist/
 .vscode
 *.sublime-project
 *.sublime-workspace
+.claude/settings.local.json
