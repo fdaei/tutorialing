@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# پلن B: build روی ماشین محلی و انتقال ایمیج‌ها.
+#
+#   bash deploy/bin/build-local.sh
+#
+# فقط وقتی لازم است که build روی سرور OOM بخورد (علامتش: پیام Killed یا
+# exit code 137 در خروجی `deploy.sh build`). سرور ۷.۸ گیگ رم دارد و build
+# نکست معمولاً ۲ تا ۳ گیگ پیک می‌زند؛ فاز build خودش swap می‌سازد، ولی اگر
+# باز هم کم آورد این مسیر بدون هیچ تغییری در Dockerfile کار می‌کند.
+#
+# هزینه‌اش آپلود چند صد مگابایت به فرانکفورت است، پس مسیر پیش‌فرض نیست.
+# روی خود ماشین محلی اجرا می‌شود، نه سرور.
+
+set -euo pipefail
+
+HOST="${HOST:-lingospeak}"
+REMOTE_ENV="${REMOTE_ENV:-lingospeak/env/app.env}"
+cd "$(git rev-parse --show-toplevel)"
+
+BLD=$'\033[1m' GRN=$'\033[32m' RST=$'\033[0m'
+step() { printf '\n%s══ %s%s\n' "$BLD" "$1" "$RST"; }
+
+step "خواندن متغیرهای build از سرور"
+# فقط NEXT_PUBLIC_* خوانده می‌شود. اینها در باندل کلاینت جاسازی می‌شوند، پس
+# ذاتاً عمومی‌اند — هیچ سکرتی از سرور به ماشین محلی نمی‌آید.
+mapfile -t pub < <(ssh "$HOST" "grep -E '^NEXT_PUBLIC_[A-Z_0-9]*=' ~/$REMOTE_ENV || true")
+[[ ${#pub[@]} -gt 0 ]] || {
+	echo "هیچ NEXT_PUBLIC_* در ~/$REMOTE_ENV پیدا نشد — اول فاز env را کامل کن." >&2
+	exit 1
+}
+build_args=()
+for line in "${pub[@]}"; do
+	printf '  %s\n' "$line"
+	build_args+=(--build-arg "$line")
+done
+
+step "build ایمیج API"
+docker build -f deploy/docker/api.Dockerfile --target runtime -t lingospeak-api:latest .
+
+step "build ایمیج migrate (استیج builder)"
+# لایه‌هایش با ایمیج بالا مشترک است، پس عملاً فقط یک تگ اضافه می‌شود.
+docker build -f deploy/docker/api.Dockerfile --target builder -t lingospeak-api-migrate:latest .
+
+step "build ایمیج وب"
+docker build -f deploy/docker/web.Dockerfile --target runtime "${build_args[@]}" -t lingospeak-web:latest .
+
+step "انتقال"
+size=$(docker image inspect lingospeak-api:latest lingospeak-web:latest lingospeak-api-migrate:latest \
+	--format '{{.Size}}' | paste -sd+ | bc)
+echo "  حجم خام سه ایمیج: $(numfmt --to=iec "$size") (فشرده کمتر می‌شود)"
+echo "  در حال ارسال — این مرحله طولانی‌ترین بخش است…"
+docker save lingospeak-api:latest lingospeak-api-migrate:latest lingospeak-web:latest |
+	gzip -1 | ssh "$HOST" 'gunzip | docker load'
+
+step "تأیید روی سرور"
+ssh "$HOST" 'docker images --format "  {{.Repository}}:{{.Tag}}  {{.Size}}" | grep lingospeak'
+
+printf '\n%sانجام شد.%s ادامه از فاز services:\n' "$GRN" "$RST"
+echo "  ssh $HOST 'sudo bash ~/lingospeak-provision/deploy.sh services'"

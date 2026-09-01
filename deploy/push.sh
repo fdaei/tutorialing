@@ -31,20 +31,27 @@ echo
 # صرفاً پیلود موقت است — هیچ حالتی (state) در آن نگهداری نمی‌شود.
 ssh "$HOST" "rm -rf ~/$DEST && mkdir -p ~/$DEST"
 
-# push.sh خودش لازم نیست منتقل شود (اسکریپت سمت محلی است).
+# ‏push.sh و push-source.sh و bin/build-local.sh منتقل نمی‌شوند: هر سه سمت
+# محلی اجرا می‌شوند.
 scp -r \
 	"$SRC/bootstrap.sh" \
+	"$SRC/deploy.sh" \
 	"$SRC/README.md" \
+	"$SRC/DEPLOY.md" \
 	"$SRC/fail2ban" \
 	"$SRC/ufw" \
 	"$SRC/edge" \
+	"$SRC/app" \
+	"$SRC/docker" \
+	"$SRC/env" \
 	"$SRC/bin" \
 	"$HOST:~/$DEST/"
 
-ssh "$HOST" "chmod +x ~/$DEST/bootstrap.sh ~/$DEST/bin/*.sh"
+ssh "$HOST" "chmod +x ~/$DEST/bootstrap.sh ~/$DEST/deploy.sh ~/$DEST/bin/*.sh"
 
 echo
 echo "منتقل شد. هیچ چیزی اجرا نشده."
 echo "مرحله‌ی بعد (دستی):"
-echo "  ssh $HOST"
-echo "  sudo bash ~/$DEST/bootstrap.sh all      # یا فاز به فاز، README را ببینید"
+echo "  زیرساخت : sudo bash ~/$DEST/bootstrap.sh all   (اگر هنوز اجرا نشده)"
+echo "  سورس اپ : bash deploy/push-source.sh           (از همین ماشین)"
+echo "  دیپلوی  : sudo bash ~/$DEST/deploy.sh env      (فاز به فاز — DEPLOY.md)"

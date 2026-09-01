@@ -1,0 +1,203 @@
+# پروژه‌ی compose اپ lingospeak.
+#
+# قاعده‌ی ثابت سرور: هیچ سرویسی روی 0.0.0.0 پورت publish نمی‌کند. تنها راه ورود
+# از اینترنت، کانتینر Caddy در پروژه‌ی جدای `edge` است. پورت‌های زیر عمداً به
+# 127.0.0.1 بایند شده‌اند — فقط برای psql/بکاپ/عیب‌یابی از خود هاست.
+#
+# همه‌ی دستورها باید با فایل env اجرا شوند تا جای‌گذاری ${...} کار کند:
+#   docker compose --env-file ../env/app.env -f docker-compose.yml <cmd>
+name: lingospeak-app
+
+x-logging: &logging
+  # دیسک ۱۰۰ گیگ است و لاگ داکر پیش‌فرض سقف ندارد. ۱۰ مگ × ۳ فایل به ازای
+  # هر سرویس یعنی حداکثر ~۳۰ مگ، حتی وقتی چیزی در حال crash-loop است.
+  driver: json-file
+  options: { max-size: '10m', max-file: '3' }
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: lingospeak-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports: ['127.0.0.1:15432:5432']
+    volumes: [postgres_data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    logging: *logging
+    networks: [internal]
+
+  redis:
+    image: redis:7-alpine
+    container_name: lingospeak-redis
+    restart: unless-stopped
+    # appendonly عمدی است. TokenRevocationService نشانگرهای ابطال را اینجا
+    # نگه می‌دارد؛ پاک شدن Redis یعنی توکن‌های کاربری که تازه معلق شده تا ۱۵
+    # دقیقه دوباره معتبر می‌شوند. قفل رزرو هم همین‌جاست.
+    command: ['redis-server', '--appendonly', 'yes']
+    ports: ['127.0.0.1:16379:6379']
+    volumes: [redis_data:/data]
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    logging: *logging
+    networks: [internal]
+
+  minio:
+    image: minio/minio:latest
+    container_name: lingospeak-minio
+    restart: unless-stopped
+    command: server /data --console-address :9001
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY}
+      # مرورگر مستقیم با URL های presigned به مینیو PUT/GET می‌زند. بدون این
+      # مقدار، آپلود با خطای CORS رد می‌شود در حالی که سمت سرور همه‌چیز سالم
+      # به نظر می‌رسد.
+      MINIO_API_CORS_ALLOW_ORIGIN: ${WEB_URL}
+    # ۹۰۰۱ (کنسول) عمداً فقط روی لوکال‌هاست است و در Caddyfile هم هیچ مسیری
+    # به آن نمی‌رود. برای دیدنش: ssh -L 9001:127.0.0.1:19001 lingospeak
+    ports:
+      - '127.0.0.1:19000:9000'
+      - '127.0.0.1:19001:9001'
+    volumes: [minio_data:/data]
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:9000/minio/health/live']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    logging: *logging
+    # روی edge هم هست تا Caddy بتواند storage.lingospeak.org را به آن پراکسی کند.
+    networks: [internal, edge]
+
+  minio-init:
+    image: minio/mc:latest
+    container_name: lingospeak-minio-init
+    depends_on:
+      minio: { condition: service_healthy }
+    entrypoint: ['/bin/sh', '-c']
+    # برخلاف نسخه‌ی توسعه، هیچ فایل نمونه‌ای کپی نمی‌شود: docker/minio-seed/
+    # مدرک دمو است و جایش در production نیست.
+    command:
+      - >-
+        set -e;
+        until mc alias set local http://minio:9000 "$${S3_ACCESS_KEY}" "$${S3_SECRET_KEY}"; do sleep 2; done;
+        mc mb --ignore-existing local/$${S3_BUCKET};
+        mc anonymous set none local/$${S3_BUCKET};
+        echo "bucket $${S3_BUCKET} ready (private)";
+    environment:
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
+      S3_BUCKET: ${S3_BUCKET}
+    restart: 'no'
+    logging: *logging
+    networks: [internal]
+
+  # سرویس یکبارمصرف برای migration و داده‌ی مرجع. با `up` بالا نمی‌آید (profile).
+  # از استیج builder ساخته می‌شود چون prisma CLI و tsx هر دو devDependency
+  # هستند؛ لایه‌ها با ایمیج api مشترک‌اند پس دیسک اضافه‌ای نمی‌گیرد.
+  migrate:
+    profiles: ['tools']
+    build:
+      context: ../../
+      dockerfile: deploy/docker/api.Dockerfile
+      target: builder
+    image: lingospeak-api-migrate:latest
+    container_name: lingospeak-migrate
+    working_dir: /app/apps/api
+    env_file: ['../env/app.env']
+    depends_on:
+      postgres: { condition: service_healthy }
+    restart: 'no'
+    logging: *logging
+    networks: [internal]
+
+  api:
+    build:
+      context: ../../
+      dockerfile: deploy/docker/api.Dockerfile
+      target: runtime
+    image: lingospeak-api:latest
+    container_name: lingospeak-api
+    restart: unless-stopped
+    env_file: ['../env/app.env']
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      minio: { condition: service_healthy }
+    healthcheck:
+      # بدون curl در ایمیج — node 22 خودش fetch سراسری دارد.
+      # ‏/api/health وقتی پستگرس یا ردیس قطع باشد ۵۰۳ می‌دهد، پس این واقعاً
+      # آمادگی را می‌سنجد نه صرفاً زنده بودن پروسه.
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:4001/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    logging: *logging
+    networks: [internal, edge]
+
+  web:
+    build:
+      context: ../../
+      dockerfile: deploy/docker/web.Dockerfile
+      target: runtime
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+        NEXT_PUBLIC_WEB_URL: ${NEXT_PUBLIC_WEB_URL}
+        NEXT_PUBLIC_S3_ORIGIN: ${NEXT_PUBLIC_S3_ORIGIN}
+        NEXT_PUBLIC_CONTACT_PHONE: ${NEXT_PUBLIC_CONTACT_PHONE}
+        NEXT_PUBLIC_CONTACT_EMAIL: ${NEXT_PUBLIC_CONTACT_EMAIL}
+        NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-}
+        NEXT_PUBLIC_LOCALE_COOKIE_MAX_AGE_SECONDS: ${NEXT_PUBLIC_LOCALE_COOKIE_MAX_AGE_SECONDS:-31536000}
+        NEXT_PUBLIC_ENAMAD_HTML: ${NEXT_PUBLIC_ENAMAD_HTML:-}
+    image: lingospeak-web:latest
+    container_name: lingospeak-web
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: '3000'
+      HOSTNAME: 0.0.0.0
+    depends_on:
+      api: { condition: service_healthy }
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    logging: *logging
+    # فقط edge: وب مستقیم با پستگرس/ردیس حرف نمی‌زند. رندر سمت سرور از همان
+    # NEXT_PUBLIC_API_URL عمومی استفاده می‌کند، که با alias شبکه روی کانتینر
+    # Caddy حل می‌شود (به deploy/edge/docker-compose.yml نگاه کنید) — نه با
+    # اتکا به hairpin NAT ارائه‌دهنده.
+    networks: [edge]
+
+volumes:
+  postgres_data: {}
+  redis_data: {}
+  minio_data: {}
+
+networks:
+  internal:
+    driver: bridge
+  edge:
+    external: true

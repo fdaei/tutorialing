@@ -75,3 +75,6 @@ apps/*/dist/
 *.sublime-project
 *.sublime-workspace
 .claude/settings.local.json
+
+# فایل env تولیدی — فقط روی سرور می‌ماند، هرگز کامیت نمی‌شود.
+deploy/env/app.env

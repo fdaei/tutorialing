@@ -1,0 +1,98 @@
+# Caddyfile لبه — production لینگواسپیک.
+#
+# جایگزین نسخه‌ی placeholder می‌شود. فاز `edge` در deploy.sh آن را فقط وقتی نصب
+# می‌کند که healthcheck هر دو کانتینر api و web سبز شده باشد، تا لحظه‌ای وجود
+# نداشته باشد که Caddy به بک‌اندی که هنوز آماده نیست ترافیک بفرستد.
+{
+	admin localhost:2019
+	# برای اعلان انقضای گواهی، ایمیل را از کامنت در بیاورید:
+	# email you@example.com
+}
+
+(common_headers) {
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+}
+
+www.lingospeak.org {
+	redir https://lingospeak.org{uri} permanent
+}
+
+lingospeak.org {
+	encode zstd gzip
+	import common_headers
+
+	log {
+		output file /var/log/caddy/access.log {
+			roll_size 10MiB
+			roll_keep 5
+		}
+	}
+
+	# ---------------------------------------------------------------------
+	# درگاه پرداخت هنوز فعال نیست.
+	#
+	# ‏ZARINPAL_MERCHANT_ID فعلاً یک مقدار موقت است تا گارد production در
+	# env.validation.ts دست‌نخورده بماند و مسیر توسعه‌ی `dev_` (که هر پرداختی
+	# را موفق اعلام می‌کند) هرگز فعال نشود. با آن مقدار خود API هم با ۵۰۲ رد
+	# می‌کند؛ این بلاک فقط همان رد را به یک پیام تمیز و قابل‌نمایش تبدیل می‌کند.
+	#
+	# فقط دو نقطه‌ی *شروع* پرداخت بسته می‌شوند. مسیرهای خواندنی کیف پول و
+	# فاکتورها (GET /api/payments/wallet، /wallet/transactions، /invoices) باز
+	# می‌مانند، وگرنه صفحه‌ی کیف پول کاربر بی‌دلیل می‌شکند.
+	#
+	# بعد از دریافت اینماد و مرچنت واقعی: این بلاک حذف، سپس caddy reload.
+	@payment_start {
+		method POST
+		path /api/payments /api/payments/wallet/top-up
+	}
+	handle @payment_start {
+		header Content-Type application/json
+		respond `{"statusCode":503,"error":"Service Unavailable","message":"درگاه پرداخت هنوز فعال نشده است. لطفاً بعداً تلاش کنید."}` 503
+	}
+	# ---------------------------------------------------------------------
+
+	# بدون rewrite: apps/api/src/main.ts:24 با setGlobalPrefix('api') خود API
+	# را زیر /api سوار می‌کند، پس مسیر عیناً پاس داده می‌شود.
+	handle /api/* {
+		reverse_proxy api:4001
+	}
+
+	handle {
+		reverse_proxy web:3000
+	}
+}
+
+# ---------------------------------------------------------------------------
+# ذخیره‌سازی اشیاء.
+#
+# ‏s3-object-storage.adapter.ts با getSignedUrl لینک presigned می‌سازد و آن را
+# به مرورگر می‌دهد، پس API مینیو باید عمومی باشد. کنسول (۹۰۰۱) اینجا هیچ
+# مسیری ندارد و فقط روی 127.0.0.1 هاست در دسترس است.
+#
+# امضای SigV4 هدر Host را هم امضا می‌کند. Caddy برخلاف nginx به‌صورت پیش‌فرض
+# Host اصلی را حفظ می‌کند، پس امضا معتبر می‌ماند. اگر SignatureDoesNotMatch
+# دیدید، اول مطمئن شوید S3_ENDPOINT دقیقاً https://storage.lingospeak.org است
+# (بدون اسلش انتهایی) و کسی header_up Host اضافه نکرده.
+#
+# این بلوک تا وقتی رکورد A برای storage.lingospeak.org ساخته نشده کامنت است.
+# فاز `edge` خودش DNS را چک می‌کند و اگر سبز بود از کامنت درش می‌آورد.
+# ---------------------------------------------------------------------------
+# BEGIN STORAGE
+# storage.lingospeak.org {
+# 	import common_headers
+# 	log {
+# 		output file /var/log/caddy/storage.log {
+# 			roll_size 10MiB
+# 			roll_keep 5
+# 		}
+# 	}
+# 	# آپلود مستقیم مرورگر تا سقف FILE_MAX_UPLOAD_BYTES (۵۰ مگابایت) است؛
+# 	# Caddy جریان را بدون بافر کامل عبور می‌دهد.
+# 	reverse_proxy minio:9000
+# }
+# END STORAGE
