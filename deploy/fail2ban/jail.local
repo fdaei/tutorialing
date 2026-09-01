@@ -1,0 +1,42 @@
+# fail2ban — پیکربندی lingospeak
+# این فایل توسط bootstrap.sh در /etc/fail2ban/jail.local نصب می‌شود.
+# jail.conf را هرگز ویرایش نکنید؛ آپدیت پکیج بازنویسی‌اش می‌کند.
+
+[DEFAULT]
+
+# Ubuntu 24.04 (noble) در نصب مینیمال /var/log/auth.log ندارد و fail2ban با
+# بک‌اند فایل با خطای «Have not found any log file for sshd jail» بالا نمی‌آید.
+# بک‌اند systemd مستقیم از ژورنال می‌خواند. نیازمند پکیج python3-systemd است
+# که bootstrap.sh در فاز deps نصب می‌کند.
+backend = systemd
+
+# بن‌ها به جای iptables خام در خود ufw ثبت می‌شوند، پس `ufw status` تصویر
+# کاملی از هر چیزی که بلاک شده می‌دهد.
+banaction          = ufw
+banaction_allports = ufw
+
+bantime  = 1h
+findtime = 10m
+maxretry = 4
+
+# جریمه‌ی نمایی برای تکرارکننده‌ها: بات مصر به جای ۱ ساعت تا ۱ هفته بن می‌شود،
+# در حالی که یک اشتباه انسانی همچنان سقف ۱ ساعت دارد.
+bantime.increment = true
+bantime.factor    = 2
+bantime.maxtime   = 1w
+
+# bootstrap.sh در صورت ست بودن ADMIN_IP، آن را به انتهای همین خط اضافه می‌کند.
+ignoreip = 127.0.0.1/8 ::1
+
+allowipv6 = auto
+
+[sshd]
+enabled = true
+port    = 22
+
+# `normal` عمدی است و نه `aggressive`.
+# احراز هویت این سرور فقط با کلید عمومی است (ورود با رمز بسته)، بنابراین
+# بات‌ها روی الگوهای «Invalid user» و شکست احراز هویت گیر می‌افتند که mode
+# normal پوشش می‌دهد. mode aggressive الگوهای preauth/disconnect را هم مچ
+# می‌کند و می‌تواند کانکشن‌های نیمه‌کاره‌ی خودمان را بن کند.
+mode = normal
