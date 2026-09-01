@@ -3,6 +3,7 @@ import '@testing-library/jest-dom';
 import { ReviewSection } from './review-section';
 import { api, readAccessToken } from '@/shared/services/api';
 import { LocaleProvider } from '@/components/shared/locale-provider';
+import { authPath } from '@/lib/i18n';
 
 jest.mock('@/shared/services/api', () => ({
   api: jest.fn(),
@@ -38,6 +39,18 @@ function renderCourseReviews() {
 }
 
 describe('ReviewSection', () => {
+  it('preserves an English review destination through guest authentication', () => {
+    expect(authPath('/en/courses/conversation?tab=reviews', 'en')).toBe(
+      '/en/auth?next=%2Fen%2Fcourses%2Fconversation%3Ftab%3Dreviews',
+    );
+  });
+
+  it('keeps the default locale authentication path unprefixed', () => {
+    expect(authPath('/courses/conversation', 'fa')).toBe(
+      '/auth?next=%2Fcourses%2Fconversation',
+    );
+  });
+
   it('localizes the empty review and action states in English', () => {
     render(
       <LocaleProvider locale="en">

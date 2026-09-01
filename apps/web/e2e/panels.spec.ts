@@ -104,6 +104,7 @@ test('administrator can render every administration feature', async ({ page }) =
     '/admin/teacher-documents',
     '/admin/teacher-prices',
     '/admin/languages',
+    '/admin/countries',
     '/admin/tests',
     '/admin/test-reviews',
     '/admin/bookings',
@@ -118,6 +119,7 @@ test('administrator can render every administration feature', async ({ page }) =
     '/admin/reviews',
     '/admin/roles',
     '/admin/cms',
+    '/admin/magazine',
     '/admin/notifications',
     '/admin/audit',
     '/admin/settings',
@@ -133,12 +135,12 @@ test('specialized staff are restricted to their permitted workspaces', async ({ 
   await expect(page.getByText('دسترسی مجاز نیست')).toBeVisible();
 
   await page.evaluate(() => sessionStorage.clear());
-  await session(page, 'user-finance', ['FINANCE'], ['teacher-prices.manage', 'payouts.manage', 'payments.refund']);
+  await session(page, 'user-finance', ['SUPPORT'], ['teacher-prices.manage', 'payouts.manage', 'payments.refund']);
   await page.goto('/admin/payouts');
   await expect(page.getByText('پنل مالی').first()).toBeVisible();
 
   await page.evaluate(() => sessionStorage.clear());
-  await session(page, 'user-examiner', ['EXAMINER'], ['tests.review']);
+  await session(page, 'user-examiner', ['SUPPORT'], ['tests.review']);
   await page.goto('/admin/test-reviews');
   await expect(page.getByText('پنل ارزیابی آزمون').first()).toBeVisible();
 });

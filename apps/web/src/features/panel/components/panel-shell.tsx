@@ -29,7 +29,7 @@ import {
 } from 'lucide-react';
 import { LanguageSwitcher } from '@/components/shared/language-switcher';
 import { useTranslations } from '@/components/shared/locale-provider';
-import { localePath, localized, isDefaultLocale, translate } from '@/lib/i18n';
+import { authPath, localePath, localized, isDefaultLocale, translate } from '@/lib/i18n';
 import type { AdminDashboard } from '@lingospeak/contracts';
 import { clearAuthSession } from '@/shared/services/api';
 
@@ -117,8 +117,8 @@ export function PanelShell({ title, items, children }: { title: string; items: N
   });
   useEffect(() => {
     if (me.error instanceof ApiError && me.error.status === 401)
-      router.replace(`/auth?next=${encodeURIComponent(location.pathname)}`);
-  }, [me.error, router]);
+      router.replace(authPath(location.pathname, locale));
+  }, [locale, me.error, router]);
   const adminMode = path.includes('/admin'),
     teacherMode = path.includes('/teacher-panel'),
     allowed = adminMode ? ['ADMIN', 'SUPPORT'] : teacherMode ? ['INSTRUCTOR', 'ADMIN'] : [];

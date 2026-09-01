@@ -10,10 +10,14 @@ import { AdminTeacherActions } from './admin-teacher-actions';
 import { AdminUserActions } from './admin-user-actions';
 export function AdminActions({ section, endpoint, fa }: Omit<Props, 'role'> & Localized) {
   if (section === 'users') return <AdminUserActions endpoint={endpoint} fa={fa} />;
-  if (section === 'teachers') return <AdminTeacherActions endpoint={endpoint} fa={fa} />;
-  if (section === 'settings') return <AdminSettingsActions endpoint={endpoint} fa={fa} />;
-  if (section === 'bookings') return <AdminBookingActions endpoint={endpoint} fa={fa} />;
-  if (section === 'payments') return <AdminFinanceActions endpoint={endpoint} fa={fa} />;
+  if (['teachers', 'teacher-applications'].includes(section))
+    return <AdminTeacherActions endpoint={endpoint} fa={fa} />;
+  if (section === 'settings' || section === 'cms')
+    return <AdminSettingsActions endpoint={endpoint} section={section} fa={fa} />;
+  if (section === 'bookings' || section === 'availability-blocks')
+    return <AdminBookingActions endpoint={endpoint} fa={fa} />;
+  if (['payments', 'discounts', 'refunds', 'payouts'].includes(section))
+    return <AdminFinanceActions endpoint={endpoint} section={section} fa={fa} />;
   if (section === 'roles') return <AdminRoleActions endpoint={endpoint} fa={fa} />;
   if (section === 'tickets') return <TicketForm endpoint={endpoint} fa={fa} />;
   return null;

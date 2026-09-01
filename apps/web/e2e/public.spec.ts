@@ -78,3 +78,19 @@ test('English course discovery and detail remain localized', async ({ page }) =>
   await expect(page.getByText('ضمانت بازگشت وجه تا ۷ روز')).toHaveCount(0);
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', /\/en\/courses\/english-conversation$/);
 });
+
+test('English teacher discovery and profile preserve booking context', async ({ page }) => {
+  await page.goto('/en/teachers');
+  await expect(page.getByRole('button', { name: 'Search', exact: true })).toBeVisible();
+  await expect(page.getByLabel('Language')).toContainText('German');
+  await expect(page.getByLabel('Minimum rating')).toContainText('4 stars and up');
+
+  await page.goto('/en/teachers/sara-dadkhah');
+  await expect(page.getByText('Verified LingoSpeak teacher')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'About the teacher' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Learner reviews of this teacher' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Sign in to choose a time' })).toHaveAttribute(
+    'href',
+    /\/en\/auth\?next=%2Fen%2Fcheckout%3Fteacher%3Dteacher-sara/,
+  );
+});

@@ -90,6 +90,81 @@ describe('PanelActions characterization', () => {
     );
   });
 
+  it('submits bilingual content from the canonical CMS route', async () => {
+    const view = renderAction('admin', 'cms', '/admin/cms');
+    const form = view.container.querySelector('form');
+    if (!form) throw new Error('Expected CMS form');
+    fireEvent.change(field(form, 'slug'), { target: { value: 'about-us' } });
+    fireEvent.change(field(form, 'titleFa'), { target: { value: 'درباره ما' } });
+    fireEvent.change(field(form, 'titleEn'), { target: { value: 'About us' } });
+    fireEvent.change(field(form, 'bodyFa'), { target: { value: 'متن فارسی' } });
+    fireEvent.change(field(form, 'bodyEn'), { target: { value: 'English copy' } });
+    fireEvent.submit(form);
+
+    await waitFor(() =>
+      expect(mockedApi).toHaveBeenCalledWith('/admin/cms/about-us', {
+        method: 'PUT',
+        body: JSON.stringify({
+          titleFa: 'درباره ما',
+          titleEn: 'About us',
+          contentFa: { paragraphs: ['متن فارسی'] },
+          contentEn: { paragraphs: ['English copy'] },
+          published: true,
+        }),
+      }),
+    );
+    expect(view.container.querySelector('[name="key"]')).not.toBeInTheDocument();
+  });
+
+  it('renders the availability action on its dedicated admin route', () => {
+    const view = renderAction('admin', 'availability-blocks', '/admin/bookings');
+    expect(view.container.querySelectorAll('form')).toHaveLength(1);
+    expect(view.container.querySelector('[name="startsAt"]')).toBeInTheDocument();
+    expect(view.container.querySelector('[name="endsAt"]')).toBeInTheDocument();
+  });
+
+  it.each(['discounts', 'refunds'])('renders only its authorized finance action on the admin %s route', (section) => {
+    const view = renderAction('admin', section, '/admin/payments');
+    expect(view.container.querySelectorAll('form')).toHaveLength(1);
+    expect(Boolean(view.container.querySelector('[name="paymentId"]'))).toBe(section === 'refunds');
+    expect(Boolean(view.container.querySelector('[name="code"]'))).toBe(section === 'discounts');
+    expect(view.container.querySelector('[name="weekStart"]')).not.toBeInTheDocument();
+  });
+
+  it('renders payout generation only on the authorized payouts route', () => {
+    const view = renderAction('admin', 'payouts', '/admin/reports');
+    expect(view.container.querySelectorAll('form')).toHaveLength(1);
+    expect(view.container.querySelector('[name="weekStart"]')).toBeInTheDocument();
+    expect(view.container.querySelector('[name="paymentId"]')).not.toBeInTheDocument();
+    expect(view.container.querySelector('[name="code"]')).not.toBeInTheDocument();
+  });
+
+  it.each(['cms', 'discounts', 'payouts', 'users', 'roles'])(
+    'shows a visible error when an admin %s action fails',
+    async (section) => {
+      if (section === 'users' || section === 'roles') {
+        mockedApi.mockResolvedValue([{ id: 'user-1', name: 'Admin user' }]);
+      }
+      const view = renderAction('admin', section, '/admin/resource');
+      const forms = view.container.querySelectorAll('form');
+      const form = section === 'users' || section === 'roles' ? forms[forms.length - 1] : forms[0];
+      if (!form) throw new Error(`Expected admin ${section} form`);
+      if (section === 'users' || section === 'roles') {
+        const userSelect = field(form, 'userId');
+        await waitFor(() => expect(userSelect).not.toBeDisabled());
+      }
+      mockedApi.mockRejectedValueOnce(new Error('request failed'));
+      fireEvent.submit(form);
+      await waitFor(() => expect(view.getByRole('alert')).toBeInTheDocument());
+    },
+  );
+
+  it('renders application transitions on the canonical teacher applications route', () => {
+    const view = renderAction('admin', 'teacher-applications', '/admin/teacher-applications');
+    expect(view.container.querySelector('[name="teacherId"]')).toBeInTheDocument();
+    expect(view.container.querySelector('[name="status"]')).toBeInTheDocument();
+  });
+
   it('keeps the submit action disabled while a student mutation is pending', async () => {
     mockedApi.mockImplementation(() => new Promise(() => undefined));
     const view = renderAction('student', 'profile', '/users/me');

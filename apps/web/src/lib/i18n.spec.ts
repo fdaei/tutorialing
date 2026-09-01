@@ -1,10 +1,16 @@
-import { direction, formatDate, formatMoney, localePath, localized, localeTag, resolveLocale, translate } from './i18n';
+import { authPath, direction, formatDate, formatMoney, localePath, localized, localeTag, resolveLocale, translate } from './i18n';
 
 describe('localization primitives', () => {
   it('preserves an equivalent route while changing its locale prefix', () => {
     expect(localePath('/teachers?page=2', 'en')).toBe('/en/teachers?page=2');
     expect(localePath('/en/teachers', 'fa')).toBe('/teachers');
     expect(localePath('/', 'en')).toBe('/en');
+  });
+  it('builds localized authentication routes with encoded return destinations', () => {
+    expect(authPath('/en/admin/users?status=active', 'en')).toBe(
+      '/en/auth?next=%2Fen%2Fadmin%2Fusers%3Fstatus%3Dactive',
+    );
+    expect(authPath('/dashboard', 'fa')).toBe('/auth?next=%2Fdashboard');
   });
   it('uses Persian fallback keys and correct directions', () => {
     expect(translate('fa', 'teachers')).toBe('مدرس‌ها');

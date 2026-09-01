@@ -1,11 +1,12 @@
 'use client';
 
 import { localized, isDefaultLocale, translate } from '@/lib/i18n';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, Eye, Search, ShieldCheck, UserRound, X } from 'lucide-react';
 import { api, ApiError, Paginated } from '@/shared/services/api';
 import { useTranslations } from '@/components/shared/locale-provider';
+import { formatMoney } from '@/lib/money';
 
 type Role = 'STUDENT' | 'INSTRUCTOR' | 'SUPPORT' | 'ADMIN';
 type User = {
@@ -97,11 +98,13 @@ export function AdminUsersManager() {
             <input
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
+              aria-label={translate(locale, 'adminadminUsersManagerSearchNamePhoneOrEmail')}
               className="w-full bg-transparent py-3 outline-none"
               placeholder={translate(locale, 'adminadminUsersManagerSearchNamePhoneOrEmail')}
             />
           </label>
           <select
+            aria-label={translate(locale, 'commercepricingManagerStatus')}
             value={status}
             onChange={(e) => {
               setStatus(e.target.value);
@@ -174,6 +177,7 @@ export function AdminUsersManager() {
                       <td className="p-4 text-muted">{date(user.createdAt, fa)}</td>
                       <td className="p-4">
                         <button
+                          type="button"
                           onClick={() => setSelected(user.id)}
                           className="inline-flex items-center gap-2 rounded-xl border hairline px-3 py-2 font-bold text-blue"
                         >
@@ -272,10 +276,19 @@ function UserDetails({
   invalidate: () => Promise<void>;
 }) {
   const { locale } = useTranslations();
+  const dialogRef = useRef<HTMLElement>(null);
   const qc = useQueryClient(),
     query = useQuery({ queryKey: ['admin-user-detail', id], queryFn: () => api<Detail>(`/admin/users/${id}`) }),
     [roles, setRoles] = useState<Role[]>([]),
     [status, setStatus] = useState('ACTIVE');
+  useEffect(() => {
+    dialogRef.current?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') close();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [close]);
   useEffect(() => {
     if (query.data) {
       setRoles(query.data.roles.map((r) => r.role));
@@ -301,10 +314,16 @@ function UserDetails({
   return (
     <div className="fixed inset-0 z-[80] bg-navy/35 p-3 backdrop-blur-sm" onClick={close}>
       <aside
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="admin-user-details-title"
+        tabIndex={-1}
         className={`h-full w-full max-w-3xl overflow-y-auto bg-[#f8f9fd] p-5 shadow-2xl md:p-7 ${translate(fa, 'adminadminUsersManagerMlAutoRoundedR28px')}`}
         onClick={(e) => e.stopPropagation()}
       >
         <button
+          type="button"
           onClick={close}
           className="grid size-10 place-items-center rounded-full border hairline bg-white"
           aria-label={translate(fa, 'adminadminUsersManagerClose')}
@@ -323,7 +342,9 @@ function UserDetails({
                   {(user.name ?? 'U').slice(0, 1)}
                 </span>
                 <div>
-                  <h2 className="text-2xl font-black">{user.name || translate(fa, 'adminadminUsersManagerUnnamed')}</h2>
+                  <h2 id="admin-user-details-title" className="text-2xl font-black">
+                    {user.name || translate(fa, 'adminadminUsersManagerUnnamed')}
+                  </h2>
                   <p dir="ltr" className={`${translate(fa, 'adminadminUsersManagerTextLeft')} text-sm text-muted`}>
                     {user.phone}
                     {user.email ? ` · ${user.email}` : ''}
@@ -365,6 +386,7 @@ function UserDetails({
                 </div>
                 <div className="mt-4 flex flex-wrap gap-3">
                   <button
+                    type="button"
                     disabled={!roles.length || saveRoles.isPending}
                     onClick={() => saveRoles.mutate()}
                     className="brand-gradient rounded-xl px-5 py-3 font-black text-white disabled:opacity-40"
@@ -372,6 +394,7 @@ function UserDetails({
                     {translate(fa, 'adminadminUsersManagerSaveRoles')}
                   </button>
                   <select
+                    aria-label={translate(fa, 'commercepricingManagerStatus')}
                     value={status}
                     onChange={(e) => setStatus(e.target.value)}
                     className="rounded-xl border hairline bg-white px-4"
@@ -381,6 +404,7 @@ function UserDetails({
                     <option value="DELETED">{translate(fa, 'adminadminUsersManagerDeleted')}</option>
                   </select>
                   <button
+                    type="button"
                     disabled={saveStatus.isPending}
                     onClick={() => saveStatus.mutate()}
                     className="rounded-xl border hairline bg-white px-5 py-3 font-black"
@@ -501,7 +525,7 @@ function date(value: string, fa: boolean) {
   );
 }
 function money(value: number, fa: boolean) {
-  return `${new Intl.NumberFormat(translate(fa, 'commercepricingManagerEnUS2')).format(value)} ${translate(fa, 'teacherteacherFinanceIrr')}`;
+  return formatMoney(value, fa ? 'fa' : 'en');
 }
 function countLabel(key: string, fa: boolean) {
   const labels: Record<string, [string, string]> = {

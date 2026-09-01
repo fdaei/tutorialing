@@ -5,7 +5,7 @@ import { BadgeCheck, MessageSquareText, Star, Trash2, X } from 'lucide-react';
 import { api, apiMessage, readAccessToken } from '@/shared/services/api';
 import { applyRatingChange } from './review-state';
 import { useTranslations } from '@/components/shared/locale-provider';
-import type { Locale } from '@/lib/i18n';
+import { authPath, type Locale } from '@/lib/i18n';
 
 export type PublicReview = {
   id: string;
@@ -110,7 +110,7 @@ export function ReviewSection({ subject, subjectId, title, rating, count, review
 
   async function open() {
     if (!readAccessToken()) {
-      window.location.href = `/auth?next=${encodeURIComponent(window.location.pathname)}`;
+      window.location.href = authPath(`${window.location.pathname}${window.location.search}`, locale);
       return;
     }
     setStatus(t('در حال بررسی امکان ثبت نظر…', 'Checking whether you can leave a review…'));

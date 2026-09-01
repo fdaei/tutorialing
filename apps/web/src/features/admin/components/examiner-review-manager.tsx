@@ -75,8 +75,10 @@ export function ExaminerReviewManager() {
         <div className="flex gap-2 overflow-x-auto">
           {tabs.map(([value, labelFa, labelEn]) => (
             <button
+              type="button"
               key={value}
               onClick={() => setTab(value)}
+              aria-pressed={tab === value}
               className={`shrink-0 rounded-xl px-4 py-3 text-sm font-bold ${tab === value ? 'brand-gradient text-white' : 'bg-[#f5f6fa] text-muted'}`}
             >
               {localized({ fa: labelFa, en: labelEn }, locale)}
@@ -110,8 +112,12 @@ export function ExaminerReviewManager() {
             <div className="mt-4 grid gap-3">
               {queue.data.items.map((item) => (
                 <button
+                  type="button"
                   key={item.id}
-                  onClick={() => setActive(item)}
+                  onClick={() => {
+                    claim.reset();
+                    setActive(item);
+                  }}
                   className={`rounded-2xl border p-4 text-start ${active?.id === item.id ? 'border-purple bg-lavender/40' : 'hairline hover:border-purple'}`}
                 >
                   <div className="flex items-start justify-between gap-3">
@@ -178,6 +184,7 @@ export function ExaminerReviewManager() {
               tab={tab}
               claim={() => claim.mutate(active.id)}
               claiming={claim.isPending}
+              claimError={claim.error}
               done={() => {
                 setActive(null);
                 qc.invalidateQueries({ queryKey: ['examiner-queue'] });
@@ -197,6 +204,7 @@ function ReviewEditor({
   tab,
   claim,
   claiming,
+  claimError,
   done,
 }: {
   answer: QueueAnswer;
@@ -204,6 +212,7 @@ function ReviewEditor({
   tab: string;
   claim: () => void;
   claiming: boolean;
+  claimError: unknown;
   done: () => void;
 }) {
   const [band, setBand] = useState(answer.reviewBand ?? 6.5),
@@ -255,6 +264,7 @@ function ReviewEditor({
       </div>
       {!canEdit && ['PENDING', 'NEEDS_REVISION'].includes(answer.reviewStatus) && (
         <button
+          type="button"
           onClick={claim}
           disabled={claiming}
           className="brand-gradient mt-6 rounded-xl px-6 py-3 font-black text-white disabled:opacity-50"
@@ -263,6 +273,11 @@ function ReviewEditor({
             ? translate(fa, 'adminexaminerReviewManagerClaiming')
             : translate(fa, 'adminexaminerReviewManagerClaimAndStartReview')}
         </button>
+      )}
+      {claimError != null && (
+        <p role="alert" className="mt-4 rounded-xl bg-red-50 p-4 text-red-800">
+          {apiMessage(claimError, translate(fa, 'adminexaminerReviewManagerCouldNotLoadTheReviewQueue'))}
+        </p>
       )}
       {canEdit && (
         <div className="mt-7">
@@ -333,6 +348,7 @@ function ReviewEditor({
             </p>
           )}
           <button
+            type="button"
             disabled={review.isPending || !feedbackFa.trim() || !feedbackEn.trim()}
             onClick={() => review.mutate()}
             className="brand-gradient mt-5 flex items-center gap-2 rounded-xl px-6 py-3 font-black text-white disabled:opacity-40"
@@ -344,20 +360,6 @@ function ReviewEditor({
           </button>
         </div>
       )}
-      <style jsx global>{`
-        .input {
-          width: 100%;
-          border: 1px solid rgba(16, 29, 53, 0.14);
-          border-radius: 0.9rem;
-          padding: 0.85rem 1rem;
-          background: white;
-          outline: none;
-        }
-        .input:focus {
-          border-color: #7257d9;
-          box-shadow: 0 0 0 4px rgba(114, 87, 217, 0.08);
-        }
-      `}</style>
     </div>
   );
 }
@@ -425,11 +427,12 @@ function Empty({ text }: { text: string }) {
   );
 }
 function ErrorBox({ message, retry }: { message: string; retry: () => void }) {
+  const { locale } = useTranslations();
   return (
     <div role="alert" className="mt-4 rounded-2xl bg-red-50 p-5 text-red-800">
       {message}{' '}
-      <button onClick={retry} className="font-bold underline">
-        Retry
+      <button type="button" onClick={retry} className="font-bold underline">
+        {translate(locale, 'testsaudioRecorderTryAgain')}
       </button>
     </div>
   );

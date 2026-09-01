@@ -7,6 +7,19 @@ import { Plus, Trash2 } from 'lucide-react';
 import { api, apiMessage, type Paginated } from '@/shared/services/api';
 import type { EducationalLanguage } from '@/features/languages';
 import { useTranslations } from '@/components/shared/locale-provider';
+import { adminDeleteConfirmation } from '../admin-confirmation';
+
+const emptyLanguageForm = {
+  code: '',
+  nameFa: '',
+  nameEn: '',
+  nativeName: '',
+  flag: '🌐',
+  direction: 'LTR',
+  proficiencySystem: 'CEFR',
+  active: true,
+  order: 0,
+};
 
 export function LanguageManager() {
   const { locale } = useTranslations(),
@@ -15,17 +28,7 @@ export function LanguageManager() {
     [search, setSearch] = useState(''),
     [page, setPage] = useState(1),
     [editing, setEditing] = useState<EducationalLanguage | null>(null),
-    [form, setForm] = useState({
-      code: '',
-      nameFa: '',
-      nameEn: '',
-      nativeName: '',
-      flag: '🌐',
-      direction: 'LTR',
-      proficiencySystem: 'CEFR',
-      active: true,
-      order: 0,
-    });
+    [form, setForm] = useState(emptyLanguageForm);
   const query = useQuery({
     queryKey: ['admin-languages', search, page],
     queryFn: () =>
@@ -42,17 +45,7 @@ export function LanguageManager() {
       }),
     onSuccess: () => {
       setEditing(null);
-      setForm({
-        code: '',
-        nameFa: '',
-        nameEn: '',
-        nativeName: '',
-        flag: '🌐',
-        direction: 'LTR',
-        proficiencySystem: 'CEFR',
-        active: true,
-        order: 0,
-      });
+      setForm(emptyLanguageForm);
       refresh();
     },
   });
@@ -134,13 +127,24 @@ export function LanguageManager() {
                     <td className="p-3">
                       <div className="flex justify-end gap-2">
                         <button
+                          type="button"
                           onClick={() => edit(item)}
                           className="rounded-lg border hairline px-3 py-2 font-bold text-blue"
                         >
                           {translate(locale, 'admincountryManagerEdit')}
                         </button>
                         <button
-                          onClick={() => remove.mutate(item.id)}
+                          type="button"
+                          aria-label={localized(
+                            { fa: `حذف ${item.nameFa}`, en: `Delete ${item.nameEn}` },
+                            locale,
+                          )}
+                          disabled={remove.isPending}
+                          onClick={() =>
+                            window.confirm(
+                              adminDeleteConfirmation(localized({ fa: item.nameFa, en: item.nameEn }, locale), locale),
+                            ) && remove.mutate(item.id)
+                          }
                           className="grid size-9 place-items-center rounded-lg text-red-600 hover:bg-red-50"
                         >
                           <Trash2 size={17} />
@@ -152,6 +156,11 @@ export function LanguageManager() {
               </tbody>
             </table>
           </div>
+        )}
+        {remove.isError && (
+          <p role="alert" className="mt-4 rounded-xl bg-red-50 p-3 text-red-800">
+            {apiMessage(remove.error, localized({ fa: 'حذف زبان انجام نشد.', en: 'The language could not be deleted.' }, locale))}
+          </p>
         )}
         <div className="mt-5 flex justify-between">
           <button
@@ -179,7 +188,13 @@ export function LanguageManager() {
             ? translate(locale, 'adminlanguageManagerEditLanguage')
             : translate(locale, 'adminlanguageManagerAddLanguage')}
         </h2>
-        <div className="mt-5 grid gap-4">
+        <form
+          className="mt-5 grid gap-4"
+          onSubmit={(event) => {
+            event.preventDefault();
+            save.mutate();
+          }}
+        >
           <Field label="Code">
             <input
               value={form.code}
@@ -188,6 +203,9 @@ export function LanguageManager() {
               }
               className="input"
               dir="ltr"
+              required
+              minLength={2}
+              maxLength={20}
             />
           </Field>
           <div className="grid grid-cols-2 gap-3">
@@ -196,6 +214,9 @@ export function LanguageManager() {
                 value={form.nameFa}
                 onChange={(event) => setForm((current) => ({ ...current, nameFa: event.target.value }))}
                 className="input"
+                required
+                minLength={2}
+                maxLength={100}
               />
             </Field>
             <Field label={translate(locale, 'admincountryManagerEnglishName')}>
@@ -204,6 +225,9 @@ export function LanguageManager() {
                 onChange={(event) => setForm((current) => ({ ...current, nameEn: event.target.value }))}
                 className="input"
                 dir="ltr"
+                required
+                minLength={2}
+                maxLength={100}
               />
             </Field>
           </div>
@@ -213,6 +237,8 @@ export function LanguageManager() {
                 value={form.nativeName}
                 onChange={(event) => setForm((current) => ({ ...current, nativeName: event.target.value }))}
                 className="input"
+                required
+                maxLength={100}
               />
             </Field>
             <Field label={translate(locale, 'admincountryManagerFlag')}>
@@ -220,6 +246,7 @@ export function LanguageManager() {
                 value={form.flag}
                 onChange={(event) => setForm((current) => ({ ...current, flag: event.target.value }))}
                 className="input text-center"
+                maxLength={32}
               />
             </Field>
           </div>
@@ -248,6 +275,8 @@ export function LanguageManager() {
           <Field label={translate(locale, 'admincountryManagerOrder')}>
             <input
               type="number"
+              min={0}
+              max={10000}
               value={form.order}
               onChange={(event) => setForm((current) => ({ ...current, order: Number(event.target.value) }))}
               className="input"
@@ -269,35 +298,28 @@ export function LanguageManager() {
           )}
           <div className="flex gap-3">
             <button
+              type="submit"
               disabled={save.isPending}
-              onClick={() => save.mutate()}
               className="brand-gradient flex flex-1 items-center justify-center gap-2 rounded-xl py-3 font-black text-white"
             >
               <Plus size={18} />
               {translate(locale, 'admincountryManagerSave')}
             </button>
             {editing && (
-              <button onClick={() => setEditing(null)} className="rounded-xl border hairline px-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setEditing(null);
+                  setForm(emptyLanguageForm);
+                }}
+                className="rounded-xl border hairline px-4"
+              >
                 {translate(locale, 'admincountryManagerCancel')}
               </button>
             )}
           </div>
-        </div>
+        </form>
       </section>
-      <style jsx global>{`
-        .input {
-          width: 100%;
-          border: 1px solid rgba(16, 29, 53, 0.14);
-          border-radius: 0.9rem;
-          padding: 0.8rem 1rem;
-          background: white;
-          outline: none;
-        }
-        .input:focus {
-          border-color: #7257d9;
-          box-shadow: 0 0 0 4px rgba(114, 87, 217, 0.08);
-        }
-      `}</style>
     </div>
   );
 }
@@ -310,11 +332,12 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 function Error({ message, retry }: { message: string; retry: () => void }) {
+  const { locale } = useTranslations();
   return (
-    <div className="mt-5 rounded-2xl bg-red-50 p-5 text-red-800">
+    <div role="alert" className="mt-5 rounded-2xl bg-red-50 p-5 text-red-800">
       {message}{' '}
-      <button onClick={retry} className="font-bold underline">
-        Retry
+      <button type="button" onClick={retry} className="font-bold underline">
+        {translate(locale, 'testsaudioRecorderTryAgain')}
       </button>
     </div>
   );
