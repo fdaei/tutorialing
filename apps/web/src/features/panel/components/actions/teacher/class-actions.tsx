@@ -2,21 +2,10 @@
 
 import { translate } from '@/lib/i18n';
 import { api } from '@/shared/services/api';
-import {
-  Area,
-  BookingSelect,
-  Field,
-  Localized,
-  Select,
-  Shell,
-  Status,
-  StudentSelect,
-  Submit,
-  useAction,
-  value,
-} from '../shared/action-controls';
+import { BookingSelect, Field, Localized, Shell, Status, Submit, useAction, value } from '../shared/action-controls';
 export function ClassActions({ endpoint, fa }: { endpoint: string } & Localized) {
-  const action = useAction(endpoint);
+  const attendanceAction = useAction(endpoint);
+  const completionAction = useAction(endpoint);
   return (
     <Shell title={translate(fa, 'legacyAttendanceMeetingLinkAndClassCompletion')}>
       <form
@@ -24,7 +13,7 @@ export function ClassActions({ endpoint, fa }: { endpoint: string } & Localized)
         onSubmit={(event) => {
           event.preventDefault();
           const form = new FormData(event.currentTarget);
-          action.mutate(() =>
+          attendanceAction.mutate(() =>
             api(`/bookings/${value(form, 'bookingId')}/attendance`, {
               method: 'PUT',
               body: JSON.stringify({
@@ -47,27 +36,28 @@ export function ClassActions({ endpoint, fa }: { endpoint: string } & Localized)
           {translate(fa, 'legacyTeacherAttended')}
         </label>
         <div className="md:col-span-2">
-          <Submit fa={fa} busy={action.isPending}>
+          <Submit fa={fa} busy={attendanceAction.isPending}>
             {translate(fa, 'legacySaveAttendance')}
           </Submit>
         </div>
       </form>
+      <Status fa={fa} error={attendanceAction.error} ok={attendanceAction.isSuccess} />
       <form
         className="mt-5 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end"
         onSubmit={(event) => {
           event.preventDefault();
           const form = new FormData(event.currentTarget);
-          action.mutate(() => api(`/bookings/${value(form, 'bookingId')}/complete`, { method: 'POST' }));
+          completionAction.mutate(() => api(`/bookings/${value(form, 'bookingId')}/complete`, { method: 'POST' }));
         }}
       >
         <BookingSelect fa={fa} />
         <div>
-          <Submit fa={fa} busy={action.isPending}>
+          <Submit fa={fa} busy={completionAction.isPending}>
             {translate(fa, 'legacyCompleteClass')}
           </Submit>
         </div>
       </form>
-      <Status fa={fa} error={action.error} ok={action.isSuccess} />
+      <Status fa={fa} error={completionAction.error} ok={completionAction.isSuccess} />
     </Shell>
   );
 }

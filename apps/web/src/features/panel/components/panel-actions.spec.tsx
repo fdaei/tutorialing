@@ -75,6 +75,22 @@ describe('PanelActions characterization', () => {
     );
   });
 
+  it.each(['classes', 'plans'])('shows an error beside the failing secondary teacher %s action', async (section) => {
+    mockedApi.mockResolvedValue([{ id: 'entity-1', title: 'Existing item', status: 'CONFIRMED' }]);
+    const view = renderAction('teacher', section, section === 'classes' ? '/bookings/me' : '/learning/plans');
+    const forms = view.container.querySelectorAll('form');
+    const form = forms[forms.length - 1];
+    if (!form) throw new Error(`Expected secondary teacher ${section} form`);
+    const selectName = section === 'classes' ? 'bookingId' : 'planId';
+    await waitFor(() => expect(field(form, selectName)).not.toBeDisabled());
+    mockedApi.mockRejectedValueOnce(new Error('request failed'));
+
+    fireEvent.submit(form);
+
+    await waitFor(() => expect(view.getByRole('alert')).toBeInTheDocument());
+    expect(view.queryAllByRole('status')).toHaveLength(0);
+  });
+
   it('dispatches admin settings and preserves setting payload', async () => {
     const view = renderAction('admin', 'settings', '/admin/settings');
     const form = view.container.querySelector('form');

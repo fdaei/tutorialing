@@ -37,7 +37,9 @@ export function StudentWallet() {
         )}
         <p className="mt-4 text-xs text-white/60">موجودی از دفتر کل مالی محاسبه می‌شود.</p>
       </section>
-      {wallet.isError && <Error text={apiMessage(wallet.error, 'موجودی دریافت نشد.')} />}
+      {wallet.isError && (
+        <Error text={apiMessage(wallet.error, 'موجودی دریافت نشد.')} onRetry={() => void wallet.refetch()} />
+      )}
       <nav className="mt-6 flex gap-2 overflow-auto rounded-2xl bg-white p-2 shadow-soft">
         {(
           [
@@ -111,13 +113,38 @@ export function StudentWallet() {
           </aside>
         </section>
       )}
-      {tab === 'transactions' && <Transactions loading={transactions.isLoading} items={transactions.data ?? []} />}{' '}
-      {tab === 'invoices' && <Invoices loading={invoices.isLoading} items={invoices.data ?? []} />}
+      {tab === 'transactions' && (
+        <Transactions
+          loading={transactions.isLoading}
+          error={transactions.isError}
+          retry={() => void transactions.refetch()}
+          items={transactions.data ?? []}
+        />
+      )}{' '}
+      {tab === 'invoices' && (
+        <Invoices
+          loading={invoices.isLoading}
+          error={invoices.isError}
+          retry={() => void invoices.refetch()}
+          items={invoices.data ?? []}
+        />
+      )}
     </>
   );
 }
-function Transactions({ loading, items }: { loading: boolean; items: Transaction[] }) {
+function Transactions({
+  loading,
+  error,
+  retry,
+  items,
+}: {
+  loading: boolean;
+  error: boolean;
+  retry: () => void;
+  items: Transaction[];
+}) {
   if (loading) return <Loading />;
+  if (error) return <Error text="گردش حساب دریافت نشد." onRetry={retry} />;
   if (!items.length)
     return (
       <div className="mt-5">
@@ -154,8 +181,19 @@ function Transactions({ loading, items }: { loading: boolean; items: Transaction
     </div>
   );
 }
-function Invoices({ loading, items }: { loading: boolean; items: Invoice[] }) {
+function Invoices({
+  loading,
+  error,
+  retry,
+  items,
+}: {
+  loading: boolean;
+  error: boolean;
+  retry: () => void;
+  items: Invoice[];
+}) {
   if (loading) return <Loading />;
+  if (error) return <Error text="فاکتورها دریافت نشدند." onRetry={retry} />;
   if (!items.length)
     return (
       <div className="mt-5">
@@ -186,10 +224,15 @@ function Invoices({ loading, items }: { loading: boolean; items: Invoice[] }) {
 function Loading() {
   return <div className="skeleton mt-5 h-64 rounded-2xl" />;
 }
-function Error({ text }: { text: string }) {
+function Error({ text, onRetry }: { text: string; onRetry?: () => void }) {
   return (
-    <p role="alert" className="mt-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">
-      {text}
-    </p>
+    <div role="alert" className="mt-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">
+      <p>{text}</p>
+      {onRetry && (
+        <button type="button" onClick={onRetry} className="mt-2 font-black underline">
+          تلاش دوباره
+        </button>
+      )}
+    </div>
   );
 }

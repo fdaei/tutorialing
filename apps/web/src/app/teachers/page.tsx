@@ -1,21 +1,26 @@
 'use client';
 
 import { translate } from '@/lib/i18n';
-import { useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useSearchParams } from 'next/navigation';
 import { Search, RotateCcw, SlidersHorizontal } from 'lucide-react';
 import { Header, Footer, Empty } from '@/components/layout/site';
 import { TeacherCard } from '@/features/teacher/components/teacher-card';
+import { TeacherLanguageFilter } from '@/features/teacher/components/teacher-language-filter';
 import { publicApi, type Paginated } from '@/shared/services/api';
 import type { PublicTeacher } from '@/features/teacher';
 import { useTranslations } from '@/components/shared/locale-provider';
 import type { EducationalLanguage } from '@/features/languages';
-export default function Directory() {
+import { normalizeTeacherLanguage, teacherDirectoryEndpoint } from '@/features/teacher/teacher-directory-query';
+
+function DirectoryContent() {
+  const params = useSearchParams();
   const { locale } = useTranslations(),
     [q, setQ] = useState(''),
     [search, setSearch] = useState(''),
     [skill, setSkill] = useState(''),
-    [language, setLanguage] = useState(''),
+    [language, setLanguage] = useState(() => normalizeTeacherLanguage(params.get('language'))),
     [minRating, setMinRating] = useState(''),
     [sort, setSort] = useState('rating'),
     [page, setPage] = useState(1);
@@ -25,6 +30,9 @@ export default function Directory() {
     queryFn: () => publicApi<EducationalLanguage[]>('/languages'),
     staleTime: 10 * 60 * 1000,
   });
+  useEffect(() => {
+    if (language && languages.data && !languages.data.some((item) => item.code === language)) setLanguage('');
+  }, [language, languages.data]);
   const hasFilters = Boolean(q || search || skill || language || minRating || sort !== 'rating');
   const resetFilters = () => {
     setQ('');
@@ -38,9 +46,7 @@ export default function Directory() {
   const query = useQuery({
     queryKey: ['teachers', search, skill, language, minRating, sort, page],
     queryFn: () =>
-      publicApi<Paginated<PublicTeacher>>(
-        `/teachers?page=${page}&limit=9&search=${encodeURIComponent(search)}&skill=${skill}&language=${language}&minRating=${minRating}&sort=${sort}`,
-      ),
+      publicApi<Paginated<PublicTeacher>>(teacherDirectoryEndpoint({ page, search, skill, language, minRating, sort })),
   });
   return (
     <>
@@ -67,21 +73,17 @@ export default function Directory() {
               placeholder={translate(locale, 'teachersTeacherNameOrSpecialty')}
             />
           </label>
-          <select
-            aria-label={english ? 'Language' : 'زبان'}
+          <TeacherLanguageFilter
+            locale={locale}
             value={language}
-            onChange={(e) => {
-              setLanguage(e.target.value);
+            languages={languages.data}
+            loading={languages.isLoading}
+            error={languages.isError}
+            onChange={(nextLanguage) => {
+              setLanguage(nextLanguage);
               setPage(1);
             }}
-            className="min-h-13 rounded-2xl border hairline px-4"
-          >
-            disabled={languages.isLoading || languages.isError}
-            <option value="">{languages.isError ? (english ? 'Languages unavailable' : 'زبان‌ها در دسترس نیستند') : (english ? 'All languages' : 'همه زبان‌ها')}</option>
-            {languages.data?.map((item) => (
-              <option key={item.id} value={item.code}>{locale === 'en' ? item.nameEn : item.nameFa}</option>
-            ))}
-          </select>
+          />
           <select
             aria-label={translate(locale, 'teachersSkill')}
             value={skill}
@@ -117,7 +119,10 @@ export default function Directory() {
             <option value="price_asc">{translate(locale, 'teachersLowestPrice')}</option>
             <option value="newest">{translate(locale, 'teachersNewest')}</option>
           </select>
-          <button type="submit" className="brand-gradient flex min-h-13 items-center justify-center gap-2 rounded-2xl px-5 font-black text-white">
+          <button
+            type="submit"
+            className="brand-gradient flex min-h-13 items-center justify-center gap-2 rounded-2xl px-5 font-black text-white"
+          >
             <Search size={18} aria-hidden="true" />
             {english ? 'Search' : 'جست‌وجو'}
           </button>
@@ -174,7 +179,8 @@ export default function Directory() {
                 {translate(locale, 'admincountryManagerPrevious')}
               </button>
               <span className="px-3 py-2">
-                {page.toLocaleString(english ? 'en-US' : 'fa-IR')} / {(query.data.totalPages || 1).toLocaleString(english ? 'en-US' : 'fa-IR')}
+                {page.toLocaleString(english ? 'en-US' : 'fa-IR')} /{' '}
+                {(query.data.totalPages || 1).toLocaleString(english ? 'en-US' : 'fa-IR')}
               </span>
               <button
                 disabled={page >= query.data.totalPages}
@@ -189,5 +195,13 @@ export default function Directory() {
       </main>
       <Footer />
     </>
+  );
+}
+
+export default function Directory() {
+  return (
+    <Suspense fallback={<div className="skeleton min-h-screen" />}>
+      <DirectoryContent />
+    </Suspense>
   );
 }

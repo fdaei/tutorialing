@@ -18,7 +18,8 @@ import {
   value,
 } from '../shared/action-controls';
 export function PlanForm({ endpoint, fa }: { endpoint: string } & Localized) {
-  const action = useAction(endpoint);
+  const planAction = useAction(endpoint);
+  const assignmentAction = useAction(endpoint);
   return (
     <div className="grid gap-5 xl:grid-cols-2">
       <Shell title={translate(fa, 'legacyCreateLearningPlan')}>
@@ -27,7 +28,7 @@ export function PlanForm({ endpoint, fa }: { endpoint: string } & Localized) {
           onSubmit={(event) => {
             event.preventDefault();
             const form = new FormData(event.currentTarget);
-            action.mutate(() =>
+            planAction.mutate(() =>
               api('/learning/plans', {
                 method: 'POST',
                 body: JSON.stringify({
@@ -63,12 +64,12 @@ export function PlanForm({ endpoint, fa }: { endpoint: string } & Localized) {
           <Field name="milestone" label={translate(fa, 'legacyFirstMilestone')} required />
           <Field name="dueAt" label={translate(fa, 'legacyDueDate')} type="date" />
           <div className="md:col-span-2">
-            <Submit fa={fa} busy={action.isPending}>
+            <Submit fa={fa} busy={planAction.isPending}>
               {translate(fa, 'legacyCreatePlan')}
             </Submit>
           </div>
         </form>
-        <Status fa={fa} error={action.error} ok={action.isSuccess} />
+        <Status fa={fa} error={planAction.error} ok={planAction.isSuccess} />
       </Shell>
       <Shell title={translate(fa, 'legacyAddAnAssignmentToAPlan')}>
         <form
@@ -76,7 +77,7 @@ export function PlanForm({ endpoint, fa }: { endpoint: string } & Localized) {
           onSubmit={(event) => {
             event.preventDefault();
             const form = new FormData(event.currentTarget);
-            action.mutate(() =>
+            assignmentAction.mutate(() =>
               api(`/learning/plans/${value(form, 'planId')}/assignments`, {
                 method: 'POST',
                 body: JSON.stringify({
@@ -92,11 +93,11 @@ export function PlanForm({ endpoint, fa }: { endpoint: string } & Localized) {
           <Field name="assignmentTitle" label={translate(fa, 'legacyAssignmentTitle')} required />
           <Area name="instructions" label={translate(fa, 'legacyInstructionsAndSubmissionDetails')} required />
           <Field name="assignmentDueAt" label={translate(fa, 'legacydueDate2')} type="date" />
-          <Submit fa={fa} busy={action.isPending}>
+          <Submit fa={fa} busy={assignmentAction.isPending}>
             {translate(fa, 'legacyAddAssignment')}
           </Submit>
         </form>
-        <Status fa={fa} error={action.error} ok={action.isSuccess} />
+        <Status fa={fa} error={assignmentAction.error} ok={assignmentAction.isSuccess} />
       </Shell>
     </div>
   );
