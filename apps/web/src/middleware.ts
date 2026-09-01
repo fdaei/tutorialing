@@ -26,7 +26,7 @@ function cspHeader(nonce: string) {
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${devEval}`,
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob:",
+    `img-src 'self' data: blob:${externalOrigin ? ` ${externalOrigin}` : ''}`,
     "font-src 'self' data:",
     `media-src 'self' blob:${externalOrigin ? ` ${externalOrigin}` : ''}`,
     `connect-src 'self'${apiOrigin ? ` ${apiOrigin}` : ''}${externalOrigin ? ` ${externalOrigin}` : ''}`,

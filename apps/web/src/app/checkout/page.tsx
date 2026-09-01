@@ -9,6 +9,7 @@ import { api, publicApi, ApiError, apiMessage } from '@/shared/services/api';
 import type { PublicTeacher } from '@/features/teacher';
 import { useTranslations } from '@/components/shared/locale-provider';
 import { localePath, localized, isDefaultLocale, translate } from '@/lib/i18n';
+import { CheckoutLoadError } from './checkout-load-error';
 
 type Slot = { startsAt: string; endsAt: string; date: string; timezone: string; type: 'trial' | 'regular' };
 export default function Checkout() {
@@ -105,7 +106,12 @@ export default function Checkout() {
     setLessonType(type);
     setSlot(null);
   }
-  if (!me.data) return <div className="skeleton min-h-screen" />;
+  if (!me.data) {
+    if (me.isError && !(me.error instanceof ApiError && me.error.status === 401)) {
+      return <CheckoutLoadError locale={locale} onRetry={() => void me.refetch()} />;
+    }
+    return <div className="skeleton min-h-screen" />;
+  }
   if (!teacherId)
     return (
       <main className="mx-auto max-w-3xl px-6 py-24 text-center">
@@ -166,7 +172,13 @@ export default function Checkout() {
             </div>
           </div>
         </div>
-        {teacher.isError && <ErrorBox text={translate(locale, 'checkoutCouldNotLoadTheTeacher')} />}
+        {teacher.isError && (
+          <ErrorBox
+            text={translate(locale, 'checkoutCouldNotLoadTheTeacher')}
+            retryLabel={translate(locale, 'legacyTryAgain')}
+            onRetry={() => void teacher.refetch()}
+          />
+        )}
         <div className="grid gap-7 lg:grid-cols-[minmax(0,1fr)_360px]">
           <section className="space-y-6">
             <div className="rounded-3xl border hairline bg-white p-6">
@@ -288,7 +300,13 @@ export default function Checkout() {
                   </div>
                 </>
               )}
-              {slots.isError && <ErrorBox text={translate(locale, 'checkoutCouldNotLoadAvailableTimesTryAgain')} />}
+              {slots.isError && (
+                <ErrorBox
+                  text={translate(locale, 'checkoutCouldNotLoadAvailableTimesTryAgain')}
+                  retryLabel={translate(locale, 'legacyTryAgain')}
+                  onRetry={() => void slots.refetch()}
+                />
+              )}
             </div>
             <label className="flex gap-3 rounded-3xl border hairline bg-white p-6">
               <input
@@ -352,15 +370,47 @@ export default function Checkout() {
                 <strong className="text-2xl">{money(price)}</strong>
               </div>
               <div className="mt-5 rounded-2xl border border-white/15 bg-white/[0.06] p-4 text-sm">
-                <div className="flex justify-between"><span className="text-white/60">{fa ? 'روش پرداخت' : 'Payment method'}</span><b>{fa ? 'کیف پول' : 'Wallet'}</b></div>
-                <div className="mt-3 flex justify-between"><span className="text-white/60">{fa ? 'موجودی کیف پول' : 'Wallet balance'}</span><b>{wallet.isLoading ? '…' : money(walletBalance)}</b></div>
-                <div className="mt-3 flex justify-between"><span className="text-white/60">{fa ? 'موجودی پس از رزرو' : 'Balance after booking'}</span><b className={walletInsufficient ? 'text-red-300' : 'text-emerald-300'}>{money(Math.max(0, walletBalance - price))}</b></div>
+                <div className="flex justify-between">
+                  <span className="text-white/60">{fa ? 'روش پرداخت' : 'Payment method'}</span>
+                  <b>{fa ? 'کیف پول' : 'Wallet'}</b>
+                </div>
+                <div className="mt-3 flex justify-between">
+                  <span className="text-white/60">{fa ? 'موجودی کیف پول' : 'Wallet balance'}</span>
+                  <b>{wallet.isLoading ? '…' : money(walletBalance)}</b>
+                </div>
+                <div className="mt-3 flex justify-between">
+                  <span className="text-white/60">{fa ? 'موجودی پس از رزرو' : 'Balance after booking'}</span>
+                  <b className={walletInsufficient ? 'text-red-300' : 'text-emerald-300'}>
+                    {money(Math.max(0, walletBalance - price))}
+                  </b>
+                </div>
               </div>
+              {wallet.isError && (
+                <div role="alert" className="mt-5 rounded-xl bg-red-500/15 p-4 text-sm text-red-100">
+                  <p>{translate(locale, 'genericError')}</p>
+                  <button
+                    type="button"
+                    onClick={() => void wallet.refetch()}
+                    className="mt-3 rounded-lg bg-white px-4 py-2 font-black text-navy"
+                  >
+                    {translate(locale, 'legacyTryAgain')}
+                  </button>
+                </div>
+              )}
               {walletInsufficient && (
                 <div className="mt-5 rounded-xl bg-amber-400/15 p-4 text-sm text-amber-100">
                   <b className="block">{fa ? 'موجودی ناکافی' : 'Insufficient balance'}</b>
-                  <span className="mt-1 block">{fa ? 'برای رزرو این نوبت ابتدا کیف پول خود را شارژ کنید.' : 'Top up your wallet before booking this lesson.'}</span>
-                  <Link href={p('/dashboard/wallet')} className="mt-3 inline-flex rounded-lg bg-white px-4 py-2 font-black text-navy">{fa ? 'شارژ کیف پول' : 'Top up wallet'}</Link>
+                  <span className="mt-1 block">
+                    {fa
+                      ? 'برای رزرو این نوبت ابتدا کیف پول خود را شارژ کنید.'
+                      : 'Top up your wallet before booking this lesson.'}
+                  </span>
+                  <Link
+                    href={p('/dashboard/wallet')}
+                    className="mt-3 inline-flex rounded-lg bg-white px-4 py-2 font-black text-navy"
+                  >
+                    {fa ? 'شارژ کیف پول' : 'Top up wallet'}
+                  </Link>
                 </div>
               )}
               {checkout.isError && (
@@ -369,13 +419,23 @@ export default function Checkout() {
                 </div>
               )}
               <button
-                disabled={!slot || !accepted || checkout.isPending || !price || walletInsufficient || wallet.isLoading}
+                disabled={
+                  !slot ||
+                  !accepted ||
+                  checkout.isPending ||
+                  !price ||
+                  walletInsufficient ||
+                  wallet.isLoading ||
+                  wallet.isError
+                }
                 onClick={() => checkout.mutate()}
                 className="brand-gradient mt-7 flex w-full items-center justify-center gap-2 rounded-xl py-4 font-black text-white disabled:opacity-40"
               >
                 {checkout.isPending
                   ? translate(locale, 'checkoutFinalAvailabilityCheck')
-                  : (fa ? 'پرداخت از کیف پول و رزرو' : 'Pay from wallet and book')}
+                  : fa
+                    ? 'پرداخت از کیف پول و رزرو'
+                    : 'Pay from wallet and book'}
                 <ShieldCheck size={18} />
               </button>
               <p className="mt-4 text-center text-xs leading-6 text-white/45">
@@ -433,10 +493,15 @@ function Summary({ icon, label, value }: { icon: React.ReactNode; label: string;
     </div>
   );
 }
-function ErrorBox({ text }: { text: string }) {
+function ErrorBox({ text, retryLabel, onRetry }: { text: string; retryLabel?: string; onRetry?: () => void }) {
   return (
     <div role="alert" className="mt-5 rounded-2xl border border-red-100 bg-red-50 p-4 text-red-800">
-      {text}
+      <p>{text}</p>
+      {onRetry && retryLabel && (
+        <button type="button" onClick={onRetry} className="mt-3 rounded-lg bg-red-800 px-4 py-2 font-black text-white">
+          {retryLabel}
+        </button>
+      )}
     </div>
   );
 }

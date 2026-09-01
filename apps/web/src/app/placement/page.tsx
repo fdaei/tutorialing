@@ -3,7 +3,18 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, ArrowRight, BookOpen, Check, ChevronLeft, ChevronRight, Clock3, RotateCcw, Sparkles, Target } from 'lucide-react';
+import {
+  ArrowLeft,
+  ArrowRight,
+  BookOpen,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Clock3,
+  RotateCcw,
+  Sparkles,
+  Target,
+} from 'lucide-react';
 import { Footer, Header } from '@/components/layout/site';
 import { CourseCard } from '@/components/marketplace/cards';
 import { api, publicApi } from '@/shared/services/api';
@@ -12,26 +23,512 @@ import { ACCESS_TOKEN_KEY } from '@/shared/services/api';
 import { courses } from '@/lib/marketplace-data';
 import { useTranslations } from '@/components/shared/locale-provider';
 import { isDefaultLocale, localePath, localized } from '@/lib/i18n';
+import { placementRecommendationPaths } from './placement-recommendations';
 
-type PlacementTest = { id: string; titleFa: string; titleEn: string; descriptionFa: string; descriptionEn: string; durationMinutes: number; language: { id: string; nameFa: string; nameEn: string; nativeName: string; flag: string } };
-type Question = { id: string; prompt: { fa?: string; en?: string }; choices: { fa?: unknown[]; en?: unknown[] }; points: number; skill: string };
+type PlacementTest = {
+  id: string;
+  titleFa: string;
+  titleEn: string;
+  descriptionFa: string;
+  descriptionEn: string;
+  durationMinutes: number;
+  language: { id: string; nameFa: string; nameEn: string; nativeName: string; flag: string };
+};
+type Question = {
+  id: string;
+  prompt: { fa?: string; en?: string };
+  choices: { fa?: unknown[]; en?: unknown[] };
+  points: number;
+  skill: string;
+};
 type TestPayload = { id: string; titleFa: string; titleEn: string; durationMinutes: number; questions: Question[] };
-type Result = { id: string; score: number; level: 'A1'|'A2'|'B1'|'B2'|'C1'|'C2'; correctAnswers: number; totalQuestions: number; completedAt: string; titleFa: string; titleEn: string; description: string; strengths: string[]; focus: string[]; authenticated: boolean };
+type Result = {
+  id: string;
+  score: number;
+  level: 'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2';
+  correctAnswers: number;
+  totalQuestions: number;
+  completedAt: string;
+  titleFa: string;
+  titleEn: string;
+  description: string;
+  strengths: string[];
+  focus: string[];
+  authenticated: boolean;
+};
 
 export default function Placement() {
-  const { locale } = useTranslations(), fa = isDefaultLocale(locale), p = (href: string) => localePath(href, locale);
-  const [languageId,setLanguageId]=useState(''), [test,setTest]=useState<TestPayload>(), [index,setIndex]=useState(0), [answers,setAnswers]=useState<Record<string,unknown>>({}), [result,setResult]=useState<Result>(), [busy,setBusy]=useState(false), [error,setError]=useState('');
-  const languages=useQuery({queryKey:['educational-languages'],queryFn:()=>publicApi<EducationalLanguage[]>('/languages')});
-  const tests=useQuery({queryKey:['instant-placement-tests',languageId],queryFn:()=>publicApi<PlacementTest[]>(`/placement/tests?languageId=${encodeURIComponent(languageId)}`),enabled:!!languageId});
-  const question=test?.questions[index], answered=question ? Object.hasOwn(answers,question.id) : false;
-  async function start(testId:string){setBusy(true);setError('');try{setTest(await publicApi<TestPayload>(`/placement/questions?testId=${encodeURIComponent(testId)}`));setIndex(0);setAnswers({});setResult(undefined);}catch{setError('دریافت سؤال‌ها ممکن نشد. دوباره تلاش کنید.');}finally{setBusy(false)}}
-  async function next(){if(!test||!question||!answered)return;if(index<test.questions.length-1){setIndex(i=>i+1);return}setBusy(true);setError('');try{const body={testId:test.id,answers:test.questions.map(q=>({questionId:q.id,value:answers[q.id]}))};const loggedIn=Boolean(sessionStorage.getItem(ACCESS_TOKEN_KEY));const outcome=loggedIn?await api<Result>('/placement/submit',{method:'POST',body:JSON.stringify(body)}):await publicApi<Result>('/placement/guest/submit',{method:'POST',body:JSON.stringify(body)});setResult(outcome);window.scrollTo({top:0,behavior:'smooth'});}catch{setError('محاسبه نتیجه انجام نشد. پاسخ‌ها حفظ شده‌اند؛ دوباره تلاش کنید.');}finally{setBusy(false)}}
-  function restart(){setTest(undefined);setResult(undefined);setAnswers({});setIndex(0);setError('')}
-  if(result)return <ResultView result={result} onRestart={restart}/>;
-  if(test&&question){const choices=(localized({fa:question.choices?.fa,en:question.choices?.en},locale)??[]) as unknown[];const progress=Math.round(((index+1)/test.questions.length)*100);return <><Header/><main className="min-h-[calc(100vh-76px)] bg-canvas py-8 md:py-14"><div className="mx-auto max-w-3xl px-5"><div className="mb-5 flex items-center justify-between text-sm"><button onClick={restart} className="flex items-center gap-2 text-muted"><ChevronRight size={17}/>خروج از آزمون</button><span className="flex items-center gap-2 text-muted"><Clock3 size={17}/>{test.durationMinutes.toLocaleString('fa-IR')} دقیقه</span></div><section className="surface-card overflow-hidden"><div className="border-b hairline p-5 md:p-7"><div className="flex items-center justify-between gap-4 text-sm"><strong>سؤال {(index+1).toLocaleString('fa-IR')} از {test.questions.length.toLocaleString('fa-IR')}</strong><span className="latin font-black text-purple">{progress}%</span></div><div className="mt-3 h-2 overflow-hidden rounded-full bg-lavender" dir="ltr"><div className="h-full rounded-full brand-gradient transition-[width]" style={{width:`${progress}%`}}/></div></div><div className="p-6 md:p-10"><span className="rounded-full bg-lavender px-3 py-1 text-xs font-black text-purple">{question.skill}</span><h1 className="mt-5 text-xl font-black leading-9 md:text-2xl">{String(localized({fa:question.prompt.fa,en:question.prompt.en},locale)??'')}</h1><div className="mt-7 grid gap-3">{choices.map((choice,choiceIndex)=>{const selected=answers[question.id]===choiceIndex;return <button key={choiceIndex} onClick={()=>setAnswers(current=>({...current,[question.id]:choiceIndex}))} className={`flex min-h-14 items-center gap-4 rounded-2xl border p-4 text-start ${selected?'border-purple bg-lavender ring-2 ring-purple/10':'hairline bg-white hover:border-purple/50'}`}><span className={`grid size-7 shrink-0 place-items-center rounded-full border ${selected?'border-purple bg-purple text-white':'hairline'}`}>{selected?<Check size={16}/>:String.fromCharCode(65+choiceIndex)}</span><span>{String(choice)}</span></button>})}</div>{error&&<p role="alert" className="mt-5 rounded-xl bg-red-50 p-4 text-sm text-red-700">{error}</p>}<div className="mt-8 flex items-center justify-between"><button disabled={index===0||busy} onClick={()=>setIndex(i=>i-1)} className="flex min-h-12 items-center gap-2 rounded-xl border hairline px-5 font-bold disabled:opacity-40"><ChevronRight size={18}/>قبلی</button><button disabled={!answered||busy} onClick={next} className="brand-gradient flex min-h-12 items-center gap-2 rounded-xl px-6 font-black text-white disabled:opacity-40">{busy?'در حال محاسبه سطح شما...':index===test.questions.length-1?'مشاهده نتیجه':'سؤال بعدی'}<ChevronLeft size={18}/></button></div></div></section></div></main></>}
-  return <><Header/><main><section className="placement-intro"><div className="page-shell py-16 md:py-24"><span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-bold text-white"><Sparkles size={16}/>نتیجه فوری بر اساس CEFR</span><h1 className="mt-6 max-w-3xl text-4xl font-black leading-[1.4] text-white md:text-6xl">سطحت را بدان؛ مسیر درست را شروع کن</h1><p className="mt-5 max-w-2xl text-lg leading-8 text-white/70">بدون نیاز به ثبت‌نام پاسخ بده. آخرین سؤال که ثبت شود، امتیاز وزن‌دار محاسبه می‌شود و همان لحظه سطح A1 تا C2 خود را می‌بینی.</p><div className="mt-8 flex flex-wrap gap-5 text-sm font-bold text-white/85"><span className="flex items-center gap-2"><Target size={18}/>امتیازدهی قطعی و خودکار</span><span className="flex items-center gap-2"><Clock3 size={18}/>بدون انتظار برای بررسی</span><span className="flex items-center gap-2"><BookOpen size={18}/>پیشنهاد دوره متناسب</span></div></div></section><section className="page-shell py-12 md:py-16"><h2 className="text-2xl font-black">زبان آزمون را انتخاب کنید</h2><p className="mt-2 text-muted">برای شروع نیازی به ورود یا ساخت حساب ندارید.</p>{languages.isLoading?<div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">{Array.from({length:4},(_,i)=><div key={i} className="skeleton h-24 rounded-2xl"/>)}</div>:languages.isError?<Error text="فهرست زبان‌ها دریافت نشد."/>:<div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">{languages.data?.map(language=><button key={language.id} onClick={()=>{setLanguageId(language.id);setError('')}} className={`rounded-2xl border p-5 text-start ${languageId===language.id?'border-purple bg-lavender ring-2 ring-purple/10':'hairline bg-white'}`}><span className="text-3xl">{language.flag||'🌐'}</span><strong className="mt-3 block">{localized({fa:language.nameFa,en:language.nameEn},locale)}</strong><small className="text-muted">{language.nativeName}</small></button>)}</div>}<div className="mt-8">{!languageId?<div className="rounded-2xl border border-dashed hairline p-8 text-center text-muted">ابتدا زبان موردنظر را انتخاب کنید.</div>:tests.isLoading?<div className="skeleton h-48 rounded-3xl"/>:tests.isError?<Error text="آزمون‌ها دریافت نشدند."/>:tests.data?.length?<div className="grid gap-4 md:grid-cols-2">{tests.data.map(item=><article className="surface-card p-6" key={item.id}><span className="text-2xl">{item.language.flag}</span><h3 className="mt-4 text-xl font-black">{localized({fa:item.titleFa,en:item.titleEn},locale)}</h3><p className="mt-3 text-sm leading-7 text-muted">{localized({fa:item.descriptionFa,en:item.descriptionEn},locale)}</p><button disabled={busy} onClick={()=>start(item.id)} className="brand-gradient mt-6 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl font-black text-white">شروع آزمون {fa?<ArrowLeft size={18}/>:<ArrowRight size={18}/>}</button></article>)}</div>:<div className="rounded-2xl border border-dashed hairline p-8 text-center text-muted">برای این زبان هنوز آزمون کاملاً خودکار منتشر نشده است.</div>}</div>{error&&<Error text={error}/>}</section></main><Footer/></>;
+  const { locale } = useTranslations(),
+    fa = isDefaultLocale(locale),
+    p = (href: string) => localePath(href, locale),
+    copy = (faCopy: string, enCopy: string) => localized({ fa: faCopy, en: enCopy }, locale),
+    numberLocale = fa ? 'fa-IR' : 'en-US';
+  const [languageId, setLanguageId] = useState(''),
+    [test, setTest] = useState<TestPayload>(),
+    [index, setIndex] = useState(0),
+    [answers, setAnswers] = useState<Record<string, unknown>>({}),
+    [result, setResult] = useState<Result>(),
+    [busy, setBusy] = useState(false),
+    [error, setError] = useState('');
+  const languages = useQuery({
+    queryKey: ['educational-languages'],
+    queryFn: () => publicApi<EducationalLanguage[]>('/languages'),
+  });
+  const tests = useQuery({
+    queryKey: ['instant-placement-tests', languageId],
+    queryFn: () => publicApi<PlacementTest[]>(`/placement/tests?languageId=${encodeURIComponent(languageId)}`),
+    enabled: !!languageId,
+  });
+  const question = test?.questions[index],
+    answered = question ? Object.hasOwn(answers, question.id) : false;
+  async function start(testId: string) {
+    setBusy(true);
+    setError('');
+    try {
+      setTest(await publicApi<TestPayload>(`/placement/questions?testId=${encodeURIComponent(testId)}`));
+      setIndex(0);
+      setAnswers({});
+      setResult(undefined);
+    } catch {
+      setError(copy('دریافت سؤال‌ها ممکن نشد. دوباره تلاش کنید.', 'Could not load the questions. Try again.'));
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function next() {
+    if (!test || !question || !answered) return;
+    if (index < test.questions.length - 1) {
+      setIndex((i) => i + 1);
+      return;
+    }
+    setBusy(true);
+    setError('');
+    try {
+      const body = {
+        testId: test.id,
+        answers: test.questions.map((q) => ({ questionId: q.id, value: answers[q.id] })),
+      };
+      const loggedIn = Boolean(sessionStorage.getItem(ACCESS_TOKEN_KEY));
+      const outcome = loggedIn
+        ? await api<Result>('/placement/submit', { method: 'POST', body: JSON.stringify(body) })
+        : await publicApi<Result>('/placement/guest/submit', { method: 'POST', body: JSON.stringify(body) });
+      setResult(outcome);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch {
+      setError(
+        copy(
+          'محاسبه نتیجه انجام نشد. پاسخ‌ها حفظ شده‌اند؛ دوباره تلاش کنید.',
+          'Could not calculate your result. Your answers are preserved; try again.',
+        ),
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+  function restart() {
+    setTest(undefined);
+    setResult(undefined);
+    setAnswers({});
+    setIndex(0);
+    setError('');
+  }
+  if (result) {
+    const selectedLanguage = languages.data?.find((language) => language.id === languageId);
+    return (
+      <ResultView
+        result={result}
+        onRestart={restart}
+        locale={locale}
+        languageCode={selectedLanguage?.code ?? ''}
+        languageName={selectedLanguage?.nameFa ?? ''}
+      />
+    );
+  }
+  if (test && question) {
+    const choices = (localized({ fa: question.choices?.fa, en: question.choices?.en }, locale) ?? []) as unknown[];
+    const progress = Math.round(((index + 1) / test.questions.length) * 100);
+    return (
+      <>
+        <Header />
+        <main className="min-h-[calc(100vh-76px)] bg-canvas py-8 md:py-14">
+          <div className="mx-auto max-w-3xl px-5">
+            <div className="mb-5 flex items-center justify-between text-sm">
+              <button onClick={restart} className="flex items-center gap-2 text-muted">
+                {fa ? <ChevronRight size={17} /> : <ChevronLeft size={17} />}
+                {copy('خروج از آزمون', 'Exit test')}
+              </button>
+              <span className="flex items-center gap-2 text-muted">
+                <Clock3 size={17} />
+                {test.durationMinutes.toLocaleString(numberLocale)} {copy('دقیقه', 'minutes')}
+              </span>
+            </div>
+            <section className="surface-card overflow-hidden">
+              <div className="border-b hairline p-5 md:p-7">
+                <div className="flex items-center justify-between gap-4 text-sm">
+                  <strong>
+                    {copy('سؤال', 'Question')} {(index + 1).toLocaleString(numberLocale)} {copy('از', 'of')}{' '}
+                    {test.questions.length.toLocaleString(numberLocale)}
+                  </strong>
+                  <span className="latin font-black text-purple">{progress}%</span>
+                </div>
+                <div className="mt-3 h-2 overflow-hidden rounded-full bg-lavender" dir="ltr">
+                  <div
+                    className="h-full rounded-full brand-gradient transition-[width]"
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+              </div>
+              <div className="p-6 md:p-10">
+                <span className="rounded-full bg-lavender px-3 py-1 text-xs font-black text-purple">
+                  {question.skill}
+                </span>
+                <h1 className="mt-5 text-xl font-black leading-9 md:text-2xl">
+                  {String(localized({ fa: question.prompt.fa, en: question.prompt.en }, locale) ?? '')}
+                </h1>
+                <div className="mt-7 grid gap-3">
+                  {choices.map((choice, choiceIndex) => {
+                    const selected = answers[question.id] === choiceIndex;
+                    return (
+                      <button
+                        key={choiceIndex}
+                        onClick={() => setAnswers((current) => ({ ...current, [question.id]: choiceIndex }))}
+                        className={`flex min-h-14 items-center gap-4 rounded-2xl border p-4 text-start ${selected ? 'border-purple bg-lavender ring-2 ring-purple/10' : 'hairline bg-white hover:border-purple/50'}`}
+                      >
+                        <span
+                          className={`grid size-7 shrink-0 place-items-center rounded-full border ${selected ? 'border-purple bg-purple text-white' : 'hairline'}`}
+                        >
+                          {selected ? <Check size={16} /> : String.fromCharCode(65 + choiceIndex)}
+                        </span>
+                        <span>{String(choice)}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                {error && (
+                  <p role="alert" className="mt-5 rounded-xl bg-red-50 p-4 text-sm text-red-700">
+                    {error}
+                  </p>
+                )}
+                <div className="mt-8 flex items-center justify-between">
+                  <button
+                    disabled={index === 0 || busy}
+                    onClick={() => setIndex((i) => i - 1)}
+                    className="flex min-h-12 items-center gap-2 rounded-xl border hairline px-5 font-bold disabled:opacity-40"
+                  >
+                    {fa ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+                    {copy('قبلی', 'Previous')}
+                  </button>
+                  <button
+                    disabled={!answered || busy}
+                    onClick={next}
+                    className="brand-gradient flex min-h-12 items-center gap-2 rounded-xl px-6 font-black text-white disabled:opacity-40"
+                  >
+                    {busy
+                      ? copy('در حال محاسبه سطح شما...', 'Calculating your level…')
+                      : index === test.questions.length - 1
+                        ? copy('مشاهده نتیجه', 'View result')
+                        : copy('سؤال بعدی', 'Next question')}
+                    {fa ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
+                  </button>
+                </div>
+              </div>
+            </section>
+          </div>
+        </main>
+      </>
+    );
+  }
+  return (
+    <>
+      <Header />
+      <main>
+        <section className="placement-intro">
+          <div className="page-shell py-16 md:py-24">
+            <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-bold text-white">
+              <Sparkles size={16} />
+              {copy('نتیجه فوری بر اساس CEFR', 'Instant CEFR result')}
+            </span>
+            <h1 className="mt-6 max-w-3xl text-4xl font-black leading-[1.4] text-white md:text-6xl">
+              {copy('سطحت را بدان؛ مسیر درست را شروع کن', 'Know your level. Start on the right path.')}
+            </h1>
+            <p className="mt-5 max-w-2xl text-lg leading-8 text-white/70">
+              {copy(
+                'بدون نیاز به ثبت‌نام پاسخ بده. آخرین سؤال که ثبت شود، امتیاز وزن‌دار محاسبه می‌شود و همان لحظه سطح A1 تا C2 خود را می‌بینی.',
+                'Answer without creating an account. After the last question, your weighted score and CEFR level from A1 to C2 are available immediately.',
+              )}
+            </p>
+            <div className="mt-8 flex flex-wrap gap-5 text-sm font-bold text-white/85">
+              <span className="flex items-center gap-2">
+                <Target size={18} />
+                {copy('امتیازدهی قطعی و خودکار', 'Automatic scoring')}
+              </span>
+              <span className="flex items-center gap-2">
+                <Clock3 size={18} />
+                {copy('بدون انتظار برای بررسی', 'No review wait')}
+              </span>
+              <span className="flex items-center gap-2">
+                <BookOpen size={18} />
+                {copy('پیشنهاد دوره متناسب', 'Level-matched courses')}
+              </span>
+            </div>
+          </div>
+        </section>
+        <section className="page-shell py-12 md:py-16">
+          <h2 className="text-2xl font-black">{copy('زبان آزمون را انتخاب کنید', 'Choose the test language')}</h2>
+          <p className="mt-2 text-muted">
+            {copy('برای شروع نیازی به ورود یا ساخت حساب ندارید.', 'You do not need an account to begin.')}
+          </p>
+          {languages.isLoading ? (
+            <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">
+              {Array.from({ length: 4 }, (_, i) => (
+                <div key={i} className="skeleton h-24 rounded-2xl" />
+              ))}
+            </div>
+          ) : languages.isError ? (
+            <Error
+              text={copy('فهرست زبان‌ها دریافت نشد.', 'Could not load the language list.')}
+              retryLabel={copy('تلاش دوباره', 'Try again')}
+              onRetry={() => void languages.refetch()}
+            />
+          ) : (
+            <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">
+              {languages.data?.map((language) => (
+                <button
+                  key={language.id}
+                  onClick={() => {
+                    setLanguageId(language.id);
+                    setError('');
+                  }}
+                  className={`rounded-2xl border p-5 text-start ${languageId === language.id ? 'border-purple bg-lavender ring-2 ring-purple/10' : 'hairline bg-white'}`}
+                >
+                  <span className="text-3xl">{language.flag || '🌐'}</span>
+                  <strong className="mt-3 block">
+                    {localized({ fa: language.nameFa, en: language.nameEn }, locale)}
+                  </strong>
+                  <small className="text-muted">{language.nativeName}</small>
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="mt-8">
+            {!languageId ? (
+              <div className="rounded-2xl border border-dashed hairline p-8 text-center text-muted">
+                {copy('ابتدا زبان موردنظر را انتخاب کنید.', 'Select a language to see available tests.')}
+              </div>
+            ) : tests.isLoading ? (
+              <div className="skeleton h-48 rounded-3xl" />
+            ) : tests.isError ? (
+              <Error
+                text={copy('آزمون‌ها دریافت نشدند.', 'Could not load the tests.')}
+                retryLabel={copy('تلاش دوباره', 'Try again')}
+                onRetry={() => void tests.refetch()}
+              />
+            ) : tests.data?.length ? (
+              <div className="grid gap-4 md:grid-cols-2">
+                {tests.data.map((item) => (
+                  <article className="surface-card p-6" key={item.id}>
+                    <span className="text-2xl">{item.language.flag}</span>
+                    <h3 className="mt-4 text-xl font-black">
+                      {localized({ fa: item.titleFa, en: item.titleEn }, locale)}
+                    </h3>
+                    <p className="mt-3 text-sm leading-7 text-muted">
+                      {localized({ fa: item.descriptionFa, en: item.descriptionEn }, locale)}
+                    </p>
+                    <button
+                      disabled={busy}
+                      onClick={() => start(item.id)}
+                      className="brand-gradient mt-6 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl font-black text-white"
+                    >
+                      {copy('شروع آزمون', 'Start test')} {fa ? <ArrowLeft size={18} /> : <ArrowRight size={18} />}
+                    </button>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-dashed hairline p-8 text-center text-muted">
+                {copy(
+                  'برای این زبان هنوز آزمون کاملاً خودکار منتشر نشده است.',
+                  'No fully automated test has been published for this language yet.',
+                )}
+              </div>
+            )}
+          </div>
+          {error && <Error text={error} />}
+        </section>
+      </main>
+      <Footer />
+    </>
+  );
 }
 
-function ResultView({result,onRestart}:{result:Result;onRestart:()=>void}){const suggested=courses.filter(course=>course.level===result.level||course.level===({A1:'A2',A2:'B1',B1:'B2',B2:'B2',C1:'B2',C2:'B2'} as const)[result.level]).slice(0,3);return <><Header/><main className="bg-canvas"><section className="result-hero"><div className="page-shell py-14 text-center text-white md:py-20"><p className="text-sm font-black text-emerald-200">نتیجه شما آماده است</p><div className="mx-auto mt-6 grid size-36 place-items-center rounded-full border-8 border-white/15 bg-white/10 shadow-2xl"><span><strong className="latin block text-5xl">{result.level}</strong><small>{result.titleFa}</small></span></div><h1 className="mt-6 text-3xl font-black md:text-5xl">سطح زبان شما: <span className="latin">{result.level} · {result.titleEn}</span></h1><p className="mx-auto mt-4 max-w-2xl leading-8 text-white/70">{result.description}</p></div></section><div className="page-shell grid gap-7 py-12 lg:grid-cols-[1fr_340px]"><div className="grid gap-7"><section className="surface-card p-6 md:p-8"><div className="grid gap-4 sm:grid-cols-3"><Stat label="امتیاز نهایی" value={`${result.score.toLocaleString('fa-IR')}٪`}/><Stat label="پاسخ درست" value={`${result.correctAnswers.toLocaleString('fa-IR')} از ${result.totalQuestions.toLocaleString('fa-IR')}`}/><Stat label="سطح CEFR" value={result.level}/></div></section><section className="grid gap-5 md:grid-cols-2"><div className="surface-card p-6"><h2 className="font-black text-green">توانایی‌های فعلی</h2><ul className="mt-4 grid gap-3 text-sm">{result.strengths.map(item=><li className="flex gap-2" key={item}><Check size={17} className="text-green"/>{item}</li>)}</ul></div><div className="surface-card p-6"><h2 className="font-black text-orange">تمرکز پیشنهادی</h2><ul className="mt-4 grid gap-3 text-sm">{result.focus.map(item=><li className="flex gap-2" key={item}><Target size={17} className="text-orange"/>{item}</li>)}</ul></div></section></div><aside className="surface-card p-6"><h2 className="text-xl font-black">قدم بعدی شما</h2><p className="mt-3 text-sm leading-7 text-muted">یک دوره متناسب با سطح فعلی انتخاب کنید و با برنامه منظم پیش بروید.</p><Link href="/courses" className="brand-gradient mt-6 flex min-h-12 items-center justify-center rounded-xl font-black text-white">مشاهده دوره‌های پیشنهادی</Link>{result.authenticated?<Link href="/dashboard" className="mt-3 flex min-h-12 items-center justify-center rounded-xl border hairline font-bold">رفتن به داشبورد</Link>:<Link href="/auth?next=/dashboard/tests" className="mt-3 flex min-h-12 items-center justify-center rounded-xl border hairline px-3 text-center font-bold text-purple">ورود و ذخیره پیشنهادهای شخصی</Link>}<button onClick={onRestart} className="mt-5 flex w-full items-center justify-center gap-2 text-sm text-muted"><RotateCcw size={16}/>تکرار آزمون</button></aside></div>{suggested.length>0&&<section className="border-t hairline bg-white py-14"><div className="page-shell"><h2 className="text-2xl font-black">دوره‌های مناسب سطح {result.level}</h2><div className="mt-7 grid gap-5 md:grid-cols-3">{suggested.map(course=><CourseCard key={course.slug} course={course}/>)}</div></div></section>}</main><Footer/></>}
-function Stat({label,value}:{label:string;value:string}){return <div className="rounded-2xl bg-canvas p-5 text-center"><strong className="latin block text-3xl text-purple">{value}</strong><span className="mt-2 block text-xs text-muted">{label}</span></div>}
-function Error({text}:{text:string}){return <p role="alert" className="mt-5 rounded-2xl border border-red-100 bg-red-50 p-5 text-red-700">{text}</p>}
+function ResultView({
+  result,
+  onRestart,
+  locale,
+  languageCode,
+  languageName,
+}: {
+  result: Result;
+  onRestart: () => void;
+  locale: 'fa' | 'en';
+  languageCode: string;
+  languageName: string;
+}) {
+  const fa = isDefaultLocale(locale),
+    copy = (faCopy: string, enCopy: string) => localized({ fa: faCopy, en: enCopy }, locale),
+    numberLocale = fa ? 'fa-IR' : 'en-US',
+    recommendations = placementRecommendationPaths(languageCode, result.level, locale);
+  const suggested = courses
+    .filter(
+      (course) =>
+        (!languageName || course.language === languageName) &&
+        (course.level === result.level ||
+          course.level === ({ A1: 'A2', A2: 'B1', B1: 'B2', B2: 'B2', C1: 'B2', C2: 'B2' } as const)[result.level]),
+    )
+    .slice(0, 3);
+  return (
+    <>
+      <Header />
+      <main className="bg-canvas">
+        <section className="result-hero">
+          <div className="page-shell py-14 text-center text-white md:py-20">
+            <p className="text-sm font-black text-emerald-200">{copy('نتیجه شما آماده است', 'Your result is ready')}</p>
+            <div className="mx-auto mt-6 grid size-36 place-items-center rounded-full border-8 border-white/15 bg-white/10 shadow-2xl">
+              <span>
+                <strong className="latin block text-5xl">{result.level}</strong>
+                <small>{localized({ fa: result.titleFa, en: result.titleEn }, locale)}</small>
+              </span>
+            </div>
+            <h1 className="mt-6 text-3xl font-black md:text-5xl">
+              {copy('سطح زبان شما:', 'Your language level:')}{' '}
+              <span className="latin">
+                {result.level} · {result.titleEn}
+              </span>
+            </h1>
+            <p className="mx-auto mt-4 max-w-2xl leading-8 text-white/70">{result.description}</p>
+          </div>
+        </section>
+        <div className="page-shell grid gap-7 py-12 lg:grid-cols-[1fr_340px]">
+          <div className="grid gap-7">
+            <section className="surface-card p-6 md:p-8">
+              <div className="grid gap-4 sm:grid-cols-3">
+                <Stat
+                  label={copy('امتیاز نهایی', 'Final score')}
+                  value={`${result.score.toLocaleString(numberLocale)}%`}
+                />
+                <Stat
+                  label={copy('پاسخ درست', 'Correct answers')}
+                  value={`${result.correctAnswers.toLocaleString(numberLocale)} ${copy('از', 'of')} ${result.totalQuestions.toLocaleString(numberLocale)}`}
+                />
+                <Stat label={copy('سطح CEFR', 'CEFR level')} value={result.level} />
+              </div>
+            </section>
+            <section className="grid gap-5 md:grid-cols-2">
+              <div className="surface-card p-6">
+                <h2 className="font-black text-green">{copy('توانایی‌های فعلی', 'Current strengths')}</h2>
+                <ul className="mt-4 grid gap-3 text-sm">
+                  {result.strengths.map((item) => (
+                    <li className="flex gap-2" key={item}>
+                      <Check size={17} className="text-green" />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="surface-card p-6">
+                <h2 className="font-black text-orange">{copy('تمرکز پیشنهادی', 'Recommended focus')}</h2>
+                <ul className="mt-4 grid gap-3 text-sm">
+                  {result.focus.map((item) => (
+                    <li className="flex gap-2" key={item}>
+                      <Target size={17} className="text-orange" />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </section>
+          </div>
+          <aside className="surface-card p-6">
+            <h2 className="text-xl font-black">{copy('قدم بعدی شما', 'Your next step')}</h2>
+            <p className="mt-3 text-sm leading-7 text-muted">
+              {copy(
+                'یک دوره متناسب با سطح فعلی انتخاب کنید و با برنامه منظم پیش بروید.',
+                'Choose a course matched to your current level and continue with a consistent plan.',
+              )}
+            </p>
+            <Link
+              href={recommendations.courses}
+              className="brand-gradient mt-6 flex min-h-12 items-center justify-center rounded-xl font-black text-white"
+            >
+              {copy('مشاهده دوره‌های پیشنهادی', 'View recommended courses')}
+            </Link>
+            <Link
+              href={recommendations.teachers}
+              className="mt-3 flex min-h-12 items-center justify-center rounded-xl border hairline font-bold"
+            >
+              {copy('مشاهده مدرس‌های مرتبط', 'View related teachers')}
+            </Link>
+            {result.authenticated ? (
+              <Link
+                href={localePath('/dashboard', locale)}
+                className="mt-3 flex min-h-12 items-center justify-center rounded-xl border hairline font-bold"
+              >
+                {copy('رفتن به داشبورد', 'Go to dashboard')}
+              </Link>
+            ) : (
+              <Link
+                href={`${localePath('/auth', locale)}?next=${encodeURIComponent(localePath('/dashboard/tests', locale))}`}
+                className="mt-3 flex min-h-12 items-center justify-center rounded-xl border hairline px-3 text-center font-bold text-purple"
+              >
+                {copy('ورود و ذخیره پیشنهادهای شخصی', 'Sign in and save personalized recommendations')}
+              </Link>
+            )}
+            <button
+              onClick={onRestart}
+              className="mt-5 flex w-full items-center justify-center gap-2 text-sm text-muted"
+            >
+              <RotateCcw size={16} />
+              {copy('تکرار آزمون', 'Retake test')}
+            </button>
+          </aside>
+        </div>
+        {suggested.length > 0 && (
+          <section className="border-t hairline bg-white py-14">
+            <div className="page-shell">
+              <h2 className="text-2xl font-black">
+                {copy(`دوره‌های مناسب سطح ${result.level}`, `Courses for level ${result.level}`)}
+              </h2>
+              <div className="mt-7 grid gap-5 md:grid-cols-3">
+                {suggested.map((course) => (
+                  <CourseCard key={course.slug} course={course} />
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+      </main>
+      <Footer />
+    </>
+  );
+}
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl bg-canvas p-5 text-center">
+      <strong className="latin block text-3xl text-purple">{value}</strong>
+      <span className="mt-2 block text-xs text-muted">{label}</span>
+    </div>
+  );
+}
+function Error({ text, retryLabel, onRetry }: { text: string; retryLabel?: string; onRetry?: () => void }) {
+  return (
+    <div role="alert" className="mt-5 rounded-2xl border border-red-100 bg-red-50 p-5 text-red-700">
+      <p>{text}</p>
+      {onRetry && retryLabel && (
+        <button type="button" onClick={onRetry} className="mt-3 flex items-center gap-2 font-black underline">
+          <RotateCcw size={16} />
+          {retryLabel}
+        </button>
+      )}
+    </div>
+  );
+}

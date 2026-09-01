@@ -7,12 +7,39 @@ import type { Course } from '@/lib/marketplace-data';
 import { useTranslations } from '@/components/shared/locale-provider';
 import { localizedCourseLanguage } from '../course-localization';
 
-export function CourseDirectory({ courses }: { courses: Course[] }) {
-  const [language, setLanguage] = useState<string>('');
+export function CourseDirectory({
+  courses,
+  initialLanguage = '',
+  initialLevel = '',
+}: {
+  courses: Course[];
+  initialLanguage?: string;
+  initialLevel?: string;
+}) {
+  const languageOptions = [...new Set(courses.map((course) => course.language))];
+  const levelOptions = [...new Set(courses.map((course) => course.level))].sort();
+  const [language, setLanguage] = useState<string>(() =>
+    languageOptions.includes(initialLanguage) ? initialLanguage : '',
+  );
+  const [level, setLevel] = useState<string>(() => (levelOptions.includes(initialLevel) ? initialLevel : ''));
   const { locale } = useTranslations();
   const english = locale === 'en';
-  const languageOptions = [...new Set(courses.map((course) => course.language))];
-  const filteredCourses = language ? courses.filter((course) => course.language === language) : courses;
+  const filteredCourses = courses.filter(
+    (course) => (!language || course.language === language) && (!level || course.level === level),
+  );
+  const resultsTitle = language
+    ? level
+      ? `${localizedCourseLanguage(language, locale)} · ${level}`
+      : english
+        ? `${localizedCourseLanguage(language, locale)} courses`
+        : `دوره‌های ${language}`
+    : level
+      ? english
+        ? `Level ${level} courses`
+        : `دوره‌های سطح ${level}`
+      : english
+        ? 'All courses'
+        : 'همه دوره‌ها';
 
   return (
     <section aria-labelledby="course-results-heading" className="mt-8">
@@ -30,15 +57,23 @@ export function CourseDirectory({ courses }: { courses: Course[] }) {
         ))}
       </div>
 
+      <div
+        className="mt-3 flex flex-wrap items-center gap-2"
+        aria-label={english ? 'Filter courses by level' : 'فیلتر دوره‌ها بر اساس سطح'}
+      >
+        <FilterButton active={!level} onClick={() => setLevel('')}>
+          {english ? 'All levels' : 'همه سطح‌ها'}
+        </FilterButton>
+        {levelOptions.map((option) => (
+          <FilterButton key={option} active={level === option} onClick={() => setLevel(option)}>
+            {option}
+          </FilterButton>
+        ))}
+      </div>
+
       <div className="mt-8 flex items-center justify-between gap-4">
         <h2 id="course-results-heading" className="text-lg font-black">
-          {language
-            ? english
-              ? `${localizedCourseLanguage(language, locale)} courses`
-              : `دوره‌های ${language}`
-            : english
-              ? 'All courses'
-              : 'همه دوره‌ها'}
+          {resultsTitle}
         </h2>
         <p aria-live="polite" className="text-sm text-muted">
           {filteredCourses.length.toLocaleString(english ? 'en-US' : 'fa-IR')} {english ? 'courses' : 'دوره'}
@@ -64,7 +99,13 @@ export function CourseDirectory({ courses }: { courses: Course[] }) {
               ? 'Choose another language or return to all courses.'
               : 'زبان دیگری را انتخاب کنید یا همه دوره‌ها را ببینید.'}
           </p>
-          <button className="secondary-button mt-2" onClick={() => setLanguage('')}>
+          <button
+            className="secondary-button mt-2"
+            onClick={() => {
+              setLanguage('');
+              setLevel('');
+            }}
+          >
             <RotateCcw size={17} aria-hidden="true" />
             {english ? 'Show all courses' : 'نمایش همه دوره‌ها'}
           </button>

@@ -68,4 +68,13 @@ describe('CourseDirectory', () => {
     expect(screen.getByText('1 courses')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'View course' })).toHaveAttribute('href', '/en/courses/german-start');
   });
+
+  it('applies recommendation language and level filters on first render', () => {
+    render(<CourseDirectory courses={courses} initialLanguage="انگلیسی" initialLevel="B1" />);
+
+    expect(screen.getByRole('button', { name: 'انگلیسی' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'B1' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByText('مکالمه انگلیسی')).toBeInTheDocument();
+    expect(screen.queryByText('شروع آلمانی')).not.toBeInTheDocument();
+  });
 });

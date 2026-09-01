@@ -28,9 +28,20 @@ export type Invoice = {
   downloadUrl?: string;
 };
 export type PaymentRequest = { amount: number; gateway: string; discountCode?: string };
+const invoiceTitle = (purpose: string) => {
+  switch (purpose.toLowerCase()) {
+    case 'booking':
+      return 'پرداخت کلاس';
+    case 'package':
+      return 'پرداخت بسته آموزشی';
+    case 'wallet_top_up':
+      return 'افزایش موجودی کیف پول';
+    default:
+      return 'پرداخت';
+  }
+};
 export const walletService = {
   getWallet: () => api<Wallet>('/payments/wallet'),
-  // TODO(api): add GET /payments/wallet/transactions with filters and pagination.
   getTransactions: async (): Promise<Transaction[]> => {
     const rows = await api<
       Array<{
@@ -72,7 +83,7 @@ export const walletService = {
     return rows.map((row) => ({
       id: row.id,
       number: row.gatewayReference ?? row.id,
-      title: row.purpose === 'BOOKING' ? 'پرداخت کلاس' : 'پرداخت بسته آموزشی',
+      title: invoiceTitle(row.purpose),
       amount: row.amount,
       status: row.status,
       createdAt: row.createdAt,

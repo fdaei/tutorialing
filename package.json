@@ -7,7 +7,7 @@
   ],
   "scripts": {
     "setup": "node scripts/bootstrap.mjs",
-    "dev": "node scripts/dev.mjs",
+    "dev": "node --env-file=.env scripts/dev.mjs",
     "dev:web": "npm run setup && npm run dev -w @lingospeak/web",
     "dev:api": "npm run setup && npm run env:check && npm run services:up && npm run db:prepare && npm run start:dev -w @lingospeak/api",
     "start:api": "npm run setup && npm run env:check && npm run services:up && npm run db:prepare && npm run start -w @lingospeak/api",
