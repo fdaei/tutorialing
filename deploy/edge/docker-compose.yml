@@ -1,0 +1,56 @@
+# لبه‌ی شبکه‌ی lingospeak — Caddy به عنوان تنها سرویسی که پورت عمومی می‌گیرد.
+#
+# این یک پروژه‌ی compose مستقل از اپ است تا `docker compose down` در پروژه‌ی
+# اپ، ریورس‌پراکسی و گواهی‌های TLS را پایین نیاورد.
+#
+# قاعده‌ی ثابت (invariant) این سرور:
+#   تنها و تنها همین سرویس مجاز به publish کردن پورت روی 0.0.0.0 است.
+#   هر سرویس اپ به شبکه‌ی external `edge` وصل می‌شود و Caddy با «نام سرویس»
+#   به آن می‌رسد — بدون هیچ `ports:` ای. اگر سرویسی واقعاً به پورت هاست نیاز
+#   داشت، حتماً باید به شکل "127.0.0.1:PORT:PORT" بایند شود.
+#   (docker-compose.yml ریشه‌ی مخزن برای توسعه‌ی محلی نوشته شده و پورت‌های
+#    15432/16379/19000/19001 را بدون بایند publish می‌کند — همان‌طور روی این
+#    سرور استفاده نشود.)
+name: lingospeak-edge
+
+services:
+  caddy:
+    image: caddy:2.11.4-alpine
+    container_name: lingospeak-caddy
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+      - '443:443/udp' # HTTP/3
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # گواهی‌های ACME اینجا زندگی می‌کنند. این ولوم را پاک نکنید — دوباره
+      # گرفتن گواهی به سقف نرخ Let's Encrypt می‌خورد.
+      - caddy_data:/data
+      - caddy_config:/config
+      - ./logs:/var/log/caddy
+    networks:
+      - edge
+    healthcheck:
+      # ادمین API به جای مسیر سایت چک می‌شود: پیکربندی دامنه‌محور است و روی
+      # :80 فقط ریدایرکت به HTTPS می‌نشیند، ضمن اینکه busybox wget نه
+      # ‏--resolve دارد و نه راهی برای نادیده گرفتن گواهی استیجینگ.
+      # ادمین روی localhost:2019 داخل کانتینر است و publish نشده.
+      test: ['CMD', 'wget', '--spider', '-q', 'http://127.0.0.1:2019/config/']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: json-file
+      options: { max-size: '10m', max-file: '3' }
+
+volumes:
+  caddy_data: {}
+  caddy_config: {}
+
+networks:
+  # با `docker network create edge` ساخته می‌شود (bootstrap.sh فاز caddy).
+  # external است تا مستقل از lifecycle این پروژه باقی بماند.
+  edge:
+    external: true

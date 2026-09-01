@@ -1,0 +1,73 @@
+# Caddyfile — lingospeak.org
+#
+# DNS تأیید شده: @ و www هر دو A → 82.115.18.161 از 1.1.1.1 / 8.8.8.8 / 9.9.9.9،
+# بدون پروکسی CDN، بدون رکورد CAA.
+#
+# ⚠ در حال حاضر روی endpoint استیجینگ Let's Encrypt است. گواهی صادرشده توسط
+#   مرورگر معتبر شناخته نمی‌شود — این عمدی است. استیجینگ سقف نرخ بسیار
+#   سخاوتمندانه‌ای دارد، پس اگر پیکربندی یا شبکه ایراد داشته باشد بدون سوزاندن
+#   سهمیه‌ی محیط اصلی (۵ اعتبارسنجی ناموفق در ساعت) می‌فهمیم.
+#
+#   بعد از موفقیت استیجینگ، سوییچ به محیط اصلی:
+#       bash ~/lingospeak/bin/go-live.sh
+#   که بلوک ACME-STAGING را حذف و Caddy را ری‌استارت می‌کند.
+{
+	# BEGIN ACME-STAGING
+	acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
+	# END ACME-STAGING
+
+	# برای اعلان انقضای گواهی، ایمیل را از کامنت در بیاورید:
+	# email you@example.com
+	admin localhost:2019
+}
+
+# www به دامنه‌ی اصلی، با ۳۰۸ (متد و بدنه حفظ می‌شود).
+www.lingospeak.org {
+	redir https://lingospeak.org{uri} permanent
+}
+
+lingospeak.org {
+	encode zstd gzip
+
+	log {
+		output file /var/log/caddy/access.log {
+			roll_size 10MiB
+			roll_keep 5
+		}
+	}
+
+	header {
+		# HSTS در فاز استیجینگ هم بی‌خطر است: مرورگرها سرآیند HSTS را روی
+		# اتصالی که گواهی‌اش معتبر نیست اصلاً پردازش نمی‌کنند، پس چیزی پین نمی‌شود.
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	# Content-Security-Policy اینجا ست نمی‌شود: اپ وب آن را با nonce در هر
+	# درخواست از apps/web/src/middleware.ts تولید می‌کند و هر مقدار ثابتی
+	# اینجا با آن تداخل می‌کند.
+
+	respond /healthz "ok" 200
+
+	# ------------------------------------------------------------------
+	# مسیرهای اپ — سشن دیپلوی از کامنت درشان می‌آورد.
+	#
+	# بدون rewrite: apps/api/src/main.ts:24 با app.setGlobalPrefix('api')
+	# خودِ API را زیر /api سوار می‌کند، پس مسیر عیناً پاس داده می‌شود.
+	# نام‌های `api` و `web` نام سرویس در پروژه‌ی compose اپ هستند و از طریق
+	# شبکه‌ی external `edge` رزولو می‌شوند.
+	#
+	# handle /api/* {
+	# 	reverse_proxy api:4001
+	# }
+	#
+	# handle {
+	# 	reverse_proxy web:3000
+	# }
+	# ------------------------------------------------------------------
+
+	# تا وقتی مسیرهای بالا فعال نشده‌اند:
+	respond "lingospeak edge up — app not deployed yet" 200
+}
