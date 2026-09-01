@@ -17,15 +17,26 @@ const user = (roles: string[], permissions: string[]): AuthUser => ({
 });
 
 const SUPPORT = user(['SUPPORT'], ['tickets.read', 'tickets.manage', 'notifications.read']);
-const EXAMINER = user(['EXAMINER'], ['tests.manage']);
-const FINANCE = user(['FINANCE'], ['payments.read', 'payments.refund', 'payouts.manage']);
+const EXAMINER = user(['SUPPORT'], ['tests.manage']);
+const FINANCE = user(['SUPPORT'], ['payments.read', 'payments.refund', 'payouts.manage']);
 const ADMIN = user(
   ['ADMIN'],
-  ['users.read', 'teachers.read', 'tests.manage', 'bookings.read', 'payments.read', 'roles.manage', 'languages.manage', 'tickets.manage'],
+  [
+    'users.read',
+    'teachers.read',
+    'tests.manage',
+    'bookings.read',
+    'payments.read',
+    'roles.manage',
+    'languages.manage',
+    'tickets.manage',
+  ],
 );
 
 function controller() {
-  const searched = jest.fn().mockResolvedValue({ items: [], pagination: { page: 1, pageSize: 20, total: 0, pages: 0, hasMore: false } });
+  const searched = jest
+    .fn()
+    .mockResolvedValue({ items: [], pagination: { page: 1, pageSize: 20, total: 0, pages: 0, hasMore: false } });
   const service = { search: searched } as unknown as SearchService;
   return { ctrl: new SearchController(service), searched };
 }
@@ -74,7 +85,16 @@ describe('SearchController entity permission scoping (SEC-208)', () => {
 
   it('5. ADMIN can access allowed entities', () => {
     const { ctrl, searched } = controller();
-    for (const entity of ['users', 'teachers', 'tests', 'bookings', 'payments', 'roles', 'languages', 'support-agents']) {
+    for (const entity of [
+      'users',
+      'teachers',
+      'tests',
+      'bookings',
+      'payments',
+      'roles',
+      'languages',
+      'support-agents',
+    ]) {
       ctrl.search(ADMIN, entity, '', '1', '20');
     }
     expect(searched).toHaveBeenCalledTimes(8);

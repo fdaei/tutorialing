@@ -3,7 +3,19 @@
 import { translate } from '@/lib/i18n';
 import { api } from '@/shared/services/api';
 import { PACKAGE_TIERS } from '@lingospeak/contracts';
-import { Area, Field, Localized, Select, Shell, Status, Submit, numeric, tr, useAction, value } from '../shared/action-controls';
+import {
+  Area,
+  Field,
+  Localized,
+  Select,
+  Shell,
+  Status,
+  Submit,
+  numeric,
+  tr,
+  useAction,
+  value,
+} from '../shared/action-controls';
 export function PackageForm({ endpoint, fa }: { endpoint: string } & Localized) {
   const action = useAction(endpoint);
   return (

@@ -64,14 +64,24 @@ export class AuthController {
   @PublicRateLimit(PASSWORD_LIMIT)
   @Post('password/login')
   async passwordLogin(@Body() d: PasswordLoginDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
-    const out = await this.auth.loginWithPassword(d.identity, d.password, { ip: req.ip, userAgent: req.headers['user-agent'] });
+    const out = await this.auth.loginWithPassword(d.identity, d.password, {
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
     this.set(res, out.refreshToken);
     return SessionMapper.toResponse(out);
   }
   @PublicRateLimit(PASSWORD_LIMIT)
   @Post('password/register')
-  async passwordRegister(@Body() d: PasswordRegisterDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
-    const out = await this.auth.registerWithPassword(d.name, d.identity, d.password, { ip: req.ip, userAgent: req.headers['user-agent'] });
+  async passwordRegister(
+    @Body() d: PasswordRegisterDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const out = await this.auth.registerWithPassword(d.name, d.identity, d.password, {
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
     this.set(res, out.refreshToken);
     return SessionMapper.toResponse(out);
   }

@@ -5,14 +5,26 @@ import { badRequest, forbidden, notFound } from '../../common';
 import { config } from '../../config';
 import { SMS_PROVIDER, SmsProvider } from '../../infrastructure/messaging/sms/sms-provider';
 
-const STAFF_ROLES: Role[] = ['ADMIN', 'STAFF', 'SUPPORT'];
 const SUPPORT_ATTACHMENT_MIMES = ['image/jpeg', 'image/png', 'application/pdf'];
 const SUPPORT_ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
-const isStaff = (roles: string[]) => roles.some((role) => STAFF_ROLES.includes(role as Role));
+const SUPPORT_STAFF_WHERE: Prisma.UserWhereInput = {
+  OR: [
+    { roles: { some: { role: 'ADMIN' } } },
+    {
+      roles: {
+        some: {
+          role: 'SUPPORT',
+          permissions: { some: { permission: { key: { in: ['tickets.read', 'tickets.manage'] } } } },
+        },
+      },
+    },
+  ],
+};
+const isStaff = (roles: string[], permissions: string[]) =>
+  roles.includes('ADMIN') ||
+  (roles.includes('SUPPORT') && (permissions.includes('tickets.read') || permissions.includes('tickets.manage')));
 const authorRole = (roles: string[]): Role =>
-  (['ADMIN', 'SUPPORT', 'STAFF', 'FINANCE', 'EXAMINER', 'TEACHER', 'STUDENT'] as Role[]).find((role) =>
-    roles.includes(role),
-  ) ?? 'STUDENT';
+  (['ADMIN', 'SUPPORT', 'INSTRUCTOR', 'STUDENT'] as Role[]).find((role) => roles.includes(role)) ?? 'STUDENT';
 
 @Injectable()
 export class SupportService {
@@ -24,7 +36,8 @@ export class SupportService {
   adminTickets() {
     return this.db.ticket.findMany({
       include: { user: { select: { name: true, phone: true } }, replies: { orderBy: { createdAt: 'asc' }, take: 5 } },
-      orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }], take: 200,
+      orderBy: [{ status: 'asc' }, { updatedAt: 'desc' }],
+      take: 200,
     });
   }
 
@@ -67,6 +80,7 @@ export class SupportService {
   async list(
     userId: string,
     roles: string[],
+    permissions: string[],
     query: {
       scope?: string;
       status?: string;
@@ -80,7 +94,7 @@ export class SupportService {
       pageSize?: number;
     },
   ) {
-    const staff = isStaff(roles);
+    const staff = isStaff(roles, permissions);
     const page = Math.max(1, query.page ?? 1),
       pageSize = Math.min(100, Math.max(1, query.pageSize ?? 20));
     const where: Prisma.TicketWhereInput = staff ? {} : { userId };
@@ -144,8 +158,8 @@ export class SupportService {
     return { items, pagination: { page, pageSize, total, pages: Math.ceil(total / pageSize) } };
   }
 
-  async detail(userId: string, roles: string[], ticketId: string) {
-    const staff = isStaff(roles);
+  async detail(userId: string, roles: string[], permissions: string[], ticketId: string) {
+    const staff = isStaff(roles, permissions);
     const ticket = await this.db.ticket.findFirst({
       where: { id: ticketId, ...(staff ? {} : { userId }) },
       include: {
@@ -167,10 +181,11 @@ export class SupportService {
   async reply(
     userId: string,
     roles: string[],
+    permissions: string[],
     ticketId: string,
     data: { body: string; attachmentId?: string; internal?: boolean },
   ) {
-    const staff = isStaff(roles);
+    const staff = isStaff(roles, permissions);
     const ticket = await this.db.ticket.findUnique({ where: { id: ticketId } });
     if (!ticket) throw notFound('TICKET_NOT_FOUND');
     if (!staff && ticket.userId !== userId) throw forbidden('TICKET_OWNERSHIP_REQUIRED');
@@ -251,8 +266,15 @@ export class SupportService {
     if (!attachment) throw badRequest('SUPPORT_ATTACHMENT_INVALID');
   }
 
-  async changeStatus(actorId: string, roles: string[], ticketId: string, status: TicketStatus, note?: string) {
-    if (!isStaff(roles)) throw forbidden('TICKET_STATUS_STAFF_ONLY');
+  async changeStatus(
+    actorId: string,
+    roles: string[],
+    permissions: string[],
+    ticketId: string,
+    status: TicketStatus,
+    note?: string,
+  ) {
+    if (!isStaff(roles, permissions)) throw forbidden('TICKET_STATUS_STAFF_ONLY');
     return this.db.$transaction(async (tx) => {
       const ticket = await tx.ticket.findUnique({ where: { id: ticketId } });
       if (!ticket) throw notFound('TICKET_NOT_FOUND');
@@ -287,11 +309,18 @@ export class SupportService {
     });
   }
 
-  async assign(actorId: string, roles: string[], ticketId: string, assignedToId: string | null, note?: string) {
-    if (!isStaff(roles)) throw forbidden('TICKET_ASSIGNMENT_STAFF_ONLY');
+  async assign(
+    actorId: string,
+    roles: string[],
+    permissions: string[],
+    ticketId: string,
+    assignedToId: string | null,
+    note?: string,
+  ) {
+    if (!isStaff(roles, permissions)) throw forbidden('TICKET_ASSIGNMENT_STAFF_ONLY');
     if (assignedToId) {
       const assignee = await this.db.user.findFirst({
-        where: { id: assignedToId, roles: { some: { role: { in: STAFF_ROLES } } }, status: 'ACTIVE' },
+        where: { id: assignedToId, status: 'ACTIVE', ...SUPPORT_STAFF_WHERE },
         include: { roles: true },
       });
       if (!assignee) throw badRequest('TICKET_ASSIGNEE_INVALID');
@@ -342,7 +371,7 @@ export class SupportService {
   /** Active users who can act on an unassigned ticket. */
   private async supportStaffIds(tx: Prisma.TransactionClient) {
     const staff = await tx.user.findMany({
-      where: { status: 'ACTIVE', roles: { some: { role: { in: STAFF_ROLES } } } },
+      where: { status: 'ACTIVE', ...SUPPORT_STAFF_WHERE },
       select: { id: true },
     });
     return staff.map((user) => user.id);

@@ -84,7 +84,7 @@ export class PricingService {
         data: {
           teacherId: teacher.id,
           actorId: userId,
-          actorRole: 'TEACHER',
+          actorRole: 'INSTRUCTOR',
           action: 'teacher.counter.accepted',
           status: 'APPROVED',
           proposedTrialPrice: teacher.counterTrialPrice,
@@ -132,7 +132,7 @@ export class PricingService {
         data: {
           teacherId: teacher.id,
           actorId: userId,
-          actorRole: 'TEACHER',
+          actorRole: 'INSTRUCTOR',
           action: 'teacher.negotiation.requested',
           status: 'UNDER_REVIEW',
           proposedTrialPrice: teacher.proposedTrialPrice,
@@ -236,7 +236,7 @@ export class PricingService {
       }
       data.priceStatus = status;
       const updated = await tx.teacher.update({ where: { id: teacherId }, data });
-      const actorRole = (actorRoles.find((role) => ['ADMIN', 'STAFF', 'FINANCE'].includes(role)) ?? 'STAFF') as Role;
+      const actorRole = (actorRoles.find((role) => ['ADMIN', 'SUPPORT'].includes(role)) ?? 'ADMIN') as Role;
       await tx.teacherPriceHistory.create({
         data: {
           teacherId,

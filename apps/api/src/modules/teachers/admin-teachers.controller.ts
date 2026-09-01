@@ -6,7 +6,7 @@ import { TransitionDto } from './dto/admin/transition.dto';
 import { TeachersService } from './teachers.service';
 import { ApiTags } from '@nestjs/swagger';
 
-@Roles('ADMIN', 'STAFF')
+@Roles('ADMIN')
 @ApiTags('admin')
 @RequirePermissions(PermissionKeys.Teachers.Verify)
 @Controller('admin')

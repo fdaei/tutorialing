@@ -10,12 +10,21 @@ describe('panel access routing', () => {
   });
 
   it('routes examiner and finance roles to an authorized section', () => {
-    expect(panelHome({ roles: ['EXAMINER'], permissions: ['tests.review'] })).toBe('/admin/test-reviews');
-    expect(panelHome({ roles: ['FINANCE'], permissions: ['payouts.manage'] })).toBe('/admin/payouts');
+    expect(panelHome({ roles: ['SUPPORT'], permissions: ['tests.review'] })).toBe('/admin/test-reviews');
+    expect(panelHome({ roles: ['SUPPORT'], permissions: ['payouts.manage'] })).toBe('/admin/payouts');
+  });
+
+  it('requires tests.review instead of granting every SUPPORT user examiner access', () => {
+    expect(canOpenRequestedPanel('/admin/test-reviews', { roles: ['SUPPORT'], permissions: ['payments.read'] })).toBe(
+      false,
+    );
+    expect(canOpenRequestedPanel('/admin/test-reviews', { roles: ['SUPPORT'], permissions: ['tests.review'] })).toBe(
+      true,
+    );
   });
 
   it('requires the matching permission for each finance section', () => {
-    const payoutsOnly = { roles: ['FINANCE'], permissions: ['payouts.manage'] };
+    const payoutsOnly = { roles: ['SUPPORT'], permissions: ['payouts.manage'] };
     expect(canOpenRequestedPanel('/admin/payouts', payoutsOnly)).toBe(true);
     expect(canOpenRequestedPanel('/admin/refunds', payoutsOnly)).toBe(false);
     expect(canOpenRequestedPanel('/admin/teacher-prices', payoutsOnly)).toBe(false);
@@ -39,7 +48,7 @@ describe('panel access routing', () => {
   });
 
   it('matches the English rewrite of a route the same way', () => {
-    const teacher = { roles: ['TEACHER'], permissions: [] };
+    const teacher = { roles: ['INSTRUCTOR'], permissions: [] };
     expect(canOpenRequestedPanel('/en/teacher-panel', teacher)).toBe(true);
     expect(canOpenRequestedPanel('/en/admin', teacher)).toBe(false);
   });

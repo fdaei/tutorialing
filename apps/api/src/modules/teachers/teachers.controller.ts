@@ -52,7 +52,7 @@ export class TeachersController {
 }
 
 @Controller('teacher/application')
-@Roles('TEACHER', 'STUDENT')
+@Roles('INSTRUCTOR', 'STUDENT')
 export class TeacherApplicationController {
   constructor(private readonly service: TeachersService) {}
   @Get() mine(@CurrentUser() user: AuthUser) {

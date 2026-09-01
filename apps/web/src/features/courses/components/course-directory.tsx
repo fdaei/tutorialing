@@ -16,7 +16,10 @@ export function CourseDirectory({ courses }: { courses: Course[] }) {
 
   return (
     <section aria-labelledby="course-results-heading" className="mt-8">
-      <div className="flex flex-wrap items-center gap-2" aria-label={english ? 'Filter courses by language' : 'فیلتر دوره‌ها بر اساس زبان'}>
+      <div
+        className="flex flex-wrap items-center gap-2"
+        aria-label={english ? 'Filter courses by language' : 'فیلتر دوره‌ها بر اساس زبان'}
+      >
         <FilterButton active={!language} onClick={() => setLanguage('')}>
           {english ? 'All courses' : 'همه دوره‌ها'}
         </FilterButton>
@@ -33,7 +36,9 @@ export function CourseDirectory({ courses }: { courses: Course[] }) {
             ? english
               ? `${localizedCourseLanguage(language, locale)} courses`
               : `دوره‌های ${language}`
-            : english ? 'All courses' : 'همه دوره‌ها'}
+            : english
+              ? 'All courses'
+              : 'همه دوره‌ها'}
         </h2>
         <p aria-live="polite" className="text-sm text-muted">
           {filteredCourses.length.toLocaleString(english ? 'en-US' : 'fa-IR')} {english ? 'courses' : 'دوره'}
@@ -49,8 +54,16 @@ export function CourseDirectory({ courses }: { courses: Course[] }) {
       ) : (
         <div className="review-empty mt-5">
           <BookOpen aria-hidden="true" />
-          <strong>{english ? 'No courses have been published for this language yet' : 'برای این زبان هنوز دوره‌ای منتشر نشده است'}</strong>
-          <p>{english ? 'Choose another language or return to all courses.' : 'زبان دیگری را انتخاب کنید یا همه دوره‌ها را ببینید.'}</p>
+          <strong>
+            {english
+              ? 'No courses have been published for this language yet'
+              : 'برای این زبان هنوز دوره‌ای منتشر نشده است'}
+          </strong>
+          <p>
+            {english
+              ? 'Choose another language or return to all courses.'
+              : 'زبان دیگری را انتخاب کنید یا همه دوره‌ها را ببینید.'}
+          </p>
           <button className="secondary-button mt-2" onClick={() => setLanguage('')}>
             <RotateCcw size={17} aria-hidden="true" />
             {english ? 'Show all courses' : 'نمایش همه دوره‌ها'}

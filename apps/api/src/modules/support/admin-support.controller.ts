@@ -4,11 +4,13 @@ import { PermissionKeys, RequirePermissions } from '../auth/authorization';
 import { SupportService } from './support.service';
 import { ApiTags } from '@nestjs/swagger';
 
-@Roles('ADMIN', 'STAFF')
+@Roles('ADMIN')
 @ApiTags('admin')
 @RequirePermissions(PermissionKeys.Tickets.Read)
 @Controller('admin')
 export class AdminSupportController {
   constructor(private readonly support: SupportService) {}
-  @Get('tickets') tickets() { return this.support.adminTickets(); }
+  @Get('tickets') tickets() {
+    return this.support.adminTickets();
+  }
 }

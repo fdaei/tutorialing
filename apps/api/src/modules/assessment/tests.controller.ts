@@ -46,7 +46,8 @@ export class TestsController {
   }
 }
 
-@Roles('EXAMINER', 'ADMIN')
+@Roles('SUPPORT', 'ADMIN')
+@RequirePermissions(PermissionKeys.Assessment.Review)
 @Controller('examiner/tests')
 export class ExaminerController {
   constructor(private s: TestsService) {}
@@ -65,7 +66,7 @@ export class ExaminerController {
   }
 }
 
-@Roles('ADMIN', 'STAFF')
+@Roles('ADMIN')
 @RequirePermissions(PermissionKeys.Assessment.Manage)
 @RateLimit(RATE_LIMIT_TIERS.adminWrite)
 @Controller('admin/tests')

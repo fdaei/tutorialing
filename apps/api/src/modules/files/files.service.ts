@@ -25,7 +25,10 @@ const allowed = new Set([
 @Injectable()
 export class FilesService {
   private readonly cfg = filesConfig();
-  constructor(private readonly db: PrismaService, @Inject(OBJECT_STORAGE) private readonly storage: ObjectStorage) {}
+  constructor(
+    private readonly db: PrismaService,
+    @Inject(OBJECT_STORAGE) private readonly storage: ObjectStorage,
+  ) {}
 
   async createUpload(
     ownerId: string,
@@ -42,7 +45,12 @@ export class FilesService {
         .slice(0, 8) || 'bin';
     const key = `${ownerId}/${data.purpose}/${randomUUID()}.${ext}`;
     const file = await this.db.storedFile.create({ data: { ownerId, key, ...data, status: 'PENDING' } });
-    const uploadUrl = await this.storage.createUploadUrl({ key, contentType: data.mimeType, contentLength: data.size, checksum: data.checksum });
+    const uploadUrl = await this.storage.createUploadUrl({
+      key,
+      contentType: data.mimeType,
+      contentLength: data.size,
+      checksum: data.checksum,
+    });
     return { fileId: file.id, uploadUrl, expiresIn: this.cfg.uploadUrlTtlSeconds };
   }
 
@@ -51,7 +59,13 @@ export class FilesService {
       notFound('UPLOAD_NOT_FOUND'),
     );
     assertDomain(checksum && checksum === file.checksum, () => badRequest('UPLOAD_CHECKSUM_MISMATCH'));
-    await this.storage.putObject({ key: file.key, body, contentType: file.mimeType, contentLength: file.size, checksum: file.checksum });
+    await this.storage.putObject({
+      key: file.key,
+      body,
+      contentType: file.mimeType,
+      contentLength: file.size,
+      checksum: file.checksum,
+    });
     return { ok: true };
   }
 
@@ -61,20 +75,18 @@ export class FilesService {
     );
     const head = await this.storage.headObject(file.key);
     if (!head) throw badRequest('UPLOAD_CONTENT_MISSING');
-    if (
-      head.contentLength !== file.size ||
-      head.contentType !== file.mimeType ||
-      head.checksum !== file.checksum
-    ) {
+    if (head.contentLength !== file.size || head.contentType !== file.mimeType || head.checksum !== file.checksum) {
       await this.db.storedFile.update({ where: { id }, data: { status: 'QUARANTINED' } });
       throw badRequest('UPLOAD_VALIDATION_FAILED');
     }
     return this.db.storedFile.update({ where: { id }, data: { status: 'SAFE' } });
   }
 
-  async download(requesterId: string, roles: string[], id: string) {
-    const reviewer = roles.some((role) => ['ADMIN', 'STAFF', 'EXAMINER'].includes(role));
-    const supportStaff = roles.some((role) => ['ADMIN', 'STAFF', 'SUPPORT'].includes(role));
+  async download(requesterId: string, roles: string[], permissions: string[], id: string) {
+    const admin = roles.includes('ADMIN');
+    const supportStaff = admin || (roles.includes('SUPPORT') && permissions.includes('tickets.read'));
+    const teacherReviewer = admin || permissions.includes('teachers.verify');
+    const testReviewer = admin || permissions.includes('tests.review');
     const supportAttachment = await this.db.ticketReply.findFirst({
       where: {
         attachmentId: id,
@@ -90,13 +102,8 @@ export class FilesService {
           OR: [
             { ownerId: requesterId },
             ...(supportAttachment ? [{ id }] : []),
-            ...(reviewer
-              ? [
-                  { verificationItems: { some: {} } },
-                  { purpose: 'teacher-intro-video' },
-                  { testAnswers: { some: { attempt: { status: 'UNDER_REVIEW' as const } } } },
-                ]
-              : []),
+            ...(teacherReviewer ? [{ verificationItems: { some: {} } }, { purpose: 'teacher-intro-video' }] : []),
+            ...(testReviewer ? [{ testAnswers: { some: { attempt: { status: 'UNDER_REVIEW' as const } } } }] : []),
           ],
         },
       }),

@@ -2,7 +2,15 @@ import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Prisma } from '@prisma/client';
 import { OAuth2Client, type TokenPayload } from 'google-auth-library';
-import { createHash, createHmac, randomBytes, randomInt, randomUUID, scrypt as nodeScrypt, timingSafeEqual } from 'crypto';
+import {
+  createHash,
+  createHmac,
+  randomBytes,
+  randomInt,
+  randomUUID,
+  scrypt as nodeScrypt,
+  timingSafeEqual,
+} from 'crypto';
 import { promisify } from 'util';
 import { badRequest, conflict, isPrismaKnownError, tooManyRequests, unauthorized } from '../../common';
 import { authConfig } from '../../config/auth.config';
@@ -137,7 +145,13 @@ export class AuthService {
     const hashed = await passwordHash(password);
     try {
       const user = await this.db.user.create({
-        data: { ...normalized, name: name.trim(), passwordHash: hashed, profileComplete: true, roles: { create: { role: 'STUDENT' } } },
+        data: {
+          ...normalized,
+          name: name.trim(),
+          passwordHash: hashed,
+          profileComplete: true,
+          roles: { create: { role: 'STUDENT' } },
+        },
       });
       return this.createSession(user.id, meta);
     } catch (error) {
@@ -253,7 +267,10 @@ export class AuthService {
     });
     if (existing?.googleSubject && existing.googleSubject !== profile.sub) throw unauthorized('GOOGLE_TOKEN_INVALID');
     const user = existing
-      ? await this.db.user.update({ where: { id: existing.id }, data: { googleSubject: profile.sub, email, name: profile.name } })
+      ? await this.db.user.update({
+          where: { id: existing.id },
+          data: { googleSubject: profile.sub, email, name: profile.name },
+        })
       : await this.db.user.create({
           data: { googleSubject: profile.sub, email, name: profile.name, roles: { create: { role: 'STUDENT' } } },
         });

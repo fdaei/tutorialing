@@ -241,7 +241,7 @@ export function MyTicketManager() {
                   {detail.data.replies.map((message, index) => (
                     <article
                       key={message.id ?? index}
-                      className={`rounded-2xl p-4 ${message.authorRole === 'STUDENT' || message.authorRole === 'TEACHER' ? 'bg-blue/5' : 'bg-lavender/40'}`}
+                      className={`rounded-2xl p-4 ${message.authorRole === 'STUDENT' || message.authorRole === 'INSTRUCTOR' ? 'bg-blue/5' : 'bg-lavender/40'}`}
                     >
                       <div className="flex justify-between gap-3 text-xs text-muted">
                         <span>{message.author?.name || message.authorRole}</span>

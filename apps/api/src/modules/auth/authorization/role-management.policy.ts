@@ -10,7 +10,7 @@ import { forbidden } from '../../../common';
  * more specific error code); this is the tier-2 set from
  * ROLE_MANAGEMENT_POLICY.md.
  */
-export const PRIVILEGED_ROLES: readonly Role[] = ['FINANCE'];
+export const PRIVILEGED_ROLES: readonly Role[] = [];
 
 /**
  * Permissions that move money or control access itself. `roles.manage` is

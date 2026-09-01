@@ -2,7 +2,16 @@
 
 import { translate } from '@/lib/i18n';
 import { api } from '@/shared/services/api';
-import { ApprovedTeacherSelect, Field, Localized, Shell, Status, Submit, useAction, value } from '../shared/action-controls';
+import {
+  ApprovedTeacherSelect,
+  Field,
+  Localized,
+  Shell,
+  Status,
+  Submit,
+  useAction,
+  value,
+} from '../shared/action-controls';
 export function AdminBookingActions({ endpoint, fa }: { endpoint: string } & Localized) {
   const action = useAction(endpoint);
   return (

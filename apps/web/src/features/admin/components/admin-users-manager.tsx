@@ -7,7 +7,7 @@ import { ChevronLeft, ChevronRight, Eye, Search, ShieldCheck, UserRound, X } fro
 import { api, ApiError, Paginated } from '@/shared/services/api';
 import { useTranslations } from '@/components/shared/locale-provider';
 
-type Role = 'STUDENT' | 'TEACHER' | 'ADMIN' | 'STAFF' | 'EXAMINER' | 'SUPPORT' | 'FINANCE';
+type Role = 'STUDENT' | 'INSTRUCTOR' | 'SUPPORT' | 'ADMIN';
 type User = {
   id: string;
   name?: string;
@@ -41,15 +41,12 @@ type Detail = User & {
   _count: Record<string, number>;
 };
 
-const allRoles: Role[] = ['STUDENT', 'TEACHER', 'ADMIN', 'STAFF', 'EXAMINER', 'SUPPORT', 'FINANCE'];
+const allRoles: Role[] = ['STUDENT', 'INSTRUCTOR', 'SUPPORT', 'ADMIN'];
 const roleFa: Record<Role, string> = {
   STUDENT: 'زبان‌آموز',
-  TEACHER: 'مدرس',
+  INSTRUCTOR: 'مدرس',
   ADMIN: 'مدیر',
-  STAFF: 'همکار',
-  EXAMINER: 'ارزیاب',
   SUPPORT: 'پشتیبانی',
-  FINANCE: 'مالی',
 };
 const statusFa: Record<string, string> = {
   ACTIVE: 'فعال',

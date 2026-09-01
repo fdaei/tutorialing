@@ -7,7 +7,7 @@ import { PackageDto, PackageApprovalDto } from '../dto/request/packages.dto';
 export class PackagesController {
   constructor(private s: PackagesService) {}
 
-  @Roles('TEACHER')
+  @Roles('INSTRUCTOR')
   @Post()
   create(@CurrentUser() u: AuthUser, @Body() d: PackageDto) {
     return this.s.createPackage(u.id, d);
@@ -18,7 +18,7 @@ export class PackagesController {
     return this.s.enrollments(u.id);
   }
 
-  @Roles('TEACHER')
+  @Roles('INSTRUCTOR')
   @Get('me')
   minePackages(@CurrentUser() u: AuthUser) {
     return this.s.mine(u.id);
@@ -31,7 +31,7 @@ export class PackagesController {
     return this.s.listForTeacher(teacherId);
   }
 
-  @Roles('ADMIN', 'STAFF')
+  @Roles('ADMIN')
   @Post(':id/approval')
   approve(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() d: PackageApprovalDto) {
     return this.s.approvePackage(id, u.id, d.status);

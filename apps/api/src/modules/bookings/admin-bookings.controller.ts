@@ -4,7 +4,7 @@ import { PermissionKeys, RequirePermissions } from '../auth/authorization';
 import { BookingsService } from './bookings.service';
 import { ApiTags } from '@nestjs/swagger';
 
-@Roles('ADMIN', 'STAFF')
+@Roles('ADMIN')
 @ApiTags('admin')
 @RequirePermissions(PermissionKeys.Bookings.Read)
 @Controller('admin')

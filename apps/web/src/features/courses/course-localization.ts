@@ -8,11 +8,11 @@ const englishLanguageNames: Readonly<Record<string, string>> = {
   فرانسوی: 'French',
   ایتالیایی: 'Italian',
   پرتغالی: 'Portuguese',
-  'کره‌ای': 'Korean',
+  کره‌ای: 'Korean',
   عربی: 'Arabic',
   روسی: 'Russian',
 };
 
 export function localizedCourseLanguage(language: string, locale: Locale) {
-  return locale === 'en' ? englishLanguageNames[language] ?? language : language;
+  return locale === 'en' ? (englishLanguageNames[language] ?? language) : language;
 }

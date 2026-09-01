@@ -3,7 +3,19 @@
 import { translate } from '@/lib/i18n';
 import { api } from '@/shared/services/api';
 import { useTranslations } from '@/components/shared/locale-provider';
-import { Area, AssignmentSelect, Field, Localized, Props, Select, Shell, Status, Submit, useAction, value } from '../shared/action-controls';
+import {
+  Area,
+  AssignmentSelect,
+  Field,
+  Localized,
+  Props,
+  Select,
+  Shell,
+  Status,
+  Submit,
+  useAction,
+  value,
+} from '../shared/action-controls';
 import { TicketForm } from '../shared/ticket-form';
 export function StudentActions({ section, endpoint, fa }: Omit<Props, 'role'> & Localized) {
   const { locale } = useTranslations();

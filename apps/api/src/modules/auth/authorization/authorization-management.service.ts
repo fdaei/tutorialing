@@ -15,16 +15,21 @@ export class AuthorizationManagementService {
     private readonly policy: RoleManagementPolicy,
   ) {}
 
-  assertMayGrantRole(actorId: string, role: Role) { return this.policy.assertMayGrantRole(actorId, role); }
+  assertMayGrantRole(actorId: string, role: Role) {
+    return this.policy.assertMayGrantRole(actorId, role);
+  }
 
   roles() {
     return this.db.userRole.findMany({
       include: { user: { select: { phone: true, name: true } }, permissions: { include: { permission: true } } },
-      orderBy: { userId: 'asc' }, take: 300,
+      orderBy: { userId: 'asc' },
+      take: 300,
     });
   }
 
-  permissions() { return this.db.permission.findMany({ orderBy: { key: 'asc' } }); }
+  permissions() {
+    return this.db.permission.findMany({ orderBy: { key: 'asc' } });
+  }
 
   async setUserRoles(actorId: string, userId: string, roles: Role[]) {
     const normalized = [...new Set(roles)];
@@ -35,7 +40,8 @@ export class AuthorizationManagementService {
     if (userId === actorId && before.includes('ADMIN') && !normalized.includes('ADMIN'))
       throw new BadRequestException({ code: 'SELF_ADMIN_ROLE_REMOVE' });
     if (userId === actorId && normalized.some((role) => !before.includes(role))) throw selfElevation();
-    for (const role of normalized.filter((role) => !before.includes(role))) await this.policy.assertMayGrantRole(actorId, role);
+    for (const role of normalized.filter((role) => !before.includes(role)))
+      await this.policy.assertMayGrantRole(actorId, role);
     if (before.includes('ADMIN') && !normalized.includes('ADMIN')) {
       if ((await this.db.userRole.count({ where: { role: 'ADMIN' } })) <= 1)
         throw new BadRequestException({ code: 'LAST_ADMIN_ROLE_REMOVE' });
@@ -44,7 +50,16 @@ export class AuthorizationManagementService {
       await tx.userRole.deleteMany({ where: { userId, role: { notIn: normalized } } });
       for (const role of normalized)
         await tx.userRole.upsert({ where: { userId_role: { userId, role } }, create: { userId, role }, update: {} });
-      await tx.auditLog.create({ data: { actorId, action: 'user.roles.changed', entity: 'User', entityId: userId, before: { roles: before }, after: { roles: normalized } } });
+      await tx.auditLog.create({
+        data: {
+          actorId,
+          action: 'user.roles.changed',
+          entity: 'User',
+          entityId: userId,
+          before: { roles: before },
+          after: { roles: normalized },
+        },
+      });
       await tx.refreshSession.updateMany({ where: { userId, revokedAt: null }, data: { revokedAt: new Date() } });
     });
     if (normalized.includes('ADMIN')) await this.grantAdminPermissions(userId);
@@ -55,19 +70,28 @@ export class AuthorizationManagementService {
   async assignRole(actorId: string, userId: string, role: Role) {
     if (userId === actorId) throw selfElevation();
     await this.policy.assertMayGrantRole(actorId, role);
-    if (!(await this.db.user.findUnique({ where: { id: userId } }))) throw new NotFoundException({ code: 'USER_NOT_FOUND' });
-    const out = await this.db.userRole.upsert({ where: { userId_role: { userId, role } }, create: { userId, role }, update: {} });
+    if (!(await this.db.user.findUnique({ where: { id: userId } })))
+      throw new NotFoundException({ code: 'USER_NOT_FOUND' });
+    const out = await this.db.userRole.upsert({
+      where: { userId_role: { userId, role } },
+      create: { userId, role },
+      update: {},
+    });
     if (role === 'ADMIN') await this.grantAdminPermissions(userId);
     await this.revocation.revokeUser(userId);
-    await this.db.auditLog.create({ data: { actorId, action: 'role.assigned', entity: 'UserRole', entityId: userId, after: { role } } });
+    await this.db.auditLog.create({
+      data: { actorId, action: 'role.assigned', entity: 'UserRole', entityId: userId, after: { role } },
+    });
     return out;
   }
 
   async grantAdminPermissions(userId: string) {
     const permissions = await this.db.permission.findMany({ select: { id: true } });
-    if (permissions.length) await this.db.rolePermission.createMany({
-      data: permissions.map((permission) => ({ userId, role: 'ADMIN' as const, permissionId: permission.id })), skipDuplicates: true,
-    });
+    if (permissions.length)
+      await this.db.rolePermission.createMany({
+        data: permissions.map((permission) => ({ userId, role: 'ADMIN' as const, permissionId: permission.id })),
+        skipDuplicates: true,
+      });
   }
 
   async revokeRole(actorId: string, userId: string, role: Role) {
@@ -78,7 +102,9 @@ export class AuthorizationManagementService {
     }
     await this.db.userRole.delete({ where: { userId_role: { userId, role } } });
     await this.revocation.revokeUser(userId);
-    await this.db.auditLog.create({ data: { actorId, action: 'role.revoked', entity: 'UserRole', entityId: userId, before: { role } } });
+    await this.db.auditLog.create({
+      data: { actorId, action: 'role.revoked', entity: 'UserRole', entityId: userId, before: { role } },
+    });
     return { ok: true };
   }
 
@@ -91,10 +117,19 @@ export class AuthorizationManagementService {
     await this.db.userRole.upsert({ where: { userId_role: { userId, role } }, create: { userId, role }, update: {} });
     const out = await this.db.rolePermission.upsert({
       where: { userId_role_permissionId: { userId, role, permissionId: permission.id } },
-      create: { userId, role, permissionId: permission.id }, update: {},
+      create: { userId, role, permissionId: permission.id },
+      update: {},
     });
     await this.revocation.revokeUser(userId);
-    await this.db.auditLog.create({ data: { actorId, action: 'permission.granted', entity: 'RolePermission', entityId: userId, after: { role, permission: permissionKey } } });
+    await this.db.auditLog.create({
+      data: {
+        actorId,
+        action: 'permission.granted',
+        entity: 'RolePermission',
+        entityId: userId,
+        after: { role, permission: permissionKey },
+      },
+    });
     return out;
   }
 }

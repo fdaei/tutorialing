@@ -118,6 +118,8 @@ const SELF_SCOPED = new Set([
   'GET /reviews/teacher/:teacherId/eligibility', 'PATCH /reviews/:id', 'DELETE /reviews/:id',
   'GET /courses/:courseId/my-review', 'POST /courses/:courseId/reviews',
   'GET /courses/:courseId/review-eligibility',
+  'GET /courses/me/learning', 'GET /courses/:courseId/player',
+  'PATCH /courses/:courseId/lessons/:lessonId/progress',
   'PATCH /courses/reviews/:id', 'DELETE /courses/reviews/:id',
   'POST /blog/posts/:id/comments', 'POST /blog/posts/:id/reaction', 'POST /blog/posts/:id/rating',
   'POST /placement/submit', 'GET /placement/history',

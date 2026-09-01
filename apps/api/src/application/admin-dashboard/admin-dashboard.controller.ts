@@ -3,7 +3,7 @@ import { Roles } from '../../common';
 import { ApiTags } from '@nestjs/swagger';
 import { AdminDashboardService } from './admin-dashboard.service';
 
-@Roles('ADMIN', 'STAFF')
+@Roles('ADMIN')
 @ApiTags('admin')
 @Controller('admin')
 export class AdminDashboardController {

@@ -22,14 +22,18 @@ const FILE = { id: 'file-1', key: `${OWNER}/verification/doc.pdf`, checksum: 'a'
  * regardless of who's asking.
  */
 function harness(supportAttachment = false) {
-  const findFirst = jest.fn().mockImplementation(({ where }: { where: { id: string; status: string; OR: { ownerId?: string; id?: string }[] } }) => {
-    const ownerMatch = where.OR.some((clause) => clause.ownerId === OWNER);
-    const attachmentMatch = supportAttachment && where.OR.some((clause) => clause.id === FILE.id);
-    // No verificationItems/testAnswers relations are set up on this fixture,
-    // so the reviewer-only OR branches never match in this harness.
-    const matches = where.id === FILE.id && where.status === 'SAFE' && (ownerMatch || attachmentMatch);
-    return Promise.resolve(matches ? FILE : null);
-  });
+  const findFirst = jest
+    .fn()
+    .mockImplementation(
+      ({ where }: { where: { id: string; status: string; OR: { ownerId?: string; id?: string }[] } }) => {
+        const ownerMatch = where.OR.some((clause) => clause.ownerId === OWNER);
+        const attachmentMatch = supportAttachment && where.OR.some((clause) => clause.id === FILE.id);
+        // No verificationItems/testAnswers relations are set up on this fixture,
+        // so the reviewer-only OR branches never match in this harness.
+        const matches = where.id === FILE.id && where.status === 'SAFE' && (ownerMatch || attachmentMatch);
+        return Promise.resolve(matches ? FILE : null);
+      },
+    );
   const db = {
     storedFile: { findFirst },
     ticketReply: { findFirst: jest.fn().mockResolvedValue(supportAttachment ? { id: 'reply-1' } : null) },
@@ -42,7 +46,7 @@ function harness(supportAttachment = false) {
 describe('FilesService.download (SEC-210)', () => {
   it('rejects a different user downloading another user’s file', async () => {
     const { svc, findFirst } = harness();
-    await expect(svc.download(OTHER, ['STUDENT'], FILE.id)).rejects.toMatchObject({
+    await expect(svc.download(OTHER, ['STUDENT'], [], FILE.id)).rejects.toMatchObject({
       response: { code: 'FILE_NOT_FOUND' },
     });
     expect(findFirst).toHaveBeenCalled();
@@ -50,28 +54,28 @@ describe('FilesService.download (SEC-210)', () => {
 
   it('rejects a staff-adjacent but non-reviewer role the same way', async () => {
     const { svc } = harness();
-    await expect(svc.download(OTHER, ['SUPPORT'], FILE.id)).rejects.toMatchObject({
+    await expect(svc.download(OTHER, ['SUPPORT'], [], FILE.id)).rejects.toMatchObject({
       response: { code: 'FILE_NOT_FOUND' },
     });
   });
 
   it('still lets the owning user download their own file', async () => {
     const { svc } = harness();
-    const result = await svc.download(OWNER, ['STUDENT'], FILE.id);
+    const result = await svc.download(OWNER, ['STUDENT'], [], FILE.id);
     expect(result.url).toEqual(expect.any(String));
     expect(result.expiresIn).toEqual(expect.any(Number));
   });
 
   it('lets the ticket owner download an attachment uploaded by support', async () => {
     const { svc } = harness(true);
-    await expect(svc.download(OTHER, ['STUDENT'], FILE.id)).resolves.toMatchObject({
+    await expect(svc.download(OTHER, ['STUDENT'], [], FILE.id)).resolves.toMatchObject({
       url: expect.any(String),
     });
   });
 
   it('lets support download a file only when it is attached to a ticket', async () => {
     const { svc } = harness(true);
-    await expect(svc.download(OTHER, ['SUPPORT'], FILE.id)).resolves.toMatchObject({
+    await expect(svc.download(OTHER, ['SUPPORT'], ['tickets.read'], FILE.id)).resolves.toMatchObject({
       url: expect.any(String),
     });
   });

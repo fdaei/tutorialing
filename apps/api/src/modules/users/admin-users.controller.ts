@@ -6,7 +6,7 @@ import { UserStatusDto } from './dto/admin/user-status.dto';
 import { AdminUsersService } from './admin-users.service';
 import { ApiTags } from '@nestjs/swagger';
 
-@Roles('ADMIN', 'STAFF')
+@Roles('ADMIN')
 @ApiTags('admin')
 @Controller('admin')
 export class AdminUsersController {

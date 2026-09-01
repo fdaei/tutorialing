@@ -11,7 +11,11 @@ import { ContentService } from '../content/content.service';
 
 @Controller('support')
 export class SupportController {
-  constructor(private s: SupportService, private settingsService: SettingsService, private contentService: ContentService) {}
+  constructor(
+    private s: SupportService,
+    private settingsService: SettingsService,
+    private contentService: ContentService,
+  ) {}
   @Public() @Get('public-settings') settings() {
     return this.settingsService.publicSettings();
   }
@@ -22,26 +26,30 @@ export class SupportController {
     return this.s.create(u.id, u.roles, d);
   }
   @Get('tickets') list(@CurrentUser() u: AuthUser, @Query() q: Record<string, string>) {
-    return this.s.list(u.id, u.roles, { ...q, page: Number(q.page) || 1, pageSize: Number(q.pageSize) || 20 });
+    return this.s.list(u.id, u.roles, u.permissions, {
+      ...q,
+      page: Number(q.page) || 1,
+      pageSize: Number(q.pageSize) || 20,
+    });
   }
   @Get('tickets/:id') detail(@CurrentUser() u: AuthUser, @Param('id') id: string) {
-    return this.s.detail(u.id, u.roles, id);
+    return this.s.detail(u.id, u.roles, u.permissions, id);
   }
   @Post('tickets/:id/replies') reply(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() d: ReplyDto) {
-    return this.s.reply(u.id, u.roles, id, d);
+    return this.s.reply(u.id, u.roles, u.permissions, id, d);
   }
-  @Roles('ADMIN', 'STAFF', 'SUPPORT') @RequirePermissions(PermissionKeys.Tickets.Manage) @Patch('tickets/:id/status') status(
+  @Roles('ADMIN', 'SUPPORT') @RequirePermissions(PermissionKeys.Tickets.Manage) @Patch('tickets/:id/status') status(
     @CurrentUser() u: AuthUser,
     @Param('id') id: string,
     @Body() d: StatusDto,
   ) {
-    return this.s.changeStatus(u.id, u.roles, id, d.status, d.note);
+    return this.s.changeStatus(u.id, u.roles, u.permissions, id, d.status, d.note);
   }
-  @Roles('ADMIN', 'STAFF', 'SUPPORT') @RequirePermissions(PermissionKeys.Tickets.Manage) @Patch('tickets/:id/assignment') assign(
+  @Roles('ADMIN', 'SUPPORT') @RequirePermissions(PermissionKeys.Tickets.Manage) @Patch('tickets/:id/assignment') assign(
     @CurrentUser() u: AuthUser,
     @Param('id') id: string,
     @Body() d: AssignmentDto,
   ) {
-    return this.s.assign(u.id, u.roles, id, d.assignedToId ?? null, d.note);
+    return this.s.assign(u.id, u.roles, u.permissions, id, d.assignedToId ?? null, d.note);
   }
 }

@@ -5,6 +5,7 @@ import { requestLocale } from '@/lib/server-locale';
 import { StudentMatches, StudentProfile, StudentTests, StudentWallet } from '@/features/student';
 import { TeacherPlannerCalendar } from '@/features/scheduling';
 import { FeatureErrorBoundary } from '@/shared/components/error-boundaries';
+import { MyCourses } from '@/features/courses';
 
 const map: Record<string, [string, string, string]> = {
   classes: ['کلاس‌ها و تقویم', 'Classes and calendar', '/bookings/me'],
@@ -15,6 +16,7 @@ const map: Record<string, [string, string, string]> = {
   notifications: ['اعلان‌ها', 'Notifications', '/notifications'],
   tickets: ['تیکت‌های پشتیبانی', 'Support tickets', '/support/tickets'],
   profile: ['پروفایل و تنظیمات', 'Profile and settings', '/users/me'],
+  courses: ['دوره‌های من', 'My courses', '/courses/me/learning'],
 };
 
 export default async function Section({ params }: { params: Promise<{ section: string }> }) {
@@ -27,6 +29,8 @@ export default async function Section({ params }: { params: Promise<{ section: s
       <FeatureErrorBoundary name={`student-${section}`}>
       {section === 'tests' ? (
         <StudentTests />
+      ) : section === 'courses' ? (
+        <MyCourses />
       ) : section === 'classes' ? (
         <TeacherPlannerCalendar mode="student" />
       ) : section === 'matches' ? (

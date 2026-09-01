@@ -48,13 +48,13 @@ function service(overrides: Record<string, unknown> = {}) {
 
 /** `userRole.findUnique` mock that reports `actorId` as holding `role`. */
 function actorHolds(role: string) {
-  return jest.fn().mockImplementation(({ where }: { where: { userId_role: { userId: string; role: string } } }) =>
-    Promise.resolve(
-      where.userId_role.userId === ACTOR && where.userId_role.role === role
-        ? { userId: ACTOR, role }
-        : null,
-    ),
-  );
+  return jest
+    .fn()
+    .mockImplementation(({ where }: { where: { userId_role: { userId: string; role: string } } }) =>
+      Promise.resolve(
+        where.userId_role.userId === ACTOR && where.userId_role.role === role ? { userId: ACTOR, role } : null,
+      ),
+    );
 }
 
 describe('AuthorizationManagementService privilege self-escalation', () => {
@@ -70,7 +70,7 @@ describe('AuthorizationManagementService privilege self-escalation', () => {
 
   it('refuses to grant the actor a permission', async () => {
     const { svc, db } = service();
-    await expect(svc.grantPermission(ACTOR, ACTOR, 'FINANCE', 'payments.refund')).rejects.toMatchObject({
+    await expect(svc.grantPermission(ACTOR, ACTOR, 'SUPPORT', 'payments.refund')).rejects.toMatchObject({
       response: { code: 'SELF_PRIVILEGE_CHANGE' },
     });
     expect(db.rolePermission.upsert).not.toHaveBeenCalled();
@@ -78,9 +78,9 @@ describe('AuthorizationManagementService privilege self-escalation', () => {
 
   it('refuses a self-targeted role addition through setUserRoles', async () => {
     const { svc } = service({
-      user: { findUnique: jest.fn().mockResolvedValue({ id: ACTOR, roles: [{ role: 'STAFF' }] }) },
+      user: { findUnique: jest.fn().mockResolvedValue({ id: ACTOR, roles: [{ role: 'SUPPORT' }] }) },
     });
-    await expect(svc.setUserRoles(ACTOR, ACTOR, ['STAFF', 'ADMIN'])).rejects.toMatchObject({
+    await expect(svc.setUserRoles(ACTOR, ACTOR, ['SUPPORT', 'ADMIN'])).rejects.toMatchObject({
       response: { code: 'SELF_PRIVILEGE_CHANGE' },
     });
   });
@@ -164,22 +164,11 @@ describe('AuthorizationManagementService admin-grant requires an existing admin 
   });
 });
 
-/**
- * SEC-207. `roles.manage` is delegable to non-ADMIN staff, but it must never
- * be enough, by itself, to grant FINANCE-equivalent capability. See
- * ROLE_MANAGEMENT_POLICY.md for the tier-1/2/3 hierarchy these tests pin.
- */
 describe('AuthorizationManagementService role-management hierarchy (SEC-207)', () => {
-  it('1. STAFF cannot grant FINANCE', async () => {
-    // Default service(): actor holds no ADMIN row, i.e. an ordinary STAFF
-    // actor delegated `roles.manage` (the AuthorizationGuard permission
-    // check on the route is what lets a STAFF actor reach this method at
-    // all; the service must not also let them mint a FINANCE account).
+  it('treats SUPPORT as a standard role without inheriting financial authority', async () => {
     const { svc, db } = service();
-    await expect(svc.assignRole(ACTOR, OTHER, 'FINANCE')).rejects.toMatchObject({
-      response: { code: 'PRIVILEGED_ROLE_GRANT_REQUIRES_ADMIN' },
-    });
-    expect(db.userRole.upsert).not.toHaveBeenCalled();
+    await expect(svc.assignRole(ACTOR, OTHER, 'SUPPORT')).resolves.toBeDefined();
+    expect(db.userRole.upsert).toHaveBeenCalled();
   });
 
   it('2. SUPPORT cannot grant PAYMENTS permissions', async () => {
@@ -192,33 +181,36 @@ describe('AuthorizationManagementService role-management hierarchy (SEC-207)', (
     expect(db.rolePermission.upsert).not.toHaveBeenCalled();
   });
 
-  it('3. FINANCE cannot grant roles.manage', async () => {
+  it('does not let a SUPPORT actor grant roles.manage', async () => {
     const { svc, db } = service({
-      userRole: { upsert: jest.fn().mockResolvedValue({}), count: jest.fn().mockResolvedValue(2), findUnique: actorHolds('FINANCE') },
+      userRole: {
+        upsert: jest.fn().mockResolvedValue({}),
+        count: jest.fn().mockResolvedValue(2),
+        findUnique: actorHolds('SUPPORT'),
+      },
     });
-    // role: 'STAFF' is not itself privileged, isolating the assertion to the
-    // permission-tier check: holding FINANCE (a real, non-ADMIN privilege)
-    // still must not unlock a security-sensitive permission grant.
-    await expect(svc.grantPermission(ACTOR, OTHER, 'STAFF', 'roles.manage')).rejects.toMatchObject({
+    await expect(svc.grantPermission(ACTOR, OTHER, 'SUPPORT', 'roles.manage')).rejects.toMatchObject({
       response: { code: 'ELEVATED_PERMISSION_GRANT_REQUIRES_ADMIN' },
     });
     expect(db.rolePermission.upsert).not.toHaveBeenCalled();
   });
 
-  it('4. ADMIN can perform allowed operations', async () => {
+  it('lets ADMIN perform elevated operations', async () => {
     const { svc, db } = service({
-      userRole: { upsert: jest.fn().mockResolvedValue({}), count: jest.fn().mockResolvedValue(2), findUnique: actorHolds('ADMIN') },
+      userRole: {
+        upsert: jest.fn().mockResolvedValue({}),
+        count: jest.fn().mockResolvedValue(2),
+        findUnique: actorHolds('ADMIN'),
+      },
     });
-    await expect(svc.assignRole(ACTOR, OTHER, 'FINANCE')).resolves.toBeDefined();
-    await expect(svc.grantPermission(ACTOR, OTHER, 'FINANCE', 'payments.refund')).resolves.toBeDefined();
-    await expect(svc.grantPermission(ACTOR, OTHER, 'STAFF', 'roles.manage')).resolves.toBeDefined();
+    await expect(svc.assignRole(ACTOR, OTHER, 'SUPPORT')).resolves.toBeDefined();
+    await expect(svc.grantPermission(ACTOR, OTHER, 'SUPPORT', 'payments.refund')).resolves.toBeDefined();
+    await expect(svc.grantPermission(ACTOR, OTHER, 'ADMIN', 'roles.manage')).resolves.toBeDefined();
     expect(db.userRole.upsert).toHaveBeenCalled();
     expect(db.rolePermission.upsert).toHaveBeenCalled();
   });
 
-  it('still allows a non-admin roles.manage holder to delegate a standard (tier-3) role and permission', async () => {
-    // Unchanged behaviour: this is the legitimate ops-delegation use case
-    // roles.manage exists for, and must not regress.
+  it('allows assigning a standard permission without manufacturing an elevated capability', async () => {
     const { svc, db } = service();
     await expect(svc.assignRole(ACTOR, OTHER, 'SUPPORT')).resolves.toBeDefined();
     await expect(svc.grantPermission(ACTOR, OTHER, 'SUPPORT', 'tickets.manage')).resolves.toBeDefined();
@@ -226,13 +218,11 @@ describe('AuthorizationManagementService role-management hierarchy (SEC-207)', (
     expect(db.rolePermission.upsert).toHaveBeenCalled();
   });
 
-  it('closes the full SEC-207 exploit chain: a STAFF actor cannot mint an accomplice into FINANCE with payments.refund', async () => {
+  it('closes the privilege chain even after a standard SUPPORT role is assigned', async () => {
     const { svc } = service();
-    await expect(svc.assignRole(ACTOR, OTHER, 'FINANCE')).rejects.toMatchObject({
-      response: { code: 'PRIVILEGED_ROLE_GRANT_REQUIRES_ADMIN' },
-    });
-    await expect(svc.grantPermission(ACTOR, OTHER, 'FINANCE', 'payments.refund')).rejects.toThrow();
-    await expect(svc.grantPermission(ACTOR, OTHER, 'FINANCE', 'payouts.manage')).rejects.toThrow();
+    await expect(svc.assignRole(ACTOR, OTHER, 'SUPPORT')).resolves.toBeDefined();
+    await expect(svc.grantPermission(ACTOR, OTHER, 'SUPPORT', 'payments.refund')).rejects.toThrow();
+    await expect(svc.grantPermission(ACTOR, OTHER, 'SUPPORT', 'payouts.manage')).rejects.toThrow();
   });
 });
 
@@ -243,10 +233,23 @@ describe('AuthorizationManagementService role-management hierarchy (SEC-207)', (
  * minutes on the token the user already holds.
  */
 describe('AuthorizationManagementService privilege changes revoke outstanding tokens', () => {
-  const adminActor = { userRole: { upsert: jest.fn().mockResolvedValue({}), count: jest.fn().mockResolvedValue(2), findUnique: jest.fn().mockResolvedValue({ userId: ACTOR, role: 'ADMIN' }), delete: jest.fn().mockResolvedValue({}), deleteMany: jest.fn().mockResolvedValue({}) } };
+  const adminActor = {
+    userRole: {
+      upsert: jest.fn().mockResolvedValue({}),
+      count: jest.fn().mockResolvedValue(2),
+      findUnique: jest.fn().mockResolvedValue({ userId: ACTOR, role: 'ADMIN' }),
+      delete: jest.fn().mockResolvedValue({}),
+      deleteMany: jest.fn().mockResolvedValue({}),
+    },
+  };
 
   it('revokes when a user is suspended', async () => {
-    const { svc, revocation } = service({ user: { findUnique: jest.fn().mockResolvedValue({ id: OTHER, status: 'ACTIVE' }), update: jest.fn().mockResolvedValue({ id: OTHER, status: 'SUSPENDED' }) } });
+    const { svc, revocation } = service({
+      user: {
+        findUnique: jest.fn().mockResolvedValue({ id: OTHER, status: 'ACTIVE' }),
+        update: jest.fn().mockResolvedValue({ id: OTHER, status: 'SUSPENDED' }),
+      },
+    });
     await svc.updateUserStatus(ACTOR, OTHER, 'SUSPENDED');
     expect(revocation.revokeUser).toHaveBeenCalledWith(OTHER);
   });
@@ -254,33 +257,41 @@ describe('AuthorizationManagementService privilege changes revoke outstanding to
   // Reactivating cannot resurrect a token that was already voided, so there is
   // nothing to revoke and no reason to cut short a fresh session.
   it('does not revoke when a user is reactivated', async () => {
-    const { svc, revocation } = service({ user: { findUnique: jest.fn().mockResolvedValue({ id: OTHER, status: 'SUSPENDED' }), update: jest.fn().mockResolvedValue({ id: OTHER, status: 'ACTIVE' }) } });
+    const { svc, revocation } = service({
+      user: {
+        findUnique: jest.fn().mockResolvedValue({ id: OTHER, status: 'SUSPENDED' }),
+        update: jest.fn().mockResolvedValue({ id: OTHER, status: 'ACTIVE' }),
+      },
+    });
     await svc.updateUserStatus(ACTOR, OTHER, 'ACTIVE');
     expect(revocation.revokeUser).not.toHaveBeenCalled();
   });
 
   it('revokes when a role is assigned', async () => {
     const { svc, revocation } = service(adminActor);
-    await svc.assignRole(ACTOR, OTHER, 'FINANCE');
+    await svc.assignRole(ACTOR, OTHER, 'SUPPORT');
     expect(revocation.revokeUser).toHaveBeenCalledWith(OTHER);
   });
 
   it('revokes when a role is taken away', async () => {
     const { svc, revocation } = service(adminActor);
-    await svc.revokeRole(ACTOR, OTHER, 'FINANCE');
+    await svc.revokeRole(ACTOR, OTHER, 'SUPPORT');
     expect(revocation.revokeUser).toHaveBeenCalledWith(OTHER);
   });
 
   it('revokes when a permission is granted', async () => {
     const { svc, revocation } = service(adminActor);
-    await svc.grantPermission(ACTOR, OTHER, 'FINANCE', 'payments.refund');
+    await svc.grantPermission(ACTOR, OTHER, 'SUPPORT', 'payments.refund');
     expect(revocation.revokeUser).toHaveBeenCalledWith(OTHER);
   });
 
   it('revokes when the whole role set is replaced', async () => {
     const { svc, revocation } = service({
       ...adminActor,
-      user: { findUnique: jest.fn().mockResolvedValue({ id: OTHER, roles: [{ role: 'FINANCE' }] }), findUniqueOrThrow: jest.fn().mockResolvedValue({ id: OTHER, roles: [] }) },
+      user: {
+        findUnique: jest.fn().mockResolvedValue({ id: OTHER, roles: [{ role: 'SUPPORT' }] }),
+        findUniqueOrThrow: jest.fn().mockResolvedValue({ id: OTHER, roles: [] }),
+      },
       $transaction: jest.fn().mockImplementation((fn: (t: unknown) => unknown) =>
         fn({
           userRole: adminActor.userRole,

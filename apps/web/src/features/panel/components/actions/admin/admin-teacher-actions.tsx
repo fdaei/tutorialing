@@ -2,7 +2,17 @@
 
 import { translate } from '@/lib/i18n';
 import { api } from '@/shared/services/api';
-import { Area, Localized, Select, Shell, Status, Submit, TeacherApplicationSelect, useAction, value } from '../shared/action-controls';
+import {
+  Area,
+  Localized,
+  Select,
+  Shell,
+  Status,
+  Submit,
+  TeacherApplicationSelect,
+  useAction,
+  value,
+} from '../shared/action-controls';
 export function AdminTeacherActions({ endpoint, fa }: { endpoint: string } & Localized) {
   const action = useAction(endpoint);
   return (

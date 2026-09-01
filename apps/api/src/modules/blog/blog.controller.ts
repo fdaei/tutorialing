@@ -51,7 +51,7 @@ export class BlogController {
     return this.blog.comment(id, user.id, dto.body, dto.parentId);
   }
 
-  @Roles('ADMIN', 'STAFF')
+  @Roles('ADMIN')
   @RequirePermissions(PermissionKeys.Content.Manage)
   @RateLimit(RATE_LIMIT_TIERS.adminWrite)
   @Patch('comments/:id/moderate')
@@ -59,7 +59,7 @@ export class BlogController {
     return this.blog.moderateComment(id, dto.status);
   }
 
-  @Roles('ADMIN', 'STAFF')
+  @Roles('ADMIN')
   @RequirePermissions(PermissionKeys.Content.Manage)
   @RateLimit(RATE_LIMIT_TIERS.adminWrite)
   @Post('posts')
@@ -67,7 +67,7 @@ export class BlogController {
     return this.blog.create(user.id, dto);
   }
 
-  @Roles('ADMIN', 'STAFF')
+  @Roles('ADMIN')
   @RequirePermissions(PermissionKeys.Content.Manage)
   @RateLimit(RATE_LIMIT_TIERS.adminWrite)
   @Patch('posts/:id')
@@ -75,41 +75,41 @@ export class BlogController {
     return this.blog.update(user.id, id, dto);
   }
 
-  @Roles('TEACHER')
+  @Roles('INSTRUCTOR')
   @Get('instructor/posts')
   mine(@CurrentUser() user: AuthUser) { return this.blog.mine(user.id); }
 
-  @Roles('TEACHER')
+  @Roles('INSTRUCTOR')
   @RateLimit(RATE_LIMIT_TIERS.adminWrite)
   @Post('instructor/posts')
   instructorCreate(@CurrentUser() user: AuthUser, @Body() dto: CreateBlogPostDto) {
     return this.blog.create(user.id, dto);
   }
 
-  @Roles('TEACHER')
+  @Roles('INSTRUCTOR')
   @RateLimit(RATE_LIMIT_TIERS.adminWrite)
   @Patch('instructor/posts/:id')
   instructorUpdate(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: UpdateBlogPostDto) {
     return this.blog.update(user.id, id, dto, false);
   }
 
-  @Roles('TEACHER')
+  @Roles('INSTRUCTOR')
   @RateLimit(RATE_LIMIT_TIERS.adminWrite)
   @Post('posts/:id/submit')
   submit(@CurrentUser() user: AuthUser, @Param('id') id: string) { return this.blog.submit(user.id, id); }
 
-  @Roles('ADMIN', 'STAFF')
+  @Roles('ADMIN')
   @RequirePermissions(PermissionKeys.Content.Manage)
   @Get('review/queue')
   reviewQueue() { return this.blog.reviewQueue(); }
 
-  @Roles('ADMIN', 'STAFF')
+  @Roles('ADMIN')
   @RequirePermissions(PermissionKeys.Content.Manage)
   @RateLimit(RATE_LIMIT_TIERS.adminWrite)
   @Post('posts/:id/approve')
   approve(@CurrentUser() user: AuthUser, @Param('id') id: string) { return this.blog.approve(user.id, id); }
 
-  @Roles('ADMIN', 'STAFF')
+  @Roles('ADMIN')
   @RequirePermissions(PermissionKeys.Content.Manage)
   @RateLimit(RATE_LIMIT_TIERS.adminWrite)
   @Post('posts/:id/reject')
@@ -117,7 +117,7 @@ export class BlogController {
     return this.blog.reject(user.id, id, dto.reason);
   }
 
-  @Roles('ADMIN', 'STAFF')
+  @Roles('ADMIN')
   @RequirePermissions(PermissionKeys.Content.Manage)
   @RateLimit(RATE_LIMIT_TIERS.adminWrite)
   @Post('posts/:id/publish')
@@ -126,7 +126,7 @@ export class BlogController {
   }
 
   /** Archive is this module's delete; nothing is removed from the database. */
-  @Roles('ADMIN', 'STAFF')
+  @Roles('ADMIN')
   @RequirePermissions(PermissionKeys.Content.Manage)
   @RateLimit(RATE_LIMIT_TIERS.adminWrite)
   @Delete('posts/:id')

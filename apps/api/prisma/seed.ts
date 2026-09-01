@@ -49,7 +49,7 @@ const users = {
     phone: e164('09120000010'),
     name: 'کارشناس تأیید مدرس',
     email: 'verifier@local.test',
-    role: Role.STAFF,
+    role: Role.ADMIN,
   },
   support: {
     id: 'user-support',
@@ -63,35 +63,35 @@ const users = {
     phone: e164('09120000012'),
     name: 'کارشناس مالی',
     email: 'finance@local.test',
-    role: Role.FINANCE,
+    role: Role.SUPPORT,
   },
   examiner: {
     id: 'user-examiner',
     phone: e164('09120000013'),
     name: 'ارزیاب آزمون',
     email: 'examiner@local.test',
-    role: Role.EXAMINER,
+    role: Role.SUPPORT,
   },
   approvedTeacher: {
     id: 'user-teacher-approved',
     phone: e164('09120000001'),
     name: 'سارا دادخواه',
     email: 'sara@local.test',
-    role: Role.TEACHER,
+    role: Role.INSTRUCTOR,
   },
   germanTeacher: {
     id: 'user-teacher-german',
     phone: e164('09120000002'),
     name: 'آرمان نیک‌روش',
     email: 'arman@local.test',
-    role: Role.TEACHER,
+    role: Role.INSTRUCTOR,
   },
   pendingTeacher: {
     id: 'user-teacher-pending',
     phone: e164('09120000004'),
     name: 'نیلوفر آذری',
     email: 'niloofar@local.test',
-    role: Role.TEACHER,
+    role: Role.INSTRUCTOR,
   },
   completedStudent: {
     id: 'user-student-completed',
@@ -141,6 +141,7 @@ const permissionKeys = [
   'payments.adjust-wallet',
   'payouts.manage',
   'reviews.manage',
+  'courses.manage',
   'audit.read',
   'settings.manage',
   'cms.manage',
@@ -211,7 +212,9 @@ async function seedUsersAndPermissions() {
   // Reconcile demo-role grants instead of only adding them: older seeds gave
   // every staff role every permission, allowing SUPPORT to adjust balances.
   await db.rolePermission.deleteMany({
-    where: { userId: { in: [users.admin.id, users.verifier.id, users.support.id, users.finance.id, users.examiner.id] } },
+    where: {
+      userId: { in: [users.admin.id, users.verifier.id, users.support.id, users.finance.id, users.examiner.id] },
+    },
   });
   for (const key of permissionKeys) {
     const permission = await db.permission.upsert({
@@ -219,10 +222,23 @@ async function seedUsersAndPermissions() {
       create: { key, description: key },
       update: { description: key },
     });
-    const financeKeys = new Set(['payments.read', 'payments.refund', 'payments.adjust-wallet', 'payouts.manage', 'reports.read', 'audit.read']);
+    const financeKeys = new Set([
+      'payments.read',
+      'payments.refund',
+      'payments.adjust-wallet',
+      'payouts.manage',
+      'reports.read',
+      'audit.read',
+    ]);
     const supportKeys = new Set(['users.read', 'bookings.read', 'tickets.read', 'tickets.manage', 'payments.read']);
     const examinerKeys = new Set(['tests.manage', 'tests.review']);
-    const verifierKeys = new Set(['users.read', 'teachers.read', 'teachers.verify', 'teacher-prices.manage', 'reviews.manage']);
+    const verifierKeys = new Set([
+      'users.read',
+      'teachers.read',
+      'teachers.verify',
+      'teacher-prices.manage',
+      'reviews.manage',
+    ]);
     const actors = [
       users.admin,
       ...(financeKeys.has(key) ? [users.finance] : []),
@@ -413,7 +429,7 @@ async function seedTeachers() {
         id: `price-history-${row.id}`,
         teacherId: row.id,
         actorId: row.priceStatus === PriceStatus.APPROVED ? users.admin.id : row.userId,
-        actorRole: row.priceStatus === PriceStatus.APPROVED ? Role.ADMIN : Role.TEACHER,
+        actorRole: row.priceStatus === PriceStatus.APPROVED ? Role.ADMIN : Role.INSTRUCTOR,
         action: row.priceStatus === PriceStatus.APPROVED ? 'FINAL_APPROVED' : 'PROPOSED',
         status: row.priceStatus,
         proposedTrialPrice: row.proposedTrialPrice,
@@ -1215,8 +1231,8 @@ async function seedDemoExperience() {
       update: { name: nameFa, status: 'ACTIVE' },
     });
     await db.userRole.upsert({
-      where: { userId_role: { userId, role: Role.TEACHER } },
-      create: { userId, role: Role.TEACHER },
+      where: { userId_role: { userId, role: Role.INSTRUCTOR } },
+      create: { userId, role: Role.INSTRUCTOR },
       update: {},
     });
     await db.teacher.upsert({
@@ -2021,30 +2037,254 @@ async function seedAudit() {
 }
 
 async function seedBlog() {
-  const productivity = await db.blogCategory.upsert({ where: { slug: 'learning-tips' }, update: {}, create: { slug: 'learning-tips', nameFa: 'نکات یادگیری', nameEn: 'Learning tips' } });
-  const culture = await db.blogCategory.upsert({ where: { slug: 'culture' }, update: {}, create: { slug: 'culture', nameFa: 'فرهنگ و زبان', nameEn: 'Culture & language' } });
-  const tags = await Promise.all([
-    ['speaking', 'مکالمه', 'Speaking'] as const, ['vocabulary', 'واژگان', 'Vocabulary'] as const, ['study-plan', 'برنامه‌ریزی', 'Study plan'] as const,
-  ].map(([slug, nameFa, nameEn]) => db.blogTag.upsert({ where: { slug }, update: {}, create: { slug, nameFa, nameEn } })));
+  const productivity = await db.blogCategory.upsert({
+    where: { slug: 'learning-tips' },
+    update: {},
+    create: { slug: 'learning-tips', nameFa: 'نکات یادگیری', nameEn: 'Learning tips' },
+  });
+  const culture = await db.blogCategory.upsert({
+    where: { slug: 'culture' },
+    update: {},
+    create: { slug: 'culture', nameFa: 'فرهنگ و زبان', nameEn: 'Culture & language' },
+  });
+  const tags = await Promise.all(
+    [
+      ['speaking', 'مکالمه', 'Speaking'] as const,
+      ['vocabulary', 'واژگان', 'Vocabulary'] as const,
+      ['study-plan', 'برنامه‌ریزی', 'Study plan'] as const,
+    ].map(([slug, nameFa, nameEn]) =>
+      db.blogTag.upsert({ where: { slug }, update: {}, create: { slug, nameFa, nameEn } }),
+    ),
+  );
   const posts = [
-    { slug: 'speak-with-confidence', categoryId: productivity.id, titleFa: 'چطور با اعتمادبه‌نفس انگلیسی صحبت کنیم؟', titleEn: 'How to speak English with confidence', excerptFa: 'تمرین‌های کوتاه و کاربردی برای عبور از ترس مکالمه.', excerptEn: 'Short practical exercises to overcome speaking anxiety.', contentFa: '# از اشتباه کردن نترسید\n\nمکالمه مهارتی است که با تمرین روزانه رشد می‌کند. هر روز پنج دقیقه درباره‌ی یک موضوع ساده صحبت کنید و صدای خود را ضبط کنید.', contentEn: '# Embrace mistakes\n\nSpeaking grows through daily practice. Talk for five minutes about a simple topic and record yourself.', tagIds: [tags[0]!.id, tags[2]!.id] },
-    { slug: 'vocabulary-in-context', categoryId: productivity.id, titleFa: 'واژگان را در جمله یاد بگیرید', titleEn: 'Learn vocabulary in context', excerptFa: 'چرا حفظ کردن فهرست لغات کافی نیست و چه روشی بهتر جواب می‌دهد؟', excerptEn: 'Why word lists are not enough—and what works better.', contentFa: '## یک کلمه، سه جمله\n\nهر واژه‌ی جدید را در سه جمله‌ی واقعی به کار ببرید و روز بعد آن جمله‌ها را مرور کنید.', contentEn: '## One word, three sentences\n\nUse every new word in three real sentences and review them the next day.', tagIds: [tags[1]!.id] },
-    { slug: 'english-through-films', categoryId: culture.id, titleFa: 'یادگیری زبان با فیلم و سریال', titleEn: 'Learn English through films', excerptFa: 'یک روش سه‌مرحله‌ای برای تبدیل تماشای فیلم به تمرین زبان.', excerptEn: 'A three-step method to turn movie time into language practice.', contentFa: '### روش سه‌مرحله‌ای\n\nابتدا با زیرنویس فارسی، سپس انگلیسی و در پایان بدون زیرنویس تماشا کنید.', contentEn: '### The three-step method\n\nWatch first with native subtitles, then English subtitles, and finally without subtitles.', tagIds: [tags[0]!.id, tags[1]!.id] },
+    {
+      slug: 'speak-with-confidence',
+      categoryId: productivity.id,
+      titleFa: 'چطور با اعتمادبه‌نفس انگلیسی صحبت کنیم؟',
+      titleEn: 'How to speak English with confidence',
+      excerptFa: 'تمرین‌های کوتاه و کاربردی برای عبور از ترس مکالمه.',
+      excerptEn: 'Short practical exercises to overcome speaking anxiety.',
+      contentFa:
+        '# از اشتباه کردن نترسید\n\nمکالمه مهارتی است که با تمرین روزانه رشد می‌کند. هر روز پنج دقیقه درباره‌ی یک موضوع ساده صحبت کنید و صدای خود را ضبط کنید.',
+      contentEn:
+        '# Embrace mistakes\n\nSpeaking grows through daily practice. Talk for five minutes about a simple topic and record yourself.',
+      tagIds: [tags[0]!.id, tags[2]!.id],
+    },
+    {
+      slug: 'vocabulary-in-context',
+      categoryId: productivity.id,
+      titleFa: 'واژگان را در جمله یاد بگیرید',
+      titleEn: 'Learn vocabulary in context',
+      excerptFa: 'چرا حفظ کردن فهرست لغات کافی نیست و چه روشی بهتر جواب می‌دهد؟',
+      excerptEn: 'Why word lists are not enough—and what works better.',
+      contentFa:
+        '## یک کلمه، سه جمله\n\nهر واژه‌ی جدید را در سه جمله‌ی واقعی به کار ببرید و روز بعد آن جمله‌ها را مرور کنید.',
+      contentEn:
+        '## One word, three sentences\n\nUse every new word in three real sentences and review them the next day.',
+      tagIds: [tags[1]!.id],
+    },
+    {
+      slug: 'english-through-films',
+      categoryId: culture.id,
+      titleFa: 'یادگیری زبان با فیلم و سریال',
+      titleEn: 'Learn English through films',
+      excerptFa: 'یک روش سه‌مرحله‌ای برای تبدیل تماشای فیلم به تمرین زبان.',
+      excerptEn: 'A three-step method to turn movie time into language practice.',
+      contentFa: '### روش سه‌مرحله‌ای\n\nابتدا با زیرنویس فارسی، سپس انگلیسی و در پایان بدون زیرنویس تماشا کنید.',
+      contentEn:
+        '### The three-step method\n\nWatch first with native subtitles, then English subtitles, and finally without subtitles.',
+      tagIds: [tags[0]!.id, tags[1]!.id],
+    },
   ];
-  for (const p of posts) await db.blogPost.upsert({ where: { slug: p.slug }, update: { ...p, tagIds: undefined, status: BlogPostStatus.PUBLISHED, publishedAt: now }, create: { ...p, tagIds: undefined, authorId: users.admin.id, status: BlogPostStatus.PUBLISHED, publishedAt: now, tags: { connect: p.tagIds!.map(id => ({ id })) } } } as any);
+  for (const p of posts)
+    await db.blogPost.upsert({
+      where: { slug: p.slug },
+      update: { ...p, tagIds: undefined, status: BlogPostStatus.PUBLISHED, publishedAt: now },
+      create: {
+        ...p,
+        tagIds: undefined,
+        authorId: users.admin.id,
+        status: BlogPostStatus.PUBLISHED,
+        publishedAt: now,
+        tags: { connect: p.tagIds!.map((id) => ({ id })) },
+      },
+    } as any);
 }
 
 async function seedCourses() {
   const rows = [
-    { id: 'course-english-conversation', slug: 'english-conversation', titleFa: 'مکالمه روان انگلیسی', titleEn: 'Fluent English conversation', descriptionFa: 'مسیر تمرین‌محور مکالمه با بازخورد منظم و تمرین‌های واقعی.', descriptionEn: 'A practice-led speaking course with structured feedback.', language: 'انگلیسی', level: 'B1', teacherName: 'سارا دادخواه', lessonsCount: 16, price: 2_980_000, image: '/images/lingospeak-student.png' },
-    { id: 'course-german-zero', slug: 'german-zero', titleFa: 'آلمانی از صفر تا مکالمه', titleEn: 'German from zero to conversation', descriptionFa: 'پایه‌های زبان آلمانی برای شروع مطمئن مکالمه روزمره.', descriptionEn: 'German foundations for confident everyday conversations.', language: 'آلمانی', level: 'A1', teacherName: 'آرمان نیک‌روش', lessonsCount: 20, price: 3_490_000, image: '/images/auth/register.png' },
-    { id: 'course-french-travel', slug: 'french-travel', titleFa: 'فرانسوی برای سفر', titleEn: 'French for travel', descriptionFa: 'واژگان و موقعیت‌های ضروری برای یک سفر روان‌تر.', descriptionEn: 'Essential language and scenarios for smoother travel.', language: 'فرانسوی', level: 'A2', teacherName: 'تیم لینگواسپیک', lessonsCount: 12, price: 2_490_000, image: '/images/auth/login.png' },
-    { id: 'course-spanish-everyday', slug: 'spanish-everyday', titleFa: 'اسپانیایی برای زندگی روزمره', titleEn: 'Everyday Spanish', descriptionFa: 'مکالمه کاربردی برای موقعیت‌های واقعی زندگی روزانه.', descriptionEn: 'Practical conversations for everyday situations.', language: 'اسپانیایی', level: 'A2', teacherName: 'تیم لینگواسپیک', lessonsCount: 14, price: 2_690_000, image: '/images/auth/forgot.png' },
+    {
+      id: 'course-english-conversation',
+      slug: 'english-conversation',
+      titleFa: 'مکالمه روان انگلیسی',
+      titleEn: 'Fluent English conversation',
+      descriptionFa: 'مسیر تمرین‌محور مکالمه با بازخورد منظم و تمرین‌های واقعی.',
+      descriptionEn: 'A practice-led speaking course with structured feedback.',
+      language: 'انگلیسی',
+      level: 'B1',
+      teacherName: 'سارا دادخواه',
+      teacherId: 'teacher-sara',
+      lessonsCount: 16,
+      price: 2_980_000,
+      image: '/images/lingospeak-student.png',
+    },
+    {
+      id: 'course-german-zero',
+      slug: 'german-zero',
+      titleFa: 'آلمانی از صفر تا مکالمه',
+      titleEn: 'German from zero to conversation',
+      descriptionFa: 'پایه‌های زبان آلمانی برای شروع مطمئن مکالمه روزمره.',
+      descriptionEn: 'German foundations for confident everyday conversations.',
+      language: 'آلمانی',
+      level: 'A1',
+      teacherName: 'آرمان نیک‌روش',
+      teacherId: 'teacher-arman',
+      lessonsCount: 20,
+      price: 3_490_000,
+      image: '/images/auth/register.png',
+    },
+    {
+      id: 'course-french-travel',
+      slug: 'french-travel',
+      titleFa: 'فرانسوی برای سفر',
+      titleEn: 'French for travel',
+      descriptionFa: 'واژگان و موقعیت‌های ضروری برای یک سفر روان‌تر.',
+      descriptionEn: 'Essential language and scenarios for smoother travel.',
+      language: 'فرانسوی',
+      level: 'A2',
+      teacherName: 'تیم لینگواسپیک',
+      teacherId: null,
+      lessonsCount: 12,
+      price: 2_490_000,
+      image: '/images/auth/login.png',
+    },
+    {
+      id: 'course-spanish-everyday',
+      slug: 'spanish-everyday',
+      titleFa: 'اسپانیایی برای زندگی روزمره',
+      titleEn: 'Everyday Spanish',
+      descriptionFa: 'مکالمه کاربردی برای موقعیت‌های واقعی زندگی روزانه.',
+      descriptionEn: 'Practical conversations for everyday situations.',
+      language: 'اسپانیایی',
+      level: 'A2',
+      teacherName: 'تیم لینگواسپیک',
+      teacherId: null,
+      lessonsCount: 14,
+      price: 2_690_000,
+      image: '/images/auth/forgot.png',
+    },
   ];
-  for (const row of rows) await db.course.upsert({ where: { slug: row.slug }, create: { ...row, published: true }, update: { ...row, published: true } });
+  for (const row of rows)
+    await db.course.upsert({
+      where: { slug: row.slug },
+      create: { ...row, published: true },
+      update: { ...row, published: true },
+    });
+  const demoChapters = [
+    { id: 'course-en-chapter-1', titleFa: 'شروع مکالمه‌های واقعی', titleEn: 'Starting real conversations', order: 1 },
+    { id: 'course-en-chapter-2', titleFa: 'تعامل در زندگی روزمره', titleEn: 'Everyday interactions', order: 2 },
+    { id: 'course-en-chapter-3', titleFa: 'روان‌گویی و جمع‌بندی', titleEn: 'Fluency and review', order: 3 },
+  ];
+  for (const chapter of demoChapters)
+    await db.courseChapter.upsert({
+      where: { id: chapter.id },
+      create: { ...chapter, courseId: rows[0]!.id },
+      update: { titleFa: chapter.titleFa, titleEn: chapter.titleEn, order: chapter.order, published: true },
+    });
+  const demoLessons = [
+    [
+      'course-en-lesson-1',
+      demoChapters[0]!.id,
+      'معرفی خود با اعتمادبه‌نفس',
+      'Introducing yourself confidently',
+      'VIDEO',
+      1,
+      720,
+      {
+        fa: 'در این درس الگوهای ساده معرفی خود را در یک گفت‌وگوی واقعی تمرین می‌کنیم.',
+        en: 'Practise simple introduction patterns in a real conversation.',
+      },
+    ],
+    [
+      'course-en-lesson-2',
+      demoChapters[0]!.id,
+      'سؤال‌های کاربردی',
+      'Useful questions',
+      'TEXT',
+      2,
+      540,
+      {
+        fa: 'پرسش‌های باز و بسته را بسازید و پاسخ طبیعی بدهید.',
+        en: 'Build open and closed questions and answer naturally.',
+      },
+    ],
+    [
+      'course-en-lesson-3',
+      demoChapters[1]!.id,
+      'سفارش در کافه',
+      'Ordering at a café',
+      'AUDIO',
+      1,
+      660,
+      {
+        fa: 'به مکالمه گوش کنید و عبارت‌های کلیدی را تکرار کنید.',
+        en: 'Listen to the dialogue and repeat the key phrases.',
+      },
+    ],
+    [
+      'course-en-lesson-4',
+      demoChapters[1]!.id,
+      'قرار گذاشتن',
+      'Making plans',
+      'TEXT',
+      2,
+      600,
+      { fa: 'برای زمان و مکان قرار توافق کنید.', en: 'Agree on a time and place to meet.' },
+    ],
+    [
+      'course-en-lesson-5',
+      demoChapters[2]!.id,
+      'عبارت‌های پیونددهنده',
+      'Linking phrases',
+      'VIDEO',
+      1,
+      780,
+      { fa: 'با عبارت‌های پیونددهنده مکث‌های طولانی را کمتر کنید.', en: 'Use linking phrases to reduce long pauses.' },
+    ],
+    [
+      'course-en-lesson-6',
+      demoChapters[2]!.id,
+      'تمرین پایانی',
+      'Final practice',
+      'QUIZ',
+      2,
+      480,
+      {
+        question: 'بهترین پاسخ برای ادامه یک گفت‌وگوی دوستانه کدام است؟',
+        options: ['That sounds interesting. Tell me more.', 'No speaking.', 'Yesterday blue.'],
+      },
+    ],
+  ] as const;
+  for (const [id, chapterId, titleFa, titleEn, type, order, durationSeconds, content] of demoLessons)
+    await db.courseLesson.upsert({
+      where: { id },
+      create: {
+        id,
+        chapterId,
+        titleFa,
+        titleEn,
+        type,
+        order,
+        durationSeconds,
+        content,
+        preview: id === 'course-en-lesson-1',
+      },
+      update: { titleFa, titleEn, type, order, durationSeconds, content, published: true },
+    });
   await db.courseEnrollment.upsert({
     where: { userId_courseId: { userId: users.demoStudent.id, courseId: rows[0]!.id } },
-    create: { userId: users.demoStudent.id, courseId: rows[0]!.id, completedAt: now }, update: {},
+    create: { userId: users.demoStudent.id, courseId: rows[0]!.id },
+    update: {},
   });
 }
 

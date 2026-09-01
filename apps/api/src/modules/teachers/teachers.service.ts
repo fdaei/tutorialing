@@ -292,8 +292,8 @@ export class TeachersService {
         })),
       });
       await tx.userRole.upsert({
-        where: { userId_role: { userId, role: 'TEACHER' } },
-        create: { userId, role: 'TEACHER' },
+        where: { userId_role: { userId, role: 'INSTRUCTOR' } },
+        create: { userId, role: 'INSTRUCTOR' },
         update: {},
       });
       return tx.teacher.findUniqueOrThrow({

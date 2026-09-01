@@ -1,4 +1,11 @@
-import { CanActivate, ExecutionContext, Injectable, Logger, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
+import {
+  CanActivate,
+  ExecutionContext,
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import type { Request } from 'express';
@@ -17,13 +24,17 @@ import { TokenRevocationService } from './token-revocation.service';
  * that can move money or change privileges — and fails open for ordinary
  * student/teacher traffic, which degrades to the previous behaviour.
  */
-const PRIVILEGED_ROLES = ['ADMIN', 'FINANCE', 'STAFF', 'SUPPORT', 'EXAMINER'];
+const PRIVILEGED_ROLES = ['ADMIN', 'SUPPORT'];
 
 @Injectable()
 export class AccessGuard implements CanActivate {
   private readonly log = new Logger(AccessGuard.name);
 
-  constructor(private reflector: Reflector, private jwt: JwtService, private revocation: TokenRevocationService) {}
+  constructor(
+    private reflector: Reflector,
+    private jwt: JwtService,
+    private revocation: TokenRevocationService,
+  ) {}
 
   async canActivate(ctx: ExecutionContext): Promise<boolean> {
     if (this.reflector.getAllAndOverride<boolean>(PUBLIC_KEY, [ctx.getHandler(), ctx.getClass()])) {
@@ -49,12 +60,15 @@ export class AccessGuard implements CanActivate {
   }
 
   private async assertNotRevoked(payload: AuthUser & { iat?: number }) {
-    const privileged = payload.roles.some(role => PRIVILEGED_ROLES.includes(role));
+    const privileged = payload.roles.some((role) => PRIVILEGED_ROLES.includes(role));
     let revokedAt: number;
     try {
       revokedAt = await this.revocation.revokedAt(payload.id);
     } catch (error) {
-      this.log.error(`Revocation check unavailable for user ${payload.id}`, error instanceof Error ? error.stack : String(error));
+      this.log.error(
+        `Revocation check unavailable for user ${payload.id}`,
+        error instanceof Error ? error.stack : String(error),
+      );
       if (privileged) throw new ServiceUnavailableException('Session verification unavailable');
       return;
     }

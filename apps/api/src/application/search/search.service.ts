@@ -314,7 +314,7 @@ export class SearchService {
     );
   }
   private async supportAgents(q: string, skip: number, take: number, page: number) {
-    const roles: Role[] = ['ADMIN', 'STAFF', 'SUPPORT'];
+    const roles: Role[] = ['ADMIN', 'SUPPORT'];
     const where: Prisma.UserWhereInput = {
       status: 'ACTIVE',
       roles: { some: { role: { in: roles } } },
