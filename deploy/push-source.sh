@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# انتقال سورس اپ به سرور برای build.
+# Ship the app source to the server for building.
 #
-#   bash deploy/push-source.sh                  # از HEAD (توصیه‌شده)
-#   bash deploy/push-source.sh --working-tree   # شامل تغییرات کامیت‌نشده
+#   bash deploy/push-source.sh                  # from HEAD (recommended)
+#   bash deploy/push-source.sh --working-tree   # includes uncommitted changes
 #
-# فقط فایل‌های تحت کنترل گیت منتقل می‌شوند: نه .git (۱.۸ گیگ)، نه node_modules،
-# نه هیچ .env ای (همه در .gitignore هستند). چیزی روی سرور اجرا نمی‌شود.
+# Only git-tracked files are sent: no .git (1.8GB), no node_modules, no .env
+# (all gitignored). Nothing is executed on the server.
 
 set -euo pipefail
 
@@ -49,8 +49,8 @@ if [[ $MODE == head ]]; then
 else
 	echo "منبع : درخت کاری (شامل تغییرات کامیت‌نشده)"
 	payload=$(mktemp) && trap 'rm -f "$payload"' EXIT
-	# git ls-files تضمین می‌کند فقط فایل‌های ترک‌شده بروند — یعنی .env و
-	# node_modules حتی در این حالت هم منتقل نمی‌شوند.
+	# git ls-files guarantees only tracked files go, so .env and node_modules
+	# stay out even in this mode.
 	git ls-files -z | tar --null -T - -cf "$payload"
 fi
 
@@ -59,7 +59,7 @@ echo "مقصد : $HOST:~/$DEST"
 echo "حجم  : $(numfmt --to=iec "$(stat -c%s "$payload")") در $files فایل"
 echo
 
-# مقصد از نو ساخته می‌شود تا فایل حذف‌شده در مخزن روی سرور جا نماند.
+# Recreated from scratch so a file deleted in the repo doesn't linger remotely.
 ssh "$HOST" "rm -rf ~/$DEST && mkdir -p ~/$DEST"
 ssh "$HOST" "tar -xf - -C ~/$DEST" <"$payload"
 

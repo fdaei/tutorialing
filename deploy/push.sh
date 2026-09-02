@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
-# انتقال پیلود provisioning به سرور. فقط کپی می‌کند — هیچ چیزی اجرا نمی‌شود.
+# Copy the provisioning payload to the server. Copy only — nothing is executed.
 #
 #   bash deploy/push.sh
 #
-# دو دستور روی سرور اجرا می‌شود و هر دو بی‌ضررند:
-#   ۱) mkdir -p ~/lingospeak-provision   (مقصد scp باید وجود داشته باشد)
-#   ۲) chmod +x روی اسکریپت‌ها           (scp بیت اجرا را حفظ نمی‌کند)
-# راه‌اندازی واقعی جداگانه و دستی است:
+# Two harmless commands do run remotely: mkdir -p for the scp destination, and
+# chmod +x on the scripts (scp drops the execute bit). Provisioning itself is a
+# separate manual step:
 #   ssh lingospeak 'sudo bash ~/lingospeak-provision/bootstrap.sh all'
 
 set -euo pipefail
@@ -19,20 +18,19 @@ echo "مبدأ : $SRC"
 echo "مقصد : $HOST:~/$DEST"
 echo
 
-# گارد: DEST باید یک نام ساده باشد. بدون این، یک مقدار خالی یا مسیردار،
-# دستور پاک‌سازی زیر را به چیز خطرناکی تبدیل می‌کند.
+# Guard: DEST must be a bare name. An empty or path-bearing value would turn
+# the rm -rf below into something dangerous.
 [[ $DEST =~ ^[A-Za-z0-9._-]+$ ]] || {
 	echo "DEST نامعتبر: '$DEST' (فقط حروف، عدد، نقطه، خط تیره)" >&2
 	exit 2
 }
 
-# مقصد از نو ساخته می‌شود تا دقیقاً آینه‌ی محلی باشد: scp فایل‌های حذف‌شده را
-# پاک نمی‌کند و یک فایل قدیمیِ جامانده می‌تواند گیج‌کننده باشد. این دایرکتوری
-# صرفاً پیلود موقت است — هیچ حالتی (state) در آن نگهداری نمی‌شود.
+# Recreated from scratch to mirror local exactly: scp never deletes removed
+# files, and a stale leftover is confusing. Throwaway payload dir — no state.
 ssh "$HOST" "rm -rf ~/$DEST && mkdir -p ~/$DEST"
 
-# ‏push.sh و push-source.sh و bin/build-local.sh منتقل نمی‌شوند: هر سه سمت
-# محلی اجرا می‌شوند.
+# push.sh, push-source.sh and bin/build-local.sh are not shipped: all three
+# run locally.
 scp -r \
 	"$SRC/bootstrap.sh" \
 	"$SRC/deploy.sh" \

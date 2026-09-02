@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# آیا دامنه واقعاً به این سرور اشاره می‌کند؟
+# Does the domain actually point at this server?
 #
-# پیش از هر تلاشی برای گرفتن گواهی TLS این را اجرا کنید. Caddy در صورت شکست
-# اعتبارسنجی ACME مدام تلاش می‌کند و Let's Encrypt سقف ۵ اعتبارسنجی ناموفق
-# در ساعت به ازای هر هاست دارد؛ سوختن آن سقف یعنی یک ساعت انتظار اجباری.
+# Run this before any attempt to obtain a TLS certificate. Caddy retries ACME
+# validation on failure, and Let's Encrypt allows only 5 failed validations per
+# host per hour; burning that limit means an hour of forced waiting.
 #
 #   bash dns-check.sh [domain] [expected-ip]
 #
-# خروج ۰ فقط وقتی هر دو رکورد A (خود دامنه و www) دقیقاً به IP هدف اشاره کنند.
+# Exits 0 only when both A records (apex and www) point at the target IP.
 
 set -euo pipefail
 
@@ -16,8 +16,8 @@ EXPECT_IP="${2:-82.115.18.161}"
 
 RESOLVERS=(1.1.1.1 8.8.8.8 9.9.9.9)
 
-# dig ترجیح داده می‌شود چون اجازه‌ی انتخاب ریزالور را می‌دهد و کش محلی/سیستمی
-# را دور می‌زند — دقیقاً همان چیزی که برای بررسی propagate شدن لازم است.
+# dig is preferred because it lets us pick the resolver and bypass the local
+# system cache — exactly what checking propagation requires.
 if ! command -v dig >/dev/null 2>&1; then
 	echo "!! dig نصب نیست (بسته‌ی dnsutils). گزارش زیر ناقص است." >&2
 	echo -n "getent: "
@@ -59,8 +59,8 @@ echo "  NS  : ${ns:-—}"
 echo "  SOA : ${soa:-—}"
 echo "  CAA : ${caa:-— (بدون محدودیت؛ هر CA ای می‌تواند صادر کند)}"
 
-# CAA فهرست سفید CA هاست. اگر رکورد وجود داشته باشد و letsencrypt.org در آن
-# نباشد، صدور گواهی رد می‌شود — و این خطا در لاگ Caddy گیج‌کننده به نظر می‌رسد.
+# CAA whitelists CAs. If a record exists without letsencrypt.org in it,
+# issuance is refused — and that error looks confusing in Caddy's log.
 if [[ -n $caa && $caa != *letsencrypt.org* ]]; then
 	echo
 	echo "  ⚠ رکورد CAA وجود دارد ولی letsencrypt.org در آن نیست."
