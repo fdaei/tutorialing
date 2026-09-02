@@ -31,6 +31,6 @@ With the same `DEMO_DATA_IMPORT` and `DEMO_ADMIN_CREDENTIALS_FILE` variables, ru
 
 ## Removal
 
-Take another backup, set `DEMO_DATA_IMPORT=true`, and run `npm run db:demo:remove`. Removal is transactional and targets only rows whose primary key starts with `client-demo-2026-`; shared languages and permission definitions are removed only when unused. After verifying the site, securely delete the protected credential note and revoke any active demo-admin sessions from the normal session-management path.
+Take another backup, set `DEMO_DATA_IMPORT=true`, `DEMO_DATA_BACKUP_CONFIRMED=true`, and `DEMO_DATA_BACKUP_REFERENCE` to that backup, then run `npm run db:demo:remove`. Removal is transactional and targets only rows whose primary key starts with `client-demo-2026-`; shared languages and permission definitions are removed only when unused. After verifying the site, securely delete the protected credential note and revoke any active demo-admin sessions from the normal session-management path.
 
 The importer deliberately creates placeholder image paths rather than uploading files. Supply matching public assets separately if the deployment does not already provide a placeholder fallback.
