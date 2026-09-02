@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# سوییچ Caddy از استیجینگ Let's Encrypt به محیط اصلی.
+# Switch Caddy from Let's Encrypt staging to production.
 #
-#   bash go-live.sh [domain]        # پیش‌فرض: lingospeak.org
+#   bash go-live.sh [domain]        # default: lingospeak.org
 #
-# کاری که می‌کند: تأیید اینکه گواهی استیجینگ واقعاً صادر شده، حذف بلوک
-# ACME-STAGING از Caddyfile، ری‌استارت Caddy، و تأیید اینکه گواهی جدید این بار
-# مورد اعتماد سیستم است.
+# Confirms the staging certificate was really issued, removes the ACME-STAGING
+# block from the Caddyfile, restarts Caddy, and confirms the new certificate is
+# trusted by the system.
 #
-# چرا ری‌استارت و نه reload: عوض شدن acme_ca یعنی صدور از یک CA دیگر. Caddy
-# گواهی‌ها را در مسیری کلیدخورده به نام CA نگه می‌دارد
-# (/data/caddy/certificates/acme-staging-v02… در برابر acme-v02…)، پس گواهی
-# استیجینگ دست‌نخورده می‌ماند و ری‌استارت تمیزترین راه برای گرفتن گواهی جدید است.
+# Restart, not reload: changing acme_ca means issuing from a different CA, and
+# Caddy stores certificates under a CA-keyed path
+# (/data/caddy/certificates/acme-staging-v02… vs acme-v02…). The staging cert
+# stays untouched, and a restart is the cleanest way to get the new one.
 
 set -euo pipefail
 
@@ -39,9 +39,9 @@ fi
 # ---------------------------------------------------------------------------
 step "تأیید اینکه استیجینگ کار کرده"
 
-# --resolve یعنی اتصال مستقیم به لوکال‌هاست با SNI درست، بدون وابستگی به اینکه
-# مسیر بازگشتی از خود سرور به IP عمومی (hairpin NAT) کار کند.
-# -k لازم است: گواهی استیجینگ ریشه‌ی مورد اعتماد سیستم را ندارد.
+# --resolve connects straight to localhost with the right SNI, without relying
+# on the server reaching its own public IP (hairpin NAT). -k is required: the
+# staging certificate has no system-trusted root.
 if ! curl -fsS -k --max-time 10 --resolve "$DOMAIN:443:127.0.0.1" \
 	"https://$DOMAIN/healthz" >/dev/null; then
 	die "HTTPS با گواهی استیجینگ جواب نداد. تا این درست نشده سوییچ نکنید:
@@ -66,24 +66,24 @@ sed '/^\s*# BEGIN ACME-STAGING$/,/^\s*# END ACME-STAGING$/d' "$CADDYFILE" >"$tmp
 
 grep -q 'acme-staging' "$tmp" && die "هنوز ارجاع به استیجینگ در فایل هست — دستی بررسی کنید."
 
-# حذف بلوک یک خط خالی اضافی جا می‌گذارد؛ caddy fmt نرمالش می‌کند تا فایل بعدی
-# دقیقاً همان چیزی باشد که خود Caddy انتظار دارد.
+# Removing the block leaves a stray blank line; caddy fmt normalizes it so the
+# resulting file is exactly what Caddy expects.
 if fmt_out="$(docker run --rm -v "$tmp:/tmp/Caddyfile:ro" "$CADDY_IMAGE" \
 	caddy fmt /tmp/Caddyfile 2>/dev/null)" && [[ -n $fmt_out ]]; then
 	printf '%s\n' "$fmt_out" >"$tmp"
 fi
 
 step "اعتبارسنجی"
-# روی فایل موقت و در کانتینر یکبارمصرف، تا اگر خراب بود به Caddyِ در حال اجرا
-# دست نزنیم.
+# Against the temp file in a throwaway container, so a broken config never
+# touches the running Caddy.
 docker run --rm -v "$tmp:/tmp/Caddyfile:ro" "$CADDY_IMAGE" \
 	caddy validate --adapter caddyfile --config /tmp/Caddyfile >/dev/null 2>&1 ||
 	die "پیکربندی بعد از حذف بلوک نامعتبر شد. هیچ تغییری اعمال نشد."
 ok "پیکربندی معتبر است"
 
-# مهم: با cat جای‌گزین می‌شود نه mv.
-# ‏Caddyfile به صورت تک‌فایل bind-mount شده؛ mv اینود را عوض می‌کند و کانتینر
-# تا وقتی recreate نشود همچنان محتوای قدیمی را می‌بیند.
+# Important: replaced with cat, not mv. The Caddyfile is bind-mounted as a
+# single file; mv swaps the inode and the container keeps seeing the old
+# contents until it is recreated.
 cat "$tmp" >"$CADDYFILE"
 
 # ---------------------------------------------------------------------------
@@ -92,8 +92,8 @@ docker compose -f "$COMPOSE" restart caddy >/dev/null
 ok "Caddy ری‌استارت شد"
 
 for i in $(seq 1 24); do
-	# این بار بدون -k: اگر پاس شود یعنی گواهی توسط ریشه‌های سیستم معتبر است،
-	# که دقیقاً همان چیزی است که می‌خواهیم اثبات کنیم.
+	# No -k this time: passing means the certificate validates against the
+	# system roots, which is exactly what we're proving.
 	if curl -fsS --max-time 5 --resolve "$DOMAIN:443:127.0.0.1" \
 		"https://$DOMAIN/healthz" >/dev/null 2>&1; then
 		echo

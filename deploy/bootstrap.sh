@@ -1,27 +1,27 @@
 #!/usr/bin/env bash
 # ---------------------------------------------------------------------------
-# زیرساخت پایه‌ی سرور lingospeak — idempotent و فازبندی‌شده.
+# Base server infrastructure for lingospeak — idempotent and phased.
 #
 #   sudo bash bootstrap.sh <phase>
 #
-#   deps      نصب بسته‌ها (ufw, fail2ban, python3-systemd, dnsutils)
-#   dirs      ساخت /home/deploy/lingospeak با مالکیت و پرمیشن درست
-#   firewall  قوانین ufw (فقط 22/80/443) + بستن دور زدن ufw توسط داکر
-#   fail2ban  نصب jail و راه‌اندازی
-#   caddy     شبکه‌ی edge + ریورس‌پراکسی + گواهی استیجینگ Let's Encrypt
-#   verify    گزارش وضعیت (فقط خواندنی)
-#   all       همه‌ی موارد بالا به ترتیب
+#   deps      install packages (ufw, fail2ban, python3-systemd, dnsutils)
+#   dirs      create /home/deploy/lingospeak with correct ownership and modes
+#   firewall  ufw rules (22/80/443 only) + close Docker's ufw bypass
+#   fail2ban  install the jail and start it
+#   caddy     edge network + reverse proxy + Let's Encrypt staging certificate
+#   verify    status report (read-only)
+#   all       all of the above, in order
 #
-# اجرای مجدد هر فاز بی‌خطر است.
+# Re-running any phase is safe.
 #
-# فاز caddy عمداً روی استیجینگ Let's Encrypt می‌ماند تا مسیر ACME بدون
-# سوزاندن سهمیه‌ی محیط اصلی اثبات شود. سوییچ به گواهی معتبر:
+# The caddy phase deliberately stays on Let's Encrypt staging so the ACME path
+# is proven without burning the production quota. To switch to a real cert:
 #   bash /home/deploy/lingospeak/bin/go-live.sh
 #
-# متغیرهای اختیاری:
-#   ADMIN_IP=1.2.3.4       به ignoreip فایل fail2ban اضافه می‌شود
-#   DEPLOY_USER=deploy     کاربر مالک درخت دایرکتوری
-#   DOMAIN=lingospeak.org  دامنه‌ای که گواهی برایش تست می‌شود
+# Optional variables:
+#   ADMIN_IP=1.2.3.4       added to the fail2ban ignoreip list
+#   DEPLOY_USER=deploy     user owning the directory tree
+#   DOMAIN=lingospeak.org  domain the certificate is tested against
 # ---------------------------------------------------------------------------
 set -euo pipefail
 
@@ -48,9 +48,9 @@ phase_deps() {
 	step "نصب بسته‌ها"
 	export DEBIAN_FRONTEND=noninteractive
 	apt-get update -qq
-	# python3-systemd اختیاری به نظر می‌رسد ولی نیست: fail2ban با
-	# backend=systemd بدون آن بالا نمی‌آید، و Ubuntu 24.04 در نصب مینیمال
-	# /var/log/auth.log ندارد که بک‌اند فایل بتواند بخواند.
+	# python3-systemd looks optional but isn't: fail2ban with backend=systemd
+	# won't start without it, and a minimal Ubuntu 24.04 install has no
+	# /var/log/auth.log for the file backend to read.
 	apt-get install -y -qq ufw fail2ban python3-systemd dnsutils ca-certificates curl openssl
 	ok "ufw, fail2ban, python3-systemd, dnsutils, openssl نصب شدند"
 
@@ -66,7 +66,7 @@ phase_dirs() {
 	for d in edge edge/logs app bin provision; do
 		install -d -o "$DEPLOY_USER" -g "$DEPLOY_USER" -m 750 "$ROOT_DIR/$d"
 	done
-	# فقط برای مالک: اینها راز و بکاپ دیتابیس نگه می‌دارند.
+	# Owner-only: these hold secrets and database backups.
 	for d in env backups; do
 		install -d -o "$DEPLOY_USER" -g "$DEPLOY_USER" -m 700 "$ROOT_DIR/$d"
 	done
@@ -82,23 +82,23 @@ phase_dirs() {
 phase_firewall() {
 	step "فایروال (ufw)"
 
-	# reset عمدی است: تنها راه تضمین «فقط 22/80/443» این است که از حالت
-	# پیش‌فرض شروع کنیم، وگرنه اجرای مجدد فقط قانون اضافه می‌کند و هر قانون
-	# دستی قدیمی باقی می‌ماند. ufw نسخه‌ی قبلی فایل‌ها را در /etc/ufw/*.YYYYMMDD
-	# بکاپ می‌گیرد. اگر بعداً قانون دستی اضافه کردید، بدانید این فاز پاکش می‌کند.
+	# The reset is deliberate: starting from defaults is the only way to
+	# guarantee "22/80/443 only" — otherwise a re-run just appends rules and
+	# any old manual rule survives. ufw backs up the previous files to
+	# /etc/ufw/*.YYYYMMDD. Note that this phase wipes manual rules added later.
 	ufw --force reset >/dev/null 2>&1 || true
 	ufw default deny incoming >/dev/null
 	ufw default allow outgoing >/dev/null
 
-	# `limit` به جای `allow`: بیش از ۶ کانکشن جدید در ۳۰ ثانیه از یک IP
-	# دراپ می‌شود. ssh config محلی ControlMaster دارد، پس ssh/scp های موازی
-	# روی یک کانکشن TCP مالتی‌پلکس می‌شوند و به این سقف نمی‌خورند.
+	# `limit` rather than `allow`: more than 6 new connections in 30s from one
+	# IP get dropped. The local ssh config uses ControlMaster, so parallel
+	# ssh/scp multiplex over one TCP connection and never hit this limit.
 	ufw limit 22/tcp comment 'SSH (rate limited)' >/dev/null
 	ufw allow 80/tcp comment 'HTTP / ACME' >/dev/null
 	ufw allow 443/tcp comment 'HTTPS' >/dev/null
 	ufw allow 443/udp comment 'HTTP/3' >/dev/null
 
-	# گارد ضد قفل‌شدن: تحت هیچ شرایطی ufw را بدون قانون ۲۲ فعال نکن.
+	# Lockout guard: never enable ufw without a rule for port 22.
 	ufw show added | grep -qE '(limit|allow) 22/tcp' ||
 		die "قانون SSH ثبت نشد — ufw فعال نشد تا از سرور بیرون نمانید."
 
@@ -107,8 +107,8 @@ phase_firewall() {
 
 	step "بستن دور زدن ufw توسط داکر"
 
-	# اینترفیس عمومی در زمان اجرا تشخیص داده می‌شود، نه هاردکد — نام آن روی
-	# ارائه‌دهنده‌های مختلف فرق می‌کند (eth0 / ens3 / enp1s0 / …).
+	# The public interface is detected at runtime, not hardcoded — its name
+	# varies across providers (eth0 / ens3 / enp1s0 / …).
 	local pub_if
 	pub_if="$(ip -4 route get 1.1.1.1 2>/dev/null |
 		awk '{for(i=1;i<=NF;i++) if($i=="dev"){print $(i+1); exit}}')"
@@ -118,18 +118,18 @@ phase_firewall() {
 	local rules=/etc/ufw/after.rules
 	[[ -f "${rules}.lingospeak.bak" ]] || cp -a "$rules" "${rules}.lingospeak.bak"
 
-	# بلوک قبلی حذف و از نو نوشته می‌شود تا اجرای مکرر تکراری تولید نکند.
+	# The previous block is removed and rewritten so re-runs don't duplicate it.
 	sed -i '/^# BEGIN LINGOSPEAK DOCKER-USER$/,/^# END LINGOSPEAK DOCKER-USER$/d' "$rules"
 	sed -e "s|__PUB_IF__|$pub_if|g" "$SRC_DIR/ufw/docker-user.after.rules" >>"$rules"
 
 	ufw reload >/dev/null
 	ok "بلوک DOCKER-USER نصب شد؛ ufw reload شد"
 
-	# نکته‌ی نگهداری: خط `:DOCKER-USER - [0:0]` باعث می‌شود iptables-restore
-	# در هر reload زنجیره را flush کند، پس reload های مکرر قانون تکراری
-	# نمی‌سازند. اما اگر دیمن داکر *بعد از* ufw ری‌استارت شود، ممکن است
-	# زنجیره را از نو بسازد — بعد از هر `systemctl restart docker` یک بار
-	# `ufw reload` بزنید. فاز verify این را چک می‌کند.
+	# Maintenance note: the `:DOCKER-USER - [0:0]` line makes iptables-restore
+	# flush the chain on every reload, so repeated reloads don't duplicate
+	# rules. But if the Docker daemon restarts *after* ufw it may rebuild the
+	# chain — run `ufw reload` once after any `systemctl restart docker`. The
+	# verify phase checks for this.
 }
 
 # ---------------------------------------------------------------------------
@@ -149,7 +149,7 @@ phase_fail2ban() {
 	systemctl enable --now fail2ban >/dev/null 2>&1 || true
 	systemctl restart fail2ban
 
-	# چند لحظه تا خواندن ژورنال و بالا آمدن jail
+	# Give the jail a moment to read the journal and come up
 	for _ in $(seq 1 10); do
 		fail2ban-client status sshd >/dev/null 2>&1 && break
 		sleep 1
@@ -167,7 +167,7 @@ phase_fail2ban() {
 phase_caddy() {
 	step "Caddy (ریورس‌پراکسی)"
 
-	# شبکه external است تا با پایین آوردن پروژه‌ی اپ از بین نرود.
+	# The network is external so bringing the app project down doesn't remove it.
 	if docker network inspect edge >/dev/null 2>&1; then
 		ok "شبکه‌ی edge از قبل وجود دارد"
 	else
@@ -178,9 +178,9 @@ phase_caddy() {
 	install -o "$DEPLOY_USER" -g "$DEPLOY_USER" -m 640 \
 		"$SRC_DIR/edge/docker-compose.yml" "$EDGE_DIR/"
 
-	# با cat جای‌گزین می‌شود نه mv/install: Caddyfile به صورت تک‌فایل
-	# bind-mount شده و عوض شدن اینود یعنی کانتینرِ در حال اجرا همچنان محتوای
-	# قدیمی را می‌بیند. نوشتن در جای خود اینود را حفظ می‌کند.
+	# Replaced with cat, not mv/install: the Caddyfile is bind-mounted as a
+	# single file, and changing the inode means the running container keeps
+	# seeing the old contents. Writing in place preserves the inode.
 	if [[ -f "$EDGE_DIR/Caddyfile" ]]; then
 		cat "$SRC_DIR/edge/Caddyfile" >"$EDGE_DIR/Caddyfile"
 	else
@@ -193,9 +193,9 @@ phase_caddy() {
 	ok "Caddy بالا آمد"
 
 	step "صدور گواهی (استیجینگ Let's Encrypt)"
-	# پیکربندی دامنه‌محور است، پس تست باید با SNI درست انجام شود. --resolve
-	# اتصال را به لوکال‌هاست می‌بندد تا به hairpin NAT وابسته نباشیم، و -k
-	# لازم است چون گواهی استیجینگ ریشه‌ی مورد اعتماد سیستم را ندارد.
+	# The config is domain-based, so the test needs the right SNI. --resolve
+	# points the connection at localhost to avoid depending on hairpin NAT, and
+	# -k is required because the staging cert has no system-trusted root.
 	local got=0
 	for i in $(seq 1 24); do
 		if curl -fsS -k --max-time 5 --resolve "${DOMAIN}:443:127.0.0.1" \
@@ -268,7 +268,7 @@ phase_verify() {
 	fi
 
 	step "پورت‌های شنونده روی همه‌ی اینترفیس‌ها"
-	# هر چیزی جز 22/80/443 در این لیست یعنی یک سرویس ناخواسته در معرض اینترنت.
+	# Anything but 22/80/443 here means a service is unintentionally exposed.
 	ss -tulpnH 2>/dev/null | awk '$5 !~ /127\.0\.0\.1|\[::1\]/ {printf "  %s %s\n", $1, $5}' | sort -u
 
 	step "ساختار دایرکتوری"
@@ -292,8 +292,8 @@ all)
 	phase_verify
 	;;
 *)
-	# هدر بالای فایل را تا خط جداکننده‌ی بعدی چاپ می‌کند، تا با ویرایش هدر
-	# از هم‌گام بودن نیفتد.
+	# Prints the file header down to the next separator line, so editing the
+	# header can't leave the usage text out of sync.
 	awk 'NR>2 && /^# -{10,}/{exit} NR>2{print}' "${BASH_SOURCE[0]}" | sed 's/^# \?//'
 	exit 2
 	;;

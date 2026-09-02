@@ -1,27 +1,30 @@
 #!/usr/bin/env bash
 # ---------------------------------------------------------------------------
-# دیپلوی production لینگواسپیک — idempotent و فازبندی‌شده.
+# lingospeak production deploy — idempotent and phased.
 #
 #   sudo bash deploy.sh <phase>
 #
-#   env       اعتبارسنجی ~/lingospeak/env/app.env در برابر گاردهای production
-#   build     swap + build ترتیبی ایمیج‌های api، migrate و web
-#   services  بالا آوردن postgres/redis/minio و ساخت باکت
-#   backup    نصب بکاپ روزانه و **تست بازگردانی** (قبل از اولین migration)
-#   migrate   prisma migrate deploy + داده‌ی مرجع کشورها (بدون seed دمو)
-#   edge      بالا آوردن api/web، انتظار برای healthy، سپس نصب Caddyfile
-#   verify    گزارش کامل وضعیت (فقط خواندنی)
-#   all       همه‌ی موارد بالا به ترتیب
+#   env       validate ~/lingospeak/env/app.env against the production guards
+#   build     swap + sequential build of the api, migrate and web images
+#   services  bring up postgres/redis/minio and create the bucket
+#   backup    install the daily backup and **test a restore** (before migrating;
+#             on a first deploy the drill defers to the end of migrate)
+#   migrate   prisma migrate deploy + country reference data (no demo seed)
+#   edge      bring up api/web, wait for healthy, then install the Caddyfile
+#   verify    full status report (read-only)
+#   all       all of the above, in order
 #
-# ترتیب عمدی است: env قبل از build چون NEXT_PUBLIC_* در زمان build داخل
-# باندل جاسازی می‌شوند؛ backup قبل از migrate چون بکاپی که تست نشده بکاپ نیست.
+# The order is deliberate: env before build because NEXT_PUBLIC_* is baked into
+# the bundle at build time; backup before migrate because an untested backup
+# isn't a backup — except on a first deploy, where there is no schema to dump
+# yet and "roll back to empty" is where a failed migration leaves you anyway.
 #
-# متغیرهای اختیاری:
+# Optional variables:
 #   DOMAIN=lingospeak.org
 #   STORAGE_DOMAIN=storage.lingospeak.org
-#   SKIP_COUNTRY_SEED=1   از پرکردن جدول کشورها صرف‌نظر کن
-#   APT_MIRROR=…          آینه‌ی apt برای build (وقتی deb.debian.org در دسترس
-#   APT_SECURITY_MIRROR=… نیست). جزئیات در deploy/docker/api.Dockerfile.
+#   SKIP_COUNTRY_SEED=1   skip populating the country table
+#   APT_MIRROR=…          apt mirror for the build (when deb.debian.org is
+#   APT_SECURITY_MIRROR=… unreachable). Details in deploy/docker/api.Dockerfile.
 # ---------------------------------------------------------------------------
 set -euo pipefail
 
@@ -39,7 +42,7 @@ PROV_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 COMPOSE=(docker compose --env-file "$ENV_FILE" -f "$APP_DIR/docker-compose.yml")
 
-# به هر سه `docker build` پاس داده می‌شود؛ خالی یعنی همان deb.debian.org.
+# Passed to all three `docker build`s; empty means deb.debian.org as usual.
 APT_ARGS=()
 if [[ -n ${APT_MIRROR:-} ]]; then
 	APT_ARGS+=(--build-arg "APT_MIRROR=$APT_MIRROR")
@@ -62,6 +65,33 @@ as_deploy() { runuser -u "$DEPLOY_USER" -- "$@"; }
 id "$DEPLOY_USER" >/dev/null 2>&1 || die "کاربر $DEPLOY_USER وجود ندارد."
 
 read_env() { sed -n "s/^$1=//p" "$ENV_FILE" 2>/dev/null | head -1; }
+
+# Written once the recovery path has been proven on this server; read by
+# phase_migrate to know whether the backup phase already ran the drill.
+RESTORE_STAMP="$ROOT_DIR/backups/.restore-verified"
+
+# Tables in the app database's public schema. Empty output means postgres did
+# not answer — callers must treat that as an error, not as "no tables".
+pg_tables() {
+	as_deploy docker exec lingospeak-postgres psql -U "$(read_env POSTGRES_USER)" \
+		-d "$(read_env POSTGRES_DB)" -tAc \
+		"SELECT count(*) FROM information_schema.tables WHERE table_schema='public'" \
+		2>/dev/null || true
+}
+
+# Take a real backup and prove it restores. Both halves need a database that
+# already has a schema, so the caller decides when this can run.
+backup_drill() {
+	step "اجرای یک بکاپ واقعی"
+	as_deploy "$ROOT_DIR/bin/backup-postgres.sh" | sed 's/^/     /'
+
+	step "تست بازگردانی"
+	# This step is the reason the backup phase exists. A backup that has never
+	# been restored is just a file.
+	as_deploy "$ROOT_DIR/bin/restore-postgres.sh" --verify | sed 's/^/     /'
+	date -Is | as_deploy tee "$RESTORE_STAMP" >/dev/null
+	ok "مسیر بازگردانی تأیید شد"
+}
 
 # ---------------------------------------------------------------------------
 phase_env() {
@@ -89,9 +119,9 @@ phase_env() {
 	[[ $perms == 600 ]] || die "پرمیشن $ENV_FILE برابر $perms است، باید 600 باشد: chmod 600 $ENV_FILE"
 	ok "پرمیشن 600"
 
-	# متغیرهایی که schema برایشان default ندارد (env.validation.ts).
+	# Variables the schema has no default for (env.validation.ts).
 	local required=(DATABASE_URL JWT_ACCESS_SECRET JWT_REFRESH_SECRET S3_ACCESS_KEY S3_SECRET_KEY S3_BUCKET)
-	# متغیرهایی که فقط build وب از آنها استفاده می‌کند.
+	# Variables used only by the web build.
 	required+=(POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB NEXT_PUBLIC_API_URL NEXT_PUBLIC_S3_ORIGIN NEXT_PUBLIC_WEB_URL)
 	local missing=()
 	for k in "${required[@]}"; do
@@ -100,8 +130,8 @@ phase_env() {
 	[[ ${#missing[@]} -eq 0 ]] || die "این متغیرها خالی یا غایب‌اند: ${missing[*]}"
 	ok "همه‌ی متغیرهای اجباری مقدار دارند"
 
-	# طول سکرت‌ها. schema حداقل ۳۲ می‌خواهد؛ کوتاه بودنشان باعث می‌شود API
-	# در زمان بوت بیفتد، نه اینجا — پس همین‌جا جلویش را می‌گیریم.
+	# Secret lengths. The schema requires at least 32; too-short values crash
+	# the API at boot rather than here, so catch them now.
 	for k in JWT_ACCESS_SECRET JWT_REFRESH_SECRET; do
 		local v
 		v="$(read_env "$k")"
@@ -111,7 +141,7 @@ phase_env() {
 		die "JWT_ACCESS_SECRET و JWT_REFRESH_SECRET یکی هستند — باید فرق کنند"
 	ok "سکرت‌های JWT به اندازه‌ی کافی بلند و متمایزند"
 
-	# گاردهای production؛ هرکدام API را در زمان بوت می‌اندازند.
+	# Production guards; each of these would crash the API at boot.
 	[[ "$(read_env NODE_ENV)" == production ]] || die "NODE_ENV باید production باشد"
 	grep -qE '^AUTH_DEV_OTP=true' "$ENV_FILE" &&
 		die "AUTH_DEV_OTP=true با NODE_ENV=production ⇒ API بالا نمی‌آید (و OTP ثابت 123456 می‌شود)"
@@ -123,7 +153,7 @@ phase_env() {
 		die "TRUST_PROXY باید 1 باشد (یک پراکسی: Caddy) وگرنه محدودیت نرخ per-IP بی‌اثر می‌شود"
 	ok "گاردهای production رعایت شده‌اند"
 
-	# ‏DATABASE_URL نباید placeholder مانده باشد و باید رمز واقعی داشته باشد.
+	# DATABASE_URL must not still be a placeholder and must hold the real password.
 	local dburl pgpass
 	dburl="$(read_env DATABASE_URL)"
 	pgpass="$(read_env POSTGRES_PASSWORD)"
@@ -134,9 +164,9 @@ phase_env() {
 		warn "DATABASE_URL به postgres:5432 اشاره نمی‌کند؛ داخل شبکه‌ی compose همین درست است"
 	ok "DATABASE_URL با POSTGRES_PASSWORD همخوان است"
 
-	# نشانی‌های عمومی
-	# ترتیب مهم است: اسلش انتهایی اول چک می‌شود، وگرنه چک ناهمخوانی زودتر
-	# می‌گیرد و پیامی می‌دهد که علت واقعی را پنهان می‌کند.
+	# Public URLs.
+	# Order matters: the trailing slash is checked first, otherwise the mismatch
+	# check fires earlier and reports a message that hides the real cause.
 	[[ "$(read_env S3_ENDPOINT)" != */ ]] ||
 		die "S3_ENDPOINT اسلش انتهایی دارد — امضای SigV4 را خراب می‌کند"
 	[[ "$(read_env NEXT_PUBLIC_S3_ORIGIN)" != */ ]] ||
@@ -152,9 +182,9 @@ phase_build() {
 	if [[ "$(swapon --show --noheadings | wc -l)" -gt 0 ]]; then
 		ok "swap از قبل فعال است: $(free -h | awk '/^Swap:/{print $2}')"
 	else
-		# سرور ۷.۸ گیگ رم دارد و build نکست ۲ تا ۳ گیگ پیک می‌زند. swap تور
-		# ایمنی است نه مسیر عادی: سقف heap در Dockerfile وب باعث می‌شود قبل
-		# از رسیدن به swap متوقف شود.
+		# The server has 7.8GB RAM and the Next build peaks at 2-3GB. Swap is a
+		# safety net, not the normal path: the heap cap in the web Dockerfile
+		# stops the build before it ever reaches swap.
 		fallocate -l 4G /swapfile
 		chmod 600 /swapfile
 		mkswap /swapfile >/dev/null
@@ -168,19 +198,19 @@ phase_build() {
 	install -o "$DEPLOY_USER" -g "$DEPLOY_USER" -m 640 \
 		"$PROV_DIR/app/docker-compose.yml" "$APP_DIR/docker-compose.yml"
 
-	# فایل‌های دیپلوی از پیلود provision می‌آیند، نه از snapshot سورس، تا
-	# اصلاح یک Dockerfile نیازمند push دوباره‌ی کل سورس نباشد.
+	# Deploy files come from the provision payload, not the source snapshot, so
+	# fixing a Dockerfile doesn't require re-pushing the whole source.
 	install -d -o "$DEPLOY_USER" -g "$DEPLOY_USER" -m 750 "$SRC_DIR/deploy/docker"
 	install -o "$DEPLOY_USER" -g "$DEPLOY_USER" -m 640 \
 		"$PROV_DIR/docker/api.Dockerfile" "$PROV_DIR/docker/web.Dockerfile" "$SRC_DIR/deploy/docker/"
 
 	step "build ایمیج API"
-	# ترتیبی و نه موازی: دو build همزمان روی ۷.۸ گیگ رم قابل اتکا نیست.
+	# Sequential, not parallel: two concurrent builds on 7.8GB RAM aren't reliable.
 	as_deploy docker build -f "$SRC_DIR/deploy/docker/api.Dockerfile" \
 		"${APT_ARGS[@]}" --target runtime -t lingospeak-api:latest "$SRC_DIR"
 	ok "lingospeak-api:latest"
 
-	# گارد اصلی‌ترین ریسک ایمیج API: حل شدن @lingospeak/contracts در زمان اجرا.
+	# Guards the API image's biggest risk: resolving @lingospeak/contracts at runtime.
 	if as_deploy docker run --rm --entrypoint node lingospeak-api:latest \
 		-e "require('@lingospeak/contracts')" 2>/dev/null; then
 		ok "@lingospeak/contracts داخل ایمیج قابل require است"
@@ -201,8 +231,8 @@ phase_build() {
 		"${APT_ARGS[@]}" --target runtime "${args[@]}" -t lingospeak-web:latest "$SRC_DIR"
 	ok "lingospeak-web:latest"
 
-	# CLAUDE.md: بعد از هر نصب وابستگی، تأیید کن postcss به نسخه‌ی وصله‌شده
-	# رسیده باشد (نکست نسخه‌ی قدیمی خودش را همراه دارد).
+	# CLAUDE.md: after any dependency install, verify postcss resolved to the
+	# patched version (Next bundles its own older copy).
 	step "بررسی override بسته‌ی postcss"
 	as_deploy docker run --rm --entrypoint sh lingospeak-api:latest -c \
 		'ls node_modules/postcss/package.json >/dev/null 2>&1 && node -p "require(\"postcss/package.json\").version" || echo "(در ایمیج runtime نیست — درست است)"' |
@@ -225,8 +255,8 @@ phase_services() {
 	ok "باکت ساخته شد (بدون هیچ فایل نمونه‌ای)"
 
 	step "بررسی اینکه هیچ پورتی عمومی نشده"
-	# مهم‌تر از خروجی ufw: داکر زنجیره‌ی خودش را قبل از ufw اعمال می‌کند، پس
-	# آنچه واقعاً می‌شمارد این است که چه چیزی روی 0.0.0.0 شنود می‌کند.
+	# More telling than ufw's output: Docker applies its own chain before ufw,
+	# so what actually counts is what is listening on 0.0.0.0.
 	local public
 	public="$(ss -tulpnH | awk '$5 ~ /^(0\.0\.0\.0|\*|\[::\])/ {print $1, $5}' |
 		grep -vE ':(22|80|443)$' || true)"
@@ -257,13 +287,29 @@ phase_backup() {
 	fi
 	as_deploy crontab -l | grep backup-postgres | sed 's/^/     /'
 
-	step "اجرای یک بکاپ واقعی"
-	as_deploy "$ROOT_DIR/bin/backup-postgres.sh" | sed 's/^/     /'
+	step "وضعیت دیتابیس"
+	# The rollback point this phase exists to create only means something if
+	# there is something to roll back to. On a first deploy the database has no
+	# tables yet: the dump would be ~370 bytes, `restore --verify` would reject
+	# it for having no tables, and even if both passed, restoring it lands you
+	# exactly where a failed first migration leaves you anyway. Discriminate on
+	# the database's actual state, not on the dump's byte size — and never by
+	# weakening the size guard, which is what stops a 3am cron run from writing
+	# an empty dump and then rotating the last good backups away.
+	local tables
+	tables="$(pg_tables)"
+	[[ $tables =~ ^[0-9]+$ ]] ||
+		die "پستگرس پاسخ نداد — اول فاز services را بزن"
+	if [[ $tables -eq 0 ]]; then
+		warn "دیتابیس خالی است (۰ جدول) — یعنی این اولین دیپلوی است"
+		printf '     نقطه‌ی بازگشتِ قبل از migrate روی دیتابیس خالی معنایی ندارد.\n'
+		printf '     بکاپ و تست بازگردانی به انتهای فاز migrate موکول شد،\n'
+		printf '     یعنی اولین لحظه‌ای که اسکیمایی برای دامپ گرفتن وجود دارد.\n'
+		return 0
+	fi
+	ok "دیتابیس $tables جدول دارد — نقطه‌ی بازگشت ساخته می‌شود"
 
-	step "تست بازگردانی"
-	# این گام دلیل وجود فاز است. بکاپی که هرگز بازگردانده نشده فقط یک فایل
-	# است؛ تا اینجا سبز نشود، migrate اجرا نمی‌شود.
-	as_deploy "$ROOT_DIR/bin/restore-postgres.sh" --verify | sed 's/^/     /'
+	backup_drill
 }
 
 # ---------------------------------------------------------------------------
@@ -273,7 +319,7 @@ phase_migrate() {
 		npx prisma migrate status 2>&1 | tail -20 | sed 's/^/     /' || true
 
 	step "اعمال migration ها"
-	# فقط migrate deploy — هرگز `migrate dev` و هرگز `db push`.
+	# migrate deploy only — never `migrate dev`, never `db push`.
 	as_deploy "${COMPOSE[@]}" --profile tools run --rm -T migrate \
 		npx prisma migrate deploy | sed 's/^/     /'
 	ok "migration ها اعمال شدند"
@@ -282,9 +328,9 @@ phase_migrate() {
 	if [[ -n ${SKIP_COUNTRY_SEED:-} ]]; then
 		warn "به درخواست SKIP_COUNTRY_SEED رد شد"
 	else
-		# prisma/seed.ts کاربر نمونه با OTP ثابت می‌سازد و **هرگز** اجرا
-		# نمی‌شود. seed-countries.ts فقط جدول Country را پر می‌کند و هیچ
-		# کاربری نمی‌سازد — بدون آن هر انتخابگر کشور در سایت خالی می‌ماند.
+		# prisma/seed.ts creates demo users with a fixed OTP and is **never**
+		# run here. seed-countries.ts only fills the Country table and creates
+		# no users — without it every country picker on the site is empty.
 		as_deploy "${COMPOSE[@]}" --profile tools run --rm -T migrate \
 			npx tsx prisma/seed-countries.ts | sed 's/^/     /'
 	fi
@@ -302,6 +348,20 @@ phase_migrate() {
 		warn "جدول User خالی نیست ($users) — اگر انتظارش را نداشتی، seed دمو اجرا شده"
 	fi
 	[[ $countries != 0 ]] || warn "جدول Country خالی است — انتخابگر کشور در سایت خالی می‌ماند"
+
+	# First deploy: the backup phase found an empty database and deferred the
+	# drill to here. The schema exists from this point on, so the recovery path
+	# can finally be proven. The stamp keeps this to once per server — from the
+	# next deploy on, the backup phase runs it before migrating, as it should.
+	if [[ ! -e $RESTORE_STAMP ]]; then
+		if [[ -f $ROOT_DIR/bin/backup-postgres.sh ]]; then
+			step "بکاپ و تست بازگردانی (موکول‌شده از فاز backup)"
+			printf '     حالا که اسکیما ساخته شده، مسیر بازیابی قابل اثبات است.\n'
+			backup_drill
+		else
+			warn "اسکریپت‌های بکاپ نصب نیستند — فاز backup را بزن"
+		fi
+	fi
 }
 
 # ---------------------------------------------------------------------------
@@ -311,8 +371,8 @@ phase_edge() {
 	ok "هر دو کانتینر healthy شدند"
 
 	step "بررسی مستقیم بک‌اند (قبل از تغییر Caddy)"
-	# با نام سرویس از داخل شبکه‌ی edge تست می‌شود، پس اگر چیزی خراب باشد
-	# قبل از اینکه Caddy ترافیک واقعی را به آن بدهد معلوم می‌شود.
+	# Tested by service name from inside the edge network, so a breakage shows
+	# up before Caddy sends it real traffic.
 	as_deploy docker run --rm --network edge curlimages/curl:latest \
 		-fsS --max-time 10 http://api:4001/api/health | sed 's/^/     /' ||
 		die "api:4001/api/health پاسخ سالم نداد"
@@ -351,8 +411,8 @@ phase_edge() {
 	ok "Caddyfile معتبر است"
 
 	cp -a "$EDGE_DIR/Caddyfile" "$EDGE_DIR/Caddyfile.bak.$(date +%Y%m%d-%H%M%S)"
-	# با cat جای‌گزین می‌شود نه mv: فایل به صورت تک‌فایل bind-mount شده و
-	# عوض شدن اینود یعنی کانتینر همچنان محتوای قدیمی را می‌بیند.
+	# Replaced with cat, not mv: the file is bind-mounted as a single file and
+	# changing the inode means the container keeps seeing the old contents.
 	cat "$tmp" >"$EDGE_DIR/Caddyfile"
 	rm -f "$tmp"
 
