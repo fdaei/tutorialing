@@ -20,6 +20,8 @@
 #   DOMAIN=lingospeak.org
 #   STORAGE_DOMAIN=storage.lingospeak.org
 #   SKIP_COUNTRY_SEED=1   از پرکردن جدول کشورها صرف‌نظر کن
+#   APT_MIRROR=…          آینه‌ی apt برای build (وقتی deb.debian.org در دسترس
+#   APT_SECURITY_MIRROR=… نیست). جزئیات در deploy/docker/api.Dockerfile.
 # ---------------------------------------------------------------------------
 set -euo pipefail
 
@@ -36,6 +38,15 @@ ENV_FILE="$ROOT_DIR/env/app.env"
 PROV_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 COMPOSE=(docker compose --env-file "$ENV_FILE" -f "$APP_DIR/docker-compose.yml")
+
+# به هر سه `docker build` پاس داده می‌شود؛ خالی یعنی همان deb.debian.org.
+APT_ARGS=()
+if [[ -n ${APT_MIRROR:-} ]]; then
+	APT_ARGS+=(--build-arg "APT_MIRROR=$APT_MIRROR")
+fi
+if [[ -n ${APT_SECURITY_MIRROR:-} ]]; then
+	APT_ARGS+=(--build-arg "APT_SECURITY_MIRROR=$APT_SECURITY_MIRROR")
+fi
 
 RED=$'\033[31m' GRN=$'\033[32m' YLW=$'\033[33m' BLD=$'\033[1m' RST=$'\033[0m'
 step() { printf '\n%s══ %s%s\n' "$BLD" "$1" "$RST"; }
@@ -166,7 +177,7 @@ phase_build() {
 	step "build ایمیج API"
 	# ترتیبی و نه موازی: دو build همزمان روی ۷.۸ گیگ رم قابل اتکا نیست.
 	as_deploy docker build -f "$SRC_DIR/deploy/docker/api.Dockerfile" \
-		--target runtime -t lingospeak-api:latest "$SRC_DIR"
+		"${APT_ARGS[@]}" --target runtime -t lingospeak-api:latest "$SRC_DIR"
 	ok "lingospeak-api:latest"
 
 	# گارد اصلی‌ترین ریسک ایمیج API: حل شدن @lingospeak/contracts در زمان اجرا.
@@ -179,7 +190,7 @@ phase_build() {
 
 	step "build ایمیج migrate"
 	as_deploy docker build -f "$SRC_DIR/deploy/docker/api.Dockerfile" \
-		--target builder -t lingospeak-api-migrate:latest "$SRC_DIR"
+		"${APT_ARGS[@]}" --target builder -t lingospeak-api-migrate:latest "$SRC_DIR"
 	ok "lingospeak-api-migrate:latest (لایه‌ها با api مشترک)"
 
 	step "build ایمیج وب"
@@ -187,7 +198,7 @@ phase_build() {
 	while IFS= read -r line; do args+=(--build-arg "$line"); done \
 		< <(grep -E '^NEXT_PUBLIC_[A-Z_0-9]*=' "$ENV_FILE")
 	as_deploy docker build -f "$SRC_DIR/deploy/docker/web.Dockerfile" \
-		--target runtime "${args[@]}" -t lingospeak-web:latest "$SRC_DIR"
+		"${APT_ARGS[@]}" --target runtime "${args[@]}" -t lingospeak-web:latest "$SRC_DIR"
 	ok "lingospeak-web:latest"
 
 	# CLAUDE.md: بعد از هر نصب وابستگی، تأیید کن postcss به نسخه‌ی وصله‌شده

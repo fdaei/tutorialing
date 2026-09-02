@@ -201,6 +201,85 @@ docker builder prune          # کش build را پاک می‌کند، ایمی�
 | `storage.lingospeak.org` اصلاً وصل نمی‌شود | HSTS با `includeSubDomains` فعال است؛ اگر گواهی صادر نشده باشد مرورگر حتی تلاش هم نمی‌کند |
 | محدودیت نرخ همه را با هم می‌بندد | `TRUST_PROXY` باید `1` باشد |
 | رندر سمت سرور کند یا تایم‌اوت | alias های شبکه روی کانتینر Caddy (`deploy/edge/docker-compose.yml`) |
+| `apt-get update` در build تایم‌اوت می‌خورد | تقریباً همیشه MTU است نه فیلترینگ — پایین را ببین |
+| build سبز است ولی آینه یک suite را نیاورده | `apt-get update` روی شکست یک suite هم exit 0 می‌دهد — پایین را ببین |
+
+### تایم‌اوت apt در زمان build (MTU، نه فیلترینگ)
+
+علامتش گمراه‌کننده است: `docker build` روی `apt-get update` می‌ایستد و همه‌ی
+fetchها timeout می‌شوند، در حالی که همان آدرس با `curl` از خود ماشین بدون
+مشکل جواب می‌دهد. نتیجه‌گیری طبیعی («deb.debian.org فیلتر است، آینه بگذاریم»)
+اشتباه است و با آینه هم درست نمی‌شود — چون هر آینه‌ی دیگری هم دقیقاً همین‌طور
+شکست می‌خورد.
+
+علتش اختلاف MTU است. اگر روی ماشین محلی یک تونل WireGuard بالا باشد،
+`wg-quick` این قاعده را می‌گذارد:
+
+```
+32765:	not from all fwmark 0xca6c lookup 51820   →   default dev wg1
+```
+
+یعنی **همه‌ی** ترافیک، از جمله ترافیک کانتینرها، از `wg1` رد می‌شود — نه فقط
+ترافیک خود میزبان. ‏MTU تونل معمولاً ۱۳۴۰ است ولی MTU شبکه‌ی داکر ۱۵۰۰ می‌ماند.
+دست‌دادن TCP (بسته‌های کوچک) رد می‌شود، بعد اولین بسته‌ی full-size دور انداخته
+می‌شود و PMTU discovery هم به کانتینر نمی‌رسد؛ پس اتصال برقرار می‌شود و بعد
+هنگ می‌کند. خود میزبان سالم است چون استک TCP‌اش MSS را درست clamp می‌کند.
+
+تشخیص در یک خط — اگر این کار کرد، مسئله MTU است نه دسترسی:
+
+```bash
+docker network create --opt com.docker.network.driver.mtu=1340 mtu1340
+docker run --rm --network mtu1340 debian:bookworm-slim apt-get update
+```
+
+درمان دائمی (نیازمند ری‌استارت داکر):
+
+```json
+// /etc/docker/daemon.json
+{ "mtu": 1340 }
+```
+
+`docker build` با BuildKit به شبکه‌ی دلخواه وصل نمی‌شود، پس اگر نمی‌خواهی
+دیمن را دست بزنی، یک builder جدا بساز:
+
+```bash
+docker buildx create --name mtu1340b --driver docker-container \
+  --driver-opt network=mtu1340 --use
+```
+
+‏`APT_MIRROR` (در `deploy/docker/api.Dockerfile`) مسئله‌ی جدایی است و این را حل
+نمی‌کند؛ برای وقتی است که آینه‌ی رسمی واقعاً در دسترس نباشد.
+
+### ‏`apt-get update` که شکست می‌خورد ولی exit 0 می‌دهد
+
+این تله مستقل از MTU است و به‌مراتب خطرناک‌تر، چون build سبز می‌ماند.
+‏`apt-get update` حتی وقتی یک suite کامل نمی‌آید هم کد خروجی صفر می‌دهد —
+چه fetchها timeout بخورند (که `W:` است) و چه آینه اصلاً آن آرشیو را نداشته
+باشد (که `E:` چاپ می‌کند و باز هم exit 0). با
+`APT_MIRROR=mirror.arvancloud.ir` و بدون `APT_SECURITY_MIRROR` دقیقاً همین
+اتفاق می‌افتد:
+
+```
+Err:4 http://mirror.arvancloud.ir/debian-security bookworm-security Release
+  404  Not Found
+E: The repository '…' does not have a Release file.
+```
+
+بعدش `apt-get install openssl` **موفق** می‌شود و از آرشیو اصلی نصب می‌کند —
+یعنی ایمیج با openssl بدون وصله‌های امنیتی بیرون می‌آید و هیچ‌جا خطایی دیده
+نمی‌شود.
+
+برای همین هر دو Dockerfile با `-o APT::Update::Error-Mode=any` اجرا می‌کنند؛
+این فلگ همان حالت را به exit 100 تبدیل می‌کند و build همان‌جا می‌ایستد. اگر
+build با این خطا شکست خورد، آینه را عوض نکن — suite امنیتی را روی آینه‌ای
+بگذار که واقعاً داردش:
+
+```bash
+--build-arg APT_MIRROR=mirror.arvancloud.ir \
+--build-arg APT_SECURITY_MIRROR=ftp.de.debian.org
+```
+
+(‏`deploy/bin/build-local.sh` همین جفت را پیش‌فرض پاس می‌دهد.)
 
 ## بازگشت
 
