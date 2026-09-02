@@ -27,7 +27,12 @@ COPY package.json package-lock.json ./
 COPY apps/api/package.json ./apps/api/
 COPY apps/web/package.json ./apps/web/
 COPY packages/contracts/package.json ./packages/contracts/
-# مثل ایمیج API: اسکریپت `prepare` بسته‌ی contracts بدون سورس شکست می‌خورد.
+# مثل ایمیج API: اسکریپت `prepare` بسته‌ی contracts بدون سورس شکست می‌خورد —
+# و --ignore-scripts به‌تنهایی کافی نیست، چون npm آن را برای پکیج‌های
+# workspace/local هم اجرا می‌کند (رفتاری که این فلگ نادیده‌اش می‌گیرد). حذفش
+# تنها راه مطمئن است؛ استیج builder با `npm rebuild` هرچه واقعاً لازم است را
+# دوباره اجرا می‌کند.
+RUN npm pkg delete scripts.prepare -w @lingospeak/contracts
 RUN npm ci --ignore-scripts
 
 # ---------- builder ----------
