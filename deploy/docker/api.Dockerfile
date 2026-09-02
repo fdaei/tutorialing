@@ -28,9 +28,12 @@ COPY package.json package-lock.json ./
 COPY apps/api/package.json ./apps/api/
 COPY apps/web/package.json ./apps/web/
 COPY packages/contracts/package.json ./packages/contracts/
-# --ignore-scripts چون packages/contracts یک اسکریپت `prepare` دارد که tsc
-# اجرا می‌کند — و سورس هنوز کپی نشده. استیج builder با `npm rebuild` هر
-# اسکریپت نصبی که واقعاً لازم است را از نو اجرا می‌کند.
+# packages/contracts یک اسکریپت `prepare` دارد که tsc اجرا می‌کند. --ignore-scripts
+# **آن را برای پکیج‌های workspace/local سرکوب نمی‌کند** (یک رفتار شناخته‌شده و
+# مستندنشده‌ی npm) — و سورس اینجا هنوز کپی نشده، پس با «tsconfig.esm.json پیدا
+# نشد» شکست می‌خورد. حذفش این‌جا تنها راه مطمئن است. استیج builder با
+# `npm rebuild` هر اسکریپت نصبی که واقعاً لازم است را از نو اجرا می‌کند.
+RUN npm pkg delete scripts.prepare -w @lingospeak/contracts
 RUN npm ci --ignore-scripts
 
 # ---------- builder ----------
@@ -55,6 +58,9 @@ COPY package.json package-lock.json ./
 COPY apps/api/package.json ./apps/api/
 COPY apps/web/package.json ./apps/web/
 COPY packages/contracts/package.json ./packages/contracts/
+# همان دلیل استیج deps: `prepare` بدون سورس شکست می‌خورد و --ignore-scripts
+# آن را برای پکیج‌های workspace سرکوب نمی‌کند.
+RUN npm pkg delete scripts.prepare -w @lingospeak/contracts
 RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 
 # کلاینت تولیدشده‌ی Prisma و موتورهایش. با --ignore-scripts ساخته نمی‌شوند،
