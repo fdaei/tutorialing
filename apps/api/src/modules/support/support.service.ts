@@ -368,7 +368,6 @@ export class SupportService {
     return result.updated;
   }
 
-  /** Active users who can act on an unassigned ticket. */
   private async supportStaffIds(tx: Prisma.TransactionClient) {
     const staff = await tx.user.findMany({
       where: { status: 'ACTIVE', ...SUPPORT_STAFF_WHERE },

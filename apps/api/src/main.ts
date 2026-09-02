@@ -55,6 +55,16 @@ async function bootstrap() {
     SwaggerModule.setup('docs', app, SwaggerModule.createDocument(app, swaggerConfig));
   }
   await app.listen(Number(cfg.PORT));
+  // Loud on every boot while it is on: these numbers can sign in without an SMS
+  // ever being sent, so the fact must be visible in the logs rather than only in
+  // whichever env file happens to be on the box. Empty is the default and logs
+  // nothing at all.
+  if (cfg.AUTH_OTP_ALLOWLIST.length > 0) {
+    logger.warn(
+      { event: 'auth.otp.allowlist.active', phones: cfg.AUTH_OTP_ALLOWLIST },
+      'AUTH_OTP_ALLOWLIST is active: these numbers receive a fixed OTP and no SMS is sent for them',
+    );
+  }
   logger.log({ port: Number(cfg.PORT), environment: cfg.NODE_ENV }, 'API started');
 }
 void bootstrap();

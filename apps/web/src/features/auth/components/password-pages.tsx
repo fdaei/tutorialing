@@ -11,7 +11,6 @@ import { authMessage, googleAuth, loginWithPassword, registerWithPassword, sendR
 
 type Errors = Record<string, string>;
 
-/** Keeps password and passwordless sign-in available side by side. */
 function OtpFallbackHint() {
   return (
     <p className="mt-5 text-center text-xs leading-6 text-[#8993a7]">

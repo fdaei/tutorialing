@@ -8,11 +8,20 @@ export class SmsService {
     private db: PrismaService,
     @Inject(SMS_PROVIDER) private provider: SmsProvider,
   ) {}
-  async sendOtp(phone: string, code: string, userId?: string) {
+  async sendOtp(phone: string, code: string, userId?: string, allowlisted = false) {
     const cfg = config();
     let providerId: string;
     let response: object;
-    if (this.provider.configured) {
+    if (allowlisted) {
+      // AUTH_OTP_ALLOWLIST. Nothing is delivered: whoever holds this number
+      // already knows the code, because they are the operator who set
+      // AUTH_OTP_ALLOWLIST_CODE. Checked *before* `provider.configured` on
+      // purpose — the deployment this exists for has a placeholder Kavenegar
+      // key, which makes the provider report itself configured and then reject
+      // every send, so an allowlist behind that branch would never be reached.
+      providerId = `allowlist-${Date.now()}`;
+      response = { adapter: 'allowlist' };
+    } else if (this.provider.configured) {
       try {
         ({ response, providerId } = await this.provider.sendLookup({
           phone,

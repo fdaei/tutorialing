@@ -12,7 +12,7 @@
 set -euo pipefail
 
 DOMAIN="${1:-lingospeak.org}"
-EXPECT_IP="${2:-82.115.18.161}"
+EXPECT_IP="${2:?expected IP is required from the private operations configuration}"
 
 RESOLVERS=(1.1.1.1 8.8.8.8 9.9.9.9)
 

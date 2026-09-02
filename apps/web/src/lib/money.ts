@@ -22,7 +22,6 @@ import type { Locale } from './i18n';
 
 const LOCALE_TAG: Record<Locale, string> = { fa: 'fa-IR', en: 'en-US' };
 
-/** Grouped digits only, in the locale's own numerals. No unit. */
 export function formatNumber(value: number, locale: Locale) {
   return new Intl.NumberFormat(LOCALE_TAG[locale]).format(value);
 }
@@ -37,12 +36,10 @@ export function formatMoney(value: number, locale: Locale) {
   return `${formatNumber(value, locale)} ${translate(locale, 'libmoneyToman')}`;
 }
 
-/** The unit on its own, for form labels like "Amount (Toman)". */
 export function moneyUnit(locale: Locale) {
   return translate(locale, 'libmoneyToman');
 }
 
-/** For optional amounts, where a missing value should read as an em dash. */
 export function formatMoneyOrDash(value: number | null | undefined, locale: Locale) {
   return value == null ? '—' : formatMoney(value, locale);
 }

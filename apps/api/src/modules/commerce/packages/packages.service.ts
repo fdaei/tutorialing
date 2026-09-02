@@ -55,14 +55,12 @@ export class PackagesService {
     });
   }
 
-  /** A teacher's own packages, including the unapproved ones. */
   async mine(userId: string) {
     const teacher = await this.db.teacher.findUnique({ where: { userId } });
     if (!teacher) throw notFound('TEACHER_PROFILE_NOT_FOUND');
     return this.db.package.findMany({ where: { teacherId: teacher.id }, orderBy: [{ credits: 'asc' }] });
   }
 
-  /** Packages a student can actually buy from a teacher. */
   listForTeacher(teacherId: string) {
     return this.db.package.findMany({
       where: { teacherId, active: true, approvalStatus: 'APPROVED' },

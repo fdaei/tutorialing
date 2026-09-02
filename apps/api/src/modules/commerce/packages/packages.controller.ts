@@ -24,7 +24,6 @@ export class PackagesController {
     return this.s.mine(u.id);
   }
 
-  /** Buyable packages shown on a teacher's public profile. */
   @Public()
   @Get('teacher/:teacherId')
   forTeacher(@Param('teacherId') teacherId: string) {

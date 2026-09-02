@@ -31,7 +31,7 @@ set -euo pipefail
 DEPLOY_USER="${DEPLOY_USER:-deploy}"
 DOMAIN="${DOMAIN:-lingospeak.org}"
 STORAGE_DOMAIN="${STORAGE_DOMAIN:-storage.lingospeak.org}"
-SERVER_IP="${SERVER_IP:-82.115.18.161}"
+SERVER_IP="${SERVER_IP:?set SERVER_IP from the private operations configuration}"
 
 ROOT_DIR="${ROOT_DIR:-/home/${DEPLOY_USER}/lingospeak}"
 APP_DIR="$ROOT_DIR/app"
@@ -98,21 +98,16 @@ backup_drill() {
 
 # ---------------------------------------------------------------------------
 phase_env() {
-	step "نصب فایل نمونه"
-	install -o "$DEPLOY_USER" -g "$DEPLOY_USER" -m 600 \
-		"$PROV_DIR/env/.env.production.example" "$ROOT_DIR/env/.env.production.example"
-	ok "نمونه: $ROOT_DIR/env/.env.production.example"
-
 	step "اعتبارسنجی $ENV_FILE"
 	if [[ ! -f $ENV_FILE ]]; then
 		cat >&2 <<-EOF
-		  فایل env هنوز ساخته نشده. روی سرور:
+		  فایل env خصوصی هنوز ساخته نشده. آن را مستقیماً روی سرور بساز:
 
-		    cp $ROOT_DIR/env/.env.production.example $ENV_FILE
+		    install -m 600 /dev/null $ENV_FILE
 		    chmod 600 $ENV_FILE
 		    \${EDITOR:-nano} $ENV_FILE
 
-		  مقادیر علامت‌خورده با «⟨تولید کن⟩» را پر کن، بعد این فاز را دوباره بزن.
+		  مقادیر production را از secret manager خصوصی وارد کن، بعد این فاز را دوباره بزن.
 		EOF
 		exit 1
 	fi
@@ -148,6 +143,8 @@ phase_env() {
 	[[ "$(read_env NODE_ENV)" == production ]] || die "NODE_ENV باید production باشد"
 	grep -qE '^AUTH_DEV_OTP=true' "$ENV_FILE" &&
 		die "AUTH_DEV_OTP=true با NODE_ENV=production ⇒ API بالا نمی‌آید (و OTP ثابت 123456 می‌شود)"
+	[[ -z "$(read_env AUTH_OTP_ALLOWLIST)" ]] ||
+		die "AUTH_OTP_ALLOWLIST در production ممنوع است؛ ورود باید از مسیر واقعی OTP انجام شود"
 	[[ "$(read_env ZARINPAL_SANDBOX)" == false ]] || die "ZARINPAL_SANDBOX باید false باشد"
 	[[ -n "$(read_env ZARINPAL_MERCHANT_ID)" ]] ||
 		die "ZARINPAL_MERCHANT_ID خالی است ⇒ مسیر dev_ فعال می‌شود و هر پرداختی موفق اعلام می‌گردد"

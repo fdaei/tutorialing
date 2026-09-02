@@ -1,6 +1,5 @@
 import { IsDateString, IsIn, IsInt, IsOptional, IsString, Length, Matches, Max, Min } from 'class-validator';
 
-/** Request bodies for `PayoutsController` and `TeacherFinanceController`. */
 
 export class PayoutWindowDto {
   @IsDateString() weekStart!: string;

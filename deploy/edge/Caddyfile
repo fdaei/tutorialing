@@ -1,8 +1,4 @@
-# Caddyfile — lingospeak.org
-#
-# DNS تأیید شده: @ و www هر دو A → 82.115.18.161 از 1.1.1.1 / 8.8.8.8 / 9.9.9.9،
-# بدون پروکسی CDN، بدون رکورد CAA.
-#
+# Public Caddy configuration. DNS and infrastructure topology are documented privately.
 # ⚠ در حال حاضر روی endpoint استیجینگ Let's Encrypt است. گواهی صادرشده توسط
 #   مرورگر معتبر شناخته نمی‌شود — این عمدی است. استیجینگ سقف نرخ بسیار
 #   سخاوتمندانه‌ای دارد، پس اگر پیکربندی یا شبکه ایراد داشته باشد بدون سوزاندن

@@ -49,7 +49,6 @@ export class RoleManagementPolicy {
     return !!grant;
   }
 
-  /** Throws unless `actorId` may grant `role` to someone else. */
   async assertMayGrantRole(actorId: string, role: Role): Promise<void> {
     if (role === 'ADMIN') {
       if (!(await this.actorHoldsAdmin(actorId))) throw adminGrantRequiresAdmin();
@@ -60,7 +59,6 @@ export class RoleManagementPolicy {
     }
   }
 
-  /** Throws unless `actorId` may grant `permissionKey` to someone else. */
   async assertMayGrantPermission(actorId: string, permissionKey: string): Promise<void> {
     if (ELEVATED_PERMISSIONS.includes(permissionKey) && !(await this.actorHoldsAdmin(actorId))) {
       throw elevatedPermissionGrantRequiresAdmin();

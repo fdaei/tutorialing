@@ -37,7 +37,6 @@ function imports(file: string) {
   return specs;
 }
 
-/** Every (file, importSpecifier) pair under src/modules, specs excluded. */
 function moduleImports() {
   return sourceFiles(MODULES_DIR).flatMap((file) => {
     return imports(file).map((spec) => ({ file: relative(__dirname, file), spec }));

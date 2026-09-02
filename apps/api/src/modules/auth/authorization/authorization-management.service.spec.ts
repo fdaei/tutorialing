@@ -46,7 +46,6 @@ function service(overrides: Record<string, unknown> = {}) {
   };
 }
 
-/** `userRole.findUnique` mock that reports `actorId` as holding `role`. */
 function actorHolds(role: string) {
   return jest
     .fn()

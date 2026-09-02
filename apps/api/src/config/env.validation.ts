@@ -23,6 +23,45 @@ export const envSchema = z.object({
   AUTH_OTP_HOURLY_WINDOW_SECONDS: z.coerce.number().int().positive().default(defaultConfig.auth.otpHourlyWindowSeconds),
   AUTH_OTP_HOURLY_LIMIT: z.coerce.number().int().positive().default(defaultConfig.auth.otpHourlyLimit),
   AUTH_OTP_ATTEMPT_LIMIT: z.coerce.number().int().positive().default(defaultConfig.auth.otpAttemptLimit),
+  // Temporary sign-in path for a named set of phones while no SMS provider is
+  // configured. Deliberately narrower than AUTH_DEV_OTP, which fixes the code
+  // at a well-known `123456` for *every* account: here the fixed code reaches
+  // only the numbers listed here, and its value comes from
+  // AUTH_OTP_ALLOWLIST_CODE rather than from a constant in the source. Empty —
+  // the default — makes the whole feature inert and every phone follows the
+  // normal provider path.
+  //
+  // Entries are compared against the phone as it arrives at
+  // `AuthService.requestOtp`, which `RequestOtpDto` has already forced into
+  // E.164 (`IsInternationalPhone`), so the same shape is required here; a
+  // locally-formatted `0912…` would silently never match.
+  AUTH_OTP_ALLOWLIST: z
+    .string()
+    .default(defaultConfig.auth.otpAllowlist)
+    .transform((value) => [...new Set(value.split(',').map((entry) => entry.trim()).filter(Boolean))])
+    .superRefine((phones, ctx) => {
+      for (const phone of phones) {
+        // Kept in sync with common/validators/is-international-phone.decorator.ts.
+        // Duplicated rather than imported so this module stays free of Nest and
+        // class-validator: it is parsed before the container exists.
+        if (!/^\+[1-9]\d{7,14}$/.test(phone)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `AUTH_OTP_ALLOWLIST entry "${phone}" is not E.164 (a leading + followed by 8-15 digits)`,
+          });
+        }
+      }
+    }),
+  // At least 8 digits: a 6-digit code is the length the normal random path
+  // uses, and this one is long-lived rather than valid for two minutes, so it
+  // has to be far outside brute-force range for the rate limiter to matter.
+  AUTH_OTP_ALLOWLIST_CODE: z.preprocess(
+    (value) => (value === '' ? undefined : value),
+    z
+      .string()
+      .regex(/^\d{8,}$/, 'AUTH_OTP_ALLOWLIST_CODE must be all digits and at least 8 of them')
+      .optional(),
+  ),
   GOOGLE_CLIENT_ID: z.preprocess(
     (value) => (value === '' ? undefined : value),
     z.string().min(10).optional(),
@@ -121,6 +160,33 @@ export const envSchema = z.object({
 });
 
 export const envSchemaWithGuards = envSchema.superRefine((env, ctx) => {
+  if (env.NODE_ENV === 'production' && env.AUTH_OTP_ALLOWLIST.length > 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['AUTH_OTP_ALLOWLIST'],
+      message: 'AUTH_OTP_ALLOWLIST is disabled in production',
+    });
+  }
+  // A non-empty allowlist with no code would have to fall back to a constant
+  // compiled into the source — the exact property that makes AUTH_DEV_OTP
+  // unusable here. Refuse to start instead of inventing one.
+  if (env.AUTH_OTP_ALLOWLIST.length > 0 && !env.AUTH_OTP_ALLOWLIST_CODE) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['AUTH_OTP_ALLOWLIST_CODE'],
+      message: 'AUTH_OTP_ALLOWLIST_CODE is required whenever AUTH_OTP_ALLOWLIST is not empty',
+    });
+  }
+  // Contradictory: AUTH_DEV_OTP already accepts a fixed code for every phone,
+  // so an allowlist alongside it narrows nothing and only obscures which of the
+  // two is actually in force.
+  if (env.AUTH_OTP_ALLOWLIST.length > 0 && env.AUTH_DEV_OTP) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['AUTH_OTP_ALLOWLIST'],
+      message: 'AUTH_OTP_ALLOWLIST must not be combined with AUTH_DEV_OTP, which already fixes the code for every phone',
+    });
+  }
   if (env.NODE_ENV === 'production' && env.AUTH_DEV_OTP) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,

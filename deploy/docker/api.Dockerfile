@@ -16,7 +16,6 @@
 # ---------------------------------------------------------------------------
 ARG NODE_IMAGE=node:22-bookworm-slim
 
-# ---------- base ----------
 FROM ${NODE_IMAGE} AS base
 # ‏APT_MIRROR وقتی به کار می‌آید که آرشیو رسمی واقعاً در دسترس نباشد:
 #   --build-arg APT_MIRROR=mirror.arvancloud.ir
@@ -80,7 +79,6 @@ RUN apt-get -o APT::Update::Error-Mode=any update \
 	&& rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 
-# ---------- deps ----------
 # فقط مانیفست‌ها کپی می‌شوند تا این لایه با تغییر سورس بی‌اعتبار نشود.
 FROM base AS deps
 COPY package.json package-lock.json ./
@@ -95,7 +93,6 @@ COPY packages/contracts/package.json ./packages/contracts/
 RUN npm pkg delete scripts.prepare -w @lingospeak/contracts
 RUN npm ci --ignore-scripts
 
-# ---------- builder ----------
 # این استیج در فاز migrate هم مستقیم استفاده می‌شود: هم prisma CLI و هم tsx
 # اینجا موجودند (هر دو devDependency) و لایه‌ها با runtime مشترک‌اند، پس
 # دیسک اضافه‌ای مصرف نمی‌شود.
@@ -116,7 +113,6 @@ RUN npm run build -w @lingospeak/api
 # گارد سریع: اگر نقطه‌ی ورود جابه‌جا شود، همین‌جا شکست بخور نه در زمان اجرا.
 RUN test -f apps/api/dist/apps/api/src/main.js
 
-# ---------- runtime ----------
 FROM base AS runtime
 ENV NODE_ENV=production
 COPY package.json package-lock.json ./

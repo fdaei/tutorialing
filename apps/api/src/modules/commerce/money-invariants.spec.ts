@@ -10,19 +10,16 @@
  * right. These encode the rule the audit verified by hand.
  */
 
-/** Mirrors `payments.service.ts` — subtotal, discount, wallet, gateway split. */
 function splitPayment(subtotal: number, discountAmount: number, walletAmount: number) {
   const amount = subtotal - discountAmount;
   return { amount, gatewayAmount: amount - walletAmount };
 }
 
-/** Mirrors `earnings.service.ts:41-42` — commission rounded, net by subtraction. */
 function splitEarning(gross: number, percent: number) {
   const commissionAmount = Math.round((gross * percent) / 100);
   return { grossAmount: gross, commissionAmount, netAmount: gross - commissionAmount };
 }
 
-/** Mirrors `auto-discounts.service.ts:53` / `payments.service.ts:88`. */
 function discountFor(type: 'percent' | 'fixed', value: number, subtotal: number, maxAmount?: number) {
   const raw = type === 'percent' ? Math.round((subtotal * value) / 100) : value;
   const capped = maxAmount != null ? Math.min(raw, maxAmount) : raw;

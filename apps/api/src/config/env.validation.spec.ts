@@ -9,7 +9,6 @@ const base = {
   S3_BUCKET: 'lingospeak',
 };
 
-/** Production additionally requires the real SMS and gateway credentials. */
 const prod = { ...base, NODE_ENV: 'production', ZARINPAL_MERCHANT_ID: 'merchant-1', KAVENEGAR_API_KEY: 'sms-key' };
 
 describe('AUTH_DEV_OTP', () => {
@@ -27,6 +26,14 @@ describe('AUTH_DEV_OTP', () => {
   it('refuses to start when combined with production', () => {
     expect(() => validate({ ...prod, AUTH_DEV_OTP: 'true' })).toThrow(/AUTH_DEV_OTP/);
     expect(validate({ ...prod, AUTH_DEV_OTP: 'false' }).AUTH_DEV_OTP).toBe(false);
+  });
+});
+
+describe('AUTH_OTP_ALLOWLIST', () => {
+  it('cannot bypass SMS delivery in production', () => {
+    expect(() =>
+      validate({ ...prod, AUTH_OTP_ALLOWLIST: '+12025550100', AUTH_OTP_ALLOWLIST_CODE: '4820391756' }),
+    ).toThrow(/AUTH_OTP_ALLOWLIST/);
   });
 });
 

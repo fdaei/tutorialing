@@ -154,7 +154,6 @@ export class BlogService {
     return post;
   }
 
-  /** Same field-by-field mapping as `create`, and the same fields — no more. */
   async update(actorId: string, id: string, dto: UpdateBlogPostDto, canManageAll = true) {
     const before = await this.db.blogPost.findUnique({ where: { id } });
     if (!before) throw notFound('BLOG_POST_NOT_FOUND');

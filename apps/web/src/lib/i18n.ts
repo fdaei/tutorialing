@@ -14,7 +14,6 @@ export function isLocale(value: string | null | undefined): value is Locale {
   return value === 'fa' || value === 'en';
 }
 
-/** Normalizes untrusted route/header/storage values to the supported locale set. */
 export function resolveLocale(value: string | null | undefined): Locale {
   return isLocale(value) ? value : defaultLocale;
 }
@@ -40,7 +39,6 @@ export function localePath(pathname: string, locale: Locale) {
   return prefix ? (clean === '/' ? prefix : `${prefix}${clean}`) : clean;
 }
 
-/** Builds a localized sign-in URL while preserving a safe, encoded in-app destination. */
 export function authPath(returnTo: string, locale: Locale) {
   const localizedReturnTo = localePath(returnTo, locale);
   return `${localePath('/auth', locale)}?next=${encodeURIComponent(localizedReturnTo)}`;
@@ -281,7 +279,6 @@ export function formatDate(value: Date | string, locale: Locale) {
 
 export type LocalizedValue<T = string> = Partial<Record<Locale, T | null | undefined>>;
 
-/** Selects localized API content with a predictable fallback. */
 export function localized<T>(value: LocalizedValue<T>, locale: Locale | boolean): T {
   const resolvedLocale: Locale = typeof locale === 'boolean' ? (locale ? 'fa' : 'en') : locale;
   return (value[resolvedLocale] ?? value[defaultLocale] ?? Object.values(value).find(Boolean) ?? '') as T;

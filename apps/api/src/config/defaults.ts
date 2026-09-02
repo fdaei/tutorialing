@@ -22,6 +22,7 @@ export const defaultConfig = {
     otpHourlyWindowSeconds: 3_600,
     otpHourlyLimit: 10,
     otpAttemptLimit: 5,
+    otpAllowlist: '',
   },
   storage: {
     endpoint: 'http://localhost:9000',

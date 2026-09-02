@@ -53,7 +53,6 @@ describe('trial price is half the regular price', () => {
 });
 
 describe('automatic deactivation after repeated one-star reviews', () => {
-  /** The deactivation write, as distinct from the rating refresh. */
   const DEACTIVATION = { where: { id: 'teacher-1' }, data: { status: 'REJECTED' } };
 
   function harness(options: { oneStars: number; status?: string; threshold?: number }) {

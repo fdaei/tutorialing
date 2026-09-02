@@ -3,7 +3,6 @@ import type { Booking } from '@prisma/client';
 import { PrismaService, Tx } from '../../../infrastructure/database/prisma.service';
 import { SettingsService } from '../../settings/settings.service';
 
-/** Used when the setting row is absent or unusable. */
 const DEFAULT_COMMISSION_PERCENT = 20;
 const DEFAULT_HOLD_DAYS = 7;
 const DAY_MS = 86_400_000;

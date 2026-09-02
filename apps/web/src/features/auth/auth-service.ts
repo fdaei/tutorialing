@@ -4,13 +4,6 @@ import { api, ApiError, publicApi } from '@/shared/services/api';
 import type { PanelIdentity } from '@/lib/panel-access';
 
 /**
- * The single seam between the password-style auth screens and the backend.
- *
- * Keeping every network call here means the page components stay pure UI and
- * never learn an endpoint path.
- */
-
-/**
  * The server generates and validates a six-digit code
  * (`@Matches(/^\d{6}$/)` in VerifyOtpDto, `randomInt(100000, 1000000)` in
  * AuthService). Changing the code length is a backend change first; this
@@ -20,7 +13,6 @@ export const OTP_LENGTH = 6;
 
 const CHALLENGE_KEY = 'password-recovery-challenge';
 
-/** Thrown when a screen exists but the endpoint behind it does not. */
 export class AuthUnavailableError extends Error {
   constructor(message: string) {
     super(message);
@@ -54,7 +46,6 @@ export function normalizePhone(value: string): string | null {
   return digits.length === 10 ? `+98${digits}` : null;
 }
 
-/** Classifies the shared "email or mobile" field so callers can branch on it. */
 export function parseIdentity(value: string): ParsedIdentity {
   const trimmed = value.trim();
   if (EMAIL_PATTERN.test(trimmed)) return { kind: 'email', email: trimmed.toLowerCase() };
@@ -116,7 +107,6 @@ export async function sendRecoveryCode(identity: string): Promise<RecoveryChalle
   return requestOtp('/auth/otp/request', parsed.phone);
 }
 
-/** Real call: POST /auth/otp/resend, reusing the number from the stored challenge. */
 export async function resendRecoveryCode(): Promise<RecoveryChallenge> {
   const current = readRecovery();
   if (!current) throw new AuthUnavailableError('درخواست بازیابی پیدا نشد. دوباره کد دریافت کنید.');
@@ -143,7 +133,6 @@ export async function verifyRecoveryCode(code: string): Promise<SessionResponse>
   return session;
 }
 
-/** Real call: POST /auth/google, with a credential from Google Identity Services. */
 export async function googleAuth(credential: string): Promise<SessionResponse> {
   const session = await publicApi<SessionResponse>('/auth/google', {
     method: 'POST',
@@ -178,7 +167,6 @@ export async function saveNewPassword(password: string): Promise<void> {
   await api('/auth/password/set', { method: 'POST', body: JSON.stringify({ password }) });
 }
 
-/** Normalizes anything thrown by this module into a Persian message for the UI. */
 export function authMessage(error: unknown, fallback = 'خطایی رخ داد. دوباره تلاش کنید') {
   if (error instanceof AuthUnavailableError) return error.message;
   if (error instanceof ApiError) return error.message;

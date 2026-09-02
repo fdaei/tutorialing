@@ -1,6 +1,5 @@
 import { IsIn, IsInt, IsOptional, IsString, Min } from 'class-validator';
 
-/** Request bodies for `PaymentsController` (checkout, gateway, refunds). */
 
 export class PayDto {
   @IsIn(['booking', 'package']) purpose!: 'booking' | 'package';

@@ -30,6 +30,9 @@
     "db:generate": "npm run db:generate -w @lingospeak/api",
     "db:migrate": "npm run db:migrate -w @lingospeak/api",
     "db:seed": "npm run db:seed -w @lingospeak/api",
+    "db:demo:import": "npm run db:demo:import -w @lingospeak/api",
+    "db:demo:remove": "npm run db:demo:remove -w @lingospeak/api",
+    "db:demo:verify": "npm run db:demo:verify -w @lingospeak/api",
     "db:prepare": "npm run db:generate && npm run db:validate && npm run db:migrate && npm run db:seed",
     "db:setup": "npm run setup && npm run env:check && npm run services:up && npm run db:prepare"
   },

@@ -15,7 +15,10 @@
     "db:migrate": "prisma migrate deploy",
     "db:migrate:dev": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
-    "db:seed:countries": "tsx prisma/seed-countries.ts"
+    "db:seed:countries": "tsx prisma/seed-countries.ts",
+    "db:demo:import": "tsx prisma/demo-data.ts import",
+    "db:demo:remove": "tsx prisma/demo-data.ts remove",
+    "db:demo:verify": "tsx prisma/demo-data.ts verify"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.744.0",

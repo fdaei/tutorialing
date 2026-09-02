@@ -1,7 +1,6 @@
 import { IsIn, IsInt, IsString, Max, MaxLength, Min } from 'class-validator';
 import { PACKAGE_TIERS } from '@lingospeak/contracts';
 
-/** Request bodies for `PackagesController`. */
 
 export class PackageDto {
   @IsString() @MaxLength(120) titleFa!: string;

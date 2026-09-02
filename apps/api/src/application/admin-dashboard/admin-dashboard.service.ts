@@ -11,7 +11,6 @@ function safeNumber(value: bigint, metric: string): number {
 export class AdminDashboardService {
   constructor(private readonly repository: DashboardReadRepository) {}
 
-  /** Two database statements: one singleton projection read and one activity read. */
   async get() {
     const [stats, recentActivity] = await this.repository.load();
 

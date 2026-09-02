@@ -20,6 +20,10 @@ import {
 } from '@prisma/client';
 import { seedCountries } from './country.seed';
 
+if (process.env.NODE_ENV === 'production') {
+  throw new Error('Production seed disabled');
+}
+
 const db = new PrismaClient();
 const DAY = 86_400_000;
 const now = new Date();
@@ -29,94 +33,85 @@ const at = (days: number, hour: number, minute = 0) => {
   return date;
 };
 
-/**
- * Every sign-in path stores and looks phones up in E.164, so the seed must too.
- * The web client posts `+98` + the local number and `RequestOtpDto` rejects
- * anything that is not `+<digits>`, after which `AuthService.requestOtp` upserts
- * on that exact string. A row written as `09120000000` is therefore never
- * matched: signing in with a demo number quietly created a *second*,
- * STUDENT-only account under `+989120000000` and the seeded ADMIN/STAFF roles
- * stayed unreachable. Numbers stay in the readable local form at the call sites
- * because that is what the login form asks for — it strips the leading zero and
- * prepends the country's dial code itself.
- */
-const e164 = (local: string) => `+98${local.replace(/^0+/, '')}`;
+// NANP 555-0100 through 555-0199 are reserved for fictional use.
+const demoPhone = (suffix: number) => `+120255501${String(suffix).padStart(2, '0')}`;
+const normalizeIranianPhone = (local: string) => `+98${local.replace(/^0+/, '')}`;
 
 const users = {
-  admin: { id: 'user-admin', phone: e164('09120000000'), name: 'مدیر کل', email: 'admin@local.test', role: Role.ADMIN },
+  admin: { id: 'user-admin', phone: demoPhone(0), name: 'مدیر کل', email: 'admin@local.test', role: Role.ADMIN },
   verifier: {
     id: 'user-verifier',
-    phone: e164('09120000010'),
+    phone: demoPhone(10),
     name: 'کارشناس تأیید مدرس',
     email: 'verifier@local.test',
     role: Role.ADMIN,
   },
   support: {
     id: 'user-support',
-    phone: e164('09120000011'),
+    phone: demoPhone(11),
     name: 'کارشناس پشتیبانی',
     email: 'support@local.test',
     role: Role.SUPPORT,
   },
   finance: {
     id: 'user-finance',
-    phone: e164('09120000012'),
+    phone: demoPhone(12),
     name: 'کارشناس مالی',
     email: 'finance@local.test',
     role: Role.SUPPORT,
   },
   examiner: {
     id: 'user-examiner',
-    phone: e164('09120000013'),
+    phone: demoPhone(13),
     name: 'ارزیاب آزمون',
     email: 'examiner@local.test',
     role: Role.SUPPORT,
   },
   approvedTeacher: {
     id: 'user-teacher-approved',
-    phone: e164('09120000001'),
+    phone: demoPhone(1),
     name: 'سارا دادخواه',
     email: 'sara@local.test',
     role: Role.INSTRUCTOR,
   },
   germanTeacher: {
     id: 'user-teacher-german',
-    phone: e164('09120000002'),
+    phone: demoPhone(2),
     name: 'آرمان نیک‌روش',
     email: 'arman@local.test',
     role: Role.INSTRUCTOR,
   },
   pendingTeacher: {
     id: 'user-teacher-pending',
-    phone: e164('09120000004'),
+    phone: demoPhone(4),
     name: 'نیلوفر آذری',
     email: 'niloofar@local.test',
     role: Role.INSTRUCTOR,
   },
   completedStudent: {
     id: 'user-student-completed',
-    phone: e164('09121111111'),
+    phone: demoPhone(20),
     name: 'نازنین کاظمی',
     email: 'nazanin@local.test',
     role: Role.STUDENT,
   },
   futureStudent: {
     id: 'user-student-future',
-    phone: e164('09121111112'),
+    phone: demoPhone(21),
     name: 'علی رضایی',
     email: 'ali@local.test',
     role: Role.STUDENT,
   },
   ticketStudent: {
     id: 'user-student-ticket',
-    phone: e164('09121111113'),
+    phone: demoPhone(22),
     name: 'مریم احمدی',
     email: 'maryam@local.test',
     role: Role.STUDENT,
   },
   demoStudent: {
-    id: 'user-student-demo-09390315707',
-    phone: e164('09390315707'),
+    id: 'user-student-demo',
+    phone: demoPhone(23),
     name: 'کاربر نمایشی لینگواسپیک',
     email: 'demo.student@local.test',
     role: Role.STUDENT,
@@ -153,7 +148,7 @@ const permissionKeys = [
 
 /**
  * Repairs databases seeded while phones were still stored in the local
- * `09xxxxxxxxx` form (see the `e164` note above). Signing in with a demo number
+ * a legacy local form. Signing in with a demo number
  * created a duplicate STUDENT account under the E.164 spelling, so the two rows
  * now sit side by side and the seed's own upsert would collide on the primary
  * key when it reconciles ids.
@@ -171,7 +166,7 @@ async function normalizeLegacyPhones() {
   const legacy = await db.user.findMany({ where: { phone: { startsWith: '0' } }, select: { id: true, phone: true } });
   for (const row of legacy) {
     if (!row.phone || !/^0\d{10}$/.test(row.phone)) continue;
-    const phone = e164(row.phone);
+    const phone = normalizeIranianPhone(row.phone);
     const duplicate = await db.user.findUnique({ where: { phone }, select: { id: true } });
     if (duplicate && duplicate.id !== row.id) {
       const parked = `${row.phone}.duplicate.${duplicate.id}`;
@@ -1216,7 +1211,7 @@ async function seedDemoExperience() {
       demoTeachers[index]!;
     const userId = `user-teacher-demo-${key}`,
       teacherId = `teacher-demo-${key}`,
-      phone = e164(`091300001${String(index).padStart(2, '0')}`);
+      phone = demoPhone(30 + index);
     await db.user.upsert({
       where: { phone },
       create: {

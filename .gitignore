@@ -26,6 +26,32 @@ apps/*/node_modules/
 .env
 .env.test
 .env*.local
+.env.production
+.env.staging
+app.env
+deploy/env/.env.production.example
+
+# Private keys and certificates
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+id_rsa
+id_ed25519
+
+# Database backups
+*.bak
+*.sql
+*.dump
+*.sql.gz
+backups/
+
+# Audit, debug, and test artifacts
+AUDIT.zip
+*.err
+.err
+test-results/
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache
@@ -34,6 +60,7 @@ apps/*/node_modules/
 # Next.js build output
 .next
 .next-dev
+.next-dev/
 out
 
 # Nuxt.js build / generate output
@@ -78,3 +105,7 @@ apps/*/dist/
 
 # فایل env تولیدی — فقط روی سرور می‌ماند، هرگز کامیت نمی‌شود.
 deploy/env/app.env
+
+# Generated demo administrator credentials must stay on the server.
+demo-admin-credentials*
+*.credentials.txt

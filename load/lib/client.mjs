@@ -14,9 +14,7 @@ export async function api(path, opts = {}) {
   let body = null;
   try {
     body = await res.json();
-  } catch {
-    /* empty body */
-  }
+  } catch {}
   return { status: res.status, headers: res.headers, body };
 }
 

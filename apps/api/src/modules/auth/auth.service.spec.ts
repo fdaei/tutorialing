@@ -139,7 +139,6 @@ const ACTIVE_USER = {
   roles: [],
 };
 
-/** The `where` shape of the atomic rotation claim, as opposed to a family revoke. */
 const CLAIM_WHERE = { id: 'session-1', revokedAt: null, expiresAt: { gt: expect.any(Date) } };
 
 function refreshHarness(session: unknown, claimedRows = 1) {

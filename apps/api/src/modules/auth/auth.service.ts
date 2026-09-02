@@ -108,7 +108,14 @@ export class AuthService {
     });
     if (hourlyRequestCount >= this.settings.otpHourlyLimit) throw tooManyRequests('OTP_HOURLY_LIMIT');
 
-    const code = this.settings.developmentOtp ? '123456' : String(randomInt(100000, 1000000));
+    // AUTH_OTP_ALLOWLIST. `phone` is already E.164 here (RequestOtpDto), which
+    // is the form the allowlist is validated in, so an exact match is correct.
+    // Resolving to the code rather than to a boolean keeps the fallback safe:
+    // if the code were somehow absent the number drops back to a random code
+    // and a failed delivery, never to a guessable one.
+    const allowlistCode = this.settings.otpAllowlist.includes(phone) ? this.settings.otpAllowlistCode : undefined;
+    const code =
+      allowlistCode ?? (this.settings.developmentOtp ? '123456' : String(randomInt(100000, 1000000)));
     const user = await this.db.user.upsert({
       where: { phone },
       update: {},
@@ -123,7 +130,7 @@ export class AuthService {
         resendAfter: new Date(now + this.settings.otpResendSeconds * 1000),
       },
     });
-    const sent = await this.sms.sendOtp(phone, code, user.id);
+    const sent = await this.sms.sendOtp(phone, code, user.id, allowlistCode !== undefined);
     return {
       challengeId: challenge.id,
       expiresIn: this.settings.otpTtlSeconds,

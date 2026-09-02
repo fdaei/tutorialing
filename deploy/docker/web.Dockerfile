@@ -17,7 +17,6 @@
 # ---------------------------------------------------------------------------
 ARG NODE_IMAGE=node:22-bookworm-slim
 
-# ---------- base ----------
 FROM ${NODE_IMAGE} AS base
 # ‏APT_MIRROR وقتی به کار می‌آید که آرشیو رسمی واقعاً در دسترس نباشد:
 #   --build-arg APT_MIRROR=mirror.arvancloud.ir
@@ -80,7 +79,6 @@ RUN apt-get -o APT::Update::Error-Mode=any update \
 	&& rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 
-# ---------- deps ----------
 FROM base AS deps
 COPY package.json package-lock.json ./
 COPY apps/api/package.json ./apps/api/
@@ -94,7 +92,6 @@ COPY packages/contracts/package.json ./packages/contracts/
 RUN npm pkg delete scripts.prepare -w @lingospeak/contracts
 RUN npm ci --ignore-scripts
 
-# ---------- builder ----------
 FROM deps AS builder
 COPY tsconfig.base.json ./
 COPY packages/contracts ./packages/contracts
@@ -133,7 +130,6 @@ RUN npm run build -w @lingospeak/web
 # بخور نه با یک ایمیج بی‌سرور.
 RUN test -f apps/web/.next/standalone/apps/web/server.js
 
-# ---------- runtime ----------
 FROM base AS runtime
 ENV NODE_ENV=production \
 	NEXT_TELEMETRY_DISABLED=1 \
