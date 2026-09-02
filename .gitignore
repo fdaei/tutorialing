@@ -47,6 +47,9 @@ id_ed25519
 *.sql.gz
 backups/
 
+# Prisma migrations are source code, not database backup artifacts.
+!apps/api/prisma/migrations/**/migration.sql
+
 # Audit, debug, and test artifacts
 AUDIT.zip
 *.err

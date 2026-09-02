@@ -342,19 +342,25 @@ phase_migrate() {
 			npx tsx prisma/seed-countries.ts | sed 's/^/     /'
 	fi
 
-	step "تأیید: داده‌ی مرجع هست، داده‌ی دمو نیست"
-	local users countries
+	step "تأیید: داده‌ی مرجع و صفحه‌های عمومی هستند، داده‌ی دمو نیست"
+	local users countries about_pages
 	users="$(as_deploy docker exec lingospeak-postgres psql -U "$(read_env POSTGRES_USER)" \
 		-d "$(read_env POSTGRES_DB)" -tAc 'SELECT count(*) FROM "User"' 2>/dev/null || echo '?')"
 	countries="$(as_deploy docker exec lingospeak-postgres psql -U "$(read_env POSTGRES_USER)" \
 		-d "$(read_env POSTGRES_DB)" -tAc 'SELECT count(*) FROM "Country"' 2>/dev/null || echo '?')"
-	printf '     User    = %s\n     Country = %s\n' "$users" "$countries"
+	about_pages="$(as_deploy docker exec lingospeak-postgres psql -U "$(read_env POSTGRES_USER)" \
+		-d "$(read_env POSTGRES_DB)" -tAc \
+		'SELECT count(*) FROM "CmsPage" WHERE "slug" = '\''about'\'' AND "published" = true' \
+		2>/dev/null || echo '?')"
+	printf '     User        = %s\n     Country     = %s\n     Public about = %s\n' \
+		"$users" "$countries" "$about_pages"
 	if [[ $users == 0 ]]; then
 		ok "هیچ کاربر نمونه‌ای ساخته نشده"
 	else
 		warn "جدول User خالی نیست ($users) — اگر انتظارش را نداشتی، seed دمو اجرا شده"
 	fi
 	[[ $countries != 0 ]] || warn "جدول Country خالی است — انتخابگر کشور در سایت خالی می‌ماند"
+	[[ $about_pages == 1 ]] || die "صفحهٔ عمومی about پس از migration موجود و منتشر نیست"
 
 	# First deploy: the backup phase found an empty database and deferred the
 	# drill to here. The schema exists from this point on, so the recovery path
