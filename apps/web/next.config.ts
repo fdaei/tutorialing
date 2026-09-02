@@ -1,9 +1,8 @@
 import type { NextConfig } from 'next';
 import { resolve } from 'node:path';
 
-// `next build` همیشه با cwd برابر apps/web اجرا می‌شود (چه مستقیم، چه با
-// `npm run build -w @lingospeak/web`)، پس ریشه‌ی مخزن دو سطح بالاتر است.
-// عمداً از import.meta.url استفاده نشده: این پکیج CommonJS است.
+// `next build` always runs with cwd = apps/web, so the repo root is two levels
+// up. Deliberately not import.meta.url: this package is CommonJS.
 const repoRoot = resolve(process.cwd(), '..', '..');
 
 const config: NextConfig = {
@@ -13,15 +12,13 @@ const config: NextConfig = {
   // vendor chunks).
   distDir: process.env.NEXT_DIST_DIR ?? '.next',
 
-  // خروجی standalone: به جای نیاز داشتن به کل node_modules در زمان اجرا، فقط
-  // فایل‌هایی که واقعاً import شده‌اند کنار یک server.js کپی می‌شوند. ایمیج
-  // production را از حدود یک گیگابایت به چند صد مگابایت می‌رساند.
+  // Copies only the files actually imported next to a server.js instead of
+  // shipping all of node_modules: ~1GB production image down to a few hundred MB.
   output: 'standalone',
 
-  // در npm workspaces بیشتر وابستگی‌ها به node_modules ریشه‌ی مخزن hoist
-  // می‌شوند، نه apps/web/node_modules. بدون این خط، ردیابی فایل‌ها از
-  // apps/web شروع می‌شود، بسته‌های hoist‌شده را جا می‌گذارد و کانتینر در زمان
-  // اجرا با MODULE_NOT_FOUND می‌افتد.
+  // npm workspaces hoists most dependencies to the repo-root node_modules, not
+  // apps/web/node_modules. Without this, tracing starts at apps/web, misses the
+  // hoisted packages, and the container dies at runtime with MODULE_NOT_FOUND.
   outputFileTracingRoot: repoRoot,
 };
 

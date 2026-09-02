@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# بازگردانی بکاپ پستگرس.
+# Restore a Postgres backup.
 #
-#   restore-postgres.sh --verify [file]        بازگردانی در یک دیتابیس موقت و حذفش
-#   restore-postgres.sh --into-production file  بازنویسی دیتابیس اصلی (مخرب)
+#   restore-postgres.sh --verify [file]         restore into a temp DB, then drop it
+#   restore-postgres.sh --into-production file  overwrite the real DB (destructive)
 #
-# بدون آرگومان فایل، جدیدترین بکاپ انتخاب می‌شود.
+# With no file argument, the newest backup is used.
 #
-# ‏--verify حالت پیش‌فرض است و عمداً بی‌خطر: بکاپی که هرگز بازگردانده نشده،
-# بکاپ نیست — فقط یک فایل است. فاز backup در deploy.sh همین را یک بار اجرا
-# می‌کند تا قبل از اولین migration ثابت شود مسیر بازیابی کار می‌کند.
+# --verify is the default and deliberately safe: a backup that has never been
+# restored isn't a backup, just a file. deploy.sh's backup phase runs this once
+# to prove the recovery path works before the first migration.
 
 set -euo pipefail
 
@@ -64,12 +64,12 @@ if [[ $MODE == production ]]; then
 	read -r -p "برای ادامه دقیقاً بنویس: RESTORE $PGDB > " answer
 	[[ $answer == "RESTORE $PGDB" ]] || die "لغو شد"
 
-	# یک بکاپ ایمنی از وضعیت فعلی، پیش از بازنویسی.
+	# Safety backup of the current state, before overwriting.
 	safety="$BACKUP_DIR/pre-restore-$(date +%Y%m%d-%H%M%S).sql.gz"
 	docker exec "$CONTAINER" pg_dump -U "$PGUSER" -d "$PGDB" --clean --if-exists | gzip -9 >"$safety"
 	ok "بکاپ ایمنی از وضعیت فعلی: $safety"
 
-	# دامپ با --clean --if-exists ساخته شده، پس خودش اشیاء قبلی را پاک می‌کند.
+	# The dump was made with --clean --if-exists, so it drops prior objects itself.
 	zcat "$FILE" | psql_as -d "$PGDB" >/dev/null
 	ok "بازگردانی در $PGDB انجام شد"
 	tables=$(psql_as -d "$PGDB" -tAc "SELECT count(*) FROM information_schema.tables WHERE table_schema='public'")
@@ -77,7 +77,7 @@ if [[ $MODE == production ]]; then
 	exit 0
 fi
 
-# ── حالت verify ───────────────────────────────────────────────────────────
+# ── verify mode ───────────────────────────────────────────────────────────
 echo "حالت : verify (دیتابیس موقت «$VERIFY_DB»، دیتابیس اصلی دست نمی‌خورد)"
 echo
 
