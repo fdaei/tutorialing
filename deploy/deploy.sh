@@ -83,12 +83,15 @@ pg_tables() {
 # already has a schema, so the caller decides when this can run.
 backup_drill() {
 	step "اجرای یک بکاپ واقعی"
-	as_deploy "$ROOT_DIR/bin/backup-postgres.sh" | sed 's/^/     /'
+	# `bash` spelled out rather than relying on the scripts' shebangs: both need
+	# bash (pipefail, [[ =~ ]], <<<), and a file that loses its shebang is run by
+	# /bin/sh — dash on Debian — which dies on the first line.
+	as_deploy bash "$ROOT_DIR/bin/backup-postgres.sh" | sed 's/^/     /'
 
 	step "تست بازگردانی"
 	# This step is the reason the backup phase exists. A backup that has never
 	# been restored is just a file.
-	as_deploy "$ROOT_DIR/bin/restore-postgres.sh" --verify | sed 's/^/     /'
+	as_deploy bash "$ROOT_DIR/bin/restore-postgres.sh" --verify | sed 's/^/     /'
 	date -Is | as_deploy tee "$RESTORE_STAMP" >/dev/null
 	ok "مسیر بازگردانی تأیید شد"
 }
@@ -276,13 +279,20 @@ phase_backup() {
 	ok "نصب شد در $ROOT_DIR/bin/"
 
 	step "ثبت cron روزانه"
-	local line="0 3 * * * $ROOT_DIR/bin/backup-postgres.sh >> $ROOT_DIR/backups/backup.log 2>&1"
-	local current
+	# cron hands the command to /bin/sh, so `bash` is spelled out here too — a
+	# script whose shebang went missing would otherwise be run by dash.
+	local line="0 3 * * * bash $ROOT_DIR/bin/backup-postgres.sh >> $ROOT_DIR/backups/backup.log 2>&1"
+	local current kept
 	current="$(as_deploy crontab -l 2>/dev/null || true)"
-	if grep -qF 'backup-postgres.sh' <<<"$current"; then
+	if grep -qxF "$line" <<<"$current"; then
 		ok "cron از قبل ثبت شده"
 	else
-		printf '%s\n%s\n' "$current" "$line" | sed '/^$/d' | as_deploy crontab -
+		# Drop any earlier backup-postgres.sh line before adding this one. Matching
+		# on the filename alone and skipping would leave a server that was
+		# provisioned before this fix running the old, shebang-less invocation
+		# forever — the cron backup would fail nightly and nobody would look.
+		kept="$(grep -vF 'backup-postgres.sh' <<<"$current" || true)"
+		printf '%s\n%s\n' "$kept" "$line" | sed '/^$/d' | as_deploy crontab -
 		ok "هر روز ساعت ۳ بامداد"
 	fi
 	as_deploy crontab -l | grep backup-postgres | sed 's/^/     /'
