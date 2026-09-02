@@ -166,9 +166,26 @@ describe('api transport characterization', () => {
     });
   });
 
-  it('returns null for a successful response without a JSON body', async () => {
+  it('returns null for a 204 that carries no body by definition', async () => {
     fetchMock.mockResolvedValue({ ok: true, status: 204, json: async () => Promise.reject(new SyntaxError('empty')) });
     await expect(publicApi('/empty')).resolves.toBeNull();
+  });
+
+  it('rejects a 200 whose body is not JSON instead of laundering null into the caller', async () => {
+    // A proxy placeholder or an HTML error page served with 200 used to resolve
+    // as null typed as T, so the failure surfaced as "Cannot read properties of
+    // null" inside whichever component first touched the payload.
+    fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => Promise.reject(new SyntaxError('<html>')) });
+    await expect(publicApi('/teachers')).rejects.toMatchObject({
+      name: 'ApiError',
+      status: 200,
+      details: { code: 'INVALID_RESPONSE_BODY' },
+    });
+  });
+
+  it('preserves an explicit JSON null body for endpoints that return one', async () => {
+    fetchMock.mockResolvedValue(jsonResponse(200, null));
+    await expect(publicApi('/support/pages/missing')).resolves.toBeNull();
   });
 
   it('maps HTTP errors and field errors to the observable ApiError contract', async () => {

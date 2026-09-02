@@ -12,15 +12,31 @@ import { LanguageDiscoveryCard } from '@/features/languages/components/language-
 import { TeacherCard } from '@/features/teacher/components/teacher-card';
 import { requestLocale } from '@/lib/server-locale';
 import { formatNumber, localePath } from '@/lib/i18n';
+import { logError } from '@/shared/services/error-logger';
 
 export const dynamic = 'force-dynamic';
 
+const EMPTY_TEACHERS: Paginated<PublicTeacher> = { data: [], total: 0, page: 1, totalPages: 0 };
+const EMPTY_POSTS: BlogPostsPage = { items: [], page: 1, pageSize: 0 };
+
+// The landing page is what an unauthenticated visitor hits first, so no single
+// upstream section may take the whole render down. A freshly seeded database
+// legitimately has no teachers, courses, or posts, and a degraded endpoint has
+// to degrade to an empty section rather than a 500. The failure is still logged,
+// because an unreachable API otherwise renders exactly like an empty database.
+function withFallback<T>(endpoint: string, request: Promise<T>, fallback: T): Promise<T> {
+  return request.catch((error: unknown) => {
+    logError(error, { scope: 'route', name: `home:${endpoint}` });
+    return fallback;
+  });
+}
+
 export default async function Home() {
   const [languages, teacherPage, courses, posts, locale] = await Promise.all([
-    publicApi<EducationalLanguage[]>('/languages'),
-    publicApi<Paginated<PublicTeacher>>('/teachers?page=1&limit=4&sort=rating'),
-    publicApi<Course[]>('/courses'),
-    publicApi<BlogPostsPage>('/blog/posts?pageSize=3'),
+    withFallback('/languages', publicApi<EducationalLanguage[]>('/languages'), []),
+    withFallback('/teachers', publicApi<Paginated<PublicTeacher>>('/teachers?page=1&limit=4&sort=rating'), EMPTY_TEACHERS),
+    withFallback('/courses', publicApi<Course[]>('/courses'), []),
+    withFallback('/blog/posts', publicApi<BlogPostsPage>('/blog/posts?pageSize=3'), EMPTY_POSTS),
     requestLocale(),
   ]);
   const english = locale === 'en';
@@ -35,12 +51,13 @@ export default async function Home() {
   const faqs = english
     ? [['How do I book a private lesson?', 'Review a teacher profile, choose a lesson and an available time, then read its cancellation policy before confirming.'], ['Are teachers verified?', 'Yes. We only show teachers whose identity, qualifications, and application have passed review.'], ['Are lessons online or in person?', 'Current bookings are for online lessons, with times displayed in your time zone.'], ['Can I cancel or reschedule?', 'The exact terms depend on the policy shown for that booking before you confirm it.']]
     : [['چطور کلاس خصوصی رزرو کنم؟', 'پروفایل مدرس را بررسی کنید، نوع جلسه و زمان آزاد را انتخاب کنید و سیاست لغو همان رزرو را پیش از تأیید ببینید.'], ['آیا مدرس‌ها تأیید شده‌اند؟', 'بله، فقط پروفایل مدرس‌هایی نمایش داده می‌شود که فرایند بررسی هویت، مدارک و تأیید نهایی را گذرانده‌اند.'], ['کلاس‌ها آنلاین هستند یا حضوری؟', 'رزروهای فعلی برای کلاس آنلاین طراحی شده‌اند و زمان جلسه بر اساس منطقه زمانی شما نمایش داده می‌شود.'], ['شرایط لغو یا تغییر زمان کلاس چیست؟', 'شرایط دقیق به سیاست ثبت‌شده هنگام رزرو بستگی دارد و پیش از تأیید نهایی به شما نمایش داده می‌شود.']];
-  const teachers = teacherPage.data;
+  const teachers = teacherPage?.data ?? [];
+  const postItems = posts?.items ?? [];
   const statistics = [
     { label: t('زبان فعال', 'Active languages'), value: languages.length, icon: GraduationCap },
-    { label: t('مدرس تأییدشده', 'Verified teachers'), value: teacherPage.total, icon: Users },
+    { label: t('مدرس تأییدشده', 'Verified teachers'), value: teacherPage?.total ?? 0, icon: Users },
     { label: t('دوره منتشرشده', 'Published courses'), value: courses.length, icon: BookOpen },
-    { label: t('مقاله تازه', 'Recent articles'), value: posts.items.length, icon: Headphones },
+    { label: t('مقاله تازه', 'Recent articles'), value: postItems.length, icon: Headphones },
   ];
   return <><Header/><main className="overflow-hidden bg-white">
     <section className="hero-wash"><div className="page-shell grid items-center gap-12 pb-14 pt-10 lg:grid-cols-[1.05fr_.95fr] lg:pb-20 lg:pt-16">
@@ -51,11 +68,11 @@ export default async function Home() {
     <section className="section-space"><div className="page-shell"><div className="section-title"><p>{t('گام‌به‌گام تا تسلط', 'A practical route to fluency')}</p><h2>{t('مسیر یادگیری شما، روشن و قابل پیگیری', 'A learning route you can understand and track')}</h2></div><ol className="learning-track">{steps.map((step,i)=><li key={step}><span>{formatNumber(i+1, locale)}</span><strong>{step}</strong></li>)}</ol></div></section>
     <section className="bg-canvas section-space"><div className="page-shell"><div className="section-title"><p>{t('چرا LingoSpeak؟', 'Why LingoSpeak?')}</p><h2>{t('همه‌چیز برای یک انتخاب مطمئن', 'Everything you need to choose with confidence')}</h2></div><div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">{benefits.map(([Icon,title,body])=><article key={title} className="market-card lift p-6"><span className="grid size-12 place-items-center rounded-2xl bg-lavender text-purple"><Icon size={23}/></span><h3 className="mt-5 font-black">{title}</h3><p className="mt-3 text-sm leading-7 text-muted">{body}</p></article>)}</div></div></section>
     <section className="section-space"><div className="page-shell"><div className="placement-banner"><div className="relative z-10 max-w-2xl"><p className="text-sm font-black text-[#9ce8d0]">{t('آزمون استاندارد CEFR', 'CEFR-aligned placement')}</p><h2 className="mt-3 text-3xl font-black leading-[1.5] text-white md:text-5xl">{t('نقطه شروع درست را پیدا کن', 'Find the right place to start')}</h2><p className="mt-4 max-w-xl leading-8 text-white/72">{t('با یک ارزیابی مرحله‌ای، سطح فعلی‌ات از A1 تا C2 مشخص می‌شود و دوره‌هایی را می‌بینی که دقیقاً با توانایی و هدف تو هماهنگ‌اند.', 'A structured assessment identifies your current level from A1 to C2, then points you to learning options suited to your skills and goals.')}</p><div className="mt-7 flex flex-wrap gap-5 text-sm font-bold text-white/85"><span className="flex items-center gap-2"><Timer size={18}/>{t('حدود ۲۰ دقیقه', 'About 20 minutes')}</span><span className="flex items-center gap-2"><BrainCircuit size={18}/>{t('ارزیابی چندمهارتی', 'Multiple skills')}</span><span className="flex items-center gap-2"><Route size={18}/>{t('پیشنهاد مسیر یادگیری', 'A suggested learning route')}</span></div><Link href={path('/placement')} className="mt-8 inline-flex min-h-13 items-center gap-3 rounded-xl bg-white px-7 font-black text-[#24216f] shadow-xl">{t('شروع تعیین سطح', 'Start placement')} <ArrowLeft className={english ? 'rotate-180' : undefined} size={19}/></Link></div><div className="cefr-orbit" aria-hidden="true">{['A1','A2','B1','B2','C1','C2'].map((level,index)=><span key={level} style={{'--i':index} as React.CSSProperties}>{level}</span>)}</div></div></div></section>
-    <section className="section-space"><div className="page-shell"><SectionHeading title={t('زبان مورد علاقه‌ات را انتخاب کن', 'Choose the language you want to learn')} href={path('/languages')} link={t('مشاهده همه زبان‌ها', 'View all languages')} english={english}/><div className="mt-9 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">{languages.slice(0,4).map(x=><LanguageDiscoveryCard key={x.id} language={x} locale={locale}/>)}</div></div></section>
-    <section className="bg-canvas section-space"><div className="page-shell"><SectionHeading title={t('مدرس‌هایی که با هدف شما هماهنگ‌اند', 'Teachers who fit your goals')} href={path('/teachers')} link={t('مشاهده همه مدرس‌ها', 'View all teachers')} english={english}/><div className="mt-9 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">{teachers.map(x=><TeacherCard key={x.id} teacher={x}/>)}</div></div></section>
-    <section className="section-space"><div className="page-shell"><SectionHeading title={t('دوره‌های پیشنهادی برای شروع', 'Courses to get you started')} href={path('/courses')} link={t('مشاهده همه دوره‌ها', 'View all courses')} english={english}/><div className="mt-9 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">{courses.slice(0,4).map(x=><CourseCard key={x.slug} course={x}/>)}</div></div></section>
+    {languages.length>0&&<section className="section-space"><div className="page-shell"><SectionHeading title={t('زبان مورد علاقه‌ات را انتخاب کن', 'Choose the language you want to learn')} href={path('/languages')} link={t('مشاهده همه زبان‌ها', 'View all languages')} english={english}/><div className="mt-9 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">{languages.slice(0,4).map(x=><LanguageDiscoveryCard key={x.id} language={x} locale={locale}/>)}</div></div></section>}
+    {teachers.length>0&&<section className="bg-canvas section-space"><div className="page-shell"><SectionHeading title={t('مدرس‌هایی که با هدف شما هماهنگ‌اند', 'Teachers who fit your goals')} href={path('/teachers')} link={t('مشاهده همه مدرس‌ها', 'View all teachers')} english={english}/><div className="mt-9 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">{teachers.map(x=><TeacherCard key={x.id} teacher={x}/>)}</div></div></section>}
+    {courses.length>0&&<section className="section-space"><div className="page-shell"><SectionHeading title={t('دوره‌های پیشنهادی برای شروع', 'Courses to get you started')} href={path('/courses')} link={t('مشاهده همه دوره‌ها', 'View all courses')} english={english}/><div className="mt-9 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">{courses.slice(0,4).map(x=><CourseCard key={x.slug} course={x}/>)}</div></div></section>}
     <section className="page-shell pb-24"><div className="teach-banner"><div className="relative min-h-64 lg:min-h-80"><Image src="/images/auth/register.png" alt={t('مدرس حرفه‌ای زبان آماده تدریس', 'A professional language teacher ready to teach')} fill sizes="(min-width:1024px) 36vw, 100vw" className="object-contain object-bottom"/></div><div className="py-10 lg:py-14"><p className="text-sm font-bold text-purple">{t('به جمع مدرس‌های ما بپیوندید', 'Teach with LingoSpeak')}</p><h2 className="mt-3 text-3xl font-black leading-[1.5] md:text-4xl">{t('مدرس زبان هستید؟', 'Are you a language teacher?')}<br/><span className="brand-text">{t('شاگردهای جدید منتظر شما هستند', 'Meet learners looking for your expertise')}</span></h2><div className="mt-6 grid gap-3 text-sm sm:grid-cols-2">{(english ? ['Reach new learners','Set your schedule and capacity','Manage lessons and earnings','Build a professional profile'] : ['دسترسی به زبان‌آموزان جدید','تعیین برنامه و ظرفیت کلاس‌ها','مدیریت درآمد و جلسات','ساخت پروفایل حرفه‌ای']).map(x=><span key={x} className="flex items-center gap-2"><CheckCircle2 size={17} className="text-purple"/>{x}</span>)}</div><Link href={path('/teach/register')} className="brand-gradient mt-8 inline-flex min-h-12 items-center rounded-xl px-8 font-black text-white">{t('ثبت‌نام به عنوان مدرس', 'Apply to teach')}</Link></div></div></section>
-    {posts.items.length>0&&<section className="bg-canvas section-space"><div className="page-shell"><SectionHeading title={t('مجله یادگیری زبان', 'Language learning magazine')} href={path('/blog')} link={t('مشاهده همه مقالات', 'View all articles')} english={english}/><div className="mt-9 grid gap-5 md:grid-cols-3">{posts.items.map(x=><BlogCard key={x.slug} post={{slug:x.slug,category:english ? (x.category?.nameEn??'Learning') : (x.category?.nameFa??'یادگیری'),title:english ? x.titleEn : x.titleFa,excerpt:english ? x.excerptEn : x.excerptFa,date:t('مجله لینگواسپیک', 'LingoSpeak magazine'),readTime:t('مطالعه مقاله', 'Read article'),image:x.coverImage??'/images/lingospeak-student.png'}}/>)}</div></div></section>}
+    {postItems.length>0&&<section className="bg-canvas section-space"><div className="page-shell"><SectionHeading title={t('مجله یادگیری زبان', 'Language learning magazine')} href={path('/blog')} link={t('مشاهده همه مقالات', 'View all articles')} english={english}/><div className="mt-9 grid gap-5 md:grid-cols-3">{postItems.map(x=><BlogCard key={x.slug} post={{slug:x.slug,category:english ? (x.category?.nameEn??'Learning') : (x.category?.nameFa??'یادگیری'),title:english ? x.titleEn : x.titleFa,excerpt:english ? x.excerptEn : x.excerptFa,date:t('مجله لینگواسپیک', 'LingoSpeak magazine'),readTime:t('مطالعه مقاله', 'Read article'),image:x.coverImage??'/images/lingospeak-student.png'}}/>)}</div></div></section>}
     <section className="section-space"><div className="page-shell max-w-4xl"><div className="text-center"><p className="text-sm font-bold text-purple">{t('سؤالات متداول', 'Frequently asked questions')}</p><h2 className="mt-3 text-3xl font-black">{t('پاسخ روشن پیش از شروع', 'Clear answers before you begin')}</h2></div><div className="mt-8 divide-y overflow-hidden rounded-2xl border hairline bg-white">{faqs.map(([q,a],i)=><details key={q} className="group p-5" open={i===0}><summary className="cursor-pointer list-none font-black">{q}<span className={english ? 'float-right text-purple group-open:rotate-45' : 'float-left text-purple group-open:rotate-45'}>＋</span></summary><p className="mt-3 text-sm leading-7 text-muted">{a}</p></details>)}</div></div></section>
     <section className="page-shell pb-24"><div className="final-cta"><div><p className="text-sm text-white/70">{t('از امروز شروع کنید', 'Start today')}</p><h2 className="mt-2 text-3xl font-black">{t('یک زبان تازه، یک دنیای تازه', 'A new language opens a new world')}</h2></div><div className="flex flex-wrap gap-3"><Link href={path('/courses')} className="rounded-xl bg-white px-6 py-3 font-black text-purple">{t('مشاهده دوره‌ها', 'Browse courses')}</Link><Link href={path('/teachers')} className="rounded-xl border border-white/40 px-6 py-3 font-black text-white">{t('پیدا کردن مدرس', 'Find a teacher')}</Link></div></div></section>
   </main><Footer/></>;

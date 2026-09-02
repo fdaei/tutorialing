@@ -7,6 +7,10 @@ function locale() {
 const COMMON_ERROR_MESSAGES: Record<string, Record<ApiLocale, string>> = {
   INTERNAL_ERROR: { fa: 'خطای غیرمنتظره‌ای رخ داد. دوباره تلاش کنید.', en: 'An unexpected error occurred. Try again.' },
   REQUEST_FAILED: { fa: 'درخواست انجام نشد.', en: 'The request failed.' },
+  INVALID_RESPONSE_BODY: {
+    fa: 'پاسخ دریافتی از سرویس قابل خواندن نبود.',
+    en: 'The service returned a response that could not be read.',
+  },
   AUTHENTICATION_REQUIRED: { fa: 'برای ادامه وارد حساب کاربری شوید.', en: 'Sign in to continue.' },
   SESSION_UNAVAILABLE: {
     fa: 'نشست شما لغو شده یا حساب در دسترس نیست.',
