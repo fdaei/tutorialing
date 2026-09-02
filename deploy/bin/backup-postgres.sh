@@ -1,3 +1,13 @@
+#!/usr/bin/env bash
+# Daily Postgres backup: dump, verify, rotate. Installed by deploy.sh's backup
+# phase and run from cron at 03:00.
+#
+# The shebang is load-bearing: `set -o pipefail`, `[[ =~ ]]` and `<<<` are all
+# bash-only. Without it an exec of this file falls back to /bin/sh (dash on
+# Debian) and it dies on its very first line with "Illegal option -o pipefail".
+# deploy.sh and the cron line also spell out `bash` explicitly, so the script
+# still runs correctly if the shebang is ever lost again.
+
 set -euo pipefail
 
 ROOT_DIR="${ROOT_DIR:-/home/deploy/lingospeak}"
