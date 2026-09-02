@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# پلن B: build روی ماشین محلی و انتقال ایمیج‌ها.
+# Plan B: build on the local machine and ship the images.
 #
 #   bash deploy/bin/build-local.sh
 #
-# فقط وقتی لازم است که build روی سرور OOM بخورد (علامتش: پیام Killed یا
-# exit code 137 در خروجی `deploy.sh build`). سرور ۷.۸ گیگ رم دارد و build
-# نکست معمولاً ۲ تا ۳ گیگ پیک می‌زند؛ فاز build خودش swap می‌سازد، ولی اگر
-# باز هم کم آورد این مسیر بدون هیچ تغییری در Dockerfile کار می‌کند.
+# Only needed when the server build OOMs (symptom: Killed, or exit code 137 in
+# `deploy.sh build` output). The server has 7.8GB RAM and the Next build
+# typically peaks at 2-3GB; the build phase adds swap itself, but if that still
+# isn't enough this path works with no Dockerfile changes.
 #
-# هزینه‌اش آپلود چند صد مگابایت به فرانکفورت است، پس مسیر پیش‌فرض نیست.
-# روی خود ماشین محلی اجرا می‌شود، نه سرور.
+# It costs a few hundred MB uploaded to Frankfurt, so it isn't the default.
+# Runs on the local machine, not the server.
 
 set -euo pipefail
 
@@ -17,24 +17,24 @@ HOST="${HOST:-lingospeak}"
 REMOTE_ENV="${REMOTE_ENV:-lingospeak/env/app.env}"
 cd "$(git rev-parse --show-toplevel)"
 
-# آینه‌ی apt. برخلاف deploy.sh (که روی سرور فرانکفورت اجرا می‌شود و آرشیو رسمی
-# را دارد) این اسکریپت روی ماشین محلی اجرا می‌شود، جایی که IPهای فست‌لای
-# deb.debian.org مسدودند — پس پیش‌فرض این‌جا آینه است، نه آرشیو رسمی.
+# apt mirror. Unlike deploy.sh (which runs on the Frankfurt server and can
+# reach the official archive), this script runs locally, where the Fastly IPs
+# behind deb.debian.org are blocked — so a mirror is the default here.
 #
-# دو متغیر لازم است، نه یکی: آروان آرشیو debian-security را روی مسیر استاندارد
-# ندارد (۴۰۴ می‌دهد) و suite امنیتی جایی است که openssl وصله‌اش را می‌گیرد.
-# جزئیات هر دو تله در deploy/docker/api.Dockerfile.
+# Two variables are needed, not one: Arvan doesn't carry the debian-security
+# archive at the standard path (404s), and the security suite is where openssl
+# gets its patch. Both traps are detailed in deploy/docker/api.Dockerfile.
 #
-# بازگشت به آرشیو رسمی (مثلاً از شبکه‌ای که فیلتر نیست):
+# Back to the official archive (e.g. from an unfiltered network):
 #   APT_MIRROR=deb.debian.org APT_SECURITY_MIRROR=deb.debian.org \
 #     bash deploy/bin/build-local.sh
 #
-# ⚠ اگر build روی `apt-get update` تایم‌اوت می‌خورد، اول MTU را بررسی کن نه
-#   فیلترینگ — بخش «تایم‌اوت apt در زمان build» در deploy/DEPLOY.md. آینه
-#   دادن آن مشکل را حل نمی‌کند، و با تونل WireGuard بالا هر آینه‌ای همان‌جا
-#   می‌ایستد.
+# WARNING: if the build times out on `apt-get update`, check MTU first, not
+#   filtering — see the apt build-timeout section in deploy/DEPLOY.md. Setting
+#   a mirror does not fix that, and with a WireGuard tunnel up any mirror
+#   stalls the same way.
 #
-# هر آرگومان اضافه‌ی خط فرمان هم دست‌نخورده به هر سه `docker build` می‌رود:
+# Extra command-line arguments are passed through to all three `docker build`s:
 #   bash deploy/bin/build-local.sh --build-arg APT_MIRROR=parspack.repo
 apt_args=(
 	--build-arg "APT_MIRROR=${APT_MIRROR:-mirror.arvancloud.ir}"
@@ -46,8 +46,8 @@ BLD=$'\033[1m' GRN=$'\033[32m' RST=$'\033[0m'
 step() { printf '\n%s══ %s%s\n' "$BLD" "$1" "$RST"; }
 
 step "خواندن متغیرهای build از سرور"
-# فقط NEXT_PUBLIC_* خوانده می‌شود. اینها در باندل کلاینت جاسازی می‌شوند، پس
-# ذاتاً عمومی‌اند — هیچ سکرتی از سرور به ماشین محلی نمی‌آید.
+# Only NEXT_PUBLIC_* is read. These are embedded in the client bundle and so
+# are public by nature — no secret leaves the server for the local machine.
 mapfile -t pub < <(ssh "$HOST" "grep -E '^NEXT_PUBLIC_[A-Z_0-9]*=' ~/$REMOTE_ENV || true")
 [[ ${#pub[@]} -gt 0 ]] || {
 	echo "هیچ NEXT_PUBLIC_* در ~/$REMOTE_ENV پیدا نشد — اول فاز env را کامل کن." >&2
@@ -64,7 +64,7 @@ docker build -f deploy/docker/api.Dockerfile "${apt_args[@]}" \
 	--target runtime -t lingospeak-api:latest .
 
 step "build ایمیج migrate (استیج builder)"
-# لایه‌هایش با ایمیج بالا مشترک است، پس عملاً فقط یک تگ اضافه می‌شود.
+# Shares layers with the image above, so this is effectively just an extra tag.
 docker build -f deploy/docker/api.Dockerfile "${apt_args[@]}" \
 	--target builder -t lingospeak-api-migrate:latest .
 

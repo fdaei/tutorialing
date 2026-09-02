@@ -22,6 +22,24 @@ PGDB="$(read_env POSTGRES_DB)"
 docker inspect -f '{{.State.Running}}' "$CONTAINER" 2>/dev/null | grep -q true ||
 	die "کانتینر $CONTAINER بالا نیست"
 
+# A dump of a table-less database is ~370 bytes of pure header: structurally a
+# perfect dump of nothing, so none of the checks below can tell it apart from a
+# real one. On the cron path an empty production database is an emergency, not a
+# backup opportunity, so bail out here — *before* anything is written and before
+# the rotation step, so the last good backups survive.
+# deploy.sh checks the same thing itself and skips this script entirely on a
+# first deploy, where an empty database is expected rather than alarming.
+tables="$(docker exec "$CONTAINER" psql -U "$PGUSER" -d "$PGDB" -tAc \
+	"SELECT count(*) FROM information_schema.tables WHERE table_schema='public'" 2>/dev/null || true)"
+[[ $tables =~ ^[0-9]+$ ]] || die "شمارش جدول‌های «$PGDB» ناموفق بود — پستگرس پاسخ نداد"
+if [[ $tables -eq 0 ]]; then
+	log "دیتابیس «$PGDB» هیچ جدولی در schema public ندارد"
+	log "اگر هنوز migration اجرا نشده این طبیعی است — اول: deploy.sh migrate"
+	log "اگر قبلاً داده داشت یعنی اسکیما از دست رفته — به $BACKUP_DIR دست نزن"
+	die "از دیتابیس خالی بکاپ گرفته نشد (چرخش بکاپ‌های قدیمی هم اجرا نشد)"
+fi
+log "جدول‌های مبدأ: $tables"
+
 mkdir -p "$BACKUP_DIR"
 chmod 700 "$BACKUP_DIR"
 
@@ -37,11 +55,25 @@ if ! docker exec "$CONTAINER" pg_dump -U "$PGUSER" -d "$PGDB" --clean --if-exist
 fi
 
 gzip -t "$tmp" 2>/dev/null || die "فایل gzip خراب است"
-zcat "$tmp" | head -40 | grep -q 'PostgreSQL database dump' ||
+
+# Capture first, match after. head and grep exit as soon as they have what they
+# need, which SIGPIPEs zcat; `set -o pipefail` turns that into a false failure
+# on any dump larger than the 64KB pipe buffer — that is, on every real one.
+dump_head="$(zcat "$tmp" | head -40 || true)"
+grep -q 'PostgreSQL database dump' <<<"$dump_head" ||
 	die "خروجی شبیه دامپ پستگرس نیست"
 
+# pg_dump writes this line last (newer versions follow it with \unrestrict), so
+# it is the one exact test for a truncated dump. `gzip -t` passes happily on a
+# stream that was closed cleanly halfway through, and a byte-count floor is only
+# ever a guess: a valid dump of a small schema is well under 1KB, while an empty
+# database — the case a floor looks like it catches — is caught up front by the
+# table count instead.
+dump_tail="$(zcat "$tmp" | tail -10)"
+grep -q 'PostgreSQL database dump complete' <<<"$dump_tail" ||
+	die "دامپ ناقص است — خط پایانی pg_dump در فایل نیست"
+
 size=$(stat -c%s "$tmp")
-[[ $size -gt 1024 ]] || die "بکاپ مشکوک کوچک است ($size بایت)"
 
 mv "$tmp" "$final"
 trap - EXIT
