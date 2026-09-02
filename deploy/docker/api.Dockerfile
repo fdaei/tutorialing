@@ -46,7 +46,13 @@ COPY packages/contracts ./packages/contracts
 COPY apps/api ./apps/api
 RUN npm rebuild
 RUN npm run build:contracts
-RUN npm run db:generate -w @lingospeak/api
+# apps/api/prisma.config.ts می‌خواند `env('DATABASE_URL')` از پکیج
+# `prisma/config` — این هلپر اگر متغیر غایب باشد throw می‌کند، حتی برای
+# `generate` که هیچ اتصال واقعی به دیتابیس لازم ندارد. در dev این با
+# apps/api/.env (که dotenv/config در همان فایل می‌خواند) پنهان می‌ماند؛ اینجا
+# چنین فایلی عمداً کپی نشده (رمز دارد)، پس یک مقدار بی‌معنی فقط برای همین
+# دستور کافی است.
+RUN DATABASE_URL='postgresql://build:build@localhost:5432/build' npm run db:generate -w @lingospeak/api
 RUN npm run build -w @lingospeak/api
 # گارد سریع: اگر نقطه‌ی ورود جابه‌جا شود، همین‌جا شکست بخور نه در زمان اجرا.
 RUN test -f apps/api/dist/apps/api/src/main.js
