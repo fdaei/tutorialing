@@ -17,6 +17,31 @@ HOST="${HOST:-lingospeak}"
 REMOTE_ENV="${REMOTE_ENV:-lingospeak/env/app.env}"
 cd "$(git rev-parse --show-toplevel)"
 
+# آینه‌ی apt. برخلاف deploy.sh (که روی سرور فرانکفورت اجرا می‌شود و آرشیو رسمی
+# را دارد) این اسکریپت روی ماشین محلی اجرا می‌شود، جایی که IPهای فست‌لای
+# deb.debian.org مسدودند — پس پیش‌فرض این‌جا آینه است، نه آرشیو رسمی.
+#
+# دو متغیر لازم است، نه یکی: آروان آرشیو debian-security را روی مسیر استاندارد
+# ندارد (۴۰۴ می‌دهد) و suite امنیتی جایی است که openssl وصله‌اش را می‌گیرد.
+# جزئیات هر دو تله در deploy/docker/api.Dockerfile.
+#
+# بازگشت به آرشیو رسمی (مثلاً از شبکه‌ای که فیلتر نیست):
+#   APT_MIRROR=deb.debian.org APT_SECURITY_MIRROR=deb.debian.org \
+#     bash deploy/bin/build-local.sh
+#
+# ⚠ اگر build روی `apt-get update` تایم‌اوت می‌خورد، اول MTU را بررسی کن نه
+#   فیلترینگ — بخش «تایم‌اوت apt در زمان build» در deploy/DEPLOY.md. آینه
+#   دادن آن مشکل را حل نمی‌کند، و با تونل WireGuard بالا هر آینه‌ای همان‌جا
+#   می‌ایستد.
+#
+# هر آرگومان اضافه‌ی خط فرمان هم دست‌نخورده به هر سه `docker build` می‌رود:
+#   bash deploy/bin/build-local.sh --build-arg APT_MIRROR=parspack.repo
+apt_args=(
+	--build-arg "APT_MIRROR=${APT_MIRROR:-mirror.arvancloud.ir}"
+	--build-arg "APT_SECURITY_MIRROR=${APT_SECURITY_MIRROR:-ftp.de.debian.org}"
+	"$@"
+)
+
 BLD=$'\033[1m' GRN=$'\033[32m' RST=$'\033[0m'
 step() { printf '\n%s══ %s%s\n' "$BLD" "$1" "$RST"; }
 
@@ -35,14 +60,17 @@ for line in "${pub[@]}"; do
 done
 
 step "build ایمیج API"
-docker build -f deploy/docker/api.Dockerfile --target runtime -t lingospeak-api:latest .
+docker build -f deploy/docker/api.Dockerfile "${apt_args[@]}" \
+	--target runtime -t lingospeak-api:latest .
 
 step "build ایمیج migrate (استیج builder)"
 # لایه‌هایش با ایمیج بالا مشترک است، پس عملاً فقط یک تگ اضافه می‌شود.
-docker build -f deploy/docker/api.Dockerfile --target builder -t lingospeak-api-migrate:latest .
+docker build -f deploy/docker/api.Dockerfile "${apt_args[@]}" \
+	--target builder -t lingospeak-api-migrate:latest .
 
 step "build ایمیج وب"
-docker build -f deploy/docker/web.Dockerfile --target runtime "${build_args[@]}" -t lingospeak-web:latest .
+docker build -f deploy/docker/web.Dockerfile "${apt_args[@]}" \
+	--target runtime "${build_args[@]}" -t lingospeak-web:latest .
 
 step "انتقال"
 size=$(docker image inspect lingospeak-api:latest lingospeak-web:latest lingospeak-api-migrate:latest \
