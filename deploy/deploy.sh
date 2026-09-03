@@ -32,6 +32,14 @@ DEPLOY_USER="${DEPLOY_USER:-deploy}"
 DOMAIN="${DOMAIN:-lingospeak.org}"
 STORAGE_DOMAIN="${STORAGE_DOMAIN:-storage.lingospeak.org}"
 SERVER_IP="${SERVER_IP:?set SERVER_IP from the private operations configuration}"
+IMAGE_TAG="${IMAGE_TAG:-latest}"
+RELEASE_SHA="${RELEASE_SHA:-}"
+
+[[ $IMAGE_TAG =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]] || {
+	printf 'Invalid Docker image tag: %s\n' "$IMAGE_TAG" >&2
+	exit 1
+}
+export IMAGE_TAG
 
 ROOT_DIR="${ROOT_DIR:-/home/${DEPLOY_USER}/lingospeak}"
 APP_DIR="$ROOT_DIR/app"
@@ -46,6 +54,11 @@ COMPOSE=(docker compose --env-file "$ENV_FILE" -f "$APP_DIR/docker-compose.yml")
 APT_ARGS=()
 if [[ -n ${APT_MIRROR:-} ]]; then
 	APT_ARGS+=(--build-arg "APT_MIRROR=$APT_MIRROR")
+fi
+
+LABEL_ARGS=(--label "org.opencontainers.image.version=$IMAGE_TAG")
+if [[ -n $RELEASE_SHA ]]; then
+	LABEL_ARGS+=(--label "org.opencontainers.image.revision=$RELEASE_SHA")
 fi
 if [[ -n ${APT_SECURITY_MIRROR:-} ]]; then
 	APT_ARGS+=(--build-arg "APT_SECURITY_MIRROR=$APT_SECURITY_MIRROR")
@@ -207,11 +220,11 @@ phase_build() {
 	step "build ایمیج API"
 	# Sequential, not parallel: two concurrent builds on 7.8GB RAM aren't reliable.
 	as_deploy docker build -f "$SRC_DIR/deploy/docker/api.Dockerfile" \
-		"${APT_ARGS[@]}" --target runtime -t lingospeak-api:latest "$SRC_DIR"
-	ok "lingospeak-api:latest"
+		"${APT_ARGS[@]}" "${LABEL_ARGS[@]}" --target runtime -t "lingospeak-api:$IMAGE_TAG" "$SRC_DIR"
+	ok "lingospeak-api:$IMAGE_TAG"
 
 	# Guards the API image's biggest risk: resolving @lingospeak/contracts at runtime.
-	if as_deploy docker run --rm --entrypoint node lingospeak-api:latest \
+	if as_deploy docker run --rm --entrypoint node "lingospeak-api:$IMAGE_TAG" \
 		-e "require('@lingospeak/contracts')" 2>/dev/null; then
 		ok "@lingospeak/contracts داخل ایمیج قابل require است"
 	else
@@ -220,21 +233,21 @@ phase_build() {
 
 	step "build ایمیج migrate"
 	as_deploy docker build -f "$SRC_DIR/deploy/docker/api.Dockerfile" \
-		"${APT_ARGS[@]}" --target builder -t lingospeak-api-migrate:latest "$SRC_DIR"
-	ok "lingospeak-api-migrate:latest (لایه‌ها با api مشترک)"
+		"${APT_ARGS[@]}" "${LABEL_ARGS[@]}" --target builder -t "lingospeak-api-migrate:$IMAGE_TAG" "$SRC_DIR"
+	ok "lingospeak-api-migrate:$IMAGE_TAG (لایه‌ها با api مشترک)"
 
 	step "build ایمیج وب"
 	local args=()
 	while IFS= read -r line; do args+=(--build-arg "$line"); done \
 		< <(grep -E '^NEXT_PUBLIC_[A-Z_0-9]*=' "$ENV_FILE")
 	as_deploy docker build -f "$SRC_DIR/deploy/docker/web.Dockerfile" \
-		"${APT_ARGS[@]}" --target runtime "${args[@]}" -t lingospeak-web:latest "$SRC_DIR"
-	ok "lingospeak-web:latest"
+		"${APT_ARGS[@]}" "${LABEL_ARGS[@]}" --target runtime "${args[@]}" -t "lingospeak-web:$IMAGE_TAG" "$SRC_DIR"
+	ok "lingospeak-web:$IMAGE_TAG"
 
 	# CLAUDE.md: after any dependency install, verify postcss resolved to the
 	# patched version (Next bundles its own older copy).
 	step "بررسی override بسته‌ی postcss"
-	as_deploy docker run --rm --entrypoint sh lingospeak-api:latest -c \
+	as_deploy docker run --rm --entrypoint sh "lingospeak-api:$IMAGE_TAG" -c \
 		'ls node_modules/postcss/package.json >/dev/null 2>&1 && node -p "require(\"postcss/package.json\").version" || echo "(در ایمیج runtime نیست — درست است)"' |
 		sed 's/^/     /'
 

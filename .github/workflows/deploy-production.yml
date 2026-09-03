@@ -1,0 +1,129 @@
+name: Deploy production
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Test and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/lingospeak
+    steps:
+      - name: Validate release tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF_NAME" =~ ^v([0-9]+\.[0-9]+\.[0-9]+|test-[A-Za-z0-9._-]+)$ ]] || {
+            echo "Tag must be vMAJOR.MINOR.PATCH or v-test-NAME" >&2
+            exit 1
+          }
+
+      - name: Check out exact tag
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npm run db:generate
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      - name: Build application
+        run: npm run build
+
+      - name: Build production images
+        run: |
+          docker build --target runtime -f deploy/docker/api.Dockerfile -t lingospeak-api:${GITHUB_REF_NAME} .
+          docker build --target builder -f deploy/docker/api.Dockerfile -t lingospeak-api-migrate:${GITHUB_REF_NAME} .
+          docker build --target runtime -f deploy/docker/web.Dockerfile -t lingospeak-web:${GITHUB_REF_NAME} .
+
+  deploy:
+    name: Deploy tagged source
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: production
+    steps:
+      - name: Check out exact tag
+        uses: actions/checkout@v4
+
+      - name: Configure SSH
+        shell: bash
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.PROD_SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.PROD_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          install -d -m 700 ~/.ssh
+          install -m 600 /dev/null ~/.ssh/id_deploy
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_deploy
+          install -m 600 /dev/null ~/.ssh/known_hosts
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Package exact tagged source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git archive --format=tar.gz --output=/tmp/lingospeak-source.tar.gz "$GITHUB_SHA"
+          tar -czf /tmp/lingospeak-provision.tar.gz deploy
+          install -m 755 deploy/ci-release.sh /tmp/ci-release.sh
+          sha256sum /tmp/lingospeak-source.tar.gz /tmp/lingospeak-provision.tar.gz > /tmp/SHA256SUMS
+
+      - name: Upload release payload
+        env:
+          PROD_HOST: ${{ secrets.PROD_HOST }}
+          PROD_USER: ${{ secrets.PROD_USER }}
+        run: |
+          set -euo pipefail
+          remote_dir="lingospeak-upload-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          ssh -i ~/.ssh/id_deploy "$PROD_USER@$PROD_HOST" "install -d -m 700 ~/$remote_dir"
+          scp -i ~/.ssh/id_deploy /tmp/lingospeak-source.tar.gz /tmp/lingospeak-provision.tar.gz /tmp/ci-release.sh /tmp/SHA256SUMS \
+            "$PROD_USER@$PROD_HOST:~/$remote_dir/"
+          printf '%s' "$remote_dir" > /tmp/remote-dir
+
+      - name: Deploy and verify
+        env:
+          PROD_HOST: ${{ secrets.PROD_HOST }}
+          PROD_USER: ${{ secrets.PROD_USER }}
+          PROD_SERVER_IP: ${{ secrets.PROD_SERVER_IP }}
+        run: |
+          set -euo pipefail
+          remote_dir="$(cat /tmp/remote-dir)"
+          ssh -i ~/.ssh/id_deploy "$PROD_USER@$PROD_HOST" \
+            "sudo SERVER_IP='$PROD_SERVER_IP' RELEASE_TAG='$GITHUB_REF_NAME' RELEASE_SHA='$GITHUB_SHA' bash ~/$remote_dir/ci-release.sh ~/$remote_dir"
+
+      - name: Remove uploaded payload
+        if: always()
+        env:
+          PROD_HOST: ${{ secrets.PROD_HOST }}
+          PROD_USER: ${{ secrets.PROD_USER }}
+        run: |
+          if [[ -f /tmp/remote-dir ]]; then
+            remote_dir="$(cat /tmp/remote-dir)"
+            ssh -i ~/.ssh/id_deploy "$PROD_USER@$PROD_HOST" "rm -rf ~/$remote_dir"
+          fi
