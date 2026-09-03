@@ -19,12 +19,17 @@ jobs:
     timeout-minutes: 30
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/lingospeak
+      JWT_ACCESS_SECRET: ci-only-access-secret-0000000000000001
+      JWT_REFRESH_SECRET: ci-only-refresh-secret-000000000000001
+      S3_ACCESS_KEY: ci-only-access-key
+      S3_SECRET_KEY: ci-only-secret-key
+      S3_BUCKET: ci-only-bucket
     steps:
       - name: Validate release tag
         shell: bash
         run: |
           set -euo pipefail
-          [[ "$GITHUB_REF_NAME" =~ ^v([0-9]+\.[0-9]+\.[0-9]+|test-[A-Za-z0-9._-]+)$ ]] || {
+          [[ "$GITHUB_REF_NAME" =~ ^v([0-9]+\.[0-9]+\.[0-9]+|-test-[A-Za-z0-9._-]+)$ ]] || {
             echo "Tag must be vMAJOR.MINOR.PATCH or v-test-NAME" >&2
             exit 1
           }

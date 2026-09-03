@@ -14,7 +14,7 @@ RELEASES_DIR="$ROOT_DIR/releases"
 RELEASE_DIR="$RELEASES_DIR/$RELEASE_TAG"
 LOCK_FILE="$ROOT_DIR/.deploy.lock"
 
-[[ $RELEASE_TAG =~ ^v([0-9]+\.[0-9]+\.[0-9]+|test-[A-Za-z0-9._-]+)$ ]] || {
+[[ $RELEASE_TAG =~ ^v([0-9]+\.[0-9]+\.[0-9]+|-test-[A-Za-z0-9._-]+)$ ]] || {
 	echo "Invalid release tag: $RELEASE_TAG" >&2
 	exit 1
 }
