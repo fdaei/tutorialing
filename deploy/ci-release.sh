@@ -68,7 +68,12 @@ printf 'tag=%s\nsha=%s\ndeployed_at=%s\n' "$RELEASE_TAG" "$RELEASE_SHA" "$(date 
 # are retained because their provenance cannot be recreated from Git.
 mapfile -t old_releases < <(find "$RELEASES_DIR" -mindepth 1 -maxdepth 1 -type d -name 'v*' -printf '%T@ %p\n' | sort -nr | tail -n +6 | cut -d' ' -f2-)
 for old in "${old_releases[@]}"; do
-	[[ $(readlink -f "$ROOT_DIR/src") != "$old/source" ]] && rm -rf -- "$old"
+	if [[ $(readlink -f "$ROOT_DIR/src") != "$old/source" ]]; then
+		old_tag="$(basename "$old")"
+		docker image rm "lingospeak-api:$old_tag" "lingospeak-api-migrate:$old_tag" "lingospeak-web:$old_tag" \
+			>/dev/null 2>&1 || true
+		rm -rf -- "$old"
+	fi
 done
 
 echo "Production release complete: $RELEASE_TAG ($RELEASE_SHA)"
