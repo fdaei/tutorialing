@@ -112,3 +112,4 @@ deploy/env/app.env
 # Generated demo administrator credentials must stay on the server.
 demo-admin-credentials*
 *.credentials.txt
+DEPLOY/
