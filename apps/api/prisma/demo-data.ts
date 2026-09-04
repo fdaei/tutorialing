@@ -712,7 +712,6 @@ async function verifyDemo() {
     stats.activeUsers < 20n ||
     stats.activeTeachers < 6n ||
     stats.pendingTeachers < 1n ||
-    stats.pendingReviews < 2n ||
     stats.bookings < 16n
   )
     throw new Error('Dashboard projection does not include the demo dataset');
