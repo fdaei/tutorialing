@@ -84,6 +84,16 @@ describe('api access-token refresh', () => {
     expect(fetchMock).toHaveBeenCalledWith(`${API}/users/me`, expect.anything());
   });
 
+  it('does not attempt a refresh for an anonymous 401 without an access token', async () => {
+    sessionStorage.removeItem('access_token');
+    fetchMock.mockResolvedValue(jsonResponse(401, { code: 'UNAUTHORIZED', message: 'Authentication required' }));
+
+    await expect(api('/users/me')).rejects.toMatchObject({ status: 401 });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(refreshCalls()).toHaveLength(0);
+  });
+
   it('retries the original request only once and never refreshes recursively', async () => {
     fetchMock.mockImplementation((url: string) =>
       Promise.resolve(

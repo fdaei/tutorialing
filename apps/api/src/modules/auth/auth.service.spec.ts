@@ -179,6 +179,16 @@ function refreshSecretAndHash() {
 }
 
 describe('AuthService.refresh (SEC-209)', () => {
+  it('rejects a missing refresh token without touching the database', async () => {
+    const { svc, db } = refreshHarness(null);
+
+    await expect(svc.refresh(undefined, {})).rejects.toMatchObject({
+      response: { code: 'REFRESH_TOKEN_REQUIRED' },
+    });
+    expect(db.$transaction).not.toHaveBeenCalled();
+    expect(db.refreshSession.findUnique).not.toHaveBeenCalled();
+  });
+
   it('1. succeeds with a valid, unexpired, unrevoked refresh token and rotates it', async () => {
     const { secret, tokenHash } = refreshSecretAndHash();
     const { svc, db } = refreshHarness({
