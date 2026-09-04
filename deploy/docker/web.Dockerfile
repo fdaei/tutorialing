@@ -144,6 +144,14 @@ COPY --from=builder /app/apps/web/.next/standalone ./
 COPY --from=builder /app/apps/web/.next/static ./apps/web/.next/static
 COPY --from=builder /app/apps/web/public ./apps/web/public
 
+# بهینه‌ساز تصویر Next در زمان اجرا زیر .next/cache می‌نویسد. همه‌ی COPYهای
+# بالا با کاربر root انجام شده‌اند، پس کاربر بی‌امتیاز runtime نمی‌تواند آن
+# پوشه را بسازد: هر بهینه‌سازی با EACCES شکست می‌خورد و به شکل
+# unhandledRejection بالا می‌آید (لاگ web پر از همین بود) و هر درخواست تصویر
+# دوباره از صفر پردازش می‌شود. پوشه از قبل ساخته و مالکیتش داده می‌شود.
+RUN mkdir -p /app/apps/web/.next/cache \
+	&& chown -R node:node /app/apps/web/.next
+
 USER node
 EXPOSE 3000
 CMD ["node", "apps/web/server.js"]
