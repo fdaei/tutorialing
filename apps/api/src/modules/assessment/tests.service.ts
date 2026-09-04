@@ -495,15 +495,19 @@ export class TestsService {
     if (!data || typeof data !== 'object' || Array.isArray(data)) throw badRequest('REQUEST_BODY_INVALID');
     return data as Record<string, unknown>;
   }
+  // The label names the offending field in `fieldErrors`; without it the client
+  // receives a bare FIELD_REQUIRED with an empty map and cannot tell the caller
+  // which input to fix.
   private requiredString(value: unknown, label: string, max = 3000) {
-    if (typeof value !== 'string' || !value.trim()) throw badRequest('FIELD_REQUIRED');
+    if (typeof value !== 'string' || !value.trim()) throw badRequest('FIELD_REQUIRED', { [label]: 'FIELD_REQUIRED' });
     const out = value.trim();
-    if (out.length > max) throw badRequest('FIELD_TOO_LONG');
+    if (out.length > max) throw badRequest('FIELD_TOO_LONG', { [label]: 'FIELD_TOO_LONG' });
     return out;
   }
   private positiveInt(value: unknown, label: string) {
     const out = Number(value);
-    if (!Number.isInteger(out) || out < 1) throw badRequest('POSITIVE_INTEGER_REQUIRED');
+    if (!Number.isInteger(out) || out < 1)
+      throw badRequest('POSITIVE_INTEGER_REQUIRED', { [label]: 'POSITIVE_INTEGER_REQUIRED' });
     return out;
   }
   private localized(value: unknown, label: string) {
@@ -517,15 +521,15 @@ export class TestsService {
     for (const key of ['slug', 'titleFa', 'titleEn', 'descriptionFa', 'descriptionEn'] as const) {
       if (data[key] !== undefined)
         out[key] = this.requiredString(data[key], key, key.startsWith('description') ? 4001 : 160);
-      else if (!partial) throw badRequest('TEST_FIELD_REQUIRED');
+      else if (!partial) throw badRequest('TEST_FIELD_REQUIRED', { [key]: 'TEST_FIELD_REQUIRED' });
     }
     if (data.languageId !== undefined)
       out.language = { connect: { id: this.requiredString(data.languageId, 'languageId', 100) } };
-    else if (!partial) throw badRequest('TEST_LANGUAGE_REQUIRED');
+    else if (!partial) throw badRequest('TEST_LANGUAGE_REQUIRED', { languageId: 'TEST_LANGUAGE_REQUIRED' });
     if (data.level !== undefined) out.level = data.level ? this.requiredString(data.level, 'level', 40) : null;
     if (data.durationMinutes !== undefined)
       out.durationMinutes = this.positiveInt(data.durationMinutes, 'durationMinutes');
-    else if (!partial) throw badRequest('TEST_DURATION_REQUIRED');
+    else if (!partial) throw badRequest('TEST_DURATION_REQUIRED', { durationMinutes: 'TEST_DURATION_REQUIRED' });
     if (data.published !== undefined) out.published = Boolean(data.published);
     return out;
   }
@@ -617,11 +621,17 @@ export class TestsService {
   }
   async createSimpleDefinition(input: unknown) {
     const data = this.record(input);
-    await this.ensureLanguage(data.languageId);
-    const titleFa = this.requiredString(data.titleFa, 'titleFa', 160),
+    // The educational language has no sensible default — sections and scoring
+    // are language-scoped — so an omitted one is reported under its own code
+    // rather than the generic FIELD_REQUIRED, matching `definitionData`.
+    if (data.languageId === undefined)
+      throw badRequest('TEST_LANGUAGE_REQUIRED', { languageId: 'TEST_LANGUAGE_REQUIRED' });
+    const languageId = this.requiredString(data.languageId, 'languageId', 100),
+      titleFa = this.requiredString(data.titleFa, 'titleFa', 160),
       titleEn = this.requiredString(data.titleEn, 'titleEn', 160),
       durationMinutes =
         data.durationMinutes === undefined ? 164 : this.positiveInt(data.durationMinutes, 'durationMinutes');
+    await this.ensureLanguage(languageId);
     const base =
         titleEn
           .toLowerCase()
@@ -629,7 +639,6 @@ export class TestsService {
           .replace(/^-|-$/g, '')
           .slice(0, 60) || 'placement-test',
       slug = `${base}-${Date.now().toString(36)}`;
-    const languageId = this.requiredString(data.languageId, 'languageId', 100);
     const sections = [
       {
         skill: 'listening',

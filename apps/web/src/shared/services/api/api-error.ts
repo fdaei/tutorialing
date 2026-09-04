@@ -147,8 +147,13 @@ export class ApiError extends Error {
     details: unknown,
   ) {
     const body = normalizeApiErrorBody(details);
+    // Field-shaped codes (FIELD_REQUIRED, FIELD_TOO_LONG, …) interpolate the
+    // offending field name into {0}; without it the copy renders as a sentence
+    // with a hole in it. Retry-after codes keep taking the delay instead.
+    const values =
+      body.retryAfterSeconds === undefined ? Object.keys(body.fieldErrors ?? {}) : [body.retryAfterSeconds];
     super(
-      errorMessage(body.code, body.retryAfterSeconds === undefined ? [] : [body.retryAfterSeconds]) ||
+      errorMessage(body.code, values) ||
         body.message ||
         errorMessage(status >= 500 ? 'INTERNAL_ERROR' : 'REQUEST_FAILED'),
     );

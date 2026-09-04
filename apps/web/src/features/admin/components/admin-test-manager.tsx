@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { BookOpen, ChevronDown, ChevronUp, Plus, Trash2 } from 'lucide-react';
 import { api, ApiError } from '@/shared/services/api';
 import { useTranslations } from '@/components/shared/locale-provider';
+import type { EducationalLanguage } from '@/features/languages';
 
 type Question = { id: string; prompt: { fa?: string; en?: string }; type: string; points: number; order: number };
 type Section = {
@@ -28,6 +29,10 @@ export function AdminTestManager() {
     [selected, setSelected] = useState<string>(),
     [expanded, setExpanded] = useState<string>();
   const query = useQuery({ queryKey: ['admin-tests'], queryFn: () => api<Test[]>('/admin/tests') }),
+    // The API refuses a test without an educational language (sections and
+    // scoring are language-scoped), so the builder has to offer the choice.
+    languages = useQuery({ queryKey: ['languages'], queryFn: () => api<EducationalLanguage[]>('/languages') }),
+    languageOptions = languages.data ?? [],
     tests = query.data ?? [],
     active = useMemo(() => tests.find((test) => test.id === (selected ?? tests[0]?.id)), [tests, selected]);
   const mutation = useMutation({
@@ -67,6 +72,7 @@ export function AdminTestManager() {
                 api('/admin/tests/simple', {
                   method: 'POST',
                   body: JSON.stringify({
+                    languageId: value(form, 'languageId'),
                     titleFa: value(form, 'titleFa'),
                     titleEn: value(form, 'titleEn'),
                     durationMinutes: Number(value(form, 'durationMinutes')) || 164,
@@ -83,6 +89,31 @@ export function AdminTestManager() {
               {translate(locale, 'adminadminTestManagerEnterTheTitlesAndTheStructureWillBe')}
             </p>
             <div className="mt-4 grid gap-3">
+              <div>
+                <select
+                  className={input}
+                  name="languageId"
+                  defaultValue=""
+                  aria-label={translate(locale, 'adminTestLanguage')}
+                  aria-describedby={languages.isError ? 'admin-test-language-error' : undefined}
+                  disabled={languages.isLoading || languages.isError}
+                  required
+                >
+                  <option value="" disabled>
+                    {translate(locale, 'adminTestSelectLanguage')}
+                  </option>
+                  {languageOptions.map((language) => (
+                    <option key={language.id} value={language.id}>
+                      {localized({ fa: language.nameFa, en: language.nameEn }, locale)}
+                    </option>
+                  ))}
+                </select>
+                {languages.isError && (
+                  <p id="admin-test-language-error" className="mt-2 text-xs text-red-600">
+                    {translate(locale, 'languagesLoadError')}
+                  </p>
+                )}
+              </div>
               <input
                 className={input}
                 name="titleFa"
@@ -106,7 +137,10 @@ export function AdminTestManager() {
                 defaultValue="164"
                 aria-label={translate(locale, 'adminadminTestManagerDurationInMinutes')}
               />
-              <button className="brand-gradient rounded-xl py-3 font-black text-white" disabled={mutation.isPending}>
+              <button
+                className="brand-gradient rounded-xl py-3 font-black text-white disabled:opacity-60"
+                disabled={mutation.isPending || !languageOptions.length}
+              >
                 {translate(locale, 'adminadminTestManagerCreateTest')}
               </button>
             </div>
