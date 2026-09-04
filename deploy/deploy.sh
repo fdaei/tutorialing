@@ -355,25 +355,44 @@ phase_migrate() {
 			npx tsx prisma/seed-countries.ts | sed 's/^/     /'
 	fi
 
+	step "صفحه‌های محتوایی عمومی"
+	# Same reasoning as the country data: the footer links to /about, /faq,
+	# /contact, /terms, /privacy and /cancellation-policy on every page, but the
+	# only place that created those rows was the demo seed — which never runs
+	# here — so production served a 404 on all of them. seed-cms-pages.ts
+	# installs just the published baseline and never overwrites text the admin
+	# panel has since edited.
+	as_deploy "${COMPOSE[@]}" --profile tools run --rm -T migrate \
+		npx tsx prisma/seed-cms-pages.ts | sed 's/^/     /'
+
 	step "تأیید: داده‌ی مرجع و صفحه‌های عمومی هستند، داده‌ی دمو نیست"
-	local users countries about_pages
+	# Every slug the site links to without a guard of its own. A missing row
+	# here is a visible 404, so the deploy stops rather than publishing one.
+	local required_pages=(about how-it-works faq contact terms privacy cancellation-policy become-a-teacher)
+	local users countries published_pages missing_pages
 	users="$(as_deploy docker exec lingospeak-postgres psql -U "$(read_env POSTGRES_USER)" \
 		-d "$(read_env POSTGRES_DB)" -tAc 'SELECT count(*) FROM "User"' 2>/dev/null || echo '?')"
 	countries="$(as_deploy docker exec lingospeak-postgres psql -U "$(read_env POSTGRES_USER)" \
 		-d "$(read_env POSTGRES_DB)" -tAc 'SELECT count(*) FROM "Country"' 2>/dev/null || echo '?')"
-	about_pages="$(as_deploy docker exec lingospeak-postgres psql -U "$(read_env POSTGRES_USER)" \
+	# One round trip: the published slugs, newline separated.
+	published_pages="$(as_deploy docker exec lingospeak-postgres psql -U "$(read_env POSTGRES_USER)" \
 		-d "$(read_env POSTGRES_DB)" -tAc \
-		'SELECT count(*) FROM "CmsPage" WHERE "slug" = '\''about'\'' AND "published" = true' \
-		2>/dev/null || echo '?')"
-	printf '     User        = %s\n     Country     = %s\n     Public about = %s\n' \
-		"$users" "$countries" "$about_pages"
+		'SELECT "slug" FROM "CmsPage" WHERE "published" = true' 2>/dev/null || echo '?')"
+	missing_pages=()
+	for slug in "${required_pages[@]}"; do
+		grep -qxF "$slug" <<<"$published_pages" || missing_pages+=("$slug")
+	done
+	printf '     User          = %s\n     Country       = %s\n     Public pages  = %s/%s\n' \
+		"$users" "$countries" \
+		"$((${#required_pages[@]} - ${#missing_pages[@]}))" "${#required_pages[@]}"
 	if [[ $users == 0 ]]; then
 		ok "هیچ کاربر نمونه‌ای ساخته نشده"
 	else
 		warn "جدول User خالی نیست ($users) — اگر انتظارش را نداشتی، seed دمو اجرا شده"
 	fi
 	[[ $countries != 0 ]] || warn "جدول Country خالی است — انتخابگر کشور در سایت خالی می‌ماند"
-	[[ $about_pages == 1 ]] || die "صفحهٔ عمومی about پس از migration موجود و منتشر نیست"
+	[[ ${#missing_pages[@]} -eq 0 ]] ||
+		die "صفحه‌های عمومی منتشرنشده: ${missing_pages[*]}"
 
 	# First deploy: the backup phase found an empty database and deferred the
 	# drill to here. The schema exists from this point on, so the recovery path
