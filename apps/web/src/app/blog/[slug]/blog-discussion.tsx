@@ -4,8 +4,11 @@ import { FormEvent, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Heart, MessageCircle, Reply } from 'lucide-react';
 import { api, publicApi } from '@/shared/services/api';
+import { useTranslations } from '@/components/shared/locale-provider';
+import { localePath } from '@/lib/i18n';
 type Comment = { id: string; body: string; createdAt: string; user?: { name?: string }; replies: Comment[] };
 export function BlogDiscussion({ postId }: { postId: string }) {
+  const { locale } = useTranslations();
   const qc = useQueryClient(),
     [notice, setNotice] = useState(''),
     comments = useQuery({
@@ -49,7 +52,7 @@ export function BlogDiscussion({ postId }: { postId: string }) {
         <p aria-live="polite" className="mt-4 rounded-xl bg-lavender p-3 text-sm text-purple">
           {notice}{' '}
           {notice.includes('وارد') && (
-            <Link href="/auth" className="font-black underline">
+            <Link href={localePath('/auth', locale)} className="font-black underline">
               ورود
             </Link>
           )}

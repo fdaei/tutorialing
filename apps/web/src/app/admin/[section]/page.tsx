@@ -3,14 +3,17 @@ import { notFound } from 'next/navigation';
 import { PanelActions, PanelShell, ResourceView, adminNav } from '@/features/panel';
 import {
   AdminFinanceCenter,
+  AdminCourseManager,
   AdminTestManager,
   AdminUsersManager,
+  CmsManager,
   CountryManager,
   ExaminerReviewManager,
   LanguageManager,
   adminSectionConfig,
   isAdminSection,
   TeacherDocumentsManager,
+  WebsiteBuilder,
 } from '@/features/admin';
 import { TicketManager } from '@/features/support';
 import { PricingManager } from '@/features/commerce';
@@ -26,7 +29,8 @@ export default async function Section({ params }: { params: Promise<{ section: s
     fa = isDefaultLocale(locale);
   const [titleFa, titleEn, endpoint] = adminSectionConfig[section];
   let content: React.ReactNode;
-  if (section === 'tests') content = <AdminTestManager />;
+  if (section === 'courses') content = <AdminCourseManager />;
+  else if (section === 'tests') content = <AdminTestManager />;
   else if (section === 'bookings')
     content = (
       <div className="grid gap-6">
@@ -49,6 +53,8 @@ export default async function Section({ params }: { params: Promise<{ section: s
   else if (section === 'teacher-prices') content = <PricingManager mode="admin" />;
   else if (section === 'teacher-documents') content = <TeacherDocumentsManager />;
   else if (section === 'finance' || section === 'teacher-earnings') content = <AdminFinanceCenter />;
+  else if (section === 'cms') content = <CmsManager />;
+  else if (section === 'website-builder') content = <WebsiteBuilder />;
   else if (section === 'payouts')
     content = (
       <div className="grid gap-6">

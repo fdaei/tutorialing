@@ -16,17 +16,35 @@ export class ContentService {
     return this.db.cmsPage.findMany({ orderBy: { slug: 'asc' } });
   }
 
-  upsert(slug: string, data: { titleFa?: string; titleEn?: string; contentFa?: unknown; contentEn?: unknown; seo?: unknown; published?: boolean }) {
+  upsert(
+    slug: string,
+    data: {
+      titleFa?: string;
+      titleEn?: string;
+      contentFa?: unknown;
+      contentEn?: unknown;
+      seo?: unknown;
+      published?: boolean;
+    },
+  ) {
     const titleFa = data.titleFa ?? slug;
     const titleEn = data.titleEn ?? slug;
     const contentFa = (data.contentFa ?? {}) as Prisma.InputJsonValue;
     const contentEn = (data.contentEn ?? {}) as Prisma.InputJsonValue;
     const seo = (data.seo ?? {}) as Prisma.InputJsonValue;
     const published = data.published === true;
+    const update: Prisma.CmsPageUpdateInput = {};
+    if (data.titleFa !== undefined) update.titleFa = data.titleFa;
+    if (data.titleEn !== undefined) update.titleEn = data.titleEn;
+    if (data.contentFa !== undefined) update.contentFa = contentFa;
+    if (data.contentEn !== undefined) update.contentEn = contentEn;
+    if (data.seo !== undefined) update.seo = seo;
+    if (data.published !== undefined) update.published = data.published;
+
     return this.db.cmsPage.upsert({
       where: { slug },
       create: { slug, titleFa, titleEn, contentFa, contentEn, seo, published },
-      update: { titleFa, titleEn, contentFa, contentEn, seo, published },
+      update,
     });
   }
 }

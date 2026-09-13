@@ -1,12 +1,18 @@
 import { Body, Controller, Get, Headers, Param, Post, Req } from '@nestjs/common';
 import type { Request } from 'express';
-import { CurrentUser, RateLimit, RATE_LIMIT_TIERS, type AuthUser } from '../../common';
+import { CurrentUser, Public, RateLimit, RATE_LIMIT_TIERS, type AuthUser } from '../../common';
 import { FilesService } from './files.service';
 import { UploadDto } from './dto/request/upload.dto';
 
 @Controller('files')
 export class FilesController {
   constructor(private s: FilesService) {}
+
+  @Public()
+  @Get('public/:id')
+  publicImage(@Param('id') id: string) {
+    return this.s.publicImage(id);
+  }
 
   @RateLimit(RATE_LIMIT_TIERS.fileUpload)
   @Post('uploads')

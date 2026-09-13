@@ -19,6 +19,9 @@ export class SupportController {
   @Public() @Get('public-settings') settings() {
     return this.settingsService.publicSettings();
   }
+  @Public() @Get('navigation') navigation() {
+    return this.settingsService.publicNavigation();
+  }
   @Public() @Get('pages/:slug') page(@Param('slug') slug: string) {
     return this.contentService.publishedPage(slug);
   }

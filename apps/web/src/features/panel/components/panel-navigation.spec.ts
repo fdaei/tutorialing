@@ -28,6 +28,7 @@ describe('panel navigation architecture', () => {
     expect(sections.every(isAdminSection)).toBe(true);
     expect(isAdminSection('anything')).toBe(false);
     expect(adminSectionConfig.languages[2]).toBe('/admin/languages');
+    expect(adminSectionConfig.courses[2]).toBe('/admin/courses');
     expect(adminSectionConfig.tickets[2]).toBe('/admin/tickets');
   });
 

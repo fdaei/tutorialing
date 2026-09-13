@@ -10,6 +10,7 @@ import { useTranslations } from '@/components/shared/locale-provider';
 import { localePath, localized, translate } from '@/lib/i18n';
 import { webConfig } from '@/config';
 import { onAuthSessionChange } from '@/shared/services/api';
+import { usePublicNavigation } from '@/features/navigation/navigation-config';
 
 export function Brand() {
   return (
@@ -28,6 +29,7 @@ export function Header() {
     [open, setOpen] = useState(false),
     queryClient = useQueryClient(),
     pathname = usePathname();
+  const navigation = usePublicNavigation();
   const me = useQuery({ queryKey: ['header-me'], queryFn: () => api<{ roles: string[] }>('/users/me'), retry: false });
   useEffect(
     () =>
@@ -45,22 +47,20 @@ export function Header() {
     window.addEventListener('keydown', closeOnEscape);
     return () => window.removeEventListener('keydown', closeOnEscape);
   }, [open]);
-  const links: [string, string][] = [
-    [p('/'), translate(locale, 'layoutsiteHome')],
-    [p('/courses'), translate(locale, 'layoutsiteCourses')],
-    [p('/teachers'), t('teachers')],
-    [p('/languages'), translate(locale, 'layoutsiteLanguages')],
-    [p('/blog'), translate(locale, 'layoutsiteMagazine')],
-    [p('/about'), translate(locale, 'layoutsiteAboutUs')],
-  ];
+  const links = navigation.items.map((item) => ({
+    href: p(item.href),
+    label: localized({ fa: item.label.fa, en: item.label.en }, locale),
+  }));
   return (
     <header className="sticky top-0 z-40 border-b border-transparent bg-white/92 backdrop-blur-xl">
       <div className="mx-auto flex h-[76px] max-w-[1380px] items-center justify-between px-5 lg:px-8">
         <Link href={p('/')}>
           <Brand />
         </Link>
-        <nav aria-label={t('mainNavigation')} className="hidden items-center gap-9 text-sm font-bold lg:flex">
-          {links.map(([href, label]) => (
+        <nav aria-label={t('mainNavigation')} aria-busy={navigation.isLoading} className="hidden items-center gap-9 text-sm font-bold lg:flex">
+          {navigation.isLoading
+            ? [1, 2, 3, 4].map((item) => <span key={item} className="h-4 w-14 animate-pulse rounded-full bg-canvas" />)
+            : links.map(({ href, label }) => (
             <Link
               key={href}
               href={href}
@@ -69,7 +69,7 @@ export function Header() {
             >
               {label}
             </Link>
-          ))}
+            ))}
         </nav>
         <div className="flex items-center gap-2.5">
           <LanguageSwitcher className="hidden sm:inline-flex" />
@@ -98,7 +98,7 @@ export function Header() {
       </div>
       {open && (
         <nav id="mobile-main-navigation" className="grid gap-2 border-t hairline bg-white p-5 lg:hidden">
-          {links.map(([href, label]) => (
+          {links.map(({ href, label }) => (
             <Link
               key={href}
               onClick={() => setOpen(false)}
@@ -124,6 +124,7 @@ export function isActiveNavigationPath(pathname: string, href: string) {
 export function Footer() {
   const { locale, t } = useTranslations(),
     p = (x: string) => localePath(x, locale);
+  const navigation = usePublicNavigation();
   return (
     <footer className="border-t hairline bg-white">
       <div className="mx-auto grid max-w-[1380px] gap-10 px-6 py-14 md:grid-cols-4">
@@ -136,10 +137,11 @@ export function Footer() {
         <div>
           <p className="font-black">{translate(locale, 'layoutsiteExplore')}</p>
           <div className="mt-4 grid gap-3 text-sm text-muted">
-            <Link href={p('/teachers')}>{t('teachers')}</Link>
-            <Link href={p('/placement')}>{t('placement')}</Link>
-            <Link href={p('/matching')}>{t('matching')}</Link>
-            <Link href={p('/about')}>{translate(locale, 'layoutsiteAboutUs')}</Link>
+            {navigation.items.map((item) => (
+              <Link href={p(item.href)} key={item.id}>
+                {localized({ fa: item.label.fa, en: item.label.en }, locale)}
+              </Link>
+            ))}
           </div>
         </div>
         <div>

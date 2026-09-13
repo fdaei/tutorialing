@@ -115,6 +115,17 @@ export class FilesService {
     };
   }
 
+  async publicImage(id: string) {
+    const file = requireValue(
+      await this.db.storedFile.findFirst({
+        where: { id, status: 'SAFE', purpose: 'website-media', mimeType: { in: ['image/jpeg', 'image/png', 'image/webp'] } },
+        select: { key: true, mimeType: true, originalName: true },
+      }),
+      () => notFound('FILE_NOT_FOUND'),
+    );
+    return { url: await this.storage.createDownloadUrl(file.key), mimeType: file.mimeType, name: file.originalName };
+  }
+
   async ownedSafeImage(ownerId: string, id: string) {
     const file = requireValue(
       await this.db.storedFile.findFirst({

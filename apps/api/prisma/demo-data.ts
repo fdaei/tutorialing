@@ -147,18 +147,6 @@ const teachers = [
     specialties: ['Conversation', 'Grammar'],
   },
   {
-    key: 'sofia',
-    fa: 'سوفیا گارسیا',
-    en: 'Sofía García',
-    lang: 'es',
-    language: 'Spanish',
-    rating: 4.9,
-    reviews: 42,
-    years: 10,
-    price: 820000,
-    specialties: ['DELE', 'Travel Spanish'],
-  },
-  {
     key: 'claire',
     fa: 'کلر مارتن',
     en: 'Claire Martin',
@@ -175,7 +163,6 @@ const teachers = [
 const languages = [
   ['en', 'انگلیسی', 'English', 'English', '🇬🇧'],
   ['de', 'آلمانی', 'German', 'Deutsch', '🇩🇪'],
-  ['es', 'اسپانیایی', 'Spanish', 'Español', '🇪🇸'],
   ['fr', 'فرانسوی', 'French', 'Français', '🇫🇷'],
 ] as const;
 
@@ -234,17 +221,6 @@ const courses = [
     price: 2590000,
     lessons: 26,
     rating: 4.6,
-  },
-  {
-    key: 'spanish-a1',
-    teacher: 'sofia',
-    lang: 'Spanish',
-    level: 'Beginner',
-    fa: 'اسپانیایی برای سفر',
-    en: 'Spanish for Travel',
-    price: 1690000,
-    lessons: 16,
-    rating: 4.9,
   },
   {
     key: 'french-b1',
@@ -670,7 +646,7 @@ async function importDemo() {
       timeout: 120_000,
     });
     console.log(
-      'Demo import complete: 20 users, 7 teachers, 7 courses, 16 bookings, 22 reviews, 5 posts, 10 comments.',
+      'Demo import complete: 19 users, 6 teachers, 6 courses, 16 bookings, 22 reviews, 5 posts, 10 comments.',
     );
     console.log('Admin credential note was written with mode 0600; its contents were not logged.');
   } catch (error) {
@@ -709,8 +685,8 @@ async function verifyDemo() {
   const stats = await db.dashboardStat.findUnique({ where: { id: 'platform' } });
   if (
     !stats ||
-    stats.activeUsers < 20n ||
-    stats.activeTeachers < 6n ||
+    stats.activeUsers < 19n ||
+    stats.activeTeachers < 5n ||
     stats.pendingTeachers < 1n ||
     stats.bookings < 16n
   )

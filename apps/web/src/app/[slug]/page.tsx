@@ -23,22 +23,11 @@ type Page = {
   slug: string;
   titleFa: string;
   titleEn: string;
-  contentFa: { paragraphs?: string[] };
-  contentEn: { paragraphs?: string[] };
-  seo: { description?: string };
+  contentFa: { eyebrow?: string; intro?: string; paragraphs?: string[] };
+  contentEn: { eyebrow?: string; intro?: string; paragraphs?: string[] };
+  seo: { description?: string; descriptionEn?: string };
 };
-const allowed = [
-  'about',
-  'how-it-works',
-  'faq',
-  'contact',
-  'terms',
-  'privacy',
-  'cancellation-policy',
-  'become-a-teacher',
-];
 async function load(slug: string) {
-  if (!allowed.includes(slug)) return null;
   try {
     return await publicApi<Page | null>(`/support/pages/${slug}`, { cache: 'no-store' });
   } catch (error) {
@@ -51,7 +40,10 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     p = await load(slug),
     meta = pageMeta[slug];
   if (!p) return {};
-  const description = meta?.intro ?? { fa: p.seo?.description ?? p.titleFa, en: p.titleEn };
+  const description = {
+    fa: p.seo?.description || meta?.intro.fa || p.titleFa,
+    en: p.seo?.descriptionEn || meta?.intro.en || p.titleEn,
+  };
   return publicPageMetadata(`/${slug}`, { fa: p.titleFa, en: p.titleEn }, description);
 }
 export default async function CmsPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -59,10 +51,13 @@ export default async function CmsPage({ params }: { params: Promise<{ slug: stri
     p = await load(slug),
     locale = await requestLocale();
   if (!p) notFound();
-  const paragraphs = localized({ fa: p.contentFa, en: p.contentEn }, locale).paragraphs;
+  const content = localized({ fa: p.contentFa, en: p.contentEn }, locale);
+  const paragraphs = content.paragraphs;
   const meta = pageMeta[slug] ?? pageMeta.about!;
   const english = locale === 'en';
-  const t = (fa: string, en: string) => english ? en : fa;
+  const t = (fa: string, en: string) => (english ? en : fa);
+  const eyebrow = content.eyebrow || localized(meta.eyebrow, locale);
+  const intro = content.intro || localized(meta.intro, locale);
   const Icon = meta.icon;
   return (
     <>
@@ -79,12 +74,12 @@ export default async function CmsPage({ params }: { params: Promise<{ slug: stri
               <div>
                 <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-bold text-white">
                   <Icon size={17} />
-                  {localized(meta.eyebrow, locale)}
+                  {eyebrow}
                 </span>
                 <h1 className="mt-6 text-4xl font-black leading-[1.4] text-white md:text-6xl">
                   {localized({ fa: p.titleFa, en: p.titleEn }, locale)}
                 </h1>
-                <p className="mt-4 max-w-2xl leading-8 text-white/65">{localized(meta.intro, locale)}</p>
+                <p className="mt-4 max-w-2xl leading-8 text-white/65">{intro}</p>
               </div>
               <div className="hidden justify-self-end rounded-[2rem] border border-white/15 bg-white/10 p-8 text-white backdrop-blur md:block">
                 <Icon size={72} strokeWidth={1.2} />
@@ -101,20 +96,24 @@ export default async function CmsPage({ params }: { params: Promise<{ slug: stri
                   <p>{x}</p>
                 </section>
               ))}
-              {!paragraphs?.length && <p>{t('محتوای این صفحه هنوز منتشر نشده است.', 'This page does not have published content yet.')}</p>}
+              {!paragraphs?.length && (
+                <p>{t('محتوای این صفحه هنوز منتشر نشده است.', 'This page does not have published content yet.')}</p>
+              )}
             </div>
           </article>
           <aside className="space-y-5">
             <div className="surface-card p-5 lg:sticky lg:top-24">
               <h2 className="font-black">{t('دسترسی سریع', 'Quick links')}</h2>
               <div className="mt-4 grid gap-2 text-sm">
-                {([
-                  ['/about', t('درباره ما', 'About us')],
-                  ['/faq', t('پرسش‌های متداول', 'FAQ')],
-                  ['/contact', t('تماس با ما', 'Contact us')],
-                  ['/terms', t('قوانین', 'Terms')],
-                  ['/privacy', t('حریم خصوصی', 'Privacy')],
-                ] as const).map(([href, label]) => (
+                {(
+                  [
+                    ['/about', t('درباره ما', 'About us')],
+                    ['/faq', t('پرسش‌های متداول', 'FAQ')],
+                    ['/contact', t('تماس با ما', 'Contact us')],
+                    ['/terms', t('قوانین', 'Terms')],
+                    ['/privacy', t('حریم خصوصی', 'Privacy')],
+                  ] as const
+                ).map(([href, label]) => (
                   <Link
                     href={localePath(href, locale)}
                     key={href}
@@ -155,41 +154,65 @@ const pageMeta: Record<string, { icon: typeof ShieldCheck; eyebrow: LocalizedCop
   about: {
     icon: HeartHandshake,
     eyebrow: { fa: 'داستان لینگواسپیک', en: 'The LingoSpeak story' },
-    intro: { fa: 'ما زبان‌آموز، مدرس و مسیر یادگیری را در یک تجربه روشن و قابل اعتماد کنار هم قرار می‌دهیم.', en: 'We bring learners, teachers, and a clear learning route together in one trusted experience.' },
+    intro: {
+      fa: 'ما زبان‌آموز، مدرس و مسیر یادگیری را در یک تجربه روشن و قابل اعتماد کنار هم قرار می‌دهیم.',
+      en: 'We bring learners, teachers, and a clear learning route together in one trusted experience.',
+    },
   },
   faq: {
     icon: CircleHelp,
     eyebrow: { fa: 'پاسخ‌های روشن', en: 'Clear answers' },
-    intro: { fa: 'پاسخ کوتاه و مستقیم به پرسش‌هایی که پیش از شروع یا در طول مسیر ممکن است داشته باشید.', en: 'Direct answers to questions you may have before you begin or while you learn.' },
+    intro: {
+      fa: 'پاسخ کوتاه و مستقیم به پرسش‌هایی که پیش از شروع یا در طول مسیر ممکن است داشته باشید.',
+      en: 'Direct answers to questions you may have before you begin or while you learn.',
+    },
   },
   contact: {
     icon: Mail,
     eyebrow: { fa: 'کنار شما هستیم', en: 'Here when you need us' },
-    intro: { fa: 'برای راهنمایی آموزشی، حساب کاربری یا پرداخت با تیم پشتیبانی در ارتباط باشید.', en: 'Contact support for help with learning, your account, bookings, or payments.' },
+    intro: {
+      fa: 'برای راهنمایی آموزشی، حساب کاربری یا پرداخت با تیم پشتیبانی در ارتباط باشید.',
+      en: 'Contact support for help with learning, your account, bookings, or payments.',
+    },
   },
   terms: {
     icon: Scale,
     eyebrow: { fa: 'قواعد همکاری', en: 'Working together' },
-    intro: { fa: 'چارچوب استفاده منصفانه و شفاف از خدمات برای زبان‌آموزان و مدرس‌ها.', en: 'The transparent, fair-use framework for learners and teachers using LingoSpeak.' },
+    intro: {
+      fa: 'چارچوب استفاده منصفانه و شفاف از خدمات برای زبان‌آموزان و مدرس‌ها.',
+      en: 'The transparent, fair-use framework for learners and teachers using LingoSpeak.',
+    },
   },
   privacy: {
     icon: FileLock2,
     eyebrow: { fa: 'حریم خصوصی', en: 'Your privacy' },
-    intro: { fa: 'توضیح روشن درباره داده‌هایی که نگهداری می‌کنیم و کنترل‌هایی که در اختیار شماست.', en: 'A clear account of the data we keep and the controls available to you.' },
+    intro: {
+      fa: 'توضیح روشن درباره داده‌هایی که نگهداری می‌کنیم و کنترل‌هایی که در اختیار شماست.',
+      en: 'A clear account of the data we keep and the controls available to you.',
+    },
   },
   'cancellation-policy': {
     icon: BookOpenCheck,
     eyebrow: { fa: 'لغو و بازپرداخت', en: 'Cancellations and refunds' },
-    intro: { fa: 'زمان‌بندی‌ها، مسئولیت‌ها و شرایط بازگشت وجه به زبان ساده.', en: 'Timelines, responsibilities, and refund terms in plain language.' },
+    intro: {
+      fa: 'زمان‌بندی‌ها، مسئولیت‌ها و شرایط بازگشت وجه به زبان ساده.',
+      en: 'Timelines, responsibilities, and refund terms in plain language.',
+    },
   },
   'how-it-works': {
     icon: BookOpenCheck,
     eyebrow: { fa: 'مسیر یادگیری', en: 'Your learning route' },
-    intro: { fa: 'از تعیین سطح تا انتخاب مدرس و دنبال کردن پیشرفت، قدم‌به‌قدم.', en: 'From placement to choosing a teacher and tracking progress, one step at a time.' },
+    intro: {
+      fa: 'از تعیین سطح تا انتخاب مدرس و دنبال کردن پیشرفت، قدم‌به‌قدم.',
+      en: 'From placement to choosing a teacher and tracking progress, one step at a time.',
+    },
   },
   'become-a-teacher': {
     icon: HeartHandshake,
     eyebrow: { fa: 'تدریس در لینگواسپیک', en: 'Teach with LingoSpeak' },
-    intro: { fa: 'مراحل بررسی، ساخت پروفایل و شروع تدریس را شفاف و قدم‌به‌قدم ببینید.', en: 'See how review, profile setup, and teaching work, step by step.' },
+    intro: {
+      fa: 'مراحل بررسی، ساخت پروفایل و شروع تدریس را شفاف و قدم‌به‌قدم ببینید.',
+      en: 'See how review, profile setup, and teaching work, step by step.',
+    },
   },
 };

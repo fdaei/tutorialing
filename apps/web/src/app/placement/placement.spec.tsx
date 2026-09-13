@@ -31,7 +31,7 @@ describe('placement entry route', () => {
       </LocaleProvider>,
     );
 
-    expect(screen.getByRole('heading', { name: 'Know your level. Start on the right path.' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Language placement test' })).toBeInTheDocument();
     expect(screen.getByRole('alert')).toHaveTextContent('Could not load the language list.');
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
     expect(refetchLanguages).toHaveBeenCalledTimes(1);

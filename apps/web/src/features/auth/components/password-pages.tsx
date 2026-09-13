@@ -8,14 +8,17 @@ import { AuthDivider, AuthError, AuthFooter, AuthHeading, AuthNotice, AuthShell,
 import { AuthInput, PasswordInput, TermsCheckbox } from './auth-fields';
 import { GoogleAuthButton } from './google-auth-button';
 import { authMessage, googleAuth, loginWithPassword, registerWithPassword, sendRecoveryCode } from '../auth-service';
+import { useTranslations } from '@/components/shared/locale-provider';
+import { localePath } from '@/lib/i18n';
 
 type Errors = Record<string, string>;
 
 function OtpFallbackHint() {
+  const { locale } = useTranslations();
   return (
     <p className="mt-5 text-center text-xs leading-6 text-[#8993a7]">
       یا با{' '}
-      <Link href="/auth" className="font-bold text-[#3157e8] hover:underline">
+      <Link href={localePath('/auth', locale)} className="font-bold text-[#3157e8] hover:underline">
         ورود امن با کد یک‌بارمصرف
       </Link>{' '}
       ادامه دهید
@@ -25,6 +28,7 @@ function OtpFallbackHint() {
 
 export function LoginPage() {
   const router = useRouter();
+  const { locale } = useTranslations();
   const params = useSearchParams();
   const [values, setValues] = useState({ identity: '', password: '' });
   const [errors, setErrors] = useState<Errors>({});
@@ -43,7 +47,7 @@ export function LoginPage() {
     setBusy(true);
     try {
       await loginWithPassword(values.identity, values.password);
-      router.replace('/dashboard');
+      router.replace(localePath('/dashboard', locale));
     } catch (caught) {
       setError(authMessage(caught, 'ایمیل، شماره موبایل یا رمز عبور اشتباه است'));
     } finally {
@@ -56,7 +60,7 @@ export function LoginPage() {
     setError('');
     try {
       await googleAuth(credential);
-      router.replace('/dashboard');
+      router.replace(localePath('/dashboard', locale));
     } catch (caught) {
       setError(authMessage(caught));
     } finally {
@@ -87,7 +91,7 @@ export function LoginPage() {
           error={errors.password}
         />
         <div className="-mt-1 text-right">
-          <Link href="/forgot-password" className="text-sm font-bold text-[#3157e8] hover:underline">
+          <Link href={localePath('/forgot-password', locale)} className="text-sm font-bold text-[#3157e8] hover:underline">
             رمز عبور را فراموش کرده‌اید؟
           </Link>
         </div>
@@ -104,6 +108,7 @@ export function LoginPage() {
 
 export function RegisterPage() {
   const router = useRouter();
+  const { locale } = useTranslations();
   const params = useSearchParams();
   const [values, setValues] = useState({
     name: '',
@@ -132,7 +137,7 @@ export function RegisterPage() {
     setBusy(true);
     try {
       await registerWithPassword({ name: values.name, identity: values.identity, password: values.password });
-      router.replace('/dashboard');
+      router.replace(localePath('/dashboard', locale));
     } catch (caught) {
       setError(authMessage(caught));
     } finally {
@@ -145,7 +150,7 @@ export function RegisterPage() {
     setError('');
     try {
       await googleAuth(credential);
-      router.replace('/dashboard');
+      router.replace(localePath('/dashboard', locale));
     } catch (caught) {
       setError(authMessage(caught));
     } finally {
@@ -195,7 +200,7 @@ export function RegisterPage() {
           checked={values.terms}
           onChange={(terms) => setValues({ ...values, terms })}
           error={errors.terms}
-          termsHref="/terms"
+          termsHref={localePath('/terms', locale)}
         />
         <AuthError>{error}</AuthError>
         <PrimaryButton busy={busy}>{busy ? 'در حال ایجاد حساب...' : 'ایجاد حساب'}</PrimaryButton>
@@ -210,6 +215,7 @@ export function RegisterPage() {
 
 export function ForgotPasswordPage() {
   const router = useRouter();
+  const { locale } = useTranslations();
   const [identity, setIdentity] = useState('');
   const [fieldError, setFieldError] = useState('');
   const [error, setError] = useState('');
@@ -226,7 +232,7 @@ export function ForgotPasswordPage() {
     setBusy(true);
     try {
       await sendRecoveryCode(identity);
-      router.push('/verify-code');
+      router.push(localePath('/verify-code', locale));
     } catch (caught) {
       setError(authMessage(caught, 'ارسال کد انجام نشد. دوباره تلاش کنید'));
     } finally {
@@ -255,7 +261,7 @@ export function ForgotPasswordPage() {
         <PrimaryButton busy={busy}>{busy ? 'در حال ارسال...' : 'ارسال کد تأیید'}</PrimaryButton>
       </form>
       <p className="mt-8 text-center">
-        <Link href="/login" className="font-black text-[#3157e8] hover:underline">
+        <Link href={localePath('/login', locale)} className="font-black text-[#3157e8] hover:underline">
           بازگشت به ورود
         </Link>
       </p>

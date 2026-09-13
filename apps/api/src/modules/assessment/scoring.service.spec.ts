@@ -15,4 +15,13 @@ describe('ScoringService', () => {
     expect(score.band).toBeGreaterThanOrEqual(4);
     expect(score.feedback).toContain('examiner approval');
   });
+  it('uses the highest consecutively passed student-placement section', () => {
+    expect(service.placementLevel({ A1: 6, A2: 5, B1: 4, B2: 3, C1: 6 })).toBe('B1');
+    expect(service.placementLevel({ A1: 3, A2: 6, B1: 6, B2: 6, C1: 6 })).toBe('A1');
+    expect(service.placementLevel({ A1: 6, A2: 6, B1: 6, B2: 6, C1: 4 })).toBe('C1');
+  });
+  it('flags a non-consecutive result that merits manual review', () => {
+    expect(service.placementBorderline({ A1: 6, A2: 3, B1: 5, B2: 6, C1: 2 })).toBe(true);
+    expect(service.placementBorderline({ A1: 6, A2: 3, B1: 4, B2: 6, C1: 2 })).toBe(false);
+  });
 });

@@ -192,6 +192,22 @@ enum BlogReactionType {
   DISLIKE
 }
 
+enum CourseFormat {
+  SELF_PACED
+  LIVE_ONLINE
+}
+
+enum CourseDelivery {
+  ONLINE
+  IN_PERSON
+  HYBRID
+}
+
+enum CoursePlatform {
+  GOOGLE_MEET
+  SKYROOM
+}
+
 enum CourseLessonType {
   VIDEO
   AUDIO
@@ -413,8 +429,8 @@ model Teacher {
 }
 
 model Course {
-  id            String             @id @default(cuid())
-  slug          String             @unique
+  id            String   @id @default(cuid())
+  slug          String   @unique
   titleFa       String
   titleEn       String
   descriptionFa String
@@ -423,21 +439,41 @@ model Course {
   level         String
   teacherName   String
   teacherId     String?
-  teacher       Teacher?           @relation(fields: [teacherId], references: [id], onDelete: SetNull)
+  teacher       Teacher? @relation(fields: [teacherId], references: [id], onDelete: SetNull)
   lessonsCount  Int
   price         Int
   image         String?
-  published     Boolean            @default(false)
-  rating        Float              @default(0)
-  reviewsCount  Int                @default(0)
-  enrollments   CourseEnrollment[]
-  reviews       CourseReview[]
-  chapters      CourseChapter[]
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
+  published     Boolean  @default(false)
+  rating        Float    @default(0)
+  reviewsCount  Int      @default(0)
+
+  // Catalog metadata for the public institute site. `SELF_PACED` courses are the
+  // original video/lesson products played through the course player; `LIVE_ONLINE`
+  // courses are scheduled classes held on `platform`, so they carry no chapters.
+  summaryFa        String?
+  summaryEn        String?
+  category         String?
+  format           CourseFormat    @default(SELF_PACED)
+  delivery         CourseDelivery  @default(ONLINE)
+  platform         CoursePlatform?
+  durationFa       String?
+  durationEn       String?
+  audienceFa       String[]        @default([])
+  audienceEn       String[]        @default([])
+  outcomesFa       String[]        @default([])
+  outcomesEn       String[]        @default([])
+  consultationOnly Boolean         @default(false)
+  sortOrder        Int             @default(0)
+
+  enrollments CourseEnrollment[]
+  reviews     CourseReview[]
+  chapters    CourseChapter[]
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
 
   @@index([published, createdAt])
   @@index([published, rating])
+  @@index([published, sortOrder])
   @@index([teacherId, createdAt])
 }
 
@@ -1026,6 +1062,7 @@ model TestDefinition {
   descriptionEn    String
   version          Int               @default(1)
   published        Boolean           @default(false)
+  isPlacement      Boolean           @default(false)
   durationMinutes  Int
   sections         TestSection[]
   attempts         TestAttempt[]
@@ -1118,6 +1155,8 @@ model PlacementResult {
   level          String
   correctAnswers Int
   totalQuestions Int
+  sectionScores  Json?
+  borderline     Boolean        @default(false)
   completedAt    DateTime       @default(now())
 
   @@index([userId, completedAt])
@@ -1264,6 +1303,7 @@ model StoredFile {
   passageAudio      Passage[]          @relation("PassageAudio")
   questionAudio     Question[]         @relation("QuestionAudio")
   teacherIntroVideo Teacher?           @relation("TeacherIntroVideo")
+  languageImages    Language[]         @relation("LanguageImage")
   createdAt         DateTime           @default(now())
 }
 
@@ -1402,6 +1442,8 @@ model Language {
   nameEn            String
   nativeName        String
   flag              String?
+  imageId           String?
+  image             StoredFile?       @relation("LanguageImage", fields: [imageId], references: [id], onDelete: SetNull)
   direction         LanguageDirection @default(LTR)
   active            Boolean           @default(true)
   order             Int               @default(0)

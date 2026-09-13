@@ -5,7 +5,9 @@ import { Clock3, FileCheck, PlayCircle, RotateCcw } from 'lucide-react';
 import { api, apiMessage } from '@/shared/services/api';
 import type { EducationalLanguage } from '@/features/languages';
 import { jalali } from '@/lib/format';
+import { localePath } from '@/lib/i18n';
 import { PageHeading, EmptyState } from '@/components/shared/page-heading';
+import { useTranslations } from '@/components/shared/locale-provider';
 type Attempt = {
   id: string;
   status: string;
@@ -28,6 +30,7 @@ const labels: Record<string, string> = {
   EXPIRED: 'منقضی‌شده',
 };
 export function StudentTests() {
+  const { locale } = useTranslations();
   const q = useQuery({ queryKey: ['attempt-history'], queryFn: () => api<Attempt[]>('/tests/attempts/history') });
   const placement = useQuery({ queryKey: ['placement-history'], queryFn: () => api<PlacementResult[]>('/placement/history') });
   return (
@@ -57,7 +60,7 @@ export function StudentTests() {
           title="هنوز آزمونی ندارید"
           description="با انجام آزمون تعیین سطح، مسیر یادگیری متناسب با سطح شما ساخته می‌شود."
           action={
-            <Link href="/placement" className="primary-button">
+            <Link href={localePath('/placement', locale)} className="primary-button">
               شروع تعیین سطح
             </Link>
           }
@@ -75,7 +78,7 @@ export function StudentTests() {
               <Meta label="امتیاز" value={`${result.score.toLocaleString('fa-IR')}٪`} />
               <Meta label="پاسخ درست" value={`${result.correctAnswers.toLocaleString('fa-IR')} از ${result.totalQuestions.toLocaleString('fa-IR')}`} />
             </div>
-            <div className="mt-5 flex items-center justify-between"><span className="text-xs text-muted">{jalali(result.completedAt)}</span><Link href="/placement" className="secondary-button"><RotateCcw size={17}/>تکرار آزمون</Link></div>
+            <div className="mt-5 flex items-center justify-between"><span className="text-xs text-muted">{jalali(result.completedAt)}</span><Link href={localePath('/placement', locale)} className="secondary-button"><RotateCcw size={17}/>تکرار آزمون</Link></div>
           </article>
         ))}
         {q.data?.map((a) => {
@@ -127,7 +130,7 @@ export function StudentTests() {
                   </button>
                 ) : (
                   <Link
-                    href={done ? '/dashboard/tests' : `/test/session?attempt=${a.id}`}
+                    href={done ? localePath('/dashboard/tests', locale) : localePath(`/test/session?attempt=${a.id}`, locale)}
                     className="primary-button"
                   >
                     {done ? 'مشاهده نتیجه' : a.status === 'IN_PROGRESS' ? 'ادامه آزمون' : 'شروع آزمون'}{' '}

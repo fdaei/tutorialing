@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { filesConfig } from '../../config/files.config';
 import { ObjectStorage } from '../../modules/files/object-storage.port';
@@ -53,5 +53,9 @@ export class S3ObjectStorageAdapter implements ObjectStorage {
     return getSignedUrl(this.client, new GetObjectCommand({ Bucket: this.cfg.bucket, Key: key }), {
       expiresIn: this.cfg.downloadUrlTtlSeconds,
     });
+  }
+
+  async deleteObject(key: string) {
+    await this.client.send(new DeleteObjectCommand({ Bucket: this.cfg.bucket, Key: key }));
   }
 }

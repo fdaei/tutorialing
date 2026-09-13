@@ -148,10 +148,11 @@ export function AuthNotice({ children }: { children?: React.ReactNode }) {
 }
 
 export function AuthFooter({ question, href, action }: { question: string; href: string; action: string }) {
+  const { locale } = useTranslations();
   return (
     <p className="mt-7 text-center text-sm text-[#727c92]">
       {question}{' '}
-      <Link href={href} className="font-black text-[#554ad3] hover:underline">
+      <Link href={localePath(href, locale)} className="font-black text-[#554ad3] hover:underline">
         {action}
       </Link>
     </p>

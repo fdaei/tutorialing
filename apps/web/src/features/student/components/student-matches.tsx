@@ -5,7 +5,9 @@ import { useQuery } from '@tanstack/react-query';
 import { CalendarPlus, Search, Star, Users } from 'lucide-react';
 import { api, apiMessage } from '@/shared/services/api';
 import { toman } from '@/lib/format';
+import { localePath } from '@/lib/i18n';
 import { PageHeading, EmptyState } from '@/components/shared/page-heading';
+import { useTranslations } from '@/components/shared/locale-provider';
 type Teacher = {
   id: string;
   slug: string;
@@ -26,6 +28,7 @@ type Session = {
   recommendations: { teacher: Teacher; score: number; audit?: { compatibleSlots?: number } }[];
 };
 export function StudentMatches() {
+  const { locale } = useTranslations();
   const q = useQuery({ queryKey: ['matching-history'], queryFn: () => api<Session[]>('/matching/history') }),
     [level, setLevel] = useState(''),
     [rating, setRating] = useState('0'),
@@ -45,7 +48,7 @@ export function StudentMatches() {
         title="مدرس‌های پیشنهادی"
         description="پیشنهادها بر اساس هدف، سطح، بودجه و زمان‌های آزاد ثبت‌شده شما رتبه‌بندی شده‌اند."
         action={
-          <Link href="/matching" className="primary-button">
+          <Link href={localePath('/matching', locale)} className="primary-button">
             <Search size={18} />
             تطبیق جدید
           </Link>

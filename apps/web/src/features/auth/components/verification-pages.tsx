@@ -7,6 +7,8 @@ import { AuthDivider, AuthError, AuthHeading, AuthNotice, AuthShell, PrimaryButt
 import { PasswordInput } from './auth-fields';
 import { OtpInput, emptyOtp } from './otp-input';
 import { faNumber } from '@/lib/format';
+import { useTranslations } from '@/components/shared/locale-provider';
+import { localePath } from '@/lib/i18n';
 import {
   OTP_LENGTH,
   authMessage,
@@ -29,21 +31,23 @@ const clock = (seconds: number) =>
  */
 function useRecoveryGuard(requireVerified = false) {
   const router = useRouter();
+  const { locale } = useTranslations();
   const [challenge, setChallenge] = useState<RecoveryChallenge | null | undefined>();
   useEffect(() => {
     const current = readRecovery();
     if (!current || (requireVerified && !current.verified)) {
       setChallenge(null);
-      router.replace('/forgot-password');
+      router.replace(localePath('/forgot-password', locale));
       return;
     }
     setChallenge(current);
-  }, [router, requireVerified]);
+  }, [router, requireVerified, locale]);
   return challenge;
 }
 
 export function VerifyCodePage() {
   const router = useRouter();
+  const { locale } = useTranslations();
   const challenge = useRecoveryGuard();
   const [digits, setDigits] = useState(() => emptyOtp(OTP_LENGTH));
   const [wait, setWait] = useState(0);
@@ -71,7 +75,7 @@ export function VerifyCodePage() {
     setBusy(true);
     try {
       await verifyRecoveryCode(submitted);
-      router.push('/reset-password');
+      router.push(localePath('/reset-password', locale));
     } catch (caught) {
       setError(authMessage(caught, 'کد تأیید وارد شده صحیح نیست'));
     } finally {
@@ -157,11 +161,11 @@ export function VerifyCodePage() {
         <PrimaryButton busy={busy}>{busy ? 'در حال تأیید...' : 'تأیید'}</PrimaryButton>
       </form>
       <div className="mt-7 space-y-5 text-center">
-        <Link href="/forgot-password" className="block font-bold text-[#3157e8] hover:underline">
+        <Link href={localePath('/forgot-password', locale)} className="block font-bold text-[#3157e8] hover:underline">
           ویرایش شماره یا ایمیل
         </Link>
         <AuthDivider className="" />
-        <Link href="/login" className="block font-black text-[#3157e8] hover:underline">
+        <Link href={localePath('/login', locale)} className="block font-black text-[#3157e8] hover:underline">
           بازگشت به ورود
         </Link>
       </div>
@@ -171,6 +175,7 @@ export function VerifyCodePage() {
 
 export function ResetPasswordPage() {
   const router = useRouter();
+  const { locale } = useTranslations();
   const challenge = useRecoveryGuard(true);
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -192,7 +197,7 @@ export function ResetPasswordPage() {
     try {
       await saveNewPassword(password);
       clearRecovery();
-      router.replace('/login?reset=success');
+      router.replace(localePath('/login?reset=success', locale));
     } catch (caught) {
       setError(authMessage(caught));
     } finally {
@@ -228,7 +233,7 @@ export function ResetPasswordPage() {
       </form>
       <AuthDivider className="mt-8" />
       <p className="mt-7 text-center">
-        <Link href="/login" className="font-black text-[#3157e8] hover:underline">
+        <Link href={localePath('/login', locale)} className="font-black text-[#3157e8] hover:underline">
           بازگشت به ورود
         </Link>
       </p>

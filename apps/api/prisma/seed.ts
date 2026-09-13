@@ -20,6 +20,7 @@ import {
 } from '@prisma/client';
 import { seedCountries } from './country.seed';
 import { seedCmsPages } from './cms-pages.seed';
+import { studentPlacementQuestionBanks } from './placement-question-bank';
 
 if (process.env.NODE_ENV === 'production') {
   throw new Error('Production seed disabled');
@@ -39,7 +40,13 @@ const demoPhone = (suffix: number) => `+120255501${String(suffix).padStart(2, '0
 const normalizeIranianPhone = (local: string) => `+98${local.replace(/^0+/, '')}`;
 
 const users = {
-  admin: { id: 'user-admin', phone: demoPhone(0), name: 'مدیر کل', email: 'admin@local.test', role: Role.ADMIN },
+  admin: {
+    id: 'user-admin',
+    phone: normalizeIranianPhone('09390315707'),
+    name: 'مدیر کل',
+    email: 'admin@local.test',
+    role: Role.ADMIN,
+  },
   verifier: {
     id: 'user-verifier',
     phone: demoPhone(10),
@@ -181,23 +188,37 @@ async function normalizeLegacyPhones() {
 async function seedUsersAndPermissions() {
   await normalizeLegacyPhones();
   for (const user of Object.values(users)) {
-    await db.user.upsert({
-      where: { phone: user.phone },
-      create: {
-        id: user.id,
-        phone: user.phone,
-        name: user.name,
-        email: user.email,
-        profileComplete: true,
-        locale: 'fa',
-        timezone: 'Asia/Tehran',
-      },
-      // A developer may have signed in with a demo phone before running the
-      // seed, which creates that user with a random cuid. Reconcile it to the
-      // deterministic seed id so all following role and relation upserts keep
-      // working on repeated runs (Prisma cascades the id update locally).
-      update: { id: user.id, name: user.name, email: user.email, profileComplete: true, status: 'ACTIVE' },
-    });
+    const existingById = await db.user.findUnique({ where: { id: user.id }, select: { id: true } });
+    const phoneOwner = await db.user.findUnique({ where: { phone: user.phone }, select: { id: true } });
+    if (phoneOwner && phoneOwner.id !== user.id) {
+      const parked = `${user.phone}.duplicate.${phoneOwner.id}`;
+      await db.user.update({ where: { id: phoneOwner.id }, data: { phone: parked } });
+      console.warn(`[seed] parked conflicting demo phone ${user.phone} on ${parked}`);
+    }
+
+    const data = {
+      phone: user.phone,
+      name: user.name,
+      email: user.email,
+      profileComplete: true,
+      locale: 'fa',
+      timezone: 'Asia/Tehran',
+      status: 'ACTIVE' as const,
+    };
+    if (existingById) {
+      // Older databases may contain the same deterministic id with a legacy
+      // phone format. Reconcile by id before creating roles and relations.
+      await db.user.update({ where: { id: user.id }, data });
+    } else {
+      await db.user.upsert({
+        where: { phone: user.phone },
+        create: { id: user.id, ...data },
+        // A developer may have signed in with a demo phone before running the
+        // seed, which creates that user with a random cuid. Reconcile it to the
+        // deterministic seed id so all following relation upserts keep working.
+        update: { id: user.id, ...data },
+      });
+    }
     await db.userRole.upsert({
       where: { userId_role: { userId: user.id, role: user.role } },
       create: { userId: user.id, role: user.role },
@@ -255,14 +276,7 @@ async function seedUsersAndPermissions() {
 const languageRows = [
   ['lang-en', 'en', 'انگلیسی', 'English', 'English', '🇬🇧', 'LTR', 10, 'CEFR'],
   ['lang-de', 'de', 'آلمانی', 'German', 'Deutsch', '🇩🇪', 'LTR', 20, 'CEFR'],
-  ['lang-es', 'es', 'اسپانیایی', 'Spanish', 'Español', '🇪🇸', 'LTR', 30, 'CEFR'],
-  ['lang-tr', 'tr', 'ترکی', 'Turkish', 'Türkçe', '🇹🇷', 'LTR', 40, 'CEFR'],
-  ['lang-fr', 'fr', 'فرانسوی', 'French', 'Français', '🇫🇷', 'LTR', 50, 'CEFR'],
-  ['lang-it', 'it', 'ایتالیایی', 'Italian', 'Italiano', '🇮🇹', 'LTR', 60, 'CEFR'],
-  ['lang-pt', 'pt', 'پرتغالی', 'Portuguese', 'Português', '🇵🇹', 'LTR', 70, 'CEFR'],
-  ['lang-ko', 'ko', 'کره‌ای', 'Korean', '한국어', '🇰🇷', 'LTR', 80, 'CUSTOM'],
-  ['lang-ar', 'ar', 'عربی', 'Arabic', 'العربية', '🇸🇦', 'RTL', 90, 'CEFR'],
-  ['lang-ru', 'ru', 'روسی', 'Russian', 'Русский', '🇷🇺', 'LTR', 100, 'CEFR'],
+  ['lang-fr', 'fr', 'فرانسوی', 'French', 'Français', '🇫🇷', 'LTR', 30, 'CEFR'],
 ] as const;
 
 async function seedLanguages() {
@@ -273,6 +287,7 @@ async function seedLanguages() {
       update: { nameFa, nameEn, nativeName, flag, direction, order, proficiencySystem, active: true },
     });
   }
+  await db.language.deleteMany({ where: { code: { notIn: languageRows.map(([, code]) => code) } } });
 }
 
 async function seedTeachers() {
@@ -341,13 +356,13 @@ async function seedTeachers() {
       slug: 'niloofar-azari',
       nameFa: 'نیلوفر آذری',
       nameEn: 'Niloofar Azari',
-      bioFa: 'متقاضی تدریس زبان ترکی و انگلیسی.',
-      bioEn: 'Teacher applicant for Turkish and English.',
+      bioFa: 'متقاضی تدریس زبان فرانسوی.',
+      bioEn: 'Teacher applicant for French.',
       gender: 'female',
       specialties: ['conversation'],
-      languages: ['Türkçe'],
+      languages: ['Français'],
       levels: ['A1', 'A2'],
-      languageId: 'lang-tr',
+      languageId: 'lang-fr',
       status: TeacherStatus.DOCUMENT_REVIEW,
       priceStatus: PriceStatus.SUBMITTED,
       proposedTrialPrice: 220_000,
@@ -887,6 +902,129 @@ async function seedTests() {
     await db.testScore.upsert({ where: { id: row.id }, create: row, update: row });
 }
 
+async function seedStudentPlacementTests() {
+  const tests = [
+    {
+      id: 'test-student-english-placement',
+      slug: 'student-english-placement',
+      languageId: 'lang-en',
+      titleFa: 'تعیین سطح انگلیسی',
+      titleEn: 'English Placement Test',
+      descriptionFa: '۳۰ سؤال از سطح A1 تا C1 با نتیجه فوری بر اساس CEFR.',
+      descriptionEn: '30 questions from A1 to C1 with an immediate CEFR result.',
+      bank: studentPlacementQuestionBanks.en,
+    },
+    {
+      id: 'test-student-german-placement',
+      slug: 'student-german-placement',
+      languageId: 'lang-de',
+      titleFa: 'تعیین سطح آلمانی',
+      titleEn: 'German Placement Test',
+      descriptionFa: '۳۰ سؤال از سطح A1 تا C1 با نتیجه فوری بر اساس CEFR.',
+      descriptionEn: '30 questions from A1 to C1 with an immediate CEFR result.',
+      bank: studentPlacementQuestionBanks.de,
+    },
+    {
+      id: 'test-student-french-placement',
+      slug: 'student-french-placement',
+      languageId: 'lang-fr',
+      titleFa: 'تعیین سطح فرانسوی',
+      titleEn: 'French Placement Test',
+      descriptionFa: '۳۰ سؤال از سطح A1 تا C1 با نتیجه فوری بر اساس CEFR.',
+      descriptionEn: '30 questions from A1 to C1 with an immediate CEFR result.',
+      bank: studentPlacementQuestionBanks.fr,
+    },
+  ] as const;
+
+  for (const test of tests) {
+    const definition = await db.testDefinition.upsert({
+      where: { slug: test.slug },
+      create: {
+        id: test.id,
+        slug: test.slug,
+        languageId: test.languageId,
+        level: 'A1-C1',
+        titleFa: test.titleFa,
+        titleEn: test.titleEn,
+        descriptionFa: test.descriptionFa,
+        descriptionEn: test.descriptionEn,
+        durationMinutes: 10,
+        published: true,
+        isPlacement: true,
+      },
+      update: {
+        languageId: test.languageId,
+        level: 'A1-C1',
+        titleFa: test.titleFa,
+        titleEn: test.titleEn,
+        descriptionFa: test.descriptionFa,
+        descriptionEn: test.descriptionEn,
+        durationMinutes: 10,
+        published: true,
+        isPlacement: true,
+      },
+    });
+
+    const levels = ['A1', 'A2', 'B1', 'B2', 'C1'] as const;
+    for (const [sectionIndex, level] of levels.entries()) {
+      const section = await db.testSection.upsert({
+        where: { id: `section-student-${test.languageId.slice(-2)}-${level.toLowerCase()}` },
+        create: {
+          id: `section-student-${test.languageId.slice(-2)}-${level.toLowerCase()}`,
+          testId: definition.id,
+          skill: 'placement',
+          title: level,
+          instructions: {
+            fa: 'بهترین پاسخ را برای هر سؤال انتخاب کنید.',
+            en: 'Choose the best answer for each question.',
+          },
+          durationMinutes: 2,
+          order: sectionIndex + 1,
+        },
+        update: {
+          testId: definition.id,
+          skill: 'placement',
+          title: level,
+          instructions: {
+            fa: 'بهترین پاسخ را برای هر سؤال انتخاب کنید.',
+            en: 'Choose the best answer for each question.',
+          },
+          durationMinutes: 2,
+          order: sectionIndex + 1,
+        },
+      });
+
+      const questions = test.bank
+        .map((question, index) => ({ question, index }))
+        .filter(({ question }) => question.level === level);
+      for (const { question, index } of questions) {
+        await db.question.upsert({
+          where: { id: `q-student-${test.languageId.slice(-2)}-${index + 1}` },
+          create: {
+            id: `q-student-${test.languageId.slice(-2)}-${index + 1}`,
+            sectionId: section.id,
+            prompt: { fa: question.prompt, en: question.prompt },
+            type: 'single_choice',
+            choices: { fa: question.choices, en: question.choices },
+            answerKey: question.answerKey,
+            points: 1,
+            order: index + 1,
+          },
+          update: {
+            sectionId: section.id,
+            prompt: { fa: question.prompt, en: question.prompt },
+            type: 'single_choice',
+            choices: { fa: question.choices, en: question.choices },
+            answerKey: question.answerKey,
+            points: 1,
+            order: index + 1,
+          },
+        });
+      }
+    }
+  }
+}
+
 async function seedBookingsFinanceAndReviews() {
   const completed = await db.booking.upsert({
     where: { id: 'booking-completed-eligible' },
@@ -1128,104 +1266,58 @@ async function seedDemoExperience() {
       660000,
       4.6,
     ],
-    [
-      'shadi',
-      'شادی فرهمند',
-      'Shadi Farahmand',
-      'female',
-      'lang-es',
-      'Español',
-      ['conversation', 'DELE'],
-      ['A1', 'A2', 'B1'],
-      250000,
-      590000,
-      4.9,
-    ],
-    [
-      'amirali',
-      'امیرعلی توکلی',
-      'Amirali Tavakoli',
-      'male',
-      'lang-tr',
-      'Türkçe',
-      ['conversation', 'travel'],
-      ['A1', 'A2', 'B1'],
-      230000,
-      540000,
-      4.5,
-    ],
-    [
-      'yuna',
-      'یونا کیم',
-      'Yuna Kim',
-      'female',
-      'lang-ko',
-      '한국어',
-      ['TOPIK', 'conversation'],
-      ['Beginner', 'Intermediate'],
-      300000,
-      710000,
-      4.9,
-    ],
-    [
-      'marco',
-      'مارکو رضایی',
-      'Marco Rezaei',
-      'male',
-      'lang-it',
-      'Italiano',
-      ['conversation', 'CILS'],
-      ['A1', 'A2', 'B1'],
-      260000,
-      610000,
-      4.7,
-    ],
-    [
-      'elena',
-      'النا کریمی',
-      'Elena Karimi',
-      'female',
-      'lang-ru',
-      'Русский',
-      ['conversation', 'grammar'],
-      ['A1', 'A2', 'B1'],
-      275000,
-      650000,
-      4.8,
-    ],
-    [
-      'samir',
-      'سمیر موسوی',
-      'Samir Mousavi',
-      'male',
-      'lang-ar',
-      'العربية',
-      ['conversation', 'business'],
-      ['A1', 'A2', 'B1', 'B2'],
-      240000,
-      570000,
-      4.6,
-    ],
   ] as const;
+  const removedDemoTeacherIds = [
+    'teacher-demo-shadi',
+    'teacher-demo-amirali',
+    'teacher-demo-yuna',
+    'teacher-demo-marco',
+    'teacher-demo-elena',
+    'teacher-demo-samir',
+  ];
+  await db.matchingRecommendation.deleteMany({ where: { teacherId: { in: removedDemoTeacherIds } } });
+  await db.teacher.deleteMany({
+    where: {
+      id: { in: removedDemoTeacherIds },
+      bookings: { none: {} },
+      reviews: { none: {} },
+      packages: { none: {} },
+      learningPlans: { none: {} },
+      earnings: { none: {} },
+      withdrawalRequests: { none: {} },
+    },
+  });
   for (let index = 0; index < demoTeachers.length; index += 1) {
     const [key, nameFa, nameEn, gender, languageId, nativeName, specialties, levels, trial, regular, rating] =
       demoTeachers[index]!;
     const userId = `user-teacher-demo-${key}`,
       teacherId = `teacher-demo-${key}`,
       phone = demoPhone(30 + index);
-    await db.user.upsert({
-      where: { phone },
-      create: {
-        id: userId,
-        phone,
-        name: nameFa,
-        email: `${key}@demo.local`,
-        profileComplete: true,
-        locale: 'fa',
-        timezone: 'Asia/Tehran',
-      },
-      update: { name: nameFa, status: 'ACTIVE' },
-    });
+    const existingById = await db.user.findUnique({ where: { id: userId }, select: { id: true } });
+    const phoneOwner = await db.user.findUnique({ where: { phone }, select: { id: true } });
+    if (phoneOwner && phoneOwner.id !== userId) {
+      const parked = `${phone}.duplicate.${phoneOwner.id}`;
+      await db.user.update({ where: { id: phoneOwner.id }, data: { phone: parked } });
+      console.warn(`[seed] parked conflicting demo phone ${phone} on ${parked}`);
+    }
+    const userData = {
+      phone,
+      name: nameFa,
+      email: `${key}@demo.local`,
+      profileComplete: true,
+      locale: 'fa',
+      timezone: 'Asia/Tehran',
+      status: 'ACTIVE' as const,
+    };
+    if (existingById) {
+      await db.user.update({ where: { id: userId }, data: userData });
+    } else {
+      await db.user.upsert({
+        where: { phone },
+        create: { id: userId, ...userData },
+        update: { id: userId, ...userData },
+      });
+    }
     await db.userRole.upsert({
       where: { userId_role: { userId, role: Role.INSTRUCTOR } },
       create: { userId, role: Role.INSTRUCTOR },
@@ -1309,15 +1401,6 @@ async function seedDemoExperience() {
     ],
     ['test-demo-german', 'german-demo-b1', 'lang-de', 'B1', 'آزمون تعیین سطح آلمانی', 'German Placement Test', 45],
     ['test-demo-french', 'french-demo-a2', 'lang-fr', 'A2', 'آزمون تعیین سطح فرانسوی', 'French Placement Test', 40],
-    [
-      'test-demo-spanish',
-      'spanish-demo-a2',
-      'lang-es',
-      'A2',
-      'آزمون تعیین سطح اسپانیایی',
-      'Spanish Placement Test',
-      40,
-    ],
   ] as const;
   for (const [id, slug, languageId, level, titleFa, titleEn, durationMinutes] of testSpecs)
     await db.testDefinition.upsert({
@@ -1364,7 +1447,6 @@ async function seedDemoExperience() {
   const simpleSections = [
     ['german', 'test-demo-german', 'Lesen'],
     ['french', 'test-demo-french', 'Compréhension'],
-    ['spanish', 'test-demo-spanish', 'Comprensión'],
   ] as const;
   for (const [key, testId, title] of simpleSections)
     await db.testSection.upsert({
@@ -1444,15 +1526,6 @@ async function seedDemoExperience() {
       ['Je m’appelle Marie.', 'Je suis appelle Marie.', 'Moi appeler Marie.'],
       0,
     ],
-    [
-      'q-demo-spanish',
-      'section-demo-spanish',
-      'single_choice',
-      'گزینه درست را انتخاب کنید.',
-      'Choose the correct sentence.',
-      ['Me llamo Carlos.', 'Yo llama Carlos.', 'Mi llamar Carlos.'],
-      0,
-    ],
   ] as const;
   for (let i = 0; i < demoQuestions.length; i += 1) {
     const [id, sectionId, type, promptFa, promptEn, choices, answerKey] = demoQuestions[i]!;
@@ -1486,7 +1559,6 @@ async function seedDemoExperience() {
     ['attempt-demo-ielts', 'test-demo-ielts', TestStatus.IN_PROGRESS, undefined, undefined],
     ['attempt-demo-german', 'test-demo-german', TestStatus.APPROVED, 6.5, -18],
     ['attempt-demo-french', 'test-demo-french', TestStatus.APPROVED, 5.5, -35],
-    ['attempt-demo-spanish', 'test-demo-spanish', TestStatus.UNDER_REVIEW, undefined, -2],
   ] as const;
   for (const [id, testId, status, overallBand, days] of attempts)
     await db.testAttempt.upsert({
@@ -1544,7 +1616,8 @@ async function seedDemoExperience() {
     },
     update: { targetBand: 7.5, currentBand: 6.5 },
   });
-  for (let rank = 1; rank <= 10; rank += 1) {
+  await db.matchingRecommendation.deleteMany({ where: { sessionId: session.id } });
+  for (let rank = 1; rank <= demoTeachers.length; rank += 1) {
     const key = demoTeachers[rank - 1]![0];
     await db.matchingRecommendation.upsert({
       where: { sessionId_rank: { sessionId: session.id, rank } },
@@ -1925,6 +1998,7 @@ async function seedBlog() {
 }
 
 async function seedCourses() {
+  await db.course.deleteMany({ where: { id: 'course-spanish-everyday' } });
   const rows = [
     {
       id: 'course-english-conversation',
@@ -1970,21 +2044,6 @@ async function seedCourses() {
       lessonsCount: 12,
       price: 2_490_000,
       image: '/images/auth/login.png',
-    },
-    {
-      id: 'course-spanish-everyday',
-      slug: 'spanish-everyday',
-      titleFa: 'اسپانیایی برای زندگی روزمره',
-      titleEn: 'Everyday Spanish',
-      descriptionFa: 'مکالمه کاربردی برای موقعیت‌های واقعی زندگی روزانه.',
-      descriptionEn: 'Practical conversations for everyday situations.',
-      language: 'اسپانیایی',
-      level: 'A2',
-      teacherName: 'تیم لینگواسپیک',
-      teacherId: null,
-      lessonsCount: 14,
-      price: 2_690_000,
-      image: '/images/auth/forgot.png',
     },
   ];
   for (const row of rows)
@@ -2108,6 +2167,7 @@ async function main() {
   await seedTeachers();
   await seedPackages();
   await seedTests();
+  await seedStudentPlacementTests();
   await seedBookingsFinanceAndReviews();
   await seedDemoExperience();
   await seedTicketsCmsAndSettings();

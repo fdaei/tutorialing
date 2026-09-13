@@ -1,7 +1,7 @@
 import { translate } from '@/lib/i18n';
 import { upload } from '@/shared/services/upload';
 
-const PANEL_UPLOAD_TYPES = ['image/jpeg', 'image/png', 'application/pdf', 'video/mp4', 'video/webm', 'video/quicktime'];
+const PANEL_UPLOAD_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf', 'video/mp4', 'video/webm', 'video/quicktime'];
 const PANEL_UPLOAD_MAX_BYTES = 50 * 1024 * 1024;
 
 export async function uploadPanelFile(file: File, purpose: string, fa: boolean): Promise<string> {

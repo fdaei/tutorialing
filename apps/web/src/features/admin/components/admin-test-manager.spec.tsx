@@ -79,4 +79,65 @@ describe('AdminTestManager', () => {
 
     await waitFor(() => expect(screen.getByRole('button', { name: 'ساخت آزمون' })).toBeDisabled());
   });
+
+  it('shows an edit action and patches the complete question payload', async () => {
+    apiMock.mockImplementation((path: string) =>
+      Promise.resolve(
+        path === '/languages'
+          ? [{ id: 'lang-en', code: 'en', nameFa: 'انگلیسی', nameEn: 'English' }]
+          : [
+              {
+                id: 'test-1',
+                slug: 'test-1',
+                titleFa: 'آزمون',
+                titleEn: 'Test',
+                published: false,
+                sections: [
+                  {
+                    id: 'section-1',
+                    skill: 'reading',
+                    title: 'Reading',
+                    durationMinutes: 30,
+                    order: 1,
+                    questions: [
+                      {
+                        id: 'question-1',
+                        prompt: { fa: 'متن قدیمی', en: 'Old prompt' },
+                        type: 'single_choice',
+                        choices: { fa: ['الف', 'ب'], en: ['A', 'B'] },
+                        answerKey: 0,
+                        points: 1,
+                        order: 1,
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+      ) as never,
+    );
+    renderManager();
+
+    const sectionTitle = await screen.findByText('Reading');
+    expect(sectionTitle.closest('button')).not.toBeNull();
+    fireEvent.click(sectionTitle.closest('button')!);
+    fireEvent.click(await screen.findByRole('button', { name: 'ویرایش سؤال' }));
+    fireEvent.change(screen.getAllByRole('textbox', { name: 'متن فارسی سؤال' })[1]!, {
+      target: { value: 'متن جدید' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'ذخیره سؤال' }));
+
+    await waitFor(() =>
+      expect(apiMock).toHaveBeenCalledWith('/admin/tests/questions/question-1', {
+        method: 'PATCH',
+        body: JSON.stringify({
+          prompt: { fa: 'متن جدید', en: 'Old prompt' },
+          type: 'single_choice',
+          choices: { fa: ['الف', 'ب'], en: ['A', 'B'] },
+          answerKey: 0,
+          points: 1,
+        }),
+      }),
+    );
+  });
 });

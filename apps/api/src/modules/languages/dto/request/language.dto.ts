@@ -7,6 +7,7 @@ export class LanguageDto {
   @IsString() @Length(2, 100) nameEn!: string;
   @IsString() @Length(1, 100) nativeName!: string;
   @IsOptional() @IsString() @Length(1, 32) flag?: string;
+  @IsOptional() @IsString() @Length(1, 100) imageId?: string | null;
   @IsEnum(LanguageDirection) direction!: LanguageDirection;
   @IsEnum(ProficiencySystem) proficiencySystem!: ProficiencySystem;
   @IsOptional() @IsBoolean() active?: boolean;

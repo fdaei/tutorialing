@@ -5,6 +5,8 @@ export type EducationalLanguage = {
   nameEn: string;
   nativeName: string;
   flag?: string;
+  imageId?: string | null;
+  imageUrl?: string;
   direction: 'LTR' | 'RTL';
   active: boolean;
   order: number;

@@ -13,6 +13,7 @@ export class UpdateLanguageDto {
   @IsOptional() @IsString() @Length(2, 100) nameEn?: string;
   @IsOptional() @IsString() @Length(1, 100) nativeName?: string;
   @IsOptional() @IsString() @Length(1, 32) flag?: string;
+  @IsOptional() @IsString() @Length(1, 100) imageId?: string | null;
   @IsOptional() @IsEnum(LanguageDirection) direction?: LanguageDirection;
   @IsOptional() @IsEnum(ProficiencySystem) proficiencySystem?: ProficiencySystem;
   @IsOptional() @IsBoolean() active?: boolean;

@@ -1,14 +1,22 @@
 'use client';
 
 import { localized, isDefaultLocale, translate } from '@/lib/i18n';
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { BookOpen, ChevronDown, ChevronUp, Plus, Trash2 } from 'lucide-react';
+import { BookOpen, Check, ChevronDown, ChevronUp, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { api, ApiError } from '@/shared/services/api';
 import { useTranslations } from '@/components/shared/locale-provider';
 import type { EducationalLanguage } from '@/features/languages';
 
-type Question = { id: string; prompt: { fa?: string; en?: string }; type: string; points: number; order: number };
+type Question = {
+  id: string;
+  prompt: { fa?: string; en?: string };
+  type: string;
+  choices?: { fa?: string[]; en?: string[] } | null;
+  answerKey?: unknown;
+  points: number;
+  order: number;
+};
 type Section = {
   id: string;
   skill: string;
@@ -18,6 +26,7 @@ type Section = {
   questions: Question[];
 };
 type Test = { id: string; slug: string; titleFa: string; titleEn: string; published: boolean; sections: Section[] };
+type Mutate = (task: () => Promise<unknown>) => Promise<unknown>;
 const input =
   'w-full rounded-xl border border-[#dce1ee] bg-white px-3.5 py-3 outline-none transition focus:border-purple focus:ring-4 focus:ring-violet/10';
 const value = (form: FormData, key: string) => String(form.get(key) ?? '').trim();
@@ -238,7 +247,7 @@ export function AdminTestManager() {
                   section={section}
                   open={expanded === section.id}
                   toggle={() => setExpanded(expanded === section.id ? undefined : section.id)}
-                  mutate={(task) => mutation.mutate(task)}
+                  mutate={(task) => mutation.mutateAsync(task)}
                   fa={fa}
                 />
               ))}
@@ -267,10 +276,11 @@ function SectionCard({
   section: Section;
   open: boolean;
   toggle: () => void;
-  mutate: (task: () => Promise<unknown>) => void;
+  mutate: Mutate;
   fa: boolean;
 }) {
   const { locale } = useTranslations();
+  const [editingQuestionId, setEditingQuestionId] = useState<string>();
   return (
     <article className="panel-card overflow-hidden">
       <button
@@ -293,54 +303,77 @@ function SectionCard({
       {open && (
         <div className="border-t hairline p-5">
           <QuestionCreator section={section} mutate={mutate} fa={fa} />
-          <div className="mt-5 overflow-x-auto rounded-xl border hairline">
-            <table className="w-full min-w-[680px] text-sm">
-              <thead className="bg-[#f7f8fc] text-muted">
-                <tr>
-                  <th className="p-3 text-start">#</th>
-                  <th className="p-3 text-start">{translate(fa, 'adminadminTestManagerEnglishQuestion')}</th>
-                  <th className="p-3 text-start">{translate(fa, 'adminadminTestManagerType')}</th>
-                  <th className="p-3 text-start">{translate(fa, 'adminadminTestManagerPoints')}</th>
-                  <th className="p-3" />
-                </tr>
-              </thead>
-              <tbody className="divide-y hairline">
+          <div className="mt-5 overflow-hidden rounded-xl border hairline bg-white">
+            {section.questions.length ? (
+              <div className="divide-y hairline">
                 {section.questions.map((question) => (
-                  <tr key={question.id}>
-                    <td className="p-3 latin">{question.order}</td>
-                    <td className="p-3">
-                      <strong className="block">
-                        {localized({ fa: question.prompt.fa, en: question.prompt.en }, locale)}
-                      </strong>
-                      <small dir={translate(locale, 'adminadminTestManagerRtl')} className="mt-1 block text-muted">
-                        {localized({ fa: question.prompt.en, en: question.prompt.fa }, locale)}
-                      </small>
-                    </td>
-                    <td className="p-3 latin">{question.type}</td>
-                    <td className="p-3 latin">{question.points}</td>
-                    <td className="p-3 text-end">
-                      <button
-                        aria-label={translate(locale, 'adminadminTestManagerDeleteQuestion')}
-                        onClick={() =>
-                          confirm(translate(locale, 'adminadminTestManagerDeleteQuestion2')) &&
-                          mutate(() => api(`/admin/tests/questions/${question.id}`, { method: 'DELETE' }))
-                        }
-                        className="text-red-500"
-                      >
-                        <Trash2 size={17} />
-                      </button>
-                    </td>
-                  </tr>
+                  <Fragment key={question.id}>
+                    {editingQuestionId === question.id ? (
+                      <div className="p-4">
+                        <QuestionEditor
+                          question={question}
+                          fa={fa}
+                          onCancel={() => setEditingQuestionId(undefined)}
+                          onSave={async (task) => {
+                            await mutate(task);
+                            setEditingQuestionId(undefined);
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-4 p-4 sm:p-5 lg:flex-row lg:items-start lg:gap-6">
+                        <div className="flex min-w-0 flex-1 items-start gap-3">
+                          <span className="brand-gradient grid size-9 shrink-0 place-items-center rounded-lg text-sm font-black text-white">
+                            {question.order}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className="whitespace-normal break-words text-[15px] font-bold leading-8">
+                              {localized({ fa: question.prompt.fa, en: question.prompt.en }, locale)}
+                            </p>
+                            <p
+                              dir={translate(locale, 'adminadminTestManagerRtl')}
+                              className="mt-2 whitespace-normal break-words text-sm leading-7 text-muted"
+                            >
+                              {localized({ fa: question.prompt.en, en: question.prompt.fa }, locale)}
+                            </p>
+                            <div className="mt-3 flex flex-wrap gap-2 text-xs font-bold text-muted">
+                              <span className="rounded-md bg-[#f1f3f9] px-2.5 py-1.5 latin">{question.type}</span>
+                              <span className="rounded-md bg-[#f1f3f9] px-2.5 py-1.5 latin">
+                                {question.points} {translate(locale, 'adminadminTestManagerPoints')}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex shrink-0 items-center justify-end gap-2 border-t hairline pt-3 lg:border-t-0 lg:pt-0">
+                          <button
+                            type="button"
+                            onClick={() => setEditingQuestionId(question.id)}
+                            className="inline-flex items-center gap-1.5 rounded-lg border hairline px-2.5 py-2 font-bold text-blue hover:bg-blue-50"
+                          >
+                            <Pencil size={15} />
+                            {translate(locale, 'adminadminTestManagerEditQuestion')}
+                          </button>
+                          <button
+                            type="button"
+                            title={translate(locale, 'adminadminTestManagerDeleteQuestion')}
+                            aria-label={translate(locale, 'adminadminTestManagerDeleteQuestion')}
+                            onClick={() =>
+                              confirm(translate(locale, 'adminadminTestManagerDeleteQuestion2')) &&
+                              mutate(() => api(`/admin/tests/questions/${question.id}`, { method: 'DELETE' }))
+                            }
+                            className="grid size-9 place-items-center rounded-lg text-red-500 hover:bg-red-50"
+                          >
+                            <Trash2 size={17} />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </Fragment>
                 ))}
-                {!section.questions.length && (
-                  <tr>
-                    <td colSpan={5} className="p-6 text-center text-muted">
-                      {translate(fa, 'adminadminTestManagerNoQuestionsYet')}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+              </div>
+            ) : (
+              <p className="p-6 text-center text-muted">{translate(fa, 'adminadminTestManagerNoQuestionsYet')}</p>
+            )}
           </div>
         </div>
       )}
@@ -354,7 +387,7 @@ function QuestionCreator({
   fa,
 }: {
   section: Section;
-  mutate: (task: () => Promise<unknown>) => void;
+  mutate: Mutate;
   fa: boolean;
 }) {
   const [type, setType] = useState('single_choice'),
@@ -467,11 +500,169 @@ function QuestionCreator({
   );
 }
 
-function TextArea({ name, label, dir, required }: { name: string; label: string; dir?: 'ltr'; required?: boolean }) {
+function QuestionEditor({
+  question,
+  fa,
+  onCancel,
+  onSave,
+}: {
+  question: Question;
+  fa: boolean;
+  onCancel: () => void;
+  onSave: (task: () => Promise<unknown>) => Promise<unknown>;
+}) {
+  const [type, setType] = useState(question.type);
+  const objective = ['single_choice', 'multiple_choice'].includes(type);
+  const withAnswer = objective || type === 'true_false';
+  const localizedChoices = question.choices ?? {};
+  const initialAnswerKey = Array.isArray(question.answerKey)
+    ? question.answerKey.map((item) => Number(item) + 1).join(',')
+    : typeof question.answerKey === 'number'
+      ? String(question.answerKey + 1)
+      : '';
+
+  return (
+    <form
+      className="rounded-xl border border-purple/20 bg-[#f8f9fd] p-4"
+      onSubmit={(event) => {
+        event.preventDefault();
+        const form = new FormData(event.currentTarget);
+        const lines = (key: string) =>
+          value(form, key)
+            .split(/\r?\n/)
+            .map((item) => item.trim())
+            .filter(Boolean);
+        const rawAnswer = value(form, 'answerKey');
+        const answerKey =
+          type === 'multiple_choice'
+            ? rawAnswer
+                .split(',')
+                .map((item) => Number(item.trim()) - 1)
+                .filter(Number.isInteger)
+            : withAnswer
+              ? Number(rawAnswer) - 1
+              : null;
+
+        void onSave(() =>
+          api(`/admin/tests/questions/${question.id}`, {
+            method: 'PATCH',
+            body: JSON.stringify({
+              prompt: { fa: value(form, 'promptFa'), en: value(form, 'promptEn') },
+              type,
+              choices: objective ? { fa: lines('choicesFa'), en: lines('choicesEn') } : null,
+              answerKey,
+              points: Number(value(form, 'points')),
+            }),
+          }),
+        );
+      }}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <strong>{translate(fa, 'adminadminTestManagerEditQuestion')}</strong>
+        <span className="latin text-xs text-muted">#{question.order}</span>
+      </div>
+      <div className="mt-4 grid gap-3 md:grid-cols-2">
+        <label>
+          <span className="mb-2 block text-xs font-bold">{translate(fa, 'adminadminTestManagerQuestionType')}</span>
+          <select name="type" value={type} onChange={(event) => setType(event.target.value)} className={input}>
+            <option value="single_choice">{translate(fa, 'adminadminTestManagerSingleChoice')}</option>
+            <option value="multiple_choice">{translate(fa, 'adminadminTestManagerMultipleChoice')}</option>
+            <option value="true_false">{translate(fa, 'adminadminTestManagerTrueFalse')}</option>
+            <option value="short_text">{translate(fa, 'adminadminTestManagerShortAnswer')}</option>
+            <option value="essay">{translate(fa, 'adminadminTestManagerEssay')}</option>
+            <option value="recording">{translate(fa, 'adminadminTestManagerVoiceAnswer')}</option>
+          </select>
+        </label>
+        <label>
+          <span className="mb-2 block text-xs font-bold">{translate(fa, 'adminadminTestManagerPoints')}</span>
+          <input name="points" type="number" min="0.1" step="0.1" defaultValue={question.points} className={input} required />
+        </label>
+        <TextArea
+          name="promptFa"
+          label={translate(fa, 'adminadminTestManagerPersianQuestion')}
+          defaultValue={question.prompt.fa ?? ''}
+          required
+        />
+        <TextArea
+          name="promptEn"
+          label={translate(fa, 'adminadminTestManagerEnglishQuestion2')}
+          dir="ltr"
+          defaultValue={question.prompt.en ?? ''}
+          required
+        />
+        {objective && (
+          <>
+            <TextArea
+              name="choicesFa"
+              label={translate(fa, 'adminadminTestManagerPersianChoicesOnePerLine')}
+              defaultValue={localizedChoices.fa?.join('\n') ?? ''}
+              required
+            />
+            <TextArea
+              name="choicesEn"
+              label={translate(fa, 'adminadminTestManagerEnglishChoicesOnePerLine')}
+              dir="ltr"
+              defaultValue={localizedChoices.en?.join('\n') ?? ''}
+              required
+            />
+          </>
+        )}
+        {withAnswer && (
+          <label className="md:col-span-2">
+            <span className="mb-2 block text-xs font-bold">
+              {type === 'multiple_choice'
+                ? translate(fa, 'adminadminTestManagerCorrectOptionNumbersEG13')
+                : translate(fa, 'adminadminTestManagerCorrectOptionNumber')}
+            </span>
+            {type === 'true_false' ? (
+              <select name="answerKey" defaultValue={initialAnswerKey || '1'} className={input} required>
+                <option value="1">{translate(fa, 'adminadminTestManagerTrue')}</option>
+                <option value="2">{translate(fa, 'adminadminTestManagerFalse')}</option>
+              </select>
+            ) : (
+              <input
+                name="answerKey"
+                dir="ltr"
+                className={input}
+                defaultValue={initialAnswerKey}
+                placeholder={type === 'multiple_choice' ? '1,3' : '1'}
+                required
+              />
+            )}
+          </label>
+        )}
+      </div>
+      <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <button type="button" onClick={onCancel} className="inline-flex items-center justify-center gap-2 rounded-lg border hairline px-4 py-2.5 font-bold">
+          <X size={16} />
+          {translate(fa, 'adminadminTestManagerCancelEdit')}
+        </button>
+        <button type="submit" className="brand-gradient inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 font-black text-white">
+          <Check size={16} />
+          {translate(fa, 'adminadminTestManagerSaveQuestion')}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function TextArea({
+  name,
+  label,
+  dir,
+  required,
+  defaultValue,
+}: {
+  name: string;
+  label: string;
+  dir?: 'ltr';
+  required?: boolean;
+  defaultValue?: string;
+}) {
   return (
     <label>
       <span className="mb-2 block text-xs font-bold">{label}</span>
-      <textarea name={name} dir={dir} className={`${input} min-h-28`} required={required} />
+      <textarea name={name} dir={dir} defaultValue={defaultValue} className={`${input} min-h-28`} required={required} />
     </label>
   );
 }

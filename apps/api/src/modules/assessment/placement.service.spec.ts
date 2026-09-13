@@ -41,4 +41,50 @@ describe('PlacementService immediate scoring', () => {
       response: expect.objectContaining({ code: 'PLACEMENT_ANSWERS_INCOMPLETE' }),
     });
   });
+
+  it('stores five section scores and applies consecutive CEFR placement rules', async () => {
+    const sections = ['A1', 'A2', 'B1', 'B2', 'C1'].map((level, sectionIndex) => ({
+      order: sectionIndex + 1,
+      questions: Array.from({ length: 6 }, (_, questionIndex) => ({
+        id: `${level}-${questionIndex}`,
+        type: 'single_choice',
+        answerKey: 0,
+        points: 1,
+      })),
+    }));
+    const create = jest.fn(async ({ data }: { data: Record<string, unknown> }) => ({ id: 'result-2', ...data }));
+    const db = {
+      testDefinition: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'test-placement',
+          published: true,
+          isPlacement: true,
+          sections,
+        }),
+      },
+      placementResult: { create },
+    };
+    const service = new PlacementService(db as never, new ScoringService());
+    const answers = sections.flatMap((section, sectionIndex) =>
+      section.questions.map((question, questionIndex) => ({
+        questionId: question.id,
+        value: questionIndex < (sectionIndex < 3 ? 5 : 2) ? 0 : 1,
+      })),
+    );
+
+    const result = await service.submit(null, 'test-placement', answers);
+
+    expect(result).toMatchObject({
+      level: 'B1',
+      sectionScores: { A1: 5, A2: 5, B1: 5, B2: 2, C1: 2 },
+      borderline: false,
+    });
+    expect(create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        level: 'B1',
+        sectionScores: { A1: 5, A2: 5, B1: 5, B2: 2, C1: 2 },
+        borderline: false,
+      }),
+    });
+  });
 });

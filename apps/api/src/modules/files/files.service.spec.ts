@@ -1,6 +1,6 @@
 // Set before importing FilesService: `filesConfig()` reads `config()`, which
 // parses the environment, at class-property-initialisation time.
-process.env.DATABASE_URL ??= 'postgresql://u:p@localhost:5432/db?schema=public';
+process.env.DATABASE_URL ??= 'postgresql://u:p@localhost:15432/db?schema=public';
 process.env.JWT_ACCESS_SECRET ??= 'a'.repeat(32);
 process.env.JWT_REFRESH_SECRET ??= 'b'.repeat(32);
 process.env.S3_ACCESS_KEY ??= 'minio';

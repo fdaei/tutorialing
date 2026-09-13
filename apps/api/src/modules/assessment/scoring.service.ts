@@ -1,5 +1,8 @@
 import { Injectable } from '@nestjs/common';
 export type CefrLevel = 'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2';
+export type PlacementLevel = Exclude<CefrLevel, 'C2'>;
+export type PlacementSectionScores = Record<PlacementLevel, number>;
+
 @Injectable()
 export class ScoringService {
   /** Weighted percentage thresholds are intentionally centralized and can be
@@ -12,6 +15,25 @@ export class ScoringService {
     if (score >= 25) return 'A2';
     return 'A1';
   }
+
+  placementLevel(scores: PlacementSectionScores): PlacementLevel {
+    const levels: PlacementLevel[] = ['A1', 'A2', 'B1', 'B2', 'C1'];
+    let result: PlacementLevel = 'A1';
+    for (const level of levels) {
+      if (scores[level] < 4) break;
+      result = level;
+    }
+    return result;
+  }
+
+  placementBorderline(scores: PlacementSectionScores): boolean {
+    const levels: PlacementLevel[] = ['A1', 'A2', 'B1', 'B2', 'C1'];
+    return levels.some((level, index) => {
+      if (scores[level] !== 3 || index > levels.length - 3) return false;
+      return scores[levels[index + 1]!] >= 5 && scores[levels[index + 2]!] >= 5;
+    });
+  }
+
   objective(correct: number, total: number) {
     if (!total) return 0;
     const raw = (correct / total) * 40;

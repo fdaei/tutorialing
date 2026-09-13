@@ -20,6 +20,7 @@ import {
   Menu,
   MessageCircle,
   MoreHorizontal,
+  PanelsTopLeft,
   Search,
   Settings,
   ShieldCheck,
@@ -65,6 +66,7 @@ export const adminNavigationGroups = [
     hrefs: [
       '/admin/languages',
       '/admin/countries',
+      '/admin/courses',
       '/admin/tests',
       '/admin/test-reviews',
       '/admin/bookings',
@@ -76,7 +78,7 @@ export const adminNavigationGroups = [
     label: 'محتوا',
     labelEn: 'Content',
     icon: FileEdit,
-    hrefs: ['/admin/magazine', '/admin/cms', '/admin/reviews'],
+    hrefs: ['/admin/magazine', '/admin/cms', '/admin/website-builder', '/admin/reviews'],
   },
   {
     id: 'operations',
@@ -497,6 +499,14 @@ export const adminNav: NavItem[] = [
     permission: 'languages.manage',
   },
   {
+    href: '/admin/courses',
+    label: 'دوره‌ها',
+    labelEn: 'Courses',
+    icon: BookOpen,
+    roles: ['ADMIN'],
+    permission: 'courses.manage',
+  },
+  {
     href: '/admin/countries',
     label: 'کشورها',
     labelEn: 'Countries',
@@ -595,6 +605,14 @@ export const adminNav: NavItem[] = [
     permission: 'roles.manage',
   },
   { href: '/admin/cms', label: 'مدیریت محتوا', labelEn: 'CMS', roles: ['ADMIN'], permission: 'cms.manage' },
+  {
+    href: '/admin/website-builder',
+    label: 'سازنده سایت',
+    labelEn: 'Website builder',
+    icon: PanelsTopLeft,
+    roles: ['ADMIN'],
+    permission: 'settings.manage',
+  },
   {
     href: '/admin/notifications',
     label: 'اعلان‌ها',

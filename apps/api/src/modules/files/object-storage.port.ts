@@ -18,4 +18,5 @@ export interface ObjectStorage {
   }): Promise<void>;
   headObject(key: string): Promise<{ contentLength?: number; contentType?: string; checksum?: string } | null>;
   createDownloadUrl(key: string): Promise<string>;
+  deleteObject(key: string): Promise<void>;
 }

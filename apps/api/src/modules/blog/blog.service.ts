@@ -27,6 +27,11 @@ const MAX_PAGE_SIZE = 50;
 
 const AUTHOR = { select: { id: true, name: true, avatarKey: true } } as const;
 
+function readingTimeMinutes(content: string) {
+  const words = content.trim().split(/\s+/).filter(Boolean).length;
+  return Math.max(1, Math.ceil(words / 180));
+}
+
 @Injectable()
 export class BlogService {
   constructor(
@@ -54,7 +59,11 @@ export class BlogService {
         orderBy: { publishedAt: 'desc' },
         include: { category: true, tags: true, author: AUTHOR, _count: { select: { views: true } } },
       })
-      .then((items) => ({ items, page, pageSize }));
+      .then((items) => ({
+        items: items.map((item) => ({ ...item, readingTimeMinutes: readingTimeMinutes(item.contentFa || item.contentEn) })),
+        page,
+        pageSize,
+      }));
   }
 
   /**
@@ -79,7 +88,11 @@ export class BlogService {
       _avg: { value: true },
       _count: { value: true },
     });
-    return { ...post, rating: { average: ratings._avg.value, count: ratings._count.value } };
+    return {
+      ...post,
+      readingTimeMinutes: readingTimeMinutes(post.contentFa || post.contentEn),
+      rating: { average: ratings._avg.value, count: ratings._count.value },
+    };
   }
 
   comments(postId: string) {

@@ -1,13 +1,15 @@
 'use client';
 
 import { localized, isDefaultLocale, translate } from '@/lib/i18n';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, Trash2 } from 'lucide-react';
+import { ImagePlus, LoaderCircle, Plus, Trash2, Upload, X } from 'lucide-react';
 import { api, apiMessage, type Paginated } from '@/shared/services/api';
 import type { EducationalLanguage } from '@/features/languages';
 import { useTranslations } from '@/components/shared/locale-provider';
 import { adminDeleteConfirmation } from '../admin-confirmation';
+import { uploadPanelFile } from '@/features/panel/services/upload-panel-file';
+import { uploadErrorMessage } from '@/shared/services/upload';
 
 const emptyLanguageForm = {
   code: '',
@@ -15,6 +17,7 @@ const emptyLanguageForm = {
   nameEn: '',
   nativeName: '',
   flag: '🌐',
+  imageId: '',
   direction: 'LTR',
   proficiencySystem: 'CEFR',
   active: true,
@@ -28,7 +31,10 @@ export function LanguageManager() {
     [search, setSearch] = useState(''),
     [page, setPage] = useState(1),
     [editing, setEditing] = useState<EducationalLanguage | null>(null),
-    [form, setForm] = useState(emptyLanguageForm);
+    [form, setForm] = useState(emptyLanguageForm),
+    [imagePreview, setImagePreview] = useState(''),
+    [imageUploading, setImageUploading] = useState(false),
+    [imageError, setImageError] = useState('');
   const query = useQuery({
     queryKey: ['admin-languages', search, page],
     queryFn: () =>
@@ -37,15 +43,36 @@ export function LanguageManager() {
       ),
   });
   const refresh = () => qc.invalidateQueries({ queryKey: ['admin-languages'] });
+  useEffect(() => {
+    let cancelled = false;
+    if (!form.imageId) {
+      setImagePreview('');
+      return () => {
+        cancelled = true;
+      };
+    }
+    api<{ url: string }>(`/files/public/${form.imageId}`)
+      .then((result) => {
+        if (!cancelled) setImagePreview(result.url);
+      })
+      .catch(() => {
+        if (!cancelled) setImagePreview('');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [form.imageId]);
   const save = useMutation({
     mutationFn: () =>
       api(editing ? `/admin/languages/${editing.id}` : '/admin/languages', {
         method: editing ? 'PATCH' : 'POST',
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, imageId: form.imageId || null }),
       }),
     onSuccess: () => {
       setEditing(null);
-      setForm(emptyLanguageForm);
+      setForm({ ...emptyLanguageForm });
+      setImagePreview('');
+      setImageError('');
       refresh();
     },
   });
@@ -61,12 +88,21 @@ export function LanguageManager() {
       nameEn: item.nameEn,
       nativeName: item.nativeName,
       flag: item.flag || '',
+      imageId: item.imageId || '',
       direction: item.direction,
       proficiencySystem: item.proficiencySystem,
       active: item.active,
       order: item.order,
     });
+    setImagePreview('');
+    setImageError('');
   }
+  const resetForm = () => {
+    setEditing(null);
+    setForm({ ...emptyLanguageForm });
+    setImagePreview('');
+    setImageError('');
+  };
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_430px]">
       <section className="rounded-3xl border hairline bg-white p-6">
@@ -250,6 +286,67 @@ export function LanguageManager() {
               />
             </Field>
           </div>
+          <div className="rounded-2xl border border-dashed border-purple/30 bg-[#f7f7ff] p-4">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-black">{fa ? 'تصویر زبان' : 'Language image'}</p>
+                <p className="mt-1 text-xs text-muted">
+                  {fa ? 'یک تصویر افقی برای کارت زبان انتخاب کنید.' : 'Choose a landscape image for the language card.'}
+                </p>
+              </div>
+              <ImagePlus size={20} className="text-purple" aria-hidden="true" />
+            </div>
+            {imagePreview ? (
+              <div className="relative overflow-hidden rounded-xl border hairline bg-white">
+                <img src={imagePreview} alt="" className="aspect-[16/9] w-full object-cover" />
+                <button
+                  type="button"
+                  aria-label={fa ? 'حذف تصویر زبان' : 'Remove language image'}
+                  onClick={() => {
+                    setForm((current) => ({ ...current, imageId: '' }));
+                    setImagePreview('');
+                  }}
+                  className="absolute end-3 top-3 grid size-9 place-items-center rounded-full bg-white/95 text-red-600 shadow-sm"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            ) : (
+              <div className="grid aspect-[16/9] place-items-center rounded-xl border hairline bg-white text-muted">
+                <div className="text-center">
+                  <ImagePlus className="mx-auto mb-2" size={28} />
+                  <span className="text-xs">{fa ? 'هنوز تصویری انتخاب نشده' : 'No image selected yet'}</span>
+                </div>
+              </div>
+            )}
+            <label className="secondary-button mt-3 w-full cursor-pointer justify-center">
+              {imageUploading ? <LoaderCircle size={16} className="animate-spin" /> : <Upload size={16} />}
+              {imageUploading ? (fa ? 'در حال آپلود...' : 'Uploading...') : fa ? 'انتخاب تصویر' : 'Choose image'}
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                aria-label={fa ? 'انتخاب تصویر زبان' : 'Choose language image'}
+                className="hidden"
+                disabled={imageUploading}
+                onChange={async (event) => {
+                  const file = event.target.files?.[0];
+                  if (!file) return;
+                  setImageUploading(true);
+                  setImageError('');
+                  try {
+                    const imageId = await uploadPanelFile(file, 'website-media', fa);
+                    setForm((current) => ({ ...current, imageId }));
+                  } catch (error) {
+                    setImageError(uploadErrorMessage(error, fa ? 'آپلود تصویر انجام نشد.' : 'The image upload failed.'));
+                  } finally {
+                    setImageUploading(false);
+                    event.currentTarget.value = '';
+                  }
+                }}
+              />
+            </label>
+            {imageError && <p role="alert" className="mt-2 text-sm text-red-700">{imageError}</p>}
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <Field label={translate(locale, 'adminlanguageManagerDirection')}>
               <select
@@ -299,7 +396,7 @@ export function LanguageManager() {
           <div className="flex gap-3">
             <button
               type="submit"
-              disabled={save.isPending}
+              disabled={save.isPending || imageUploading}
               className="brand-gradient flex flex-1 items-center justify-center gap-2 rounded-xl py-3 font-black text-white"
             >
               <Plus size={18} />
@@ -308,10 +405,7 @@ export function LanguageManager() {
             {editing && (
               <button
                 type="button"
-                onClick={() => {
-                  setEditing(null);
-                  setForm(emptyLanguageForm);
-                }}
+                onClick={resetForm}
                 className="rounded-xl border hairline px-4"
               >
                 {translate(locale, 'admincountryManagerCancel')}

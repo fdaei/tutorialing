@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Prisma, TeacherStatus } from '@prisma/client';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { AuditService } from '../../system/audit/audit.service';
-import { badRequest, notFound } from '../../common';
+import { badRequest, conflict, notFound, assertDomain, requireValue } from '../../common';
 import { FilesService } from '../files/files.service';
 
 export type TeacherApplicationInput = {
@@ -18,6 +18,18 @@ export type TeacherApplicationInput = {
   lessonDuration?: number;
   trialDuration?: number;
   breakMinutes?: number;
+};
+
+export type AdminTeacherInput = TeacherApplicationInput & {
+  phone: string;
+  email?: string;
+  trialPrice?: number;
+  regularPrice?: number;
+  approvedTrialPrice?: number | null;
+  approvedRegularPrice?: number | null;
+  targetBands?: number[];
+  avatarFileId?: string | null;
+  status?: TeacherStatus;
 };
 
 @Injectable()
@@ -62,6 +74,284 @@ export class TeachersService {
       orderBy: { submittedAt: 'asc' },
     });
     return applications;
+  }
+
+  async adminList(page = 1, limit = 24, search = '', status = '') {
+    const normalizedPage = Math.max(1, page);
+    const normalizedLimit = Math.min(100, Math.max(1, limit));
+    const where: Prisma.TeacherWhereInput = {
+      ...(Object.values(TeacherStatus).includes(status as TeacherStatus) && {
+        status: status as TeacherStatus,
+      }),
+      ...(search.trim() && {
+        OR: [
+          { nameFa: { contains: search.trim(), mode: 'insensitive' } },
+          { nameEn: { contains: search.trim(), mode: 'insensitive' } },
+          { user: { phone: { contains: search.trim() } } },
+          { user: { email: { contains: search.trim(), mode: 'insensitive' } } },
+        ],
+      }),
+    };
+    const [rows, total] = await this.db.$transaction([
+      this.db.teacher.findMany({
+        where,
+        skip: (normalizedPage - 1) * normalizedLimit,
+        take: normalizedLimit,
+        orderBy: { updatedAt: 'desc' },
+        select: {
+          id: true,
+          slug: true,
+          nameFa: true,
+          nameEn: true,
+          status: true,
+          rating: true,
+          reviewsCount: true,
+          experienceYears: true,
+          specialties: true,
+          approvedTrialPrice: true,
+          approvedRegularPrice: true,
+          user: { select: { phone: true, email: true, avatarKey: true } },
+          languageLinks: {
+            where: { active: true },
+            select: { language: { select: { id: true, nameFa: true, nameEn: true, flag: true } } },
+          },
+        },
+      }),
+      this.db.teacher.count({ where }),
+    ]);
+    const data = await Promise.all(rows.map((row) => this.withAvatarUrl(row)));
+    return {
+      data,
+      total,
+      page: normalizedPage,
+      limit: normalizedLimit,
+      totalPages: Math.ceil(total / normalizedLimit),
+    };
+  }
+
+  async adminDetail(id: string) {
+    const teacher = await this.db.teacher.findUnique({
+      where: { id },
+      include: {
+        user: { select: { id: true, name: true, phone: true, email: true, avatarKey: true, locale: true } },
+        languageLinks: {
+          include: {
+            language: { select: { id: true, code: true, nameFa: true, nameEn: true, nativeName: true, flag: true } },
+          },
+          orderBy: { language: { order: 'asc' } },
+        },
+        verificationItems: {
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            kind: true,
+            status: true,
+            note: true,
+            createdAt: true,
+            file: { select: { id: true, originalName: true, mimeType: true, size: true } },
+          },
+        },
+        _count: {
+          select: {
+            bookings: true,
+            reviews: true,
+            courses: true,
+            verificationItems: true,
+            availabilityRules: true,
+            learningPlans: true,
+          },
+        },
+      },
+    });
+    if (!teacher) throw notFound('TEACHER_NOT_FOUND');
+    return this.withAvatarUrl(teacher);
+  }
+
+  async adminCreate(actorId: string, input: AdminTeacherInput) {
+    const normalized = await this.adminTeacherData(actorId, input);
+    const existingUser = await this.db.user.findUnique({ where: { phone: input.phone.trim() }, select: { id: true } });
+    assertDomain(!existingUser, () => conflict('USER_PHONE_EXISTS'));
+    const slugBase =
+      input.nameEn
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '') || 'teacher';
+
+    const teacher = await this.db.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: {
+          phone: input.phone.trim(),
+          name: normalized.teacherData.nameFa,
+          email: input.email?.trim() || undefined,
+          locale: 'fa',
+          profileComplete: true,
+          ...(normalized.avatarKey !== undefined && { avatarKey: normalized.avatarKey }),
+          roles: { create: { role: 'INSTRUCTOR' } },
+        },
+      });
+      const created = await tx.teacher.create({
+        data: {
+          userId: user.id,
+          slug: `${slugBase}-${user.id.slice(-5)}`,
+          ...normalized.teacherData,
+        },
+      });
+      await tx.teacherLanguage.createMany({
+        data: normalized.languageIds.map((languageId) => ({
+          teacherId: created.id,
+          languageId,
+          active: true,
+          levels: normalized.levels,
+          specialties: normalized.teacherData.specialties,
+        })),
+      });
+      await tx.auditLog.create({
+        data: {
+          actorId,
+          action: 'teacher.created',
+          entity: 'Teacher',
+          entityId: created.id,
+          after: {
+            phone: input.phone.trim(),
+            nameFa: normalized.teacherData.nameFa,
+            nameEn: normalized.teacherData.nameEn,
+            status: normalized.teacherData.status,
+          },
+        },
+      });
+      return created;
+    });
+    return this.adminDetail(teacher.id);
+  }
+
+  async adminUpdate(actorId: string, id: string, input: Partial<AdminTeacherInput>) {
+    const before = await this.db.teacher.findUnique({
+      where: { id },
+      include: { user: true, languageLinks: { include: { language: true } } },
+    });
+    if (!before) throw notFound('TEACHER_NOT_FOUND');
+    if (input.phone && input.phone.trim() !== before.user.phone) {
+      const existingUser = await this.db.user.findUnique({ where: { phone: input.phone.trim() }, select: { id: true } });
+      assertDomain(!existingUser || existingUser.id === before.userId, () => conflict('USER_PHONE_EXISTS'));
+    }
+    const normalized = await this.adminTeacherData(actorId, {
+      phone: input.phone ?? before.user.phone ?? '',
+      email: input.email !== undefined ? input.email : before.user.email ?? undefined,
+      nameFa: input.nameFa ?? before.nameFa,
+      nameEn: input.nameEn ?? before.nameEn,
+      bioFa: input.bioFa ?? before.bioFa,
+      bioEn: input.bioEn ?? before.bioEn,
+      specialties: input.specialties ?? before.specialties,
+      languageIds: input.languageIds ?? before.languageLinks.map((link) => link.languageId),
+      levels: input.levels ?? [...new Set(before.languageLinks.flatMap((link) => link.levels))],
+      experienceYears: input.experienceYears ?? before.experienceYears,
+      gender: input.gender !== undefined ? input.gender : before.gender ?? undefined,
+      lessonDuration: input.lessonDuration ?? before.lessonDuration,
+      trialDuration: input.trialDuration ?? before.trialDuration,
+      breakMinutes: input.breakMinutes ?? before.breakMinutes,
+      trialPrice: input.trialPrice ?? before.trialPrice,
+      regularPrice: input.regularPrice ?? before.regularPrice,
+      approvedTrialPrice:
+        input.approvedTrialPrice !== undefined ? input.approvedTrialPrice : before.approvedTrialPrice,
+      approvedRegularPrice:
+        input.approvedRegularPrice !== undefined ? input.approvedRegularPrice : before.approvedRegularPrice,
+      targetBands: input.targetBands ?? before.targetBands,
+      avatarFileId: input.avatarFileId,
+      status: input.status ?? before.status,
+    });
+    const teacher = await this.db.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: before.userId },
+        data: {
+          ...(input.phone !== undefined && { phone: input.phone.trim() }),
+          ...(input.email !== undefined && { email: input.email.trim() || null }),
+          name: normalized.teacherData.nameFa,
+          ...(normalized.avatarKey !== undefined && { avatarKey: normalized.avatarKey }),
+        },
+      });
+      const updated = await tx.teacher.update({
+        where: { id },
+        data: normalized.teacherData,
+      });
+      if (input.languageIds !== undefined) {
+        await tx.teacherLanguage.deleteMany({ where: { teacherId: id } });
+        await tx.teacherLanguage.createMany({
+          data: normalized.languageIds.map((languageId) => ({
+            teacherId: id,
+            languageId,
+            active: true,
+            levels: normalized.levels,
+            specialties: normalized.teacherData.specialties,
+          })),
+        });
+      }
+      await tx.auditLog.create({
+        data: {
+          actorId,
+          action: 'teacher.updated',
+          entity: 'Teacher',
+          entityId: id,
+          before: { nameFa: before.nameFa, nameEn: before.nameEn, status: before.status },
+          after: {
+            nameFa: normalized.teacherData.nameFa,
+            nameEn: normalized.teacherData.nameEn,
+            status: normalized.teacherData.status,
+          },
+        },
+      });
+      return updated;
+    });
+    return this.adminDetail(teacher.id);
+  }
+
+  private async adminTeacherData(ownerId: string, input: AdminTeacherInput) {
+    const languageIds = [...new Set(input.languageIds)];
+    if (!languageIds.length) throw badRequest('TEACHER_LANGUAGE_REQUIRED');
+    const languages = await this.db.language.findMany({
+      where: { id: { in: languageIds }, active: true },
+      select: { id: true, nameEn: true },
+    });
+    if (languages.length !== languageIds.length) throw badRequest('TEACHER_LANGUAGE_INVALID');
+    let avatarKey: string | null | undefined;
+    if (input.avatarFileId !== undefined) {
+      if (!input.avatarFileId) avatarKey = null;
+      else {
+        if (!this.files) throw badRequest('FILE_NOT_FOUND');
+        avatarKey = (await this.files.ownedSafeImage(ownerId, input.avatarFileId, 'teacher-avatar')).key;
+      }
+    }
+    return {
+      teacherData: {
+        nameFa: input.nameFa.trim(),
+        nameEn: input.nameEn.trim(),
+        bioFa: input.bioFa.trim(),
+        bioEn: input.bioEn.trim(),
+        specialties: input.specialties.map((item) => item.trim()).filter(Boolean),
+        languages: languages.map((language) => language.nameEn),
+        experienceYears: input.experienceYears,
+        gender: input.gender?.trim() || null,
+        lessonDuration: input.lessonDuration ?? 60,
+        trialDuration: input.trialDuration ?? 30,
+        breakMinutes: input.breakMinutes ?? 0,
+        trialPrice: input.trialPrice ?? 0,
+        regularPrice: input.regularPrice ?? 0,
+        approvedTrialPrice: input.approvedTrialPrice ?? null,
+        approvedRegularPrice: input.approvedRegularPrice ?? null,
+        targetBands: input.targetBands ?? [],
+        status: input.status ?? TeacherStatus.DRAFT,
+      },
+      languageIds,
+      levels: input.levels ?? [],
+      ...(avatarKey !== undefined && { avatarKey }),
+    };
+  }
+
+  private async withAvatarUrl<T extends { user: { avatarKey: string | null } }>(teacher: T) {
+    const avatarUrl = teacher.user.avatarKey && this.files
+      ? await this.files.createDownloadUrl(teacher.user.avatarKey)
+      : null;
+    return { ...teacher, avatarUrl };
   }
 
   async directory(query: {

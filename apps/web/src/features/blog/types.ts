@@ -6,6 +6,10 @@ export type BlogPostSummary = {
   excerptFa: string;
   excerptEn: string;
   coverImage?: string | null;
+  publishedAt?: string | null;
+  createdAt?: string;
+  readingTimeMinutes?: number;
+  _count?: { views?: number; comments?: number };
   category?: { nameFa: string; nameEn: string } | null;
   author?: { name: string | null } | null;
 };

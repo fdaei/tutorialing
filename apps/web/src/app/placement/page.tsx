@@ -1,19 +1,27 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   ArrowLeft,
   ArrowRight,
+  BadgeCheck,
   BookOpen,
   Check,
+  CircleHelp,
   ChevronLeft,
   ChevronRight,
   Clock3,
+  FileCheck2,
+  ListChecks,
   RotateCcw,
+  Save,
+  ShieldCheck,
   Sparkles,
   Target,
+  TimerReset,
+  Volume2,
 } from 'lucide-react';
 import { Footer, Header } from '@/components/layout/site';
 import { CourseCard } from '@/components/marketplace/cards';
@@ -39,7 +47,7 @@ type Question = {
   prompt: { fa?: string; en?: string };
   choices: { fa?: unknown[]; en?: unknown[] };
   points: number;
-  skill: string;
+  audioUrl?: string;
 };
 type TestPayload = { id: string; titleFa: string; titleEn: string; durationMinutes: number; questions: Question[] };
 type Result = {
@@ -55,12 +63,12 @@ type Result = {
   strengths: string[];
   focus: string[];
   authenticated: boolean;
+  borderline?: boolean;
 };
 
 export default function Placement() {
   const { locale } = useTranslations(),
     fa = isDefaultLocale(locale),
-    p = (href: string) => localePath(href, locale),
     copy = (faCopy: string, enCopy: string) => localized({ fa: faCopy, en: enCopy }, locale),
     numberLocale = fa ? 'fa-IR' : 'en-US';
   const [languageId, setLanguageId] = useState(''),
@@ -69,7 +77,8 @@ export default function Placement() {
     [answers, setAnswers] = useState<Record<string, unknown>>({}),
     [result, setResult] = useState<Result>(),
     [busy, setBusy] = useState(false),
-    [error, setError] = useState('');
+    [error, setError] = useState(''),
+    [secondsLeft, setSecondsLeft] = useState(0);
   const languages = useQuery({
     queryKey: ['educational-languages'],
     queryFn: () => publicApi<EducationalLanguage[]>('/languages'),
@@ -80,20 +89,72 @@ export default function Placement() {
     enabled: !!languageId,
   });
   const question = test?.questions[index],
-    answered = question ? Object.hasOwn(answers, question.id) : false;
+    answered = question ? Object.hasOwn(answers, question.id) : false,
+    choices = question
+      ? ((localized({ fa: question.choices?.fa, en: question.choices?.en }, locale) ?? []) as unknown[])
+      : [],
+    selectedLanguage = languages.data?.find((language) => language.id === languageId);
+
+  useEffect(() => {
+    if (!test || result) return;
+    const timer = window.setInterval(() => {
+      setSecondsLeft((current) => Math.max(current - 1, 0));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [test, result]);
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (!question || event.altKey || event.ctrlKey || event.metaKey || event.target instanceof HTMLInputElement) return;
+      const choiceIndex = 'ABCD'.indexOf(event.key.toUpperCase());
+      if (choiceIndex >= 0 && choiceIndex < choices.length) {
+        setAnswers((current) => ({ ...current, [question.id]: choiceIndex }));
+      }
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [choices.length, question]);
+
   async function start(testId: string) {
     setBusy(true);
     setError('');
     try {
-      setTest(await publicApi<TestPayload>(`/placement/questions?testId=${encodeURIComponent(testId)}`));
-      setIndex(0);
-      setAnswers({});
+      const payload = await publicApi<TestPayload>(`/placement/questions?testId=${encodeURIComponent(testId)}`);
+      let draft: { answers?: Record<string, unknown>; index?: number; secondsLeft?: number } | undefined;
+      try {
+        const savedDraft = sessionStorage.getItem(draftKey(testId));
+        draft = savedDraft ? (JSON.parse(savedDraft) as { answers?: Record<string, unknown>; index?: number; secondsLeft?: number }) : undefined;
+      } catch {
+        sessionStorage.removeItem(draftKey(testId));
+      }
+      setTest(payload);
+      setIndex(Math.min(Math.max(draft?.index ?? 0, 0), payload.questions.length - 1));
+      setAnswers(draft?.answers ?? {});
+      setSecondsLeft(draft?.secondsLeft ?? payload.durationMinutes * 60);
       setResult(undefined);
     } catch {
       setError(copy('دریافت سؤال‌ها ممکن نشد. دوباره تلاش کنید.', 'Could not load the questions. Try again.'));
     } finally {
       setBusy(false);
     }
+  }
+  function draftKey(testId: string) {
+    return `lingospeak-placement-draft:${testId}`;
+  }
+  function saveAndExit() {
+    if (!test) return;
+    sessionStorage.setItem(
+      draftKey(test.id),
+      JSON.stringify({ answers, index, secondsLeft }),
+    );
+    leaveTest();
+  }
+  function leaveTest() {
+    setTest(undefined);
+    setAnswers({});
+    setIndex(0);
+    setSecondsLeft(0);
+    setError('');
   }
   async function next() {
     if (!test || !question || !answered) return;
@@ -126,10 +187,12 @@ export default function Placement() {
     }
   }
   function restart() {
+    if (test) sessionStorage.removeItem(draftKey(test.id));
     setTest(undefined);
     setResult(undefined);
     setAnswers({});
     setIndex(0);
+    setSecondsLeft(0);
     setError('');
   }
   if (result) {
@@ -145,92 +208,159 @@ export default function Placement() {
     );
   }
   if (test && question) {
-    const choices = (localized({ fa: question.choices?.fa, en: question.choices?.en }, locale) ?? []) as unknown[];
     const progress = Math.round(((index + 1) / test.questions.length) * 100);
+    const remainingQuestions = Math.max(test.questions.length - index - 1, 0);
     return (
       <>
         <Header />
-        <main className="min-h-[calc(100vh-76px)] bg-canvas py-8 md:py-14">
-          <div className="mx-auto max-w-3xl px-5">
-            <div className="mb-5 flex items-center justify-between text-sm">
-              <button onClick={restart} className="flex items-center gap-2 text-muted">
-                {fa ? <ChevronRight size={17} /> : <ChevronLeft size={17} />}
-                {copy('خروج از آزمون', 'Exit test')}
+        <main className="placement-test-page">
+          <div className="placement-test-shell">
+            <div className="placement-test-toolbar">
+              <div className="placement-toolbar-status">
+                <details className="placement-rules">
+                  <summary className="placement-rules-button">
+                    <ShieldCheck size={17} />
+                    {copy('قوانین آزمون', 'Test rules')}
+                  </summary>
+                  <p>{copy('برای هر سوال یک پاسخ را انتخاب کنید. می‌توانید پاسخ‌ها را مرور کنید و در پایان نتیجه را ببینید.', 'Choose one answer per question. You can review your answers before viewing your result.')}</p>
+                </details>
+                <span className="placement-remaining">
+                  <ListChecks size={17} />
+                  <span>
+                    <small>{copy('باقی‌مانده', 'Remaining')}</small>
+                    <strong>{remainingQuestions.toLocaleString(numberLocale)}</strong>
+                  </span>
+                </span>
+                <TimerBadge seconds={secondsLeft} fa={fa} />
+              </div>
+              <button type="button" onClick={saveAndExit} className="placement-toolbar-button">
+                <Save size={17} />
+                {copy('ذخیره و خروج', 'Save & exit')}
               </button>
-              <span className="flex items-center gap-2 text-muted">
-                <Clock3 size={17} />
-                {test.durationMinutes.toLocaleString(numberLocale)} {copy('دقیقه', 'minutes')}
-              </span>
             </div>
-            <section className="surface-card overflow-hidden">
-              <div className="border-b hairline p-5 md:p-7">
-                <div className="flex items-center justify-between gap-4 text-sm">
-                  <strong>
-                    {copy('سؤال', 'Question')} {(index + 1).toLocaleString(numberLocale)} {copy('از', 'of')}{' '}
-                    {test.questions.length.toLocaleString(numberLocale)}
-                  </strong>
-                  <span className="latin font-black text-purple">{progress}%</span>
+
+            <section className="placement-test-header">
+              <div className="placement-test-heading">
+                <div className="placement-test-eyebrow">
+                  <span className="placement-live-dot" />
+                  {copy('ارزیابی آنلاین LingoSpeak', 'LingoSpeak online assessment')}
                 </div>
-                <div className="mt-3 h-2 overflow-hidden rounded-full bg-lavender" dir="ltr">
-                  <div
-                    className="h-full rounded-full brand-gradient transition-[width]"
-                    style={{ width: `${progress}%` }}
-                  />
+                <h1>{copy('آزمون تعیین سطح زبان', 'Language placement test')}</h1>
+                <p>{copy('سطح فعلی زبان شما را در کمتر از ۱۰ دقیقه ارزیابی کنید.', 'Assess your current language level in less than 10 minutes.')}</p>
+              </div>
+              <div className="placement-test-facts">
+                <div className="placement-test-language">
+                  <span className="placement-language-flag">{selectedLanguage?.flag || '🌐'}</span>
+                  <span>
+                    <small>{copy('زبان آزمون', 'Test language')}</small>
+                    <strong>{selectedLanguage ? localized({ fa: selectedLanguage.nameFa, en: selectedLanguage.nameEn }, locale) : test.titleEn}</strong>
+                  </span>
+                </div>
+                <div className="placement-fact">
+                  <FileCheck2 size={19} />
+                  <span>
+                    <small>{copy('تعداد سوال', 'Questions')}</small>
+                    <strong>{test.questions.length.toLocaleString(numberLocale)} {copy('سوال', 'questions')}</strong>
+                  </span>
+                </div>
+                <div className="placement-fact">
+                  <Clock3 size={19} />
+                  <span>
+                    <small>{copy('زمان تقریبی', 'Duration')}</small>
+                    <strong>{test.durationMinutes.toLocaleString(numberLocale)} {copy('دقیقه', 'minutes')}</strong>
+                  </span>
                 </div>
               </div>
-              <div className="p-6 md:p-10">
-                <span className="rounded-full bg-lavender px-3 py-1 text-xs font-black text-purple">
-                  {question.skill}
-                </span>
-                <h1 className="mt-5 text-xl font-black leading-9 md:text-2xl">
-                  {String(localized({ fa: question.prompt.fa, en: question.prompt.en }, locale) ?? '')}
-                </h1>
-                <div className="mt-7 grid gap-3">
-                  {choices.map((choice, choiceIndex) => {
-                    const selected = answers[question.id] === choiceIndex;
-                    return (
-                      <button
-                        key={choiceIndex}
-                        onClick={() => setAnswers((current) => ({ ...current, [question.id]: choiceIndex }))}
-                        className={`flex min-h-14 items-center gap-4 rounded-2xl border p-4 text-start ${selected ? 'border-purple bg-lavender ring-2 ring-purple/10' : 'hairline bg-white hover:border-purple/50'}`}
-                      >
-                        <span
-                          className={`grid size-7 shrink-0 place-items-center rounded-full border ${selected ? 'border-purple bg-purple text-white' : 'hairline'}`}
-                        >
-                          {selected ? <Check size={16} /> : String.fromCharCode(65 + choiceIndex)}
-                        </span>
-                        <span>{String(choice)}</span>
-                      </button>
-                    );
-                  })}
+            </section>
+
+            <ProgressSection
+              current={index + 1}
+              total={test.questions.length}
+              progress={progress}
+              locale={locale}
+              numberLocale={numberLocale}
+            />
+
+            <section className="placement-question-card">
+              <div className="placement-question-card-top">
+                <div>
+                  <span className="placement-question-number latin">
+                    Question {String(index + 1).padStart(2, '0')}
+                  </span>
+                  <span className="placement-question-type">
+                    <BadgeCheck size={15} />
+                    {copy('یک پاسخ را انتخاب کنید', 'Choose one answer')}
+                  </span>
                 </div>
-                {error && (
-                  <p role="alert" className="mt-5 rounded-xl bg-red-50 p-4 text-sm text-red-700">
-                    {error}
-                  </p>
+                {question.audioUrl && (
+                  <button type="button" className="placement-audio-button">
+                    <Volume2 size={17} />
+                    {copy('شنیدن سوال', 'Listen')}
+                  </button>
                 )}
-                <div className="mt-8 flex items-center justify-between">
-                  <button
-                    disabled={index === 0 || busy}
-                    onClick={() => setIndex((i) => i - 1)}
-                    className="flex min-h-12 items-center gap-2 rounded-xl border hairline px-5 font-bold disabled:opacity-40"
-                  >
-                    {fa ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
-                    {copy('قبلی', 'Previous')}
-                  </button>
-                  <button
-                    disabled={!answered || busy}
-                    onClick={next}
-                    className="brand-gradient flex min-h-12 items-center gap-2 rounded-xl px-6 font-black text-white disabled:opacity-40"
-                  >
-                    {busy
-                      ? copy('در حال محاسبه سطح شما...', 'Calculating your level…')
-                      : index === test.questions.length - 1
-                        ? copy('مشاهده نتیجه', 'View result')
-                        : copy('سؤال بعدی', 'Next question')}
-                    {fa ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
-                  </button>
-                </div>
+              </div>
+              <div className="placement-prompt-wrap">
+                <span className="placement-prompt-kicker">{copy('بهترین گزینه را انتخاب کنید', 'Select the best option')}</span>
+                <h2
+                  className="placement-prompt latin"
+                  dir={selectedLanguage?.direction === 'RTL' ? 'rtl' : 'ltr'}
+                  lang={selectedLanguage?.code}
+                >
+                  <QuestionPrompt text={String(localized({ fa: question.prompt.fa, en: question.prompt.en }, locale) ?? '')} />
+                </h2>
+              </div>
+              <div className="placement-options" role="radiogroup" aria-label={copy('گزینه‌های پاسخ', 'Answer options')}>
+                {choices.map((choice, choiceIndex) => {
+                  const selected = answers[question.id] === choiceIndex;
+                  return (
+                    <button
+                      key={choiceIndex}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      aria-keyshortcuts={String.fromCharCode(65 + choiceIndex)}
+                      onClick={() => setAnswers((current) => ({ ...current, [question.id]: choiceIndex }))}
+                      className={`placement-option ${selected ? 'is-selected' : ''}`}
+                    >
+                      <span className="placement-option-key latin">{String.fromCharCode(65 + choiceIndex)}</span>
+                      <span className="placement-option-copy">{String(choice)}</span>
+                      <span className="placement-option-check">{selected ? <Check size={17} /> : null}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              {error && (
+                <p role="alert" className="placement-error">
+                  {error}
+                </p>
+              )}
+              <div className="placement-navigation">
+                <button
+                  type="button"
+                  disabled={index === 0 || busy}
+                  onClick={() => setIndex((i) => i - 1)}
+                  className="placement-secondary-action"
+                >
+                  {fa ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+                  {copy('سوال قبلی', 'Previous question')}
+                </button>
+                <span className="placement-keyboard-hint">
+                  <CircleHelp size={15} />
+                  {copy('برای انتخاب سریع از کلیدهای A تا D استفاده کنید', 'Use A to D for quick selection')}
+                </span>
+                <button
+                  type="button"
+                  disabled={!answered || busy}
+                  onClick={next}
+                  className="placement-primary-action"
+                >
+                  {busy
+                    ? copy('در حال محاسبه سطح شما...', 'Calculating your level…')
+                    : index === test.questions.length - 1
+                      ? copy('مشاهده نتیجه', 'View result')
+                      : copy('ثبت پاسخ و ادامه', 'Save & continue')}
+                  {fa ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
+                </button>
               </div>
             </section>
           </div>
@@ -242,46 +372,56 @@ export default function Placement() {
     <>
       <Header />
       <main>
-        <section className="placement-intro">
-          <div className="page-shell py-16 md:py-24">
-            <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-bold text-white">
-              <Sparkles size={16} />
-              {copy('نتیجه فوری بر اساس CEFR', 'Instant CEFR result')}
-            </span>
-            <h1 className="mt-6 max-w-3xl text-4xl font-black leading-[1.4] text-white md:text-6xl">
-              {copy('سطحت را بدان؛ مسیر درست را شروع کن', 'Know your level. Start on the right path.')}
-            </h1>
-            <p className="mt-5 max-w-2xl text-lg leading-8 text-white/70">
-              {copy(
-                'بدون نیاز به ثبت‌نام پاسخ بده. آخرین سؤال که ثبت شود، امتیاز وزن‌دار محاسبه می‌شود و همان لحظه سطح A1 تا C2 خود را می‌بینی.',
-                'Answer without creating an account. After the last question, your weighted score and CEFR level from A1 to C2 are available immediately.',
-              )}
-            </p>
-            <div className="mt-8 flex flex-wrap gap-5 text-sm font-bold text-white/85">
-              <span className="flex items-center gap-2">
-                <Target size={18} />
-                {copy('امتیازدهی قطعی و خودکار', 'Automatic scoring')}
+        <section className="placement-entry">
+          <div className="page-shell placement-entry-grid">
+            <div className="placement-entry-copy">
+              <span className="placement-entry-kicker">
+                <Sparkles size={16} />
+                {copy('ارزیابی استاندارد بر اساس CEFR', 'CEFR-aligned assessment')}
               </span>
-              <span className="flex items-center gap-2">
-                <Clock3 size={18} />
-                {copy('بدون انتظار برای بررسی', 'No review wait')}
-              </span>
-              <span className="flex items-center gap-2">
-                <BookOpen size={18} />
-                {copy('پیشنهاد دوره متناسب', 'Level-matched courses')}
-              </span>
+              <h1>{copy('آزمون تعیین سطح زبان', 'Language placement test')}</h1>
+              <p>{copy('سطح فعلی زبان شما را در کمتر از ۱۰ دقیقه ارزیابی کنید.', 'Assess your current language level in less than 10 minutes.')}</p>
+              <div className="placement-entry-trust">
+                <span><ShieldCheck size={17} />{copy('نتیجه فوری و خودکار', 'Instant automated result')}</span>
+                <span><BadgeCheck size={17} />{copy('بدون نیاز به ثبت‌نام', 'No sign-up required')}</span>
+              </div>
+              <div className="placement-entry-skills">
+                <small>{copy('مهارت‌های ارزیابی‌شده', 'Skills assessed')}</small>
+                <span><BookOpen size={15} />{copy('واژگان', 'Vocabulary')}</span>
+                <span><BadgeCheck size={15} />{copy('گرامر', 'Grammar')}</span>
+                <span><Target size={15} />{copy('درک مطلب', 'Reading')}</span>
+              </div>
+            </div>
+            <div className="placement-entry-preview" aria-hidden="true">
+              <div className="placement-preview-label">{copy('مسیر سنجش شما', 'Your assessment route')}</div>
+              <div className="placement-preview-levels">
+                {['A1', 'A2', 'B1', 'B2', 'C1'].map((level, levelIndex) => (
+                  <span key={level} className={levelIndex === 2 ? 'is-active' : ''}>
+                    <i />
+                    <strong className="latin">{level}</strong>
+                  </span>
+                ))}
+              </div>
+              <div className="placement-preview-time">
+                <TimerReset size={20} />
+                <span><strong className="latin">10:00</strong><small>{copy('زمان پیشنهادی', 'Suggested time')}</small></span>
+              </div>
             </div>
           </div>
         </section>
-        <section className="page-shell py-12 md:py-16">
-          <h2 className="text-2xl font-black">{copy('زبان آزمون را انتخاب کنید', 'Choose the test language')}</h2>
-          <p className="mt-2 text-muted">
-            {copy('برای شروع نیازی به ورود یا ساخت حساب ندارید.', 'You do not need an account to begin.')}
-          </p>
+        <section className="page-shell placement-entry-content">
+          <div className="placement-section-heading">
+            <div>
+              <span className="placement-section-kicker">{copy('شروع ارزیابی', 'Start assessment')}</span>
+              <h2>{copy('زبان موردنظر خود را انتخاب کنید', 'Choose your test language')}</h2>
+              <p>{copy('آزمون متناسب با زبان انتخابی شما، از سطح A1 تا C1 طراحی شده است.', 'Your test is tailored to the language you choose and spans A1 to C1.')}</p>
+            </div>
+            <div className="placement-secure-note"><ShieldCheck size={17} />{copy('پاسخ‌ها محرمانه می‌مانند', 'Your answers stay private')}</div>
+          </div>
           {languages.isLoading ? (
-            <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">
+            <div className="placement-language-grid">
               {Array.from({ length: 4 }, (_, i) => (
-                <div key={i} className="skeleton h-24 rounded-2xl" />
+                <div key={i} className="skeleton placement-language-skeleton" />
               ))}
             </div>
           ) : languages.isError ? (
@@ -291,7 +431,7 @@ export default function Placement() {
               onRetry={() => void languages.refetch()}
             />
           ) : (
-            <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">
+            <div className="placement-language-grid">
               {languages.data?.map((language) => (
                 <button
                   key={language.id}
@@ -299,13 +439,14 @@ export default function Placement() {
                     setLanguageId(language.id);
                     setError('');
                   }}
-                  className={`rounded-2xl border p-5 text-start ${languageId === language.id ? 'border-purple bg-lavender ring-2 ring-purple/10' : 'hairline bg-white'}`}
+                  className={`placement-language-card ${languageId === language.id ? 'is-selected' : ''}`}
                 >
-                  <span className="text-3xl">{language.flag || '🌐'}</span>
-                  <strong className="mt-3 block">
-                    {localized({ fa: language.nameFa, en: language.nameEn }, locale)}
-                  </strong>
-                  <small className="text-muted">{language.nativeName}</small>
+                  <span className="placement-language-card-top">
+                    <span className="placement-language-flag">{language.flag || '🌐'}</span>
+                    {languageId === language.id && <Check size={17} />}
+                  </span>
+                  <strong>{localized({ fa: language.nameFa, en: language.nameEn }, locale)}</strong>
+                  <small>{language.nativeName}</small>
                 </button>
               ))}
             </div>
@@ -324,20 +465,24 @@ export default function Placement() {
                 onRetry={() => void tests.refetch()}
               />
             ) : tests.data?.length ? (
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="placement-test-list">
                 {tests.data.map((item) => (
-                  <article className="surface-card p-6" key={item.id}>
-                    <span className="text-2xl">{item.language.flag}</span>
-                    <h3 className="mt-4 text-xl font-black">
-                      {localized({ fa: item.titleFa, en: item.titleEn }, locale)}
-                    </h3>
-                    <p className="mt-3 text-sm leading-7 text-muted">
-                      {localized({ fa: item.descriptionFa, en: item.descriptionEn }, locale)}
-                    </p>
+                  <article className="placement-test-card" key={item.id}>
+                    <div className="placement-test-card-heading">
+                      <span className="placement-test-card-language">{item.language.flag || '🌐'}</span>
+                      <span className="placement-test-card-badge">{copy('آزمون آماده است', 'Ready to take')}</span>
+                    </div>
+                    <h3>{localized({ fa: item.titleFa, en: item.titleEn }, locale)}</h3>
+                    <p>{localized({ fa: item.descriptionFa, en: item.descriptionEn }, locale)}</p>
+                    <div className="placement-test-card-facts">
+                      <span><Clock3 size={16} />{item.durationMinutes.toLocaleString(numberLocale)} {copy('دقیقه', 'min')}</span>
+                      <span><FileCheck2 size={16} />{copy('۳۰ سوال', '30 questions')}</span>
+                      <span><BookOpen size={16} />{copy('CEFR', 'CEFR')}</span>
+                    </div>
                     <button
                       disabled={busy}
                       onClick={() => start(item.id)}
-                      className="brand-gradient mt-6 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl font-black text-white"
+                      className="placement-start-button"
                     >
                       {copy('شروع آزمون', 'Start test')} {fa ? <ArrowLeft size={18} /> : <ArrowRight size={18} />}
                     </button>
@@ -357,6 +502,80 @@ export default function Placement() {
         </section>
       </main>
       <Footer />
+    </>
+  );
+}
+
+function ProgressSection({
+  current,
+  total,
+  progress,
+  locale,
+  numberLocale,
+}: {
+  current: number;
+  total: number;
+  progress: number;
+  locale: 'fa' | 'en';
+  numberLocale: string;
+}) {
+  const fa = locale === 'fa';
+  const milestones = [
+    { label: fa ? 'شروع' : 'Start', threshold: 0 },
+    { label: fa ? 'میانی' : 'Intermediate', threshold: 50 },
+    { label: fa ? 'تکمیل' : 'Complete', threshold: 100 },
+  ];
+  return (
+    <section className="placement-progress-card" aria-label={fa ? 'پیشرفت آزمون' : 'Test progress'}>
+      <div className="placement-progress-heading">
+        <div>
+          <small>{fa ? 'پیشرفت آزمون' : 'Assessment progress'}</small>
+          <strong>
+            {fa ? 'سوال' : 'Question'} {current.toLocaleString(numberLocale)} {fa ? 'از' : 'of'} {total.toLocaleString(numberLocale)}
+          </strong>
+        </div>
+        <strong className="placement-progress-percent latin">{progress}% <small>{fa ? 'تکمیل شده' : 'complete'}</small></strong>
+      </div>
+      <div className="placement-progress-track" dir="ltr">
+        <span style={{ width: `${progress}%` }} />
+      </div>
+      <div className="placement-milestones">
+        {milestones.map((milestone) => (
+          <div key={milestone.label} className={progress >= milestone.threshold ? 'is-active' : ''}>
+            <span />
+            <small>{milestone.label}</small>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function TimerBadge({ seconds, fa }: { seconds: number; fa: boolean }) {
+  const minutes = Math.floor(seconds / 60).toString().padStart(2, '0');
+  const remainingSeconds = (seconds % 60).toString().padStart(2, '0');
+  const urgent = seconds > 0 && seconds <= 60;
+  return (
+    <div className={`placement-timer ${urgent ? 'is-urgent' : ''}`} role="status" aria-live="polite">
+      <TimerReset size={18} />
+      <span>
+        <small>{fa ? 'زمان باقی‌مانده' : 'Time remaining'}</small>
+        <strong className="latin">{minutes}:{remainingSeconds}</strong>
+      </span>
+    </div>
+  );
+}
+
+function QuestionPrompt({ text }: { text: string }) {
+  const parts = text.split('___');
+  return (
+    <>
+      {parts.map((part, index) => (
+        <span key={`${part}-${index}`}>
+          {part}
+          {index < parts.length - 1 && <span className="placement-blank" aria-label="blank" />}
+        </span>
+      ))}
     </>
   );
 }
@@ -406,6 +625,14 @@ function ResultView({
               </span>
             </h1>
             <p className="mx-auto mt-4 max-w-2xl leading-8 text-white/70">{result.description}</p>
+            {result.borderline && (
+              <p className="mx-auto mt-5 max-w-2xl rounded-xl border border-amber-200/25 bg-amber-100/10 px-4 py-3 text-sm font-bold text-amber-100">
+                {copy(
+                  'نتیجه بین دو سطح قرار دارد؛ برای تعیین دقیق‌تر، ارزیابی تکمیلی پیشنهاد می‌شود.',
+                  'Your result is borderline; a further assessment is recommended for a more precise level.',
+                )}
+              </p>
+            )}
           </div>
         </section>
         <div className="page-shell grid gap-7 py-12 lg:grid-cols-[1fr_340px]">

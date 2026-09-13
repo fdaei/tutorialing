@@ -10,7 +10,7 @@
  * which phone to point it at.
  */
 const BASE_ENV: Record<string, string> = {
-  DATABASE_URL: 'postgresql://u:p@localhost:5432/db?schema=public',
+  DATABASE_URL: 'postgresql://u:p@localhost:15432/db?schema=public',
   JWT_ACCESS_SECRET: 'a'.repeat(32),
   JWT_REFRESH_SECRET: 'b'.repeat(32),
   S3_ACCESS_KEY: 'minio',

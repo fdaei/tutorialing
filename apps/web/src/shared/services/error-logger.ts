@@ -8,3 +8,8 @@ export function logError(error: unknown, context: ErrorContext): void {
   const safeError = error instanceof Error ? { name: error.name, message: error.message } : { name: 'UnknownError' };
   console.error('[ui-error]', safeError, context);
 }
+
+export function logWarning(error: unknown, context: ErrorContext): void {
+  const safeError = error instanceof Error ? { name: error.name, message: error.message } : { name: 'UnknownError' };
+  console.warn('[ui-warning]', safeError, context);
+}

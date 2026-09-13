@@ -18,6 +18,20 @@ export class SettingsService {
     return this.db.setting.findMany({ where: { public: true } });
   }
 
+  async publicNavigation() {
+    const setting = await this.db.setting.findUnique({
+      where: { key: 'landing.page' },
+      select: { value: true, public: true },
+    });
+    if (!setting?.public || !setting.value || typeof setting.value !== 'object' || Array.isArray(setting.value)) {
+      return { items: null };
+    }
+    const header = (setting.value as Record<string, unknown>).header;
+    if (!header || typeof header !== 'object' || Array.isArray(header)) return { items: null };
+    const nav = (header as Record<string, unknown>).nav;
+    return { items: Array.isArray(nav) ? nav : null };
+  }
+
   list() {
     return this.db.setting.findMany();
   }

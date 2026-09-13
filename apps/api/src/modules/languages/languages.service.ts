@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { LanguageDirection, Prisma, ProficiencySystem } from '@prisma/client';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { badRequest, conflict, notFound, assertDomain, requireValue } from '../../common';
+import { FilesService } from '../files/files.service';
 
 export type LanguageInput = {
   code: string;
@@ -9,6 +10,7 @@ export type LanguageInput = {
   nameEn: string;
   nativeName: string;
   flag?: string;
+  imageId?: string | null;
   direction: LanguageDirection;
   active?: boolean;
   order?: number;
@@ -29,7 +31,10 @@ export type CountryInput = {
 
 @Injectable()
 export class LanguagesService {
-  constructor(private readonly db: PrismaService) {}
+  constructor(
+    private readonly db: PrismaService,
+    private readonly files: FilesService,
+  ) {}
 
   publicList(includeInactive = false) {
     return this.db.language.findMany({
@@ -42,6 +47,7 @@ export class LanguagesService {
         nameEn: true,
         nativeName: true,
         flag: true,
+        imageId: true,
         direction: true,
         active: true,
         order: true,
@@ -162,6 +168,7 @@ export class LanguagesService {
       nameEn: input.nameEn.trim(),
       nativeName: input.nativeName.trim(),
       flag: input.flag?.trim() || null,
+      imageId: input.imageId?.trim() || null,
       direction: input.direction,
       proficiencySystem: input.proficiencySystem,
       active: input.active ?? true,
@@ -171,6 +178,7 @@ export class LanguagesService {
 
   async create(actorId: string, input: LanguageInput) {
     const data = this.normalize(input);
+    if (data.imageId) await this.files.publicImage(data.imageId);
     const exists = await this.db.language.findUnique({ where: { code: data.code } });
     assertDomain(!exists, () => conflict('LANGUAGE_CODE_EXISTS'));
     return this.db.$transaction(async (tx) => {
@@ -192,11 +200,13 @@ export class LanguagesService {
       nameEn: input.nameEn ?? before.nameEn,
       nativeName: input.nativeName ?? before.nativeName,
       flag: input.flag ?? before.flag ?? undefined,
+      imageId: input.imageId !== undefined ? input.imageId : before.imageId,
       direction: input.direction ?? before.direction,
       active: input.active ?? before.active,
       order: input.order ?? before.order,
       proficiencySystem: input.proficiencySystem ?? before.proficiencySystem,
     });
+    if (merged.imageId) await this.files.publicImage(merged.imageId);
     const duplicate = await this.db.language.findFirst({ where: { code: merged.code, id: { not: id } } });
     assertDomain(!duplicate, () => conflict('LANGUAGE_CODE_EXISTS'));
     return this.db.$transaction(async (tx) => {
