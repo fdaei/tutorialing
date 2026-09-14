@@ -26,6 +26,7 @@ export const defaultConfig = {
   },
   storage: {
     endpoint: 'http://localhost:9000',
+    publicEndpoint: 'http://localhost:19000',
     region: 'us-east-1',
     forcePathStyle: true,
     maxUploadBytes: 52_428_800,

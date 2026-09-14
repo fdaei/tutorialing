@@ -69,6 +69,7 @@ export const envSchema = z.object({
   API_URL: z.string().url().default(defaultConfig.app.apiUrl),
   WEB_URL: z.string().url().default(defaultConfig.app.webUrl),
   S3_ENDPOINT: z.string().url().default(defaultConfig.storage.endpoint),
+  S3_PUBLIC_ENDPOINT: z.string().url().default(defaultConfig.storage.publicEndpoint),
   S3_ACCESS_KEY: z.string().min(1),
   S3_SECRET_KEY: z.string().min(1),
   S3_BUCKET: z.string().min(1),

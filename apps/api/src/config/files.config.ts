@@ -4,6 +4,7 @@ export function filesConfig() {
   const env = config();
   return {
     endpoint: env.S3_ENDPOINT,
+    publicEndpoint: env.S3_PUBLIC_ENDPOINT,
     region: env.S3_REGION,
     forcePathStyle: env.S3_FORCE_PATH_STYLE,
     accessKey: env.S3_ACCESS_KEY,
