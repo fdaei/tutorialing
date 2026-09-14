@@ -370,13 +370,14 @@ function MediaField({ label, value, fa, onChange }: { label: string; value: stri
   return <div className="rounded-2xl border hairline p-4"><div className="mb-3 flex items-center justify-between gap-3"><strong className="text-sm">{label}</strong><ImagePlus size={18} className="text-purple" /></div>{preview ? <img src={preview} alt="" className="h-32 w-full rounded-xl object-cover" /> : <div className="grid h-32 place-items-center rounded-xl bg-canvas text-muted"><ImagePlus /></div>}<input className="input mt-3" value={value} dir="ltr" onChange={(event) => onChange(event.target.value)} placeholder="/images/..." /><label className="secondary-button mt-3 cursor-pointer"><Upload size={16} />{busy ? (fa ? 'در حال آپلود...' : 'Uploading...') : fa ? 'آپلود تصویر' : 'Upload image'}<input className="hidden" type="file" accept="image/jpeg,image/png,image/webp" disabled={busy} onChange={async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    const target = event.currentTarget;
     setBusy(true);
     try {
       const id = await uploadPanelFile(file, 'website-media', fa);
       onChange(`media:${id}`);
     } finally {
       setBusy(false);
-      event.currentTarget.value = '';
+      target.value = '';
     }
   }} /></label></div>;
 }
