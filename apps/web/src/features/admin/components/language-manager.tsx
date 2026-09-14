@@ -329,7 +329,8 @@ export function LanguageManager() {
                 className="hidden"
                 disabled={imageUploading}
                 onChange={async (event) => {
-                  const file = event.target.files?.[0];
+                  const input = event.target;
+                  const file = input.files?.[0];
                   if (!file) return;
                   setImageUploading(true);
                   setImageError('');
@@ -340,7 +341,7 @@ export function LanguageManager() {
                     setImageError(uploadErrorMessage(error, fa ? 'آپلود تصویر انجام نشد.' : 'The image upload failed.'));
                   } finally {
                     setImageUploading(false);
-                    event.currentTarget.value = '';
+                    input.value = '';
                   }
                 }}
               />
