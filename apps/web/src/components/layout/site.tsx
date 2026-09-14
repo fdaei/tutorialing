@@ -1,29 +1,32 @@
 'use client';
 import Link from 'next/link';
-import { Clock3, Headphones, Mail, Menu, MessageCircle, Phone, X } from 'lucide-react';
+import { Clock3, Headphones, Mail, Menu, Phone, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/shared/services/api';
-import { LanguageSwitcher } from '@/components/shared/language-switcher';
+import { LanguageToggle } from '@/components/shared/language-switcher';
 import { useTranslations } from '@/components/shared/locale-provider';
 import { localePath, localized, translate } from '@/lib/i18n';
-import { webConfig } from '@/config';
+import { brandAssets, contactPhoneHref, isLinkEnabled, webConfig } from '@/config';
 import { onAuthSessionChange } from '@/shared/services/api';
 import { usePublicNavigation } from '@/features/navigation/navigation-config';
+import { defaultLandingConfig, type LandingConfig } from '@/features/landing';
 
-export function Brand() {
-  return (
-    <span className="flex items-center gap-2">
-      <span className="brand-gradient grid size-10 place-items-center rounded-full text-lg font-black text-white shadow-lg">
-        <MessageCircle size={23} />
-      </span>
-      <strong className="latin text-xl font-bold text-navy">LingoSpeak</strong>
-    </span>
-  );
+/** The LingoSpeak logo. The artwork carries the wordmark, so the name is the image's accessible text. */
+export function BrandLogo({ name = 'LingoSpeak' }: { name?: string }) {
+  return <img src={brandAssets.logo} alt={name} width={160} height={44} className="landing-brand-logo" />;
 }
 
-export function Header() {
+type HeaderProps = {
+  /**
+   * The landing page passes its server-rendered builder config so the menu is
+   * in the first paint; every other page reads the same published menu client-side.
+   */
+  config?: Pick<LandingConfig, 'brand' | 'header'>;
+};
+
+export function Header({ config }: HeaderProps = {}) {
   const { locale, t } = useTranslations(),
     p = (x: string) => localePath(x, locale),
     [open, setOpen] = useState(false),
@@ -47,68 +50,74 @@ export function Header() {
     window.addEventListener('keydown', closeOnEscape);
     return () => window.removeEventListener('keydown', closeOnEscape);
   }, [open]);
-  const links = navigation.items.map((item) => ({
-    href: p(item.href),
-    label: localized({ fa: item.label.fa, en: item.label.en }, locale),
-  }));
+  const { brand, header } = config ?? defaultLandingConfig;
+  const items = navigation.isSuccess || !config ? navigation.items : config.header.nav;
+  const loading = navigation.isLoading && !config;
+  const links = items
+    .filter((item) => item.visible && isLinkEnabled(item.href))
+    .map((item) => ({ id: item.id, href: p(item.href), label: localized({ fa: item.label.fa, en: item.label.en }, locale) }));
+  const signedIn = Boolean(me.data);
   return (
-    <header className="sticky top-0 z-40 border-b border-transparent bg-white/92 backdrop-blur-xl">
-      <div className="mx-auto flex h-[76px] max-w-[1380px] items-center justify-between px-5 lg:px-8">
-        <Link href={p('/')}>
-          <Brand />
+    <header className={header.sticky ? 'landing-header landing-header-sticky' : 'landing-header'} style={{ backgroundColor: header.background }}>
+      <div className="landing-container landing-header-inner">
+        <Link href={p('/')} className="landing-brand">
+          <BrandLogo name={brand.name} />
         </Link>
-        <nav aria-label={t('mainNavigation')} aria-busy={navigation.isLoading} className="hidden items-center gap-9 text-sm font-bold lg:flex">
-          {navigation.isLoading
+        <nav aria-label={t('mainNavigation')} aria-busy={loading} className="landing-desktop-nav">
+          {loading
             ? [1, 2, 3, 4].map((item) => <span key={item} className="h-4 w-14 animate-pulse rounded-full bg-canvas" />)
-            : links.map(({ href, label }) => (
-            <Link
-              key={href}
-              href={href}
-              aria-current={isActiveNavigationPath(pathname, href) ? 'page' : undefined}
-              className="hover:text-blue aria-[current=page]:text-purple"
-            >
-              {label}
-            </Link>
-            ))}
+            : links.map(({ id, href, label }) => (
+                <Link key={id} href={href} aria-current={isActiveNavigationPath(pathname, href) ? 'page' : undefined}>
+                  {label}
+                </Link>
+              ))}
         </nav>
-        <div className="flex items-center gap-2.5">
-          <LanguageSwitcher className="hidden sm:inline-flex" />
-          <Link
-            href={p(me.data ? '/panel' : '/auth')}
-            className="rounded-xl border border-[#cfd5e5] bg-white px-5 py-2.5 text-sm font-bold hover:border-purple"
-          >
-            {me.data ? t('dashboard') : t('signIn')}
-          </Link>
-          <Link
-            href={p('/teach')}
-            className="brand-gradient brand-glow hidden rounded-xl px-5 py-2.5 text-sm font-bold text-white sm:block"
-          >
-            {translate(locale, 'layoutsiteTeachWithUs')}
-          </Link>
+        <div className="landing-header-actions">
+          <LanguageToggle className="landing-header-language" />
+          {signedIn ? (
+            <Link href={p('/panel')} className="landing-header-signup">
+              {t('dashboard')}
+            </Link>
+          ) : (
+            <>
+              <Link href={p('/auth')} className="landing-header-signin">
+                {localized(header.signIn, locale)}
+              </Link>
+              <Link href={p('/auth')} className="landing-header-signup">
+                {localized(header.signUp, locale)}
+              </Link>
+            </>
+          )}
           <button
-            className="grid size-10 place-items-center lg:hidden"
+            type="button"
+            className="landing-menu-toggle"
             onClick={() => setOpen((x) => !x)}
             aria-label={t('openMenu')}
             aria-expanded={open}
             aria-controls="mobile-main-navigation"
           >
-            {open ? <X /> : <Menu />}
+            {open ? <X size={20} /> : <Menu size={20} />}
           </button>
         </div>
       </div>
       {open && (
-        <nav id="mobile-main-navigation" className="grid gap-2 border-t hairline bg-white p-5 lg:hidden">
-          {links.map(({ href, label }) => (
-            <Link
-              key={href}
-              onClick={() => setOpen(false)}
-              href={href}
-              aria-current={isActiveNavigationPath(pathname, href) ? 'page' : undefined}
-              className="rounded-xl px-4 py-3 font-bold hover:bg-lavender aria-[current=page]:bg-lavender aria-[current=page]:text-purple"
-            >
-              {label}
+        <nav id="mobile-main-navigation" aria-label={t('mainNavigation')} className="landing-mobile-nav">
+          <div className="landing-container">
+            {links.map(({ id, href, label }) => (
+              <Link key={id} href={href} onClick={() => setOpen(false)} aria-current={isActiveNavigationPath(pathname, href) ? 'page' : undefined}>
+                {label}
+              </Link>
+            ))}
+            {!signedIn && (
+              <Link href={p('/auth')} onClick={() => setOpen(false)}>
+                {localized(header.signIn, locale)}
+              </Link>
+            )}
+            <Link href={p('/teach')} onClick={() => setOpen(false)}>
+              {translate(locale, 'layoutsiteTeachWithUs')}
             </Link>
-          ))}
+            <LanguageToggle className="landing-header-language" />
+          </div>
         </nav>
       )}
     </header>
@@ -129,7 +138,7 @@ export function Footer() {
     <footer className="border-t hairline bg-white">
       <div className="mx-auto grid max-w-[1380px] gap-10 px-6 py-14 md:grid-cols-4">
         <div className="md:col-span-1">
-          <Brand />
+          <BrandLogo />
           <p className="mt-5 text-sm leading-7 text-muted">
             {translate(locale, 'layoutsiteSmartIELTSTeacherMatchingFromAssessmentToA')}
           </p>
@@ -137,11 +146,14 @@ export function Footer() {
         <div>
           <p className="font-black">{translate(locale, 'layoutsiteExplore')}</p>
           <div className="mt-4 grid gap-3 text-sm text-muted">
-            {navigation.items.map((item) => (
-              <Link href={p(item.href)} key={item.id}>
-                {localized({ fa: item.label.fa, en: item.label.en }, locale)}
-              </Link>
-            ))}
+            {navigation.items
+              .filter((item) => item.visible && isLinkEnabled(item.href))
+              .map((item) => (
+                <Link href={p(item.href)} key={item.id}>
+                  {localized({ fa: item.label.fa, en: item.label.en }, locale)}
+                </Link>
+              ))}
+            <Link href={p('/teach')}>{translate(locale, 'layoutsiteTeachWithUs')}</Link>
           </div>
         </div>
         <div>
@@ -157,11 +169,11 @@ export function Footer() {
         <div>
           <p className="font-black">{translate(locale, 'layoutsiteContact')}</p>
           <div className="mt-4 grid gap-3 text-sm text-muted">
-            <a href="tel:+982191094200" className="flex items-center gap-3 rounded-xl py-1 hover:text-purple" dir="ltr">
-              <Phone size={17} aria-hidden="true" /> <span className="latin whitespace-nowrap">021 9109 4200</span>
+            <a href={contactPhoneHref} className="flex items-center gap-3 rounded-xl py-1 hover:text-purple" dir="ltr">
+              <Phone size={17} aria-hidden="true" /> <span className="latin whitespace-nowrap">{webConfig.contactPhone}</span>
             </a>
-            <a href="mailto:support@lingospeak.ir" className="flex items-center gap-3 rounded-xl py-1 hover:text-purple" dir="ltr">
-              <Mail size={17} aria-hidden="true" /> <span className="latin break-all">support@lingospeak.ir</span>
+            <a href={`mailto:${webConfig.contactEmail}`} className="flex items-center gap-3 rounded-xl py-1 hover:text-purple" dir="ltr">
+              <Mail size={17} aria-hidden="true" /> <span className="latin break-all">{webConfig.contactEmail}</span>
             </a>
             <p className="flex items-start gap-3"><Clock3 className="mt-0.5 shrink-0" size={17} aria-hidden="true" />{translate(locale, 'layoutsiteSaturdayThursday9002000')}</p>
           </div>

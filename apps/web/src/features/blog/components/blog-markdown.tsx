@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { ElementType, ReactNode } from 'react';
 
 function stripTags(value: string) {
   return value.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
@@ -25,7 +25,7 @@ function renderInline(value: string): ReactNode[] {
     if (token.startsWith('`') && token.endsWith('`')) return <code key={index}>{token.slice(1, -1)}</code>;
     const link = token.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
     if (link) {
-      const [, label, href] = link;
+      const [, label = '', href = ''] = link;
       const safeHref = href.startsWith('/') || href.startsWith('https://') || href.startsWith('http://') ? href : null;
       return safeHref ? <a key={index} href={safeHref}>{label}</a> : token;
     }
@@ -101,30 +101,30 @@ export function BlogMarkdown({ content }: { content: string }) {
       flushParagraph();
       flushQuote();
       flushList();
-      const level = Math.min(heading[1].length, 4);
-      const Heading = `h${level}` as keyof JSX.IntrinsicElements;
-      blocks.push(<Heading key={`h-${blocks.length}`}>{renderInline(heading[2])}</Heading>);
+      const level = Math.min(heading[1]?.length ?? 1, 4);
+      const Heading = `h${level}` as ElementType;
+      blocks.push(<Heading key={`h-${blocks.length}`}>{renderInline(heading[2] ?? '')}</Heading>);
       return;
     }
     const quoteLine = line.match(/^\s*>\s?(.*)$/);
     if (quoteLine) {
       flushParagraph();
       flushList();
-      quote.push(quoteLine[1]);
+      quote.push(quoteLine[1] ?? '');
       return;
     }
     const unordered = line.match(/^\s*[-*+]\s+(.+)$/);
     if (unordered) {
       flushParagraph();
       flushQuote();
-      list.push(unordered[1]);
+      list.push(unordered[1] ?? '');
       return;
     }
     const ordered = line.match(/^\s*\d+\.\s+(.+)$/);
     if (ordered) {
       flushParagraph();
       flushQuote();
-      orderedList.push(ordered[1]);
+      orderedList.push(ordered[1] ?? '');
       return;
     }
     if (!line.trim()) {

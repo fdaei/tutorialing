@@ -126,10 +126,16 @@ export class FilesService {
     return { url: await this.storage.createDownloadUrl(file.key), mimeType: file.mimeType, name: file.originalName };
   }
 
-  async ownedSafeImage(ownerId: string, id: string) {
+  async ownedSafeImage(ownerId: string, id: string, purpose?: string) {
     const file = requireValue(
       await this.db.storedFile.findFirst({
-        where: { id, ownerId, status: 'SAFE', mimeType: { in: ['image/jpeg', 'image/png', 'image/webp'] } },
+        where: {
+          id,
+          ownerId,
+          status: 'SAFE',
+          ...(purpose ? { purpose } : {}),
+          mimeType: { in: ['image/jpeg', 'image/png', 'image/webp'] },
+        },
         select: { key: true, size: true },
       }),
       () => notFound('FILE_NOT_FOUND'),

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { webConfig } from './config';
+import { featureFlags, isTeacherDiscoveryPath, webConfig } from './config';
 
 // A strict, nonce-based script-src is the actual precondition that lets an
 // injected <script> read sessionStorage (e.g. the access token) and exfiltrate
@@ -40,6 +40,15 @@ function cspHeader(nonce: string) {
 export function middleware(request: NextRequest) {
   const english = request.nextUrl.pathname === '/en' || request.nextUrl.pathname.startsWith('/en/');
   const locale = english ? 'en' : 'fa';
+  // Teacher discovery is paused: bookmarked or shared /teachers and /matching
+  // URLs land on courses. 307 (not 308) so browsers and crawlers don't cache the
+  // move and the routes come back as soon as the flag is enabled.
+  if (!featureFlags.teacherDiscovery && isTeacherDiscoveryPath(request.nextUrl.pathname)) {
+    const target = request.nextUrl.clone();
+    target.pathname = english ? '/en/courses' : '/courses';
+    target.search = '';
+    return NextResponse.redirect(target, 307);
+  }
   const nonce = btoa(crypto.randomUUID());
   const csp = cspHeader(nonce);
   const headers = new Headers(request.headers);

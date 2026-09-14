@@ -16,6 +16,7 @@ import { api } from '@/shared/services/api';
 import { PanelShell, studentNav } from '@/features/panel';
 import { useTranslations } from '@/components/shared/locale-provider';
 import { formatDate, localePath, localized } from '@/lib/i18n';
+import { isLinkEnabled } from '@/config';
 type Me = { name?: string };
 type Booking = {
   startsAt: string;
@@ -61,7 +62,8 @@ export default function Dashboard() {
       done: hasClass,
       href: '/matching',
     },
-  ];
+  ].filter((step) => isLinkEnabled(step.href));
+  const nextStepHref = hasClass ? '/dashboard/classes' : '/matching';
   return (
     <PanelShell title={t('studentPanel')} items={studentNav}>
       <section className="soft-gradient panel-card relative overflow-hidden p-7 md:p-10">
@@ -103,8 +105,9 @@ export default function Dashboard() {
         </div>
       </section>
       <section className="mt-6 grid gap-4 md:grid-cols-2">
+        {isLinkEnabled(nextStepHref) && (
         <Link
-          href={p(hasClass ? '/dashboard/classes' : '/matching')}
+          href={p(nextStepHref)}
           className="panel-card lift flex items-center gap-4 p-6"
         >
           <span className="grid size-14 place-items-center rounded-full bg-lavender text-purple">
@@ -121,6 +124,7 @@ export default function Dashboard() {
           </span>
           <ArrowRight className="rtl:rotate-180" />
         </Link>
+        )}
         <Link
           href={p(assessmentDone ? '/dashboard/tests' : '/placement')}
           className="panel-card lift flex items-center gap-4 p-6"

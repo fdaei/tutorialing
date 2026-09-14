@@ -7,6 +7,7 @@ import type { EducationalLanguage } from '@/features/languages';
 import type { Course } from '@/lib/marketplace-data';
 import { requestLocale } from '@/lib/server-locale';
 import { localePath, localized } from '@/lib/i18n';
+import { featureFlags } from '@/config';
 
 const legacyCodes: Record<string, string> = { english: 'en', german: 'de', french: 'fr', spanish: 'es' };
 
@@ -43,9 +44,11 @@ export default async function LanguagePage({ params }: { params: Promise<{ slug:
               <Link href={localePath('/placement', locale)} className="brand-gradient inline-flex rounded-xl px-7 py-4 font-black text-white">
                 {t('شروع تعیین سطح رایگان', 'Start free placement')}
               </Link>
-              <Link href={localePath('/teachers', locale)} className="inline-flex rounded-xl border hairline bg-white px-7 py-4 font-black text-purple">
-                {t('پیدا کردن مدرس', 'Find a teacher')}
-              </Link>
+              {featureFlags.teacherDiscovery && (
+                <Link href={localePath('/teachers', locale)} className="inline-flex rounded-xl border hairline bg-white px-7 py-4 font-black text-purple">
+                  {t('پیدا کردن مدرس', 'Find a teacher')}
+                </Link>
+              )}
             </div>
           </div>
         </section>

@@ -17,6 +17,8 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:seed:countries": "tsx prisma/seed-countries.ts",
     "db:seed:cms": "tsx prisma/seed-cms-pages.ts",
+    "db:seed:catalog": "tsx prisma/seed-catalog.ts",
+    "db:seed:blog": "tsx prisma/seed-blog.ts",
     "db:demo:import": "tsx prisma/demo-data.ts import",
     "db:demo:remove": "tsx prisma/demo-data.ts remove",
     "db:demo:verify": "tsx prisma/demo-data.ts verify"

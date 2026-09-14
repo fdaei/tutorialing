@@ -267,12 +267,9 @@ export function translate(locale: Locale | boolean, key: MessageKey) {
 export function formatNumber(value: number, locale: Locale) {
   return new Intl.NumberFormat(localeConfig[locale].tag).format(value);
 }
+/** Amounts are stored in Toman; Intl's IRR currency would mislabel them as Rial (see lib/money.ts). */
 export function formatMoney(value: number, locale: Locale) {
-  return new Intl.NumberFormat(localeConfig[locale].tag, {
-    style: 'currency',
-    currency: 'IRR',
-    maximumFractionDigits: 0,
-  }).format(value);
+  return `${formatNumber(value, locale)} ${messages[locale].libmoneyToman}`;
 }
 export function formatDate(value: Date | string, locale: Locale) {
   return new Intl.DateTimeFormat(localeConfig[locale].dateTag, {

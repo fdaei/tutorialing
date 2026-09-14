@@ -5,6 +5,7 @@ import { Header, Footer } from '@/components/layout/site';
 import { ApiError, publicApi } from '@/shared/services/api';
 import { requestLocale } from '@/lib/server-locale';
 import { publicPageMetadata } from '@/lib/public-metadata';
+import { contactPhoneHref, webConfig } from '@/config';
 import Link from 'next/link';
 import {
   ArrowLeft,
@@ -126,13 +127,13 @@ export default async function CmsPage({ params }: { params: Promise<{ slug: stri
               </div>
               {slug === 'contact' && (
                 <div className="mt-5 border-t hairline pt-5 text-sm">
-                  <a href="tel:+982191094200" dir="ltr" className="flex items-center gap-2 py-2">
+                  <a href={contactPhoneHref} dir="ltr" className="flex items-center gap-2 py-2">
                     <Phone size={16} />
-                    021 9109 4200
+                    {webConfig.contactPhone}
                   </a>
-                  <a href="mailto:support@lingospeak.ir" dir="ltr" className="flex items-center gap-2 break-all py-2">
+                  <a href={`mailto:${webConfig.contactEmail}`} dir="ltr" className="flex items-center gap-2 break-all py-2">
                     <Mail size={16} />
-                    support@lingospeak.ir
+                    {webConfig.contactEmail}
                   </a>
                   <p className="flex items-center gap-2 py-2 text-muted">
                     <MapPin size={16} />

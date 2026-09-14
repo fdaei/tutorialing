@@ -16,10 +16,11 @@ import {
   TicketDirection,
   TicketMessageType,
   TicketStatus,
-  BlogPostStatus,
 } from '@prisma/client';
 import { seedCountries } from './country.seed';
 import { seedCmsPages } from './cms-pages.seed';
+import { seedBlogPosts } from './blog-posts.seed';
+import { catalogTeacherId, seedLingoSpeakCatalog } from './lingospeak-catalog.seed';
 import { studentPlacementQuestionBanks } from './placement-question-bank';
 
 if (process.env.NODE_ENV === 'production') {
@@ -38,6 +39,16 @@ const at = (days: number, hour: number, minute = 0) => {
 // NANP 555-0100 through 555-0199 are reserved for fictional use.
 const demoPhone = (suffix: number) => `+120255501${String(suffix).padStart(2, '0')}`;
 const normalizeIranianPhone = (local: string) => `+98${local.replace(/^0+/, '')}`;
+
+// The institute's only two teachers, installed by lingospeak-catalog.seed.ts.
+const AHMADI = catalogTeacherId('arezoo');
+const SHAHFAR = catalogTeacherId('shahriar');
+// Their approved prices (catalog REGULAR_PRICE; the trial is always half).
+const REGULAR_PRICE = 552_000;
+const TRIAL_PRICE = 276_000;
+// commerce.commissionPercent below is 20.
+const REGULAR_COMMISSION = 110_400;
+const REGULAR_NET = REGULAR_PRICE - REGULAR_COMMISSION;
 
 const users = {
   admin: {
@@ -74,27 +85,6 @@ const users = {
     name: 'ارزیاب آزمون',
     email: 'examiner@local.test',
     role: Role.SUPPORT,
-  },
-  approvedTeacher: {
-    id: 'user-teacher-approved',
-    phone: demoPhone(1),
-    name: 'سارا دادخواه',
-    email: 'sara@local.test',
-    role: Role.INSTRUCTOR,
-  },
-  germanTeacher: {
-    id: 'user-teacher-german',
-    phone: demoPhone(2),
-    name: 'آرمان نیک‌روش',
-    email: 'arman@local.test',
-    role: Role.INSTRUCTOR,
-  },
-  pendingTeacher: {
-    id: 'user-teacher-pending',
-    phone: demoPhone(4),
-    name: 'نیلوفر آذری',
-    email: 'niloofar@local.test',
-    role: Role.INSTRUCTOR,
   },
   completedStudent: {
     id: 'user-student-completed',
@@ -309,182 +299,60 @@ async function seedTeachers() {
     update: { active: true },
   });
 
-  const teacherRows = [
-    {
-      id: 'teacher-sara',
-      userId: users.approvedTeacher.id,
-      slug: 'sara-dadkhah',
-      nameFa: 'سارا دادخواه',
-      nameEn: 'Sara Dadkhah',
-      bioFa: 'مدرس تأییدشده انگلیسی با تمرکز بر رایتینگ و اسپیکینگ.',
-      bioEn: 'Verified English teacher focused on writing and speaking.',
-      gender: 'female',
-      specialties: ['writing', 'speaking'],
-      languages: ['English'],
-      levels: ['B1', 'B2', 'C1'],
-      languageId: 'lang-en',
-      status: TeacherStatus.APPROVED,
-      priceStatus: PriceStatus.APPROVED,
-      proposedTrialPrice: 290_000,
-      proposedRegularPrice: 690_000,
-      approvedTrialPrice: 290_000,
-      approvedRegularPrice: 690_000,
-    },
-    {
-      id: 'teacher-arman',
-      userId: users.germanTeacher.id,
-      slug: 'arman-nikroush',
-      nameFa: 'آرمان نیک‌روش',
-      nameEn: 'Arman Nikroush',
-      bioFa: 'مدرس تأییدشده آلمانی برای سطوح A1 تا B2.',
-      bioEn: 'Verified German teacher for levels A1 through B2.',
-      gender: 'male',
-      specialties: ['conversation', 'grammar'],
-      languages: ['Deutsch'],
-      levels: ['A1', 'A2', 'B1', 'B2'],
-      languageId: 'lang-de',
-      status: TeacherStatus.APPROVED,
-      priceStatus: PriceStatus.APPROVED,
-      proposedTrialPrice: 260_000,
-      proposedRegularPrice: 620_000,
-      approvedTrialPrice: 260_000,
-      approvedRegularPrice: 620_000,
-    },
-    {
-      id: 'teacher-niloofar',
-      userId: users.pendingTeacher.id,
-      slug: 'niloofar-azari',
-      nameFa: 'نیلوفر آذری',
-      nameEn: 'Niloofar Azari',
-      bioFa: 'متقاضی تدریس زبان فرانسوی.',
-      bioEn: 'Teacher applicant for French.',
-      gender: 'female',
-      specialties: ['conversation'],
-      languages: ['Français'],
-      levels: ['A1', 'A2'],
-      languageId: 'lang-fr',
-      status: TeacherStatus.DOCUMENT_REVIEW,
-      priceStatus: PriceStatus.SUBMITTED,
-      proposedTrialPrice: 220_000,
-      proposedRegularPrice: 540_000,
-      approvedTrialPrice: null,
-      approvedRegularPrice: null,
-    },
-  ] as const;
+  // Arezoo Ahmadi and Shahriar Shahfar are the institute's only teachers. The
+  // catalog seed owns their accounts, profiles and courses on every
+  // environment; here they also get the dev-only fixtures (policy,
+  // availability, documents). Shahriar's real number has not been supplied, so
+  // dev stands in a fictional one.
+  await seedLingoSpeakCatalog(db, { placeholderPhones: { shahriar: demoPhone(3) }, policyId: policy.id });
+  await retireLegacyDemoTeachers();
 
-  for (const row of teacherRows) {
-    await db.teacher.upsert({
-      where: { id: row.id },
-      create: {
-        id: row.id,
-        userId: row.userId,
-        slug: row.slug,
-        nameFa: row.nameFa,
-        nameEn: row.nameEn,
-        bioFa: row.bioFa,
-        bioEn: row.bioEn,
-        status: row.status,
-        gender: row.gender,
-        experienceYears: 7,
-        trialPrice: row.proposedTrialPrice,
-        regularPrice: row.proposedRegularPrice,
-        trialDuration: 30,
-        lessonDuration: 60,
-        breakMinutes: 15,
-        proposedTrialPrice: row.proposedTrialPrice,
-        proposedRegularPrice: row.proposedRegularPrice,
-        approvedTrialPrice: row.approvedTrialPrice,
-        approvedRegularPrice: row.approvedRegularPrice,
-        priceStatus: row.priceStatus,
-        priceReviewedById: row.priceStatus === PriceStatus.APPROVED ? users.admin.id : null,
-        priceReviewedAt: row.priceStatus === PriceStatus.APPROVED ? now : null,
-        specialties: [...row.specialties],
-        languages: [...row.languages],
-        targetBands: row.languageId === 'lang-en' ? [6.5, 7, 7.5, 8] : [],
-        policyId: policy.id,
-        submittedAt: at(-20, 9),
-        approvedAt: row.status === TeacherStatus.APPROVED ? at(-15, 10) : null,
-      },
-      update: {
-        userId: row.userId,
-        nameFa: row.nameFa,
-        nameEn: row.nameEn,
-        bioFa: row.bioFa,
-        bioEn: row.bioEn,
-        status: row.status,
-        gender: row.gender,
-        proposedTrialPrice: row.proposedTrialPrice,
-        proposedRegularPrice: row.proposedRegularPrice,
-        approvedTrialPrice: row.approvedTrialPrice,
-        approvedRegularPrice: row.approvedRegularPrice,
-        priceStatus: row.priceStatus,
-        specialties: [...row.specialties],
-        languages: [...row.languages],
-        policyId: policy.id,
-      },
-    });
-    await db.teacherLanguage.upsert({
-      where: { teacherId_languageId: { teacherId: row.id, languageId: row.languageId } },
-      create: {
-        teacherId: row.id,
-        languageId: row.languageId,
-        levels: [...row.levels],
-        specialties: [...row.specialties],
-        active: true,
-      },
-      update: { levels: [...row.levels], specialties: [...row.specialties], active: true },
+  for (const teacherId of [AHMADI, SHAHFAR]) {
+    const teacher = await db.teacher.update({
+      where: { id: teacherId },
+      data: { policyId: policy.id },
+      select: { id: true },
     });
     await db.teacherPriceHistory.upsert({
-      where: { id: `price-history-${row.id}` },
+      where: { id: `price-history-${teacher.id}` },
       create: {
-        id: `price-history-${row.id}`,
-        teacherId: row.id,
-        actorId: row.priceStatus === PriceStatus.APPROVED ? users.admin.id : row.userId,
-        actorRole: row.priceStatus === PriceStatus.APPROVED ? Role.ADMIN : Role.INSTRUCTOR,
-        action: row.priceStatus === PriceStatus.APPROVED ? 'FINAL_APPROVED' : 'PROPOSED',
-        status: row.priceStatus,
-        proposedTrialPrice: row.proposedTrialPrice,
-        proposedRegularPrice: row.proposedRegularPrice,
-        approvedTrialPrice: row.approvedTrialPrice,
-        approvedRegularPrice: row.approvedRegularPrice,
+        id: `price-history-${teacher.id}`,
+        teacherId: teacher.id,
+        actorId: users.admin.id,
+        actorRole: Role.ADMIN,
+        action: 'FINAL_APPROVED',
+        status: PriceStatus.APPROVED,
+        proposedTrialPrice: TRIAL_PRICE,
+        proposedRegularPrice: REGULAR_PRICE,
+        approvedTrialPrice: TRIAL_PRICE,
+        approvedRegularPrice: REGULAR_PRICE,
       },
-      update: {
-        status: row.priceStatus,
-        proposedTrialPrice: row.proposedTrialPrice,
-        proposedRegularPrice: row.proposedRegularPrice,
-      },
+      update: {},
     });
-
-    for (const weekday of [0, 1, 2, 3, 4, 5]) {
+    // Office hours, 10:00–17:00 Tehran.
+    for (const weekday of [0, 1, 2, 3, 4, 5])
       await db.availabilityRule.upsert({
-        where: { id: `rule-${row.id}-${weekday}` },
+        where: { id: `rule-${teacher.id}-${weekday}` },
         create: {
-          id: `rule-${row.id}-${weekday}`,
-          teacherId: row.id,
+          id: `rule-${teacher.id}-${weekday}`,
+          teacherId: teacher.id,
           weekday,
-          startMinute: 540,
-          endMinute: 1260,
+          startMinute: 600,
+          endMinute: 1020,
           timezone: 'Asia/Tehran',
           lessonDuration: 60,
-          breakMinutes: 15,
+          breakMinutes: 0,
           active: true,
         },
-        update: {
-          startMinute: 540,
-          endMinute: 1260,
-          timezone: 'Asia/Tehran',
-          lessonDuration: 60,
-          breakMinutes: 15,
-          active: true,
-        },
+        update: { startMinute: 600, endMinute: 1020, timezone: 'Asia/Tehran', lessonDuration: 60, active: true },
       });
-    }
   }
 
+  const { userId: ahmadiUserId } = await db.teacher.findUniqueOrThrow({ where: { id: AHMADI } });
   const files = [
     {
       id: 'file-teacher-id',
-      ownerId: users.approvedTeacher.id,
+      ownerId: ahmadiUserId,
       key: 'seed/teacher-id.pdf',
       originalName: 'identity.pdf',
       mimeType: 'application/pdf',
@@ -494,7 +362,7 @@ async function seedTeachers() {
     },
     {
       id: 'file-teacher-video',
-      ownerId: users.approvedTeacher.id,
+      ownerId: ahmadiUserId,
       key: 'seed/intro.mp4',
       originalName: 'intro.mp4',
       mimeType: 'video/mp4',
@@ -502,29 +370,21 @@ async function seedTeachers() {
       checksum: 'seed-teacher-video',
       purpose: 'teacher_intro',
     },
-    {
-      id: 'file-pending-certificate',
-      ownerId: users.pendingTeacher.id,
-      key: 'seed/certificate.pdf',
-      originalName: 'certificate.pdf',
-      mimeType: 'application/pdf',
-      size: 210_000,
-      checksum: 'seed-pending-certificate',
-      purpose: 'teacher_document',
-    },
   ];
   for (const file of files)
     await db.storedFile.upsert({
       where: { id: file.id },
       create: { ...file, status: 'SAFE' },
-      update: { status: 'SAFE' },
+      update: { ownerId: file.ownerId, status: 'SAFE' },
     });
+  // Belonged to the retired applicant teacher; its verification item is gone.
+  await db.storedFile.deleteMany({ where: { id: 'file-pending-certificate', verificationItems: { none: {} } } });
 
   await db.verificationItem.upsert({
     where: { id: 'verification-approved-id' },
     create: {
       id: 'verification-approved-id',
-      teacherId: 'teacher-sara',
+      teacherId: AHMADI,
       kind: 'IDENTITY',
       fileId: 'file-teacher-id',
       status: DocumentStatus.APPROVED,
@@ -532,32 +392,19 @@ async function seedTeachers() {
       reviewedAt: at(-15, 10),
       submittedAt: at(-20, 9),
     },
-    update: { status: DocumentStatus.APPROVED, fileId: 'file-teacher-id', reviewedById: users.verifier.id },
-  });
-  await db.verificationItem.upsert({
-    where: { id: 'verification-pending-certificate' },
-    create: {
-      id: 'verification-pending-certificate',
-      teacherId: 'teacher-niloofar',
-      kind: 'CERTIFICATE',
-      fileId: 'file-pending-certificate',
-      status: DocumentStatus.NEEDS_REVISION,
-      reviewedById: users.verifier.id,
-      reviewedAt: at(-1, 10),
-      rejectionReason: 'تصویر مهر مؤسسه خوانا نیست؛ نسخه واضح‌تر بارگذاری کنید.',
-      submittedAt: at(-3, 9),
-    },
     update: {
-      status: DocumentStatus.NEEDS_REVISION,
-      rejectionReason: 'تصویر مهر مؤسسه خوانا نیست؛ نسخه واضح‌تر بارگذاری کنید.',
+      teacherId: AHMADI,
+      status: DocumentStatus.APPROVED,
+      fileId: 'file-teacher-id',
+      reviewedById: users.verifier.id,
     },
   });
 
   await db.blockedPeriod.upsert({
-    where: { id: 'block-teacher-sara' },
+    where: { id: 'block-teacher-arezoo' },
     create: {
-      id: 'block-teacher-sara',
-      teacherId: 'teacher-sara',
+      id: 'block-teacher-arezoo',
+      teacherId: AHMADI,
       startsAt: at(3, 8),
       endsAt: at(3, 10),
       reason: 'جلسه شخصی',
@@ -566,40 +413,102 @@ async function seedTeachers() {
   });
 }
 
+/**
+ * Earlier versions of this seed shipped fictional teachers. On a dev database
+ * that still has them, their fixtures (bookings, earnings, reviews, packages…)
+ * are re-pointed to the institute's two teachers so the upserts below keep
+ * reconciling by id, and the fictional profiles are then removed.
+ */
+const LEGACY_DEMO_TEACHERS: Record<string, string> = {
+  'teacher-sara': AHMADI,
+  'teacher-niloofar': AHMADI,
+  'teacher-arman': SHAHFAR,
+  'teacher-demo-ava': AHMADI,
+  'teacher-demo-leila': AHMADI,
+  'teacher-demo-shadi': AHMADI,
+  'teacher-demo-yuna': AHMADI,
+  'teacher-demo-elena': AHMADI,
+  'teacher-demo-pouya': SHAHFAR,
+  'teacher-demo-navid': SHAHFAR,
+  'teacher-demo-amirali': SHAHFAR,
+  'teacher-demo-marco': SHAHFAR,
+  'teacher-demo-samir': SHAHFAR,
+};
+const LEGACY_DEMO_TEACHER_USERS = [
+  'user-teacher-approved',
+  'user-teacher-german',
+  'user-teacher-pending',
+  ...Object.keys(LEGACY_DEMO_TEACHERS)
+    .filter((id) => id.startsWith('teacher-demo-'))
+    .map((id) => `user-${id}`),
+];
+
+async function retireLegacyDemoTeachers() {
+  const legacy = await db.teacher.findMany({
+    where: { id: { in: Object.keys(LEGACY_DEMO_TEACHERS) } },
+    select: { id: true },
+  });
+  for (const { id } of legacy) {
+    const where = { teacherId: id };
+    const data = { teacherId: LEGACY_DEMO_TEACHERS[id]! };
+    await db.favorite.deleteMany({ where });
+    await db.matchingRecommendation.deleteMany({ where });
+    await db.verificationItem.deleteMany({ where });
+    await db.blockedPeriod.deleteMany({ where });
+    await db.booking.updateMany({ where, data });
+    await db.review.updateMany({ where, data });
+    await db.package.updateMany({ where, data });
+    await db.trialEvaluation.updateMany({ where, data });
+    await db.packageRecommendation.updateMany({ where, data });
+    await db.learningPlan.updateMany({ where, data });
+    await db.earning.updateMany({ where, data });
+    await db.payoutItem.updateMany({ where, data });
+    await db.withdrawalRequest.updateMany({ where, data });
+    await db.course.updateMany({ where, data });
+    await db.teacher.delete({ where: { id } });
+  }
+
+  // Also covers accounts whose profile an older seed already deleted while
+  // leaving the INSTRUCTOR role behind, so the loop above never sees them.
+  const accounts = await db.user.findMany({
+    where: { id: { in: LEGACY_DEMO_TEACHER_USERS }, teacher: null },
+    select: { id: true },
+  });
+  for (const { id: userId } of accounts) {
+    await db.userRole.deleteMany({ where: { userId, role: Role.INSTRUCTOR } });
+    // The account may still be referenced (price-history actor, wallet rows…);
+    // leaving a role-less dev user behind is harmless.
+    await db.user.delete({ where: { id: userId } }).catch(() => {
+      console.warn(`[seed] kept legacy demo teacher account ${userId}: still referenced`);
+    });
+  }
+}
+
 async function seedPackages() {
+  // The ids predate the current teachers; they are kept so existing dev
+  // databases update these rows in place instead of gaining duplicates.
   const rows = [
-    {
-      id: 'package-sara-5',
-      teacherId: 'teacher-sara',
-      titleFa: 'بسته ۵ جلسه‌ای انگلیسی',
-      titleEn: '5-session English package',
-      descriptionFa: 'پنج جلسه خصوصی برای تقویت مکالمه و رایتینگ.',
-      descriptionEn: 'Five private lessons focused on conversation and writing.',
-      credits: 5,
-      lessonMinutes: 60,
-      listPrice: 3_450_000,
-      discountPercent: 5,
-      price: 3_277_500,
-    },
-    {
-      id: 'package-arman-5',
-      teacherId: 'teacher-arman',
-      titleFa: 'بسته ۵ جلسه‌ای آلمانی',
-      titleEn: '5-session German package',
-      descriptionFa: 'پنج جلسه خصوصی زبان آلمانی از سطح A1 تا B2.',
-      descriptionEn: 'Five private German lessons for levels A1 through B2.',
-      credits: 5,
-      lessonMinutes: 60,
-      listPrice: 3_100_000,
-      discountPercent: 5,
-      price: 2_945_000,
-    },
-  ];
+    { id: 'package-sara-5', teacherId: AHMADI },
+    { id: 'package-arman-5', teacherId: SHAHFAR },
+  ].map(({ id, teacherId }) => ({
+    id,
+    teacherId,
+    titleFa: 'بسته ۵ جلسه‌ای زبان جنرال انگلیسی',
+    titleEn: '5-session General English package',
+    descriptionFa: 'پنج جلسه خصوصی آنلاین زبان جنرال انگلیسی.',
+    descriptionEn: 'Five private online General English lessons.',
+    credits: 5,
+    lessonMinutes: 60,
+    listPrice: 5 * REGULAR_PRICE,
+    discountPercent: 5,
+    price: Math.round(5 * REGULAR_PRICE * 0.95),
+  }));
   for (const row of rows) {
     await db.package.upsert({
       where: { id: row.id },
       create: { ...row, approvalStatus: 'APPROVED', approvedById: users.admin.id, active: true },
       update: {
+        teacherId: row.teacherId,
         titleFa: row.titleFa,
         titleEn: row.titleEn,
         descriptionFa: row.descriptionFa,
@@ -1031,72 +940,95 @@ async function seedBookingsFinanceAndReviews() {
     create: {
       id: 'booking-completed-eligible',
       studentId: users.completedStudent.id,
-      teacherId: 'teacher-sara',
+      teacherId: AHMADI,
       startsAt: at(-10, 9),
       endsAt: at(-10, 10),
       timezone: 'Asia/Tehran',
       type: 'regular',
       status: BookingStatus.COMPLETED,
-      price: 690_000,
+      price: REGULAR_PRICE,
       policySnapshot: {},
       attendanceStudent: true,
       attendanceTeacher: true,
       meetingUrl: 'https://meet.local/completed',
     },
-    update: { status: BookingStatus.COMPLETED, attendanceStudent: true, attendanceTeacher: true },
+    update: {
+      teacherId: AHMADI,
+      price: REGULAR_PRICE,
+      status: BookingStatus.COMPLETED,
+      attendanceStudent: true,
+      attendanceTeacher: true,
+    },
   });
   const paid = await db.booking.upsert({
     where: { id: 'booking-completed-paid' },
     create: {
       id: 'booking-completed-paid',
       studentId: users.completedStudent.id,
-      teacherId: 'teacher-sara',
+      teacherId: AHMADI,
       startsAt: at(-24, 9),
       endsAt: at(-24, 10),
       timezone: 'Asia/Tehran',
       type: 'regular',
       status: BookingStatus.COMPLETED,
-      price: 690_000,
+      price: REGULAR_PRICE,
       policySnapshot: {},
       attendanceStudent: true,
       attendanceTeacher: true,
     },
-    update: { status: BookingStatus.COMPLETED, attendanceStudent: true, attendanceTeacher: true },
+    update: {
+      teacherId: AHMADI,
+      price: REGULAR_PRICE,
+      status: BookingStatus.COMPLETED,
+      attendanceStudent: true,
+      attendanceTeacher: true,
+    },
   });
   const future = await db.booking.upsert({
     where: { id: 'booking-future-confirmed' },
     create: {
       id: 'booking-future-confirmed',
       studentId: users.futureStudent.id,
-      teacherId: 'teacher-arman',
+      teacherId: SHAHFAR,
       startsAt: at(5, 12),
       endsAt: at(5, 13),
       timezone: 'Asia/Tehran',
       type: 'trial',
       status: BookingStatus.CONFIRMED,
-      price: 260_000,
+      price: TRIAL_PRICE,
       policySnapshot: {},
       meetingUrl: 'https://meet.local/future',
     },
-    update: { startsAt: at(5, 12), endsAt: at(5, 13), status: BookingStatus.CONFIRMED },
+    update: {
+      teacherId: SHAHFAR,
+      price: TRIAL_PRICE,
+      startsAt: at(5, 12),
+      endsAt: at(5, 13),
+      status: BookingStatus.CONFIRMED,
+    },
   });
   await db.booking.upsert({
     where: { id: 'booking-cancelled' },
     create: {
       id: 'booking-cancelled',
       studentId: users.ticketStudent.id,
-      teacherId: 'teacher-sara',
+      teacherId: AHMADI,
       startsAt: at(-4, 12),
       endsAt: at(-4, 13),
       timezone: 'Asia/Tehran',
       type: 'trial',
       status: BookingStatus.CANCELLED,
-      price: 290_000,
+      price: TRIAL_PRICE,
       policySnapshot: {},
       cancelledAt: at(-5, 10),
       cancellationReason: 'لغو توسط زبان‌آموز',
     },
-    update: { status: BookingStatus.CANCELLED, cancellationReason: 'لغو توسط زبان‌آموز' },
+    update: {
+      teacherId: AHMADI,
+      price: TRIAL_PRICE,
+      status: BookingStatus.CANCELLED,
+      cancellationReason: 'لغو توسط زبان‌آموز',
+    },
   });
 
   for (const booking of [completed, paid, future])
@@ -1116,7 +1048,13 @@ async function seedBookingsFinanceAndReviews() {
         gatewayReference: `seed-${booking.id}`,
         verifiedAt: now,
       },
-      update: { status: PaymentStatus.PAID, amount: booking.price, verifiedAt: now },
+      update: {
+        status: PaymentStatus.PAID,
+        subtotal: booking.price,
+        gatewayAmount: booking.price,
+        amount: booking.price,
+        verifiedAt: now,
+      },
     });
 
   const eligible = await db.earning.upsert({
@@ -1126,16 +1064,17 @@ async function seedBookingsFinanceAndReviews() {
       teacherId: completed.teacherId,
       bookingId: completed.id,
       grossAmount: completed.price,
-      commissionAmount: 103_500,
-      netAmount: 586_500,
+      commissionAmount: REGULAR_COMMISSION,
+      netAmount: REGULAR_NET,
       status: EarningStatus.ELIGIBLE,
       eligibleAt: at(-9, 0),
     },
     update: {
+      teacherId: completed.teacherId,
       status: EarningStatus.ELIGIBLE,
       grossAmount: completed.price,
-      commissionAmount: 103_500,
-      netAmount: 586_500,
+      commissionAmount: REGULAR_COMMISSION,
+      netAmount: REGULAR_NET,
     },
   });
   const paidEarning = await db.earning.upsert({
@@ -1145,12 +1084,18 @@ async function seedBookingsFinanceAndReviews() {
       teacherId: paid.teacherId,
       bookingId: paid.id,
       grossAmount: paid.price,
-      commissionAmount: 103_500,
-      netAmount: 586_500,
+      commissionAmount: REGULAR_COMMISSION,
+      netAmount: REGULAR_NET,
       status: EarningStatus.PAID,
       eligibleAt: at(-23, 0),
     },
-    update: { status: EarningStatus.PAID },
+    update: {
+      teacherId: paid.teacherId,
+      status: EarningStatus.PAID,
+      grossAmount: paid.price,
+      commissionAmount: REGULAR_COMMISSION,
+      netAmount: REGULAR_NET,
+    },
   });
   const payout = await db.payoutBatch.upsert({
     where: { id: 'payout-previous' },
@@ -1159,13 +1104,13 @@ async function seedBookingsFinanceAndReviews() {
       weekStart: at(-28, 0),
       weekEnd: at(-21, 23),
       status: PayoutStatus.TRANSFERRED,
-      totalAmount: 586_500,
+      totalAmount: REGULAR_NET,
       approvedById: users.admin.id,
       approvedAt: at(-20, 10),
       transferredAt: at(-19, 10),
       reference: 'SEED-PAYOUT-001',
     },
-    update: { status: PayoutStatus.TRANSFERRED, totalAmount: 586_500 },
+    update: { status: PayoutStatus.TRANSFERRED, totalAmount: REGULAR_NET },
   });
   await db.payoutItem.upsert({
     where: { earningId: paidEarning.id },
@@ -1176,7 +1121,7 @@ async function seedBookingsFinanceAndReviews() {
       teacherId: paidEarning.teacherId,
       amount: paidEarning.netAmount,
     },
-    update: { batchId: payout.id, amount: paidEarning.netAmount },
+    update: { batchId: payout.id, teacherId: paidEarning.teacherId, amount: paidEarning.netAmount },
   });
 
   await db.review.upsert({
@@ -1195,7 +1140,13 @@ async function seedBookingsFinanceAndReviews() {
       teacherResponse: 'از اعتماد شما ممنونم.',
       respondedAt: at(-7, 9),
     },
-    update: { rating: 5, moderationStatus: ReviewStatus.APPROVED, published: true, moderatedById: users.admin.id },
+    update: {
+      teacherId: completed.teacherId,
+      rating: 5,
+      moderationStatus: ReviewStatus.APPROVED,
+      published: true,
+      moderatedById: users.admin.id,
+    },
   });
   const rating = await db.review.aggregate({
     where: { teacherId: completed.teacherId, published: true, moderationStatus: ReviewStatus.APPROVED },
@@ -1212,183 +1163,6 @@ async function seedBookingsFinanceAndReviews() {
 
 async function seedDemoExperience() {
   const student = users.demoStudent;
-  const policy = await db.cancellationPolicy.findUniqueOrThrow({ where: { id: 'policy-flexible' } });
-  const demoTeachers = [
-    [
-      'ava',
-      'آوا مرادی',
-      'Ava Moradi',
-      'female',
-      'lang-en',
-      'English',
-      ['IELTS', 'speaking'],
-      ['B1', 'B2', 'C1'],
-      320000,
-      760000,
-      4.9,
-    ],
-    [
-      'pouya',
-      'پویا شریفی',
-      'Pouya Sharifi',
-      'male',
-      'lang-en',
-      'English',
-      ['IELTS', 'writing'],
-      ['B2', 'C1'],
-      350000,
-      820000,
-      4.8,
-    ],
-    [
-      'leila',
-      'لیلا زمانی',
-      'Leila Zamani',
-      'female',
-      'lang-de',
-      'Deutsch',
-      ['conversation', 'grammar'],
-      ['A1', 'A2', 'B1'],
-      270000,
-      640000,
-      4.7,
-    ],
-    [
-      'navid',
-      'نوید رستگار',
-      'Navid Rastegar',
-      'male',
-      'lang-fr',
-      'Français',
-      ['conversation', 'DELF'],
-      ['A1', 'A2', 'B1', 'B2'],
-      280000,
-      660000,
-      4.6,
-    ],
-  ] as const;
-  const removedDemoTeacherIds = [
-    'teacher-demo-shadi',
-    'teacher-demo-amirali',
-    'teacher-demo-yuna',
-    'teacher-demo-marco',
-    'teacher-demo-elena',
-    'teacher-demo-samir',
-  ];
-  await db.matchingRecommendation.deleteMany({ where: { teacherId: { in: removedDemoTeacherIds } } });
-  await db.teacher.deleteMany({
-    where: {
-      id: { in: removedDemoTeacherIds },
-      bookings: { none: {} },
-      reviews: { none: {} },
-      packages: { none: {} },
-      learningPlans: { none: {} },
-      earnings: { none: {} },
-      withdrawalRequests: { none: {} },
-    },
-  });
-  for (let index = 0; index < demoTeachers.length; index += 1) {
-    const [key, nameFa, nameEn, gender, languageId, nativeName, specialties, levels, trial, regular, rating] =
-      demoTeachers[index]!;
-    const userId = `user-teacher-demo-${key}`,
-      teacherId = `teacher-demo-${key}`,
-      phone = demoPhone(30 + index);
-    const existingById = await db.user.findUnique({ where: { id: userId }, select: { id: true } });
-    const phoneOwner = await db.user.findUnique({ where: { phone }, select: { id: true } });
-    if (phoneOwner && phoneOwner.id !== userId) {
-      const parked = `${phone}.duplicate.${phoneOwner.id}`;
-      await db.user.update({ where: { id: phoneOwner.id }, data: { phone: parked } });
-      console.warn(`[seed] parked conflicting demo phone ${phone} on ${parked}`);
-    }
-    const userData = {
-      phone,
-      name: nameFa,
-      email: `${key}@demo.local`,
-      profileComplete: true,
-      locale: 'fa',
-      timezone: 'Asia/Tehran',
-      status: 'ACTIVE' as const,
-    };
-    if (existingById) {
-      await db.user.update({ where: { id: userId }, data: userData });
-    } else {
-      await db.user.upsert({
-        where: { phone },
-        create: { id: userId, ...userData },
-        update: { id: userId, ...userData },
-      });
-    }
-    await db.userRole.upsert({
-      where: { userId_role: { userId, role: Role.INSTRUCTOR } },
-      create: { userId, role: Role.INSTRUCTOR },
-      update: {},
-    });
-    await db.teacher.upsert({
-      where: { id: teacherId },
-      create: {
-        id: teacherId,
-        userId,
-        slug: `demo-${key}`,
-        nameFa,
-        nameEn,
-        bioFa: `مدرس حرفه‌ای ${nativeName} با برنامه آموزشی شخصی‌سازی‌شده و تجربه کلاس آنلاین.`,
-        bioEn: `Professional ${nativeName} teacher with personalized online lessons.`,
-        status: TeacherStatus.APPROVED,
-        rating,
-        reviewsCount: 18 + index * 7,
-        experienceYears: 4 + (index % 6),
-        gender,
-        trialPrice: trial,
-        regularPrice: regular,
-        trialDuration: 30,
-        lessonDuration: 60,
-        approvedTrialPrice: trial,
-        approvedRegularPrice: regular,
-        proposedTrialPrice: trial,
-        proposedRegularPrice: regular,
-        priceStatus: PriceStatus.APPROVED,
-        priceReviewedById: users.admin.id,
-        priceReviewedAt: at(-30, 9),
-        specialties: [...specialties],
-        languages: [nativeName],
-        targetBands: languageId === 'lang-en' ? [6.5, 7, 7.5, 8] : [],
-        policyId: policy.id,
-        submittedAt: at(-40, 9),
-        approvedAt: at(-30, 9),
-      },
-      update: {
-        status: TeacherStatus.APPROVED,
-        rating,
-        reviewsCount: 18 + index * 7,
-        approvedTrialPrice: trial,
-        approvedRegularPrice: regular,
-        specialties: [...specialties],
-        policyId: policy.id,
-      },
-    });
-    await db.teacherLanguage.upsert({
-      where: { teacherId_languageId: { teacherId, languageId } },
-      create: { teacherId, languageId, levels: [...levels], specialties: [...specialties], active: true },
-      update: { levels: [...levels], specialties: [...specialties], active: true },
-    });
-    for (const weekday of [0, 1, 2, 3, 4, 5])
-      await db.availabilityRule.upsert({
-        where: { id: `rule-${teacherId}-${weekday}` },
-        create: {
-          id: `rule-${teacherId}-${weekday}`,
-          teacherId,
-          weekday,
-          startMinute: 540,
-          endMinute: 1260,
-          timezone: 'Asia/Tehran',
-          lessonDuration: 60,
-          breakMinutes: 0,
-          active: true,
-        },
-        update: { active: true, startMinute: 540, endMinute: 1260 },
-      });
-  }
-
   const testSpecs = [
     [
       'test-demo-ielts',
@@ -1617,28 +1391,31 @@ async function seedDemoExperience() {
     update: { targetBand: 7.5, currentBand: 6.5 },
   });
   await db.matchingRecommendation.deleteMany({ where: { sessionId: session.id } });
-  for (let rank = 1; rank <= demoTeachers.length; rank += 1) {
-    const key = demoTeachers[rank - 1]![0];
+  const recommended = [AHMADI, SHAHFAR];
+  for (let rank = 1; rank <= recommended.length; rank += 1) {
+    const teacherId = recommended[rank - 1]!;
     await db.matchingRecommendation.upsert({
       where: { sessionId_rank: { sessionId: session.id, rank } },
       create: {
         sessionId: session.id,
-        teacherId: `teacher-demo-${key}`,
+        teacherId,
         rank,
         score: 96 - rank * 2,
         reasons: { fa: ['هماهنگ با بودجه و زمان شما', 'تجربه تدریس آنلاین'], en: ['Matches your budget and schedule'] },
-        audit: { compatibleSlots: 12 - (rank % 4), price: demoTeachers[rank - 1]![8] },
+        audit: { compatibleSlots: 12 - (rank % 4), price: TRIAL_PRICE },
       },
-      update: { teacherId: `teacher-demo-${key}`, score: 96 - rank * 2 },
+      update: { teacherId, score: 96 - rank * 2 },
     });
   }
 
   const bookings = [
-    ['booking-demo-completed', 'teacher-demo-ava', -8, BookingStatus.COMPLETED, 760000],
-    ['booking-demo-upcoming', 'teacher-demo-pouya', 3, BookingStatus.CONFIRMED, 350000],
-    ['booking-demo-upcoming-2', 'teacher-demo-leila', 7, BookingStatus.CONFIRMED, 270000],
+    ['booking-demo-completed', AHMADI, -8, BookingStatus.COMPLETED, 'regular', REGULAR_PRICE],
+    ['booking-demo-upcoming', SHAHFAR, 3, BookingStatus.CONFIRMED, 'trial', TRIAL_PRICE],
+    // A regular lesson: the learner already had a lesson with Arezoo, and a
+    // trial is only available once per learner-teacher pair.
+    ['booking-demo-upcoming-2', AHMADI, 7, BookingStatus.CONFIRMED, 'regular', REGULAR_PRICE],
   ] as const;
-  for (const [id, teacherId, days, status, price] of bookings) {
+  for (const [id, teacherId, days, status, type, price] of bookings) {
     const booking = await db.booking.upsert({
       where: { id },
       create: {
@@ -1648,7 +1425,7 @@ async function seedDemoExperience() {
         startsAt: at(days, 14),
         endsAt: at(days, 15),
         timezone: 'Asia/Tehran',
-        type: id.includes('completed') ? 'regular' : 'trial',
+        type,
         status,
         price,
         policySnapshot: { title: 'flexible' },
@@ -1656,8 +1433,11 @@ async function seedDemoExperience() {
         attendanceStudent: status === BookingStatus.COMPLETED ? true : null,
         attendanceTeacher: status === BookingStatus.COMPLETED ? true : null,
       },
-      update: { startsAt: at(days, 14), endsAt: at(days, 15), status },
+      update: { teacherId, type, price, startsAt: at(days, 14), endsAt: at(days, 15), status },
     });
+    // The completed lesson carries the demo's 10% discount and 200,000 of wallet credit.
+    const discount = id.includes('completed') ? price / 10 : 0;
+    const wallet = id.includes('completed') ? 200_000 : 0;
     await db.payment.upsert({
       where: { id: `payment-${id}` },
       create: {
@@ -1667,16 +1447,24 @@ async function seedDemoExperience() {
         purpose: 'BOOKING',
         referenceId: booking.id,
         subtotal: price,
-        discountAmount: id.includes('completed') ? 76000 : 0,
-        walletAmount: id.includes('completed') ? 200000 : 0,
-        gatewayAmount: id.includes('completed') ? 484000 : price,
-        amount: id.includes('completed') ? 684000 : price,
+        discountAmount: discount,
+        walletAmount: wallet,
+        gatewayAmount: price - discount - wallet,
+        amount: price - discount,
         status: PaymentStatus.PAID,
         idempotencyKey: `seed-demo-${id}`,
         gatewayReference: `LS-DEMO-${1000 + days}`,
         verifiedAt: at(days - 1, 12),
       },
-      update: { status: PaymentStatus.PAID, verifiedAt: at(days - 1, 12) },
+      update: {
+        subtotal: price,
+        discountAmount: discount,
+        walletAmount: wallet,
+        gatewayAmount: price - discount - wallet,
+        amount: price - discount,
+        status: PaymentStatus.PAID,
+        verifiedAt: at(days - 1, 12),
+      },
     });
   }
   const ledger = [
@@ -1684,7 +1472,7 @@ async function seedDemoExperience() {
     ['class-1', 'DEBIT', 200000, 'پرداخت بخشی از هزینه کلاس IELTS', 'Payment', 'payment-booking-demo-completed', -9],
     ['gift-1', 'CREDIT', 300000, 'اعتبار هدیه خوش‌آمدگویی', 'Gift', 'welcome-demo', -6],
     ['refund-1', 'CREDIT', 180000, 'بازگشت وجه جلسه لغوشده', 'Refund', 'refund-demo', -4],
-    ['reserve-1', 'DEBIT', 350000, 'رزرو جلسه آزمایشی آینده', 'Payment', 'payment-booking-demo-upcoming', -1],
+    ['reserve-1', 'DEBIT', TRIAL_PRICE, 'رزرو جلسه آزمایشی آینده', 'Payment', 'payment-booking-demo-upcoming', -1],
   ] as const;
   for (const [id, direction, amount, description, referenceType, referenceId, days] of ledger)
     await db.walletEntry.upsert({
@@ -1709,7 +1497,7 @@ async function seedDemoExperience() {
     create: {
       id: 'plan-demo-ielts',
       studentId: student.id,
-      teacherId: 'teacher-demo-ava',
+      teacherId: AHMADI,
       title: 'مسیر آمادگی IELTS Academic نمره ۷٫۵',
       targetBand: 7.5,
       examDate: at(90, 8),
@@ -1739,7 +1527,7 @@ async function seedDemoExperience() {
         ],
       },
     },
-    update: { title: 'مسیر آمادگی IELTS Academic نمره ۷٫۵', targetBand: 7.5, status: 'active' },
+    update: { teacherId: AHMADI, title: 'مسیر آمادگی IELTS Academic نمره ۷٫۵', targetBand: 7.5, status: 'active' },
   });
 }
 
@@ -1835,14 +1623,19 @@ async function seedTicketsCmsAndSettings() {
     update: { data: { ticketId: ticket.id, href: `/admin/tickets/${ticket.id}` } },
   });
 
+  const supportPhone = {
+    number: '09914673683',
+    hoursFa: 'ساعت کاری ۱۰ صبح تا ۵ عصر',
+    hoursEn: 'Office hours 10:00–17:00',
+  };
   await db.setting.upsert({
     where: { key: 'support.phone' },
     create: {
       key: 'support.phone',
-      value: { number: '02191094200', hoursFa: 'شنبه تا پنج‌شنبه، ۹ تا ۲۰', hoursEn: 'Saturday–Thursday, 9–20' },
+      value: supportPhone,
       public: true,
     },
-    update: { public: true },
+    update: { value: supportPhone, public: true },
   });
   await db.setting.upsert({
     where: { key: 'sms.enabled' },
@@ -1894,8 +1687,8 @@ async function seedAudit() {
       actorId: users.admin.id,
       action: 'teacher.price.final_approved',
       entity: 'Teacher',
-      entityId: 'teacher-sara',
-      after: { approvedTrialPrice: 290_000, approvedRegularPrice: 690_000 },
+      entityId: AHMADI,
+      after: { approvedTrialPrice: TRIAL_PRICE, approvedRegularPrice: REGULAR_PRICE },
     },
     {
       actorId: users.verifier.id,
@@ -1923,240 +1716,21 @@ async function seedAudit() {
 }
 
 async function seedBlog() {
-  const productivity = await db.blogCategory.upsert({
-    where: { slug: 'learning-tips' },
-    update: {},
-    create: { slug: 'learning-tips', nameFa: 'نکات یادگیری', nameEn: 'Learning tips' },
-  });
-  const culture = await db.blogCategory.upsert({
-    where: { slug: 'culture' },
-    update: {},
-    create: { slug: 'culture', nameFa: 'فرهنگ و زبان', nameEn: 'Culture & language' },
-  });
-  const tags = await Promise.all(
-    [
-      ['speaking', 'مکالمه', 'Speaking'] as const,
-      ['vocabulary', 'واژگان', 'Vocabulary'] as const,
-      ['study-plan', 'برنامه‌ریزی', 'Study plan'] as const,
-    ].map(([slug, nameFa, nameEn]) =>
-      db.blogTag.upsert({ where: { slug }, update: {}, create: { slug, nameFa, nameEn } }),
-    ),
-  );
-  const posts = [
-    {
-      slug: 'speak-with-confidence',
-      categoryId: productivity.id,
-      titleFa: 'چطور با اعتمادبه‌نفس انگلیسی صحبت کنیم؟',
-      titleEn: 'How to speak English with confidence',
-      excerptFa: 'تمرین‌های کوتاه و کاربردی برای عبور از ترس مکالمه.',
-      excerptEn: 'Short practical exercises to overcome speaking anxiety.',
-      contentFa:
-        '# از اشتباه کردن نترسید\n\nمکالمه مهارتی است که با تمرین روزانه رشد می‌کند. هر روز پنج دقیقه درباره‌ی یک موضوع ساده صحبت کنید و صدای خود را ضبط کنید.',
-      contentEn:
-        '# Embrace mistakes\n\nSpeaking grows through daily practice. Talk for five minutes about a simple topic and record yourself.',
-      tagIds: [tags[0]!.id, tags[2]!.id],
-    },
-    {
-      slug: 'vocabulary-in-context',
-      categoryId: productivity.id,
-      titleFa: 'واژگان را در جمله یاد بگیرید',
-      titleEn: 'Learn vocabulary in context',
-      excerptFa: 'چرا حفظ کردن فهرست لغات کافی نیست و چه روشی بهتر جواب می‌دهد؟',
-      excerptEn: 'Why word lists are not enough—and what works better.',
-      contentFa:
-        '## یک کلمه، سه جمله\n\nهر واژه‌ی جدید را در سه جمله‌ی واقعی به کار ببرید و روز بعد آن جمله‌ها را مرور کنید.',
-      contentEn:
-        '## One word, three sentences\n\nUse every new word in three real sentences and review them the next day.',
-      tagIds: [tags[1]!.id],
-    },
-    {
-      slug: 'english-through-films',
-      categoryId: culture.id,
-      titleFa: 'یادگیری زبان با فیلم و سریال',
-      titleEn: 'Learn English through films',
-      excerptFa: 'یک روش سه‌مرحله‌ای برای تبدیل تماشای فیلم به تمرین زبان.',
-      excerptEn: 'A three-step method to turn movie time into language practice.',
-      contentFa: '### روش سه‌مرحله‌ای\n\nابتدا با زیرنویس فارسی، سپس انگلیسی و در پایان بدون زیرنویس تماشا کنید.',
-      contentEn:
-        '### The three-step method\n\nWatch first with native subtitles, then English subtitles, and finally without subtitles.',
-      tagIds: [tags[0]!.id, tags[1]!.id],
-    },
-  ];
-  for (const p of posts)
-    await db.blogPost.upsert({
-      where: { slug: p.slug },
-      update: { ...p, tagIds: undefined, status: BlogPostStatus.PUBLISHED, publishedAt: now },
-      create: {
-        ...p,
-        tagIds: undefined,
-        authorId: users.admin.id,
-        status: BlogPostStatus.PUBLISHED,
-        publishedAt: now,
-        tags: { connect: p.tagIds!.map((id) => ({ id })) },
-      },
-    } as any);
+  // Long-form editorial baseline shared with the production runner seed-blog.ts;
+  // the dev seed overwrites so content edits in blog-content/ show up on re-seed.
+  await seedBlogPosts(db, { authorId: users.admin.id, overwrite: true, now });
 }
 
 async function seedCourses() {
-  await db.course.deleteMany({ where: { id: 'course-spanish-everyday' } });
-  const rows = [
-    {
-      id: 'course-english-conversation',
-      slug: 'english-conversation',
-      titleFa: 'مکالمه روان انگلیسی',
-      titleEn: 'Fluent English conversation',
-      descriptionFa: 'مسیر تمرین‌محور مکالمه با بازخورد منظم و تمرین‌های واقعی.',
-      descriptionEn: 'A practice-led speaking course with structured feedback.',
-      language: 'انگلیسی',
-      level: 'B1',
-      teacherName: 'سارا دادخواه',
-      teacherId: 'teacher-sara',
-      lessonsCount: 16,
-      price: 2_980_000,
-      image: '/images/lingospeak-student.png',
+  // The course catalog is the institute's own, installed by
+  // lingospeak-catalog.seed.ts from seedTeachers(). These fictional courses
+  // predate it; their chapters, lessons, enrollments and reviews cascade.
+  await db.course.deleteMany({
+    where: {
+      id: {
+        in: ['course-spanish-everyday', 'course-english-conversation', 'course-german-zero', 'course-french-travel'],
+      },
     },
-    {
-      id: 'course-german-zero',
-      slug: 'german-zero',
-      titleFa: 'آلمانی از صفر تا مکالمه',
-      titleEn: 'German from zero to conversation',
-      descriptionFa: 'پایه‌های زبان آلمانی برای شروع مطمئن مکالمه روزمره.',
-      descriptionEn: 'German foundations for confident everyday conversations.',
-      language: 'آلمانی',
-      level: 'A1',
-      teacherName: 'آرمان نیک‌روش',
-      teacherId: 'teacher-arman',
-      lessonsCount: 20,
-      price: 3_490_000,
-      image: '/images/auth/register.png',
-    },
-    {
-      id: 'course-french-travel',
-      slug: 'french-travel',
-      titleFa: 'فرانسوی برای سفر',
-      titleEn: 'French for travel',
-      descriptionFa: 'واژگان و موقعیت‌های ضروری برای یک سفر روان‌تر.',
-      descriptionEn: 'Essential language and scenarios for smoother travel.',
-      language: 'فرانسوی',
-      level: 'A2',
-      teacherName: 'تیم لینگواسپیک',
-      teacherId: null,
-      lessonsCount: 12,
-      price: 2_490_000,
-      image: '/images/auth/login.png',
-    },
-  ];
-  for (const row of rows)
-    await db.course.upsert({
-      where: { slug: row.slug },
-      create: { ...row, published: true },
-      update: { ...row, published: true },
-    });
-  const demoChapters = [
-    { id: 'course-en-chapter-1', titleFa: 'شروع مکالمه‌های واقعی', titleEn: 'Starting real conversations', order: 1 },
-    { id: 'course-en-chapter-2', titleFa: 'تعامل در زندگی روزمره', titleEn: 'Everyday interactions', order: 2 },
-    { id: 'course-en-chapter-3', titleFa: 'روان‌گویی و جمع‌بندی', titleEn: 'Fluency and review', order: 3 },
-  ];
-  for (const chapter of demoChapters)
-    await db.courseChapter.upsert({
-      where: { id: chapter.id },
-      create: { ...chapter, courseId: rows[0]!.id },
-      update: { titleFa: chapter.titleFa, titleEn: chapter.titleEn, order: chapter.order, published: true },
-    });
-  const demoLessons = [
-    [
-      'course-en-lesson-1',
-      demoChapters[0]!.id,
-      'معرفی خود با اعتمادبه‌نفس',
-      'Introducing yourself confidently',
-      'VIDEO',
-      1,
-      720,
-      {
-        fa: 'در این درس الگوهای ساده معرفی خود را در یک گفت‌وگوی واقعی تمرین می‌کنیم.',
-        en: 'Practise simple introduction patterns in a real conversation.',
-      },
-    ],
-    [
-      'course-en-lesson-2',
-      demoChapters[0]!.id,
-      'سؤال‌های کاربردی',
-      'Useful questions',
-      'TEXT',
-      2,
-      540,
-      {
-        fa: 'پرسش‌های باز و بسته را بسازید و پاسخ طبیعی بدهید.',
-        en: 'Build open and closed questions and answer naturally.',
-      },
-    ],
-    [
-      'course-en-lesson-3',
-      demoChapters[1]!.id,
-      'سفارش در کافه',
-      'Ordering at a café',
-      'AUDIO',
-      1,
-      660,
-      {
-        fa: 'به مکالمه گوش کنید و عبارت‌های کلیدی را تکرار کنید.',
-        en: 'Listen to the dialogue and repeat the key phrases.',
-      },
-    ],
-    [
-      'course-en-lesson-4',
-      demoChapters[1]!.id,
-      'قرار گذاشتن',
-      'Making plans',
-      'TEXT',
-      2,
-      600,
-      { fa: 'برای زمان و مکان قرار توافق کنید.', en: 'Agree on a time and place to meet.' },
-    ],
-    [
-      'course-en-lesson-5',
-      demoChapters[2]!.id,
-      'عبارت‌های پیونددهنده',
-      'Linking phrases',
-      'VIDEO',
-      1,
-      780,
-      { fa: 'با عبارت‌های پیونددهنده مکث‌های طولانی را کمتر کنید.', en: 'Use linking phrases to reduce long pauses.' },
-    ],
-    [
-      'course-en-lesson-6',
-      demoChapters[2]!.id,
-      'تمرین پایانی',
-      'Final practice',
-      'QUIZ',
-      2,
-      480,
-      {
-        question: 'بهترین پاسخ برای ادامه یک گفت‌وگوی دوستانه کدام است؟',
-        options: ['That sounds interesting. Tell me more.', 'No speaking.', 'Yesterday blue.'],
-      },
-    ],
-  ] as const;
-  for (const [id, chapterId, titleFa, titleEn, type, order, durationSeconds, content] of demoLessons)
-    await db.courseLesson.upsert({
-      where: { id },
-      create: {
-        id,
-        chapterId,
-        titleFa,
-        titleEn,
-        type,
-        order,
-        durationSeconds,
-        content,
-        preview: id === 'course-en-lesson-1',
-      },
-      update: { titleFa, titleEn, type, order, durationSeconds, content, published: true },
-    });
-  await db.courseEnrollment.upsert({
-    where: { userId_courseId: { userId: users.demoStudent.id, courseId: rows[0]!.id } },
-    create: { userId: users.demoStudent.id, courseId: rows[0]!.id },
-    update: {},
   });
 }
 

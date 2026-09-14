@@ -270,7 +270,7 @@ export function PaymentSelect({ fa }: { fa: boolean }) {
               value: stringValue(payment.id),
               label: [
                 stringValue(user?.name) || stringValue(user?.phone) || translate(fa, 'legacyuser2'),
-                amount && localized({ fa: `${amount} تومان`, en: `${amount} IRR` }, locale),
+                amount && localized({ fa: `${amount} تومان`, en: `${amount} Toman` }, locale),
                 localizedDate(payment.createdAt, fa),
                 stringValue(payment.status),
               ]

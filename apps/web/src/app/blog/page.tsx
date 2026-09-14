@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import { ArrowUpLeft, BookOpenText, CalendarDays, Clock3, RotateCcw, Search, Sparkles, UserRound, X } from 'lucide-react';
 import { publicApi } from '@/shared/services/api';
 import { useTranslations } from '@/components/shared/locale-provider';
@@ -10,6 +10,8 @@ import { localePath, localized } from '@/lib/i18n';
 import { Footer, Header } from '@/components/layout/site';
 import { useDebouncedValue } from '@/shared/hooks/use-debounced-value';
 import type { BlogPostSummary, BlogPostsPage } from '@/features/blog/types';
+
+const PAGE_SIZE = 12;
 
 const copy = (locale: 'fa' | 'en', fa: string, en: string) => (locale === 'en' ? en : fa);
 
@@ -31,14 +33,19 @@ export default function BlogPage() {
   const [q, setQ] = useState('');
   const { locale, t } = useTranslations();
   const search = useDebouncedValue(q.trim(), 350);
-  const posts = useQuery({
+  const posts = useInfiniteQuery({
     queryKey: ['public-blog-posts', search],
-    queryFn: ({ signal }) =>
-      publicApi<BlogPostsPage>(`/blog/posts?${search ? `search=${encodeURIComponent(search)}&` : ''}pageSize=12`, {
-        signal,
-      }),
+    queryFn: ({ pageParam, signal }) =>
+      publicApi<BlogPostsPage>(
+        `/blog/posts?${search ? `search=${encodeURIComponent(search)}&` : ''}page=${pageParam}&pageSize=${PAGE_SIZE}`,
+        { signal },
+      ),
+    initialPageParam: 1,
+    // The API returns no total, so a full page is the only signal that more may follow.
+    getNextPageParam: (lastPage) => (lastPage.items.length === lastPage.pageSize ? lastPage.page + 1 : undefined),
     placeholderData: (previous) => previous,
   });
+  const items = posts.data?.pages.flatMap((page) => page.items) ?? [];
 
   return (
     <>
@@ -86,9 +93,9 @@ export default function BlogPage() {
               <span className="blog-section-label">{copy(locale, 'آخرین نوشته‌ها', 'Latest notes')}</span>
               <h2>{search ? copy(locale, 'نتیجه جست‌وجو', 'Search results') : copy(locale, 'برای مسیر یادگیری شما', 'For your learning route')}</h2>
             </div>
-            {!posts.isPending && !posts.isError && posts.data?.items.length ? (
+            {!posts.isPending && !posts.isError && items.length ? (
               <span className="blog-results-count">
-                {posts.data.items.length.toLocaleString(locale === 'en' ? 'en-US' : 'fa-IR')} {copy(locale, 'مقاله', 'articles')}
+                {items.length.toLocaleString(locale === 'en' ? 'en-US' : 'fa-IR')} {copy(locale, 'مقاله', 'articles')}
               </span>
             ) : null}
           </div>
@@ -117,7 +124,7 @@ export default function BlogPage() {
                 {copy(locale, 'تلاش دوباره', 'Try again')}
               </button>
             </div>
-          ) : !posts.data?.items.length ? (
+          ) : !items.length ? (
             <div className="blog-empty-state">
               <span className="blog-empty-icon"><BookOpenText size={28} /></span>
               <strong>{search ? copy(locale, 'مقاله‌ای با این عبارت پیدا نشد', 'No articles matched that search') : copy(locale, 'هنوز مقاله‌ای منتشر نشده', 'No articles have been published yet')}</strong>
@@ -133,9 +140,25 @@ export default function BlogPage() {
               )}
             </div>
           ) : (
-            <div className="blog-grid" aria-busy={posts.isFetching}>
-              {posts.data.items.map((post, index) => <BlogCard key={post.id} post={post} locale={locale} featured={index === 0} />)}
-            </div>
+            <>
+              <div className="blog-grid" aria-busy={posts.isFetching}>
+                {items.map((post, index) => <BlogCard key={post.id} post={post} locale={locale} featured={index === 0} />)}
+              </div>
+              {posts.hasNextPage && (
+                <div className="mt-10 flex justify-center">
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={() => posts.fetchNextPage()}
+                    disabled={posts.isFetchingNextPage}
+                  >
+                    {posts.isFetchingNextPage
+                      ? copy(locale, 'در حال بارگذاری…', 'Loading…')
+                      : copy(locale, 'مقاله‌های بیشتر', 'More articles')}
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </section>
       </main>

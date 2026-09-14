@@ -1,6 +1,8 @@
 import Link from 'next/link';
+import { BrandLogo, Header } from '@/components/layout/site';
 import {
   ArrowUpLeft,
+  ArrowUpRight,
   BarChart3,
   Check,
   ChevronDown,
@@ -19,6 +21,7 @@ import type { EducationalLanguage } from '@/features/languages';
 import type { BlogPostsPage } from '@/features/blog/types';
 import type { Locale } from '@/lib/i18n';
 import { localePath } from '@/lib/i18n';
+import { isLinkEnabled } from '@/config';
 import { defaultLandingConfig, localizedText, sectionStyle, type LandingConfig } from '../landing-config';
 
 type LandingHomeProps = {
@@ -32,6 +35,12 @@ type LandingHomeProps = {
 type LandingRenderProps = LandingHomeProps & {
   section: LandingConfig['sections'][number];
 };
+
+/** Points "forward" in the reading direction: up-left for RTL Persian, up-right for LTR English. */
+function ForwardArrow({ locale, size }: { locale: Locale; size: number }) {
+  const Icon = locale === 'en' ? ArrowUpRight : ArrowUpLeft;
+  return <Icon size={size} aria-hidden="true" />;
+}
 
 const iconMap = { sparkles: Sparkles, target: Target, headphones: Headphones, 'bar-chart': BarChart3 };
 
@@ -52,7 +61,7 @@ export function LandingHome(props: LandingHomeProps) {
         } as React.CSSProperties
       }
     >
-      <LandingHeader config={config} locale={locale} />
+      <Header config={{ brand: config.brand, header: config.header }} />
       <main>
         {config.sections
           .filter((section) => section.visible)
@@ -88,7 +97,7 @@ function HeroSection({ config, locale, section }: LandingRenderProps) {
           <div className="landing-actions">
             <Link href={path(config.hero.primaryButton.href)} className="landing-button landing-button-primary">
               {t(config.hero.primaryButton.label)}
-              <ArrowUpLeft size={17} aria-hidden="true" />
+              <ForwardArrow locale={locale} size={17} />
             </Link>
             <Link href={path(config.hero.secondaryButton.href)} className="landing-button landing-button-quiet">
               {t(config.hero.secondaryButton.label)}
@@ -158,7 +167,7 @@ function LanguagesSection({ config, locale, languages, section }: LandingRenderP
                   <span className="landing-overline">{language.proficiencySystem === 'CEFR' ? 'A1 — C2' : 'LEVELS'}</span>
                   <h3>{name}</h3>
                   <p>{card ? t(card.description) : english ? 'Build confidence at your pace.' : 'با ریتم خودت پیشرفت کن.'}</p>
-                  <span className="landing-inline-link">{english ? 'Explore route' : 'مشاهده مسیر'} <ArrowUpLeft size={15} /></span>
+                  <span className="landing-inline-link">{english ? 'Explore route' : 'مشاهده مسیر'} <ForwardArrow locale={locale} size={15} /></span>
                 </div>
               </Link>
             );
@@ -205,7 +214,7 @@ function PlacementSection({ config, locale, section }: LandingRenderProps) {
             <h2>{t(config.placement.title)}</h2>
             <p>{t(config.placement.description)}</p>
             <Link href={path(config.placement.button.href)} className="landing-button landing-button-light">
-              {t(config.placement.button.label)} <ArrowUpLeft size={17} />
+              {t(config.placement.button.label)} <ForwardArrow locale={locale} size={17} />
             </Link>
           </div>
           <div className="landing-placement-art">
@@ -244,7 +253,7 @@ function CoursesSection({ config, locale, courses, section }: LandingRenderProps
                     <p>{english ? course.descriptionEn : course.descriptionFa}</p>
                     <div className="landing-course-meta">
                       <span><Clock3 size={14} /> {(course.lessonsCount ?? course.lessons ?? 0).toLocaleString(english ? 'en-US' : 'fa-IR')} {english ? 'lessons' : 'جلسه'}</span>
-                      <strong>{course.price.toLocaleString(english ? 'en-US' : 'fa-IR')} تومان</strong>
+                      <strong>{course.price.toLocaleString(english ? 'en-US' : 'fa-IR')} {english ? 'Toman' : 'تومان'}</strong>
                     </div>
                   </div>
                 </Link>
@@ -253,7 +262,7 @@ function CoursesSection({ config, locale, courses, section }: LandingRenderProps
           </div>
         )}
         <div className="landing-section-link-wrap">
-          <Link href={path('/courses')} className="landing-text-link">{english ? 'View all courses' : 'مشاهده همه دوره‌ها'} <ArrowUpLeft size={16} /></Link>
+          <Link href={path('/courses')} className="landing-text-link">{english ? 'View all courses' : 'مشاهده همه دوره‌ها'} <ForwardArrow locale={locale} size={16} /></Link>
         </div>
       </div>
     </section>
@@ -278,7 +287,7 @@ function BlogSection({ config, locale, posts, section }: LandingRenderProps) {
                 <span className="landing-overline">{english ? post.category?.nameEn ?? 'Learning' : post.category?.nameFa ?? 'یادگیری'}</span>
                 <h3>{english ? post.titleEn : post.titleFa}</h3>
                 <p>{english ? post.excerptEn : post.excerptFa}</p>
-                <span className="landing-inline-link">{english ? 'Read article' : 'مطالعه مقاله'} <ArrowUpLeft size={15} /></span>
+                <span className="landing-inline-link">{english ? 'Read article' : 'مطالعه مقاله'} <ForwardArrow locale={locale} size={15} /></span>
               </div>
             </Link>
           ))}
@@ -315,7 +324,7 @@ function FinalCtaSection({ config, locale, section }: LandingRenderProps) {
       <div className="landing-container">
         <div className="landing-final-cta" style={{ backgroundColor: config.finalCta.backgroundColor }}>
           <div><span className="landing-kicker landing-kicker-light">{t(config.finalCta.eyebrow)}</span><h2>{t(config.finalCta.title)}</h2></div>
-          <Link href={path(config.finalCta.button.href)} className="landing-button landing-button-light">{t(config.finalCta.button.label)} <ArrowUpLeft size={17} /></Link>
+          <Link href={path(config.finalCta.button.href)} className="landing-button landing-button-light">{t(config.finalCta.button.label)} <ForwardArrow locale={locale} size={17} /></Link>
         </div>
       </div>
     </section>
@@ -332,28 +341,6 @@ function SectionIntro({ eyebrow, title, description }: { eyebrow: string; title:
   );
 }
 
-function LandingHeader({ config, locale }: { config: LandingConfig; locale: Locale }) {
-  const english = locale === 'en';
-  const path = (href: string) => localePath(href, locale);
-  return (
-    <header className={config.header.sticky ? 'landing-header landing-header-sticky' : 'landing-header'} style={{ backgroundColor: config.header.background }}>
-      <div className="landing-container landing-header-inner">
-        <Link href={path('/')} className="landing-brand">
-          <span className="landing-brand-mark">{config.brand.mark}</span>
-          <span>{config.brand.name}</span>
-        </Link>
-        <nav className="landing-desktop-nav">
-          {config.header.nav.filter((item) => item.visible).map((item) => <Link href={path(item.href)} key={item.id}>{english ? item.label.en : item.label.fa}</Link>)}
-        </nav>
-        <div className="landing-header-actions">
-          <Link href={path('/auth')} className="landing-header-signin">{english ? config.header.signIn.en : config.header.signIn.fa}</Link>
-          <Link href={path('/auth')} className="landing-header-signup">{english ? config.header.signUp.en : config.header.signUp.fa}</Link>
-        </div>
-      </div>
-    </header>
-  );
-}
-
 function LandingFooter({ config, locale }: { config: LandingConfig; locale: Locale }) {
   const english = locale === 'en';
   const path = (href: string) => localePath(href, locale);
@@ -362,14 +349,14 @@ function LandingFooter({ config, locale }: { config: LandingConfig; locale: Loca
     <footer className="landing-footer">
       <div className="landing-container landing-footer-grid">
         <div className="landing-footer-brand">
-          <Link href={path('/')} className="landing-brand"><span className="landing-brand-mark">{config.brand.mark}</span><span>{config.brand.name}</span></Link>
+          <Link href={path('/')} className="landing-brand"><BrandLogo name={config.brand.name} /></Link>
           <p>{t(config.footer.description)}</p>
           <div className="landing-socials"><a href={`tel:${config.footer.phone}`} aria-label={english ? 'Phone' : 'تلفن'}><Phone size={16} /></a><a href={`mailto:${config.footer.email}`} aria-label={english ? 'Email' : 'ایمیل'}><Mail size={16} /></a><a href={path('/contact')} aria-label={english ? 'Contact' : 'تماس'}><MessageCircle size={16} /></a></div>
         </div>
-        {config.footer.columns.map((column) => <div key={column.title.en}><h3>{t(column.title)}</h3><div className="landing-footer-links">{column.links.map((link) => <Link href={path(link.href)} key={link.href}>{t(link.label)}</Link>)}</div></div>)}
-        <div className="landing-footer-contact"><h3>{english ? 'Contact' : 'تماس با ما'}</h3><p><Phone size={15} /> {config.footer.phone}</p><p><Mail size={15} /> {config.footer.email}</p><p><MapPin size={15} /> {t(config.footer.address)}</p><p><Users size={15} /> {english ? 'Support, Saturday to Thursday' : 'پشتیبانی، شنبه تا پنج‌شنبه'}</p></div>
+        {config.footer.columns.map((column) => <div key={column.title.en}><h3>{t(column.title)}</h3><div className="landing-footer-links">{column.links.filter((link) => isLinkEnabled(link.href)).map((link) => <Link href={path(link.href)} key={link.href}>{t(link.label)}</Link>)}</div></div>)}
+        <div className="landing-footer-contact"><h3>{english ? 'Contact' : 'تماس با ما'}</h3><p><Phone size={15} /> {config.footer.phone}</p><p><Mail size={15} /> {config.footer.email}</p><p><MapPin size={15} /> {t(config.footer.address)}</p><p><Users size={15} /> {english ? 'Office hours 10:00–17:00' : 'ساعت کاری ۱۰ صبح تا ۵ عصر'}</p></div>
       </div>
-      <div className="landing-container landing-footer-bottom"><span>© ۱۴۰۵ {config.brand.name}</span><span>{t(config.footer.copyright)}</span></div>
+      <div className="landing-container landing-footer-bottom"><span>© {english ? '2026' : '۱۴۰۵'} {config.brand.name}</span><span>{t(config.footer.copyright)}</span></div>
     </footer>
   );
 }

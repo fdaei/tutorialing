@@ -4,12 +4,15 @@ import { useState } from 'react';
 import { LocaleProvider } from '@/components/shared/locale-provider';
 import type { Locale } from '@/lib/i18n';
 import { AppErrorBoundary } from '@/shared/components/error-boundaries';
+import { ToastProvider } from '@/shared/components/ui/toast';
 export function Providers({ children, locale }: { children: React.ReactNode; locale: Locale }) {
   const [client] = useState(() => new QueryClient({ defaultOptions: { queries: { staleTime: 30000, retry: 1 } } }));
   return (
     <LocaleProvider locale={locale}>
       <AppErrorBoundary name="client-root">
-        <QueryClientProvider client={client}>{children}</QueryClientProvider>
+        <QueryClientProvider client={client}>
+          <ToastProvider>{children}</ToastProvider>
+        </QueryClientProvider>
       </AppErrorBoundary>
     </LocaleProvider>
   );

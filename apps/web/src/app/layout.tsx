@@ -5,7 +5,7 @@ import '@fontsource-variable/inter';
 import './globals.css';
 import { Providers } from './providers';
 import { direction, localePath, localeTag, resolveLocale, translate } from '@/lib/i18n';
-import { webConfig } from '@/config';
+import { brandAssets, webConfig } from '@/config';
 import { GoogleAnalytics } from '@/components/analytics/google-analytics';
 export async function generateMetadata(): Promise<Metadata> {
   const value = (await headers()).get('x-lingospeak-locale'),
@@ -17,6 +17,7 @@ export async function generateMetadata(): Promise<Metadata> {
       template: '%s | LingoSpeak',
     },
     description: translate(locale, 'metaDescription'),
+    icons: { icon: brandAssets.mark, apple: brandAssets.mark },
     alternates: { canonical: localePath('/', locale), languages: { 'fa-IR': '/', en: '/en', 'x-default': '/' } },
   };
 }

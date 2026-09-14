@@ -31,6 +31,7 @@ import { ACCESS_TOKEN_KEY } from '@/shared/services/api';
 import { courses } from '@/lib/marketplace-data';
 import { useTranslations } from '@/components/shared/locale-provider';
 import { isDefaultLocale, localePath, localized } from '@/lib/i18n';
+import { featureFlags } from '@/config';
 import { placementRecommendationPaths } from './placement-recommendations';
 
 type PlacementTest = {
@@ -689,12 +690,14 @@ function ResultView({
             >
               {copy('مشاهده دوره‌های پیشنهادی', 'View recommended courses')}
             </Link>
-            <Link
-              href={recommendations.teachers}
-              className="mt-3 flex min-h-12 items-center justify-center rounded-xl border hairline font-bold"
-            >
-              {copy('مشاهده مدرس‌های مرتبط', 'View related teachers')}
-            </Link>
+            {featureFlags.teacherDiscovery && (
+              <Link
+                href={recommendations.teachers}
+                className="mt-3 flex min-h-12 items-center justify-center rounded-xl border hairline font-bold"
+              >
+                {copy('مشاهده مدرس‌های مرتبط', 'View related teachers')}
+              </Link>
+            )}
             {result.authenticated ? (
               <Link
                 href={localePath('/dashboard', locale)}

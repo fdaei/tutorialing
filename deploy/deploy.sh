@@ -365,13 +365,23 @@ phase_migrate() {
 	as_deploy "${COMPOSE[@]}" --profile tools run --rm -T migrate \
 		npx tsx prisma/seed-cms-pages.ts | sed 's/^/     /'
 
+	step "مدرس‌ها و دوره‌های مجموعه"
+	# The institute's real teachers and course catalog. Like the CMS baseline it
+	# creates no demo data and never overwrites rows edited from the admin panel.
+	as_deploy "${COMPOSE[@]}" --profile tools run --rm -T migrate \
+		npx tsx prisma/seed-catalog.ts | sed 's/^/     /'
+
 	step "تأیید: داده‌ی مرجع و صفحه‌های عمومی هستند، داده‌ی دمو نیست"
 	# Every slug the site links to without a guard of its own. A missing row
 	# here is a visible 404, so the deploy stops rather than publishing one.
 	local required_pages=(about how-it-works faq contact terms privacy cancellation-policy become-a-teacher)
 	local users countries published_pages missing_pages
+	# The catalog seed's teacher accounts are expected; anything else means the
+	# demo seed ran.
 	users="$(as_deploy docker exec lingospeak-postgres psql -U "$(read_env POSTGRES_USER)" \
-		-d "$(read_env POSTGRES_DB)" -tAc 'SELECT count(*) FROM "User"' 2>/dev/null || echo '?')"
+		-d "$(read_env POSTGRES_DB)" -tAc \
+		'SELECT count(*) FROM "User" WHERE "id" NOT IN ('"'"'user-teacher-arezoo'"'"', '"'"'user-teacher-shahriar'"'"')' \
+		2>/dev/null || echo '?')"
 	countries="$(as_deploy docker exec lingospeak-postgres psql -U "$(read_env POSTGRES_USER)" \
 		-d "$(read_env POSTGRES_DB)" -tAc 'SELECT count(*) FROM "Country"' 2>/dev/null || echo '?')"
 	# One round trip: the published slugs, newline separated.

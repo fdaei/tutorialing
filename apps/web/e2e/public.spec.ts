@@ -1,4 +1,8 @@
 import { test, expect } from '@playwright/test';
+
+// Must match the value the web server was built with (NEXT_PUBLIC_* is inlined).
+const teacherDiscovery = process.env.NEXT_PUBLIC_FEATURE_TEACHER_DISCOVERY === 'true';
+
 test('public discovery and auth are accessible', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
@@ -6,13 +10,15 @@ test('public discovery and auth are accessible', async ({ page }) => {
   await expect(page.getByText('مدرس تأییدشده', { exact: true }).last()).toBeVisible();
   await expect(page.getByText('+۱۲۰٬۰۰۰')).toHaveCount(0);
   await expect(page.getByText('الهام نادری')).toHaveCount(0);
-  await page.goto('/teachers');
-  await expect(page.getByRole('heading', { level: 1 })).toContainText('مدرسی');
-  await expect(page.getByRole('button', { name: 'جست‌وجو', exact: true })).toBeVisible();
-  await page.goto('/teachers/sara-dadkhah');
-  const guestBooking = page.getByRole('link', { name: 'ورود و انتخاب زمان' });
-  await expect(guestBooking).toBeVisible();
-  await expect(guestBooking).toHaveAttribute('href', /\/auth\?next=%2Fcheckout%3Fteacher%3Dteacher-sara/);
+  if (teacherDiscovery) {
+    await page.goto('/teachers');
+    await expect(page.getByRole('heading', { level: 1 })).toContainText('مدرسی');
+    await expect(page.getByRole('button', { name: 'جست‌وجو', exact: true })).toBeVisible();
+    await page.goto('/teachers/arezoo-ahmadi');
+    const guestBooking = page.getByRole('link', { name: 'ورود و انتخاب زمان' });
+    await expect(guestBooking).toBeVisible();
+    await expect(guestBooking).toHaveAttribute('href', /\/auth\?next=%2Fcheckout%3Fteacher%3Dteacher-arezoo/);
+  }
   await page.goto('/languages');
   await expect(page.getByRole('heading', { name: 'عربی' })).toBeVisible();
   await expect(page.getByRole('link', { name: /دیدن مسیر این زبان/ })).toHaveCount(10);
@@ -26,13 +32,17 @@ test('mobile layout has no horizontal overflow', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 800 });
   await page.goto('/');
   await expect(page.getByText('زبان فعال')).toBeVisible();
-  expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(
+    false,
+  );
 
-  await page.goto('/teachers');
+  await page.goto(teacherDiscovery ? '/teachers' : '/courses');
   const menuButton = page.getByRole('button', { name: 'باز کردن منو' });
   await menuButton.click();
   await expect(menuButton).toHaveAttribute('aria-expanded', 'true');
-  await expect(page.locator('#mobile-main-navigation a[aria-current="page"]')).toContainText('مدرس');
+  await expect(page.locator('#mobile-main-navigation a[aria-current="page"]')).toContainText(
+    teacherDiscovery ? 'مدرس' : 'دوره',
+  );
   await page.keyboard.press('Escape');
   await expect(menuButton).toHaveAttribute('aria-expanded', 'false');
 
@@ -68,29 +78,51 @@ test('English CMS pages preserve localized navigation and metadata', async ({ pa
 test('English course discovery and detail remain localized', async ({ page }) => {
   await page.goto('/en/courses');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Language courses');
-  await expect(page.getByRole('button', { name: 'German' })).toBeVisible();
+  // Language filters are derived from published courses; the catalog is English-only.
+  await expect(page.getByRole('button', { name: 'English' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'View course' }).first()).toHaveAttribute('href', /\/en\/courses\//);
 
-  await page.goto('/en/courses/english-conversation');
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Fluent English conversation');
+  await page.goto('/en/courses/arezoo-ahmadi-general-english-online');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('General English (online)');
   await expect(page.getByRole('heading', { name: 'What will you learn?' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Leave a rating and review' })).toBeVisible();
   await expect(page.getByText('ضمانت بازگشت وجه تا ۷ روز')).toHaveCount(0);
-  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', /\/en\/courses\/english-conversation$/);
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
+    'href',
+    /\/en\/courses\/arezoo-ahmadi-general-english-online$/,
+  );
+});
+
+test('paused teacher discovery is unreachable from the public UI', async ({ page }) => {
+  test.skip(teacherDiscovery, 'teacher discovery is enabled');
+  for (const [from, to] of [
+    ['/teachers', /\/courses$/],
+    ['/teachers/arezoo-ahmadi', /\/courses$/],
+    ['/matching', /\/courses$/],
+    ['/en/teachers', /\/en\/courses$/],
+  ] as const) {
+    await page.goto(from);
+    await expect(page).toHaveURL(to);
+  }
+  await page.goto('/');
+  await expect(page.locator('a[href$="/teachers"], a[href*="/teachers/"], a[href*="/teachers?"]')).toHaveCount(0);
+  await page.goto('/languages/german');
+  await expect(page.getByRole('link', { name: 'پیدا کردن مدرس' })).toHaveCount(0);
 });
 
 test('English teacher discovery and profile preserve booking context', async ({ page }) => {
+  test.skip(!teacherDiscovery, 'teacher discovery is paused');
   await page.goto('/en/teachers');
   await expect(page.getByRole('button', { name: 'Search', exact: true })).toBeVisible();
   await expect(page.getByLabel('Language')).toContainText('German');
   await expect(page.getByLabel('Minimum rating')).toContainText('4 stars and up');
 
-  await page.goto('/en/teachers/sara-dadkhah');
+  await page.goto('/en/teachers/arezoo-ahmadi');
   await expect(page.getByText('Verified LingoSpeak teacher')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'About the teacher' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Learner reviews of this teacher' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Sign in to choose a time' })).toHaveAttribute(
     'href',
-    /\/en\/auth\?next=%2Fen%2Fcheckout%3Fteacher%3Dteacher-sara/,
+    /\/en\/auth\?next=%2Fen%2Fcheckout%3Fteacher%3Dteacher-arezoo/,
   );
 });
