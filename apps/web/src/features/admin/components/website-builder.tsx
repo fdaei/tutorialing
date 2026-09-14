@@ -371,13 +371,14 @@ function MediaField({ label, value, fa, onChange }: { label: string; value: stri
     const input = event.target;
     const file = input.files?.[0];
     if (!file) return;
+    const target = event.currentTarget;
     setBusy(true);
     try {
       const id = await uploadPanelFile(file, 'website-media', fa);
       onChange(`media:${id}`);
     } finally {
       setBusy(false);
-      input.value = '';
+      target.value = '';
     }
   }} /></label></div>;
 }

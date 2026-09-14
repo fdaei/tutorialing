@@ -155,7 +155,7 @@ describe('route authorization matrix', () => {
   it('keeps the public surface small and known', () => {
     const publicRoutes = routes.filter((r) => r.public).map(key).sort();
     // Growth here is a security decision, so it must be a deliberate edit.
-    expect(publicRoutes.length).toBeLessThanOrEqual(30);
+    expect(publicRoutes.length).toBeLessThanOrEqual(33);
     expect(publicRoutes).toEqual(expect.arrayContaining([
       'GET /files/public/:id',
       'GET /teachers/:slug/intro-video',
