@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 750" width="1200" height="750">
+<defs><linearGradient id="c7" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#047857"/><stop offset="1" stop-color="#10b981"/></linearGradient>
+<pattern id="c7d" width="28" height="28" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="2" fill="#fff" opacity=".22"/></pattern></defs>
+<rect width="1200" height="750" fill="url(#c7)"/>
+<circle cx="980" cy="120" r="260" fill="#fff" opacity=".1"/><circle cx="220" cy="700" r="180" fill="#fff" opacity=".08"/>
+<rect x="60" y="520" width="280" height="170" fill="url(#c7d)"/>
+<g transform="translate(600 375) rotate(-3)">
+<rect x="-420" y="-190" width="840" height="380" rx="44" fill="#fff"/>
+<path d="M-330 0 l45 45 l90 -100" fill="none" stroke="#047857" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="-130" y="0" font-family="Inter, 'Segoe UI', Arial, sans-serif" font-size="54" font-weight="800" fill="#047857" letter-spacing="-1">Writing Correction</text>
+<text x="-130" y="62" font-family="Inter, 'Segoe UI', Arial, sans-serif" font-size="34" font-weight="600" fill="#475569">Band-descriptor feedback</text>
+</g></svg>

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 750" width="1200" height="750">
+<defs>
+<linearGradient id="g2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4f46e5"/><stop offset="1" stop-color="#7c6cf6"/></linearGradient>
+<pattern id="g2d" width="28" height="28" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="2" fill="#fff" opacity=".22"/></pattern>
+</defs>
+<rect width="1200" height="750" fill="url(#g2)"/>
+<circle cx="980" cy="120" r="260" fill="#fff" opacity=".1"/>
+<circle cx="220" cy="700" r="180" fill="#fff" opacity=".08"/>
+<rect x="60" y="520" width="280" height="170" fill="url(#g2d)"/>
+<g transform="translate(600 375) rotate(-3)">
+<rect x="-400" y="-190" width="800" height="380" rx="44" fill="#eef0ff"/>
+<rect x="-400" y="-190" width="800" height="380" rx="44" fill="none" stroke="#fff" stroke-opacity=".7" stroke-width="3"/>
+<g transform="translate(-230 0)"><rect x="-84" y="32" width="20" height="18" rx="5" fill="#4f46e5" opacity="0.35"/><rect x="-54" y="14" width="20" height="36" rx="5" fill="#4f46e5" opacity="0.48"/><rect x="-24" y="-4" width="20" height="54" rx="5" fill="#4f46e5" opacity="0.61"/><rect x="6" y="-22" width="20" height="72" rx="5" fill="#4f46e5" opacity="0.74"/><rect x="36" y="-40" width="20" height="90" rx="5" fill="#4f46e5" opacity="0.87"/><rect x="66" y="-58" width="20" height="108" rx="5" fill="#4f46e5" opacity="1"/></g>
+<text x="-80" y="22" font-family="Inter, 'Segoe UI', Arial, sans-serif" font-size="76" font-weight="800" fill="#4f46e5" letter-spacing="-1">A1 → C2</text>
+<rect x="-80" y="58" width="182" height="12" rx="6" fill="#7c6cf6" opacity=".55"/>
+</g>
+</svg>

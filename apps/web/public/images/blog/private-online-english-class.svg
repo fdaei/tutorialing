@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 750" width="1200" height="750">
+<defs>
+<linearGradient id="g1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4f46e5"/><stop offset="1" stop-color="#7c6cf6"/></linearGradient>
+<pattern id="g1d" width="28" height="28" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="2" fill="#fff" opacity=".22"/></pattern>
+</defs>
+<rect width="1200" height="750" fill="url(#g1)"/>
+<circle cx="220" cy="640" r="260" fill="#fff" opacity=".1"/>
+<circle cx="980" cy="80" r="180" fill="#fff" opacity=".08"/>
+<rect x="860" y="60" width="280" height="170" fill="url(#g1d)"/>
+<g transform="translate(600 375) rotate(3)">
+<rect x="-400" y="-190" width="800" height="380" rx="44" fill="#eef0ff"/>
+<rect x="-400" y="-190" width="800" height="380" rx="44" fill="none" stroke="#fff" stroke-opacity=".7" stroke-width="3"/>
+<g transform="translate(-230 0)"><rect x="-70" y="-50" width="140" height="92" rx="10" fill="none" stroke="#4f46e5" stroke-width="12"/><path d="M-92 62 H92" stroke="#4f46e5" stroke-width="14" stroke-linecap="round"/><circle cx="0" cy="-6" r="18" fill="#4f46e5"/></g>
+<text x="-80" y="22" font-family="Inter, 'Segoe UI', Arial, sans-serif" font-size="76" font-weight="800" fill="#4f46e5" letter-spacing="-1">1 : 1</text>
+<rect x="-80" y="58" width="130" height="12" rx="6" fill="#7c6cf6" opacity=".55"/>
+</g>
+</svg>

@@ -40,7 +40,7 @@ export default {
         brand: '0 14px 36px rgba(79,70,229,.22)',
       },
       borderRadius: { '4xl': '1.5rem' },
-      fontFamily: { sans: ['Vazirmatn Variable', 'Vazirmatn', 'Tahoma', 'sans-serif'] },
+      fontFamily: { sans: ['var(--site-font-fa)', 'Vazirmatn Variable', 'Vazirmatn', 'Tahoma', 'sans-serif'] },
       // Type scale tuned for Vazirmatn: Persian needs taller line boxes than Latin.
       fontSize: {
         caption: ['0.75rem', { lineHeight: '1.25rem' }],

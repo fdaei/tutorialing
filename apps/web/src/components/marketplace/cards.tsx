@@ -2,16 +2,20 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { ArrowLeft, BookOpen, Clock3, Star, Users } from 'lucide-react';
+import { ArrowLeft, BookOpen, Clock3, MapPin, Star, Users, Video } from 'lucide-react';
 import type { BlogPost, Course, Language, Teacher } from '@/lib/marketplace-data';
 import { useTranslations } from '@/components/shared/locale-provider';
 import { localePath } from '@/lib/i18n';
-import { localizedCourseLanguage } from '@/features/courses/course-localization';
+import {
+  courseBlurb,
+  localizedCourseCategory,
+  localizedCourseDelivery,
+  localizedCourseLanguage,
+  localizedCourseLevel,
+} from '@/features/courses/course-localization';
 
 const money = (value: number, locale: 'fa' | 'en') =>
-  locale === 'fa'
-    ? `${value.toLocaleString('fa-IR')} تومان`
-    : `${value.toLocaleString('en-US')} Toman`;
+  locale === 'fa' ? `${value.toLocaleString('fa-IR')} تومان` : `${value.toLocaleString('en-US')} Toman`;
 
 export function LanguageCard({ language }: { language: Language }) {
   return (
@@ -85,7 +89,8 @@ export function TeacherMarketCard({ teacher }: { teacher: Teacher }) {
         </div>
         <div className="mt-5 flex items-center justify-between border-t hairline pt-4">
           <span className="text-sm font-black">
-            {money(teacher.price, locale)} <small className="font-normal text-muted">/ {locale === 'en' ? 'lesson' : 'جلسه'}</small>
+            {money(teacher.price, locale)}{' '}
+            <small className="font-normal text-muted">/ {locale === 'en' ? 'lesson' : 'جلسه'}</small>
           </span>
           <Link href={`/teachers/${teacher.slug}`} className="text-sm font-black text-purple">
             مشاهده پروفایل
@@ -99,53 +104,80 @@ export function TeacherMarketCard({ teacher }: { teacher: Teacher }) {
 export function CourseCard({ course }: { course: Course }) {
   const { locale } = useTranslations();
   const english = locale === 'en';
-  const title = (english ? course.titleEn : course.titleFa) ?? course.title ?? (english ? 'Language course' : 'دوره زبان'),
+  const title =
+      (english ? course.titleEn : course.titleFa) ?? course.title ?? (english ? 'Language course' : 'دوره زبان'),
     teacher = course.teacherName ?? course.teacher ?? (english ? 'LingoSpeak' : 'لینگواسپیک'),
-    lessons = course.lessonsCount ?? course.lessons ?? 0;
+    lessons = course.lessonsCount ?? course.lessons ?? 0,
+    duration = english ? course.durationEn : course.durationFa,
+    blurb = courseBlurb(english ? course.descriptionEn : course.descriptionFa);
+  const href = localePath(`/courses/${course.slug}`, locale);
   return (
-    <article className="market-card lift overflow-hidden">
-      <div className="relative h-40 bg-indigo-50">
-        {course.image && (
+    <article className="market-card lift flex flex-col overflow-hidden">
+      <Link href={href} tabIndex={-1} aria-hidden="true" className="relative block aspect-[8/5] bg-indigo-50">
+        {course.image ? (
           <Image
             src={course.image}
-            alt={english ? `Course cover for ${title}` : `تصویر دوره ${title}`}
+            alt=""
             fill
-            sizes="(min-width:1024px) 25vw, 100vw"
+            sizes="(min-width:1024px) 33vw, (min-width:640px) 50vw, 100vw"
             className="object-cover"
           />
+        ) : (
+          <span className="grid h-full place-items-center text-purple">
+            <BookOpen size={36} />
+          </span>
         )}
-        <span className="absolute right-3 top-3 rounded-full bg-white/95 px-3 py-1 text-xs font-black">
-          {course.flag} {localizedCourseLanguage(course.language, locale)}
+        <span className="absolute right-3 top-3 rounded-full bg-white/95 px-3 py-1 text-xs font-black text-navy">
+          {course.category
+            ? localizedCourseCategory(course.category, locale)
+            : `${course.flag ?? ''} ${localizedCourseLanguage(course.language, locale)}`.trim()}
         </span>
-        <span className="absolute left-3 top-3 rounded-full bg-purple px-3 py-1 text-xs font-bold text-white">
-          {course.level}
+        <span className="latin absolute left-3 top-3 rounded-full bg-purple px-3 py-1 text-xs font-bold text-white">
+          {localizedCourseLevel(course.level, locale)}
         </span>
-      </div>
-      <div className="p-5">
-        <h3 className="font-black">{title}</h3>
-        <p className="mt-2 text-xs text-muted">{english ? 'Teacher' : 'مدرس'}: {teacher}</p>
-        <div className="mt-4 flex flex-wrap gap-4 text-xs text-muted">
-          <span className="flex items-center gap-1 font-bold text-navy">
+      </Link>
+      <div className="flex flex-1 flex-col p-5">
+        <h3 className="font-black leading-7">
+          <Link href={href} className="hover:text-purple">
+            {title}
+          </Link>
+        </h3>
+        <p className="mt-1 text-xs text-muted">
+          {english ? 'Teacher' : 'مدرس'}: {teacher}
+        </p>
+        {blurb && <p className="mt-3 line-clamp-3 text-sm leading-7 text-muted">{blurb}</p>}
+        <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-xs text-muted">
+          {course.delivery && (
+            <span className="flex items-center gap-1">
+              {course.delivery === 'IN_PERSON' ? <MapPin size={14} /> : <Video size={14} />}
+              {localizedCourseDelivery(course.delivery, locale)}
+            </span>
+          )}
+          <span className="flex items-center gap-1">
+            <Clock3 size={14} />
+            {duration || `${lessons.toLocaleString(english ? 'en-US' : 'fa-IR')} ${english ? 'lessons' : 'جلسه'}`}
+          </span>
+          <span className="flex items-center gap-1">
             <Star size={14} className="fill-amber-400 text-amber-400" />
             {course.reviewsCount ? (
               <>
-                {course.rating}{' '}
-                <span className="font-normal text-muted">({course.reviewsCount.toLocaleString(english ? 'en-US' : 'fa-IR')} {english ? 'reviews' : 'نظر'})</span>
+                <span className="font-bold text-navy">{course.rating}</span>(
+                {course.reviewsCount.toLocaleString(english ? 'en-US' : 'fa-IR')})
               </>
+            ) : english ? (
+              'New'
             ) : (
-              english ? 'No ratings yet' : 'هنوز امتیازی ثبت نشده'
+              'جدید'
             )}
           </span>
-          <span className="flex items-center gap-1">
-            <BookOpen size={14} />
-            {lessons.toLocaleString(english ? 'en-US' : 'fa-IR')} {english ? 'lessons' : 'جلسه'}
-          </span>
         </div>
-        <div className="mt-5 flex items-center justify-between border-t hairline pt-4">
-          <strong className="text-sm">{money(course.price, locale)}</strong>
-          <Link href={localePath(`/courses/${course.slug}`, locale)} className="text-sm font-black text-purple">
-            {english ? 'View course' : 'مشاهده دوره'}
-          </Link>
+        <div className="mt-auto pt-5">
+          <div className="flex items-center justify-between border-t hairline pt-4">
+            <strong className="text-sm">{money(course.price, locale)}</strong>
+            <Link href={href} className="text-sm font-black text-purple">
+              {english ? 'View course' : 'مشاهده دوره'}
+            </Link>
+          </div>
         </div>
       </div>
     </article>
@@ -183,7 +215,8 @@ export function BlogCard({ post }: { post: BlogPost }) {
           href={localePath(`/blog/${post.slug}`, locale)}
           className="mt-4 inline-flex items-center gap-2 text-sm font-black text-purple"
         >
-          {english ? 'Read article' : 'مطالعه مقاله'} <ArrowLeft className={english ? 'rotate-180' : undefined} size={15} />
+          {english ? 'Read article' : 'مطالعه مقاله'}{' '}
+          <ArrowLeft className={english ? 'rotate-180' : undefined} size={15} />
         </Link>
       </div>
     </article>

@@ -76,7 +76,9 @@ export async function seedBlogPosts(db: PrismaClient, { authorId, overwrite = fa
     });
     // Stagger publication dates so the magazine reads as an archive, newest first.
     const publishedAt = new Date(now.getTime() - index * 3 * DAY_MS);
-    const data = { ...post, categoryId, status: BlogPostStatus.PUBLISHED, publishedAt };
+    // Covers ship as static files in apps/web/public/images/blog, one per slug.
+    const coverImage = `/images/blog/${post.slug}.svg`;
+    const data = { ...post, coverImage, categoryId, status: BlogPostStatus.PUBLISHED, publishedAt };
 
     await db.blogPost.upsert({
       where: { slug: post.slug },

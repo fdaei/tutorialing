@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 750" width="1200" height="750">
+<defs>
+<linearGradient id="g11" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0f766e"/><stop offset="1" stop-color="#2dd4bf"/></linearGradient>
+<pattern id="g11d" width="28" height="28" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="2" fill="#fff" opacity=".22"/></pattern>
+</defs>
+<rect width="1200" height="750" fill="url(#g11)"/>
+<circle cx="220" cy="640" r="260" fill="#fff" opacity=".1"/>
+<circle cx="980" cy="80" r="180" fill="#fff" opacity=".08"/>
+<rect x="860" y="60" width="280" height="170" fill="url(#g11d)"/>
+<g transform="translate(600 375) rotate(3)">
+<rect x="-400" y="-190" width="800" height="380" rx="44" fill="#e7faf6"/>
+<rect x="-400" y="-190" width="800" height="380" rx="44" fill="none" stroke="#fff" stroke-opacity=".7" stroke-width="3"/>
+<g transform="translate(-230 0)"><rect x="-86" y="-50" width="100" height="120" rx="14" fill="#0f766e" opacity=".4" transform="rotate(-10)"/><rect x="-20" y="-60" width="100" height="120" rx="14" fill="#0f766e" transform="rotate(8)"/></g>
+<text x="-80" y="22" font-family="Inter, 'Segoe UI', Arial, sans-serif" font-size="76" font-weight="800" fill="#0f766e" letter-spacing="-1">Aa  Bb  Cc</text>
+<rect x="-80" y="58" width="260" height="12" rx="6" fill="#2dd4bf" opacity=".55"/>
+</g>
+</svg>

@@ -26,6 +26,16 @@ export type Course = {
   lessonsCount?: number;
   price: number;
   image: string | null;
+  summaryFa?: string | null;
+  summaryEn?: string | null;
+  category?: string | null;
+  delivery?: 'ONLINE' | 'IN_PERSON' | 'HYBRID' | string | null;
+  durationFa?: string | null;
+  durationEn?: string | null;
+  outcomesFa?: string[];
+  outcomesEn?: string[];
+  audienceFa?: string[];
+  audienceEn?: string[];
 };
 export type Teacher = {
   slug: string;

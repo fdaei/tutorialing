@@ -2,7 +2,18 @@ import Image from 'next/image';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { BookOpen, Check, ChevronLeft, Clock3, FileText, GraduationCap, PlayCircle, Star } from 'lucide-react';
+import {
+  BookOpen,
+  Check,
+  ChevronLeft,
+  Clock3,
+  GraduationCap,
+  MapPin,
+  PlayCircle,
+  Star,
+  Users,
+  Video,
+} from 'lucide-react';
 import { Footer, Header } from '@/components/layout/site';
 import { CourseCard } from '@/components/marketplace/cards';
 import { ReviewSection, type PublicReview } from '@/components/reviews/review-section';
@@ -11,7 +22,13 @@ import { ApiError, publicApi } from '@/shared/services/api';
 import { publicPageMetadata } from '@/lib/public-metadata';
 import { requestLocale } from '@/lib/server-locale';
 import { formatNumber, localePath, localized } from '@/lib/i18n';
-import { localizedCourseLanguage } from '@/features/courses/course-localization';
+import {
+  courseBlurb,
+  localizedCourseCategory,
+  localizedCourseDelivery,
+  localizedCourseLanguage,
+  localizedCourseLevel,
+} from '@/features/courses/course-localization';
 import { CourseEnrollmentCta } from '@/features/courses/components/course-enrollment-cta';
 import type { CourseChapter } from '@/features/courses/course-types';
 
@@ -52,7 +69,6 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
     throw error;
   }
   const courses = await publicApi<Course[]>('/courses').catch(() => []);
-  const related = courses.filter((item) => item.slug !== slug).slice(0, 3);
   const english = locale === 'en';
   const t = (fa: string, en: string) => (english ? en : fa);
   const title = (english ? course.titleEn : course.titleFa) ?? course.title ?? t('دوره زبان', 'Language course');
@@ -60,19 +76,15 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
   const language = localizedCourseLanguage(course.language, locale);
   const lessons = course.lessonsCount ?? course.lessons ?? 0;
   const teacher = course.teacherName ?? course.teacher ?? t('تیم لینگواسپیک', 'LingoSpeak team');
-  const outcomes = english
-    ? [
-        'Speak more fluently in real situations',
-        'Practise with a clear purpose',
-        'Receive regular feedback on what to improve',
-        'Know what to learn next',
-      ]
-    : [
-        'مکالمه روان‌تر در موقعیت‌های واقعی',
-        'تمرین هدفمند بدون سردرگمی',
-        'بازخورد منظم روی نقاط قابل بهبود',
-        'مسیر روشن برای ادامه یادگیری',
-      ];
+  const outcomes = (english ? course.outcomesEn : course.outcomesFa) ?? [];
+  const audience = (english ? course.audienceEn : course.audienceFa) ?? [];
+  const paragraphs = description.split(/\n\s*\n/).filter((item) => item.trim());
+  const duration = english ? course.durationEn : course.durationFa;
+  const category = course.category ? localizedCourseCategory(course.category, locale) : language;
+  const related = courses
+    .filter((item) => item.slug !== slug)
+    .sort((a, b) => Number(b.category === course.category) - Number(a.category === course.category))
+    .slice(0, 3);
   return (
     <>
       <Header />
@@ -83,13 +95,13 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
               <nav className="mb-5 flex items-center gap-2 text-xs text-white/60">
                 <Link href={localePath('/courses', locale)}>{t('دوره‌ها', 'Courses')}</Link>
                 <ChevronLeft className={english ? 'rotate-180' : undefined} size={14} />
-                <span>{language}</span>
+                <span>{category}</span>
               </nav>
               <span className="inline-flex rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-bold text-white">
-                {language} · {t('سطح', 'Level')} {course.level}
+                {category} · {localizedCourseLevel(course.level, locale)}
               </span>
               <h1 className="mt-5 max-w-3xl text-4xl font-black leading-[1.35] text-white md:text-5xl">{title}</h1>
-              <p className="mt-4 max-w-2xl text-base leading-8 text-white/70">{description}</p>
+              <p className="mt-4 max-w-2xl text-base leading-8 text-white/70">{courseBlurb(description)}</p>
               <div className="mt-6 flex flex-wrap gap-5 text-sm text-white/80">
                 <span className="flex items-center gap-2">
                   <Star className="fill-amber-400 text-amber-400" size={18} />
@@ -99,8 +111,14 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
                 </span>
                 <span className="flex items-center gap-2">
                   <Clock3 size={18} />
-                  {formatNumber(lessons, locale)} {t('درس', 'lessons')}
+                  {duration || `${formatNumber(lessons, locale)} ${t('جلسه', 'sessions')}`}
                 </span>
+                {course.delivery && (
+                  <span className="flex items-center gap-2">
+                    {course.delivery === 'IN_PERSON' ? <MapPin size={18} /> : <Video size={18} />}
+                    {localizedCourseDelivery(course.delivery, locale)}
+                  </span>
+                )}
               </div>
             </div>
             <div className="course-purchase-card">
@@ -121,9 +139,23 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
               </strong>
               <CourseEnrollmentCta slug={course.slug} />
               <ul className="mt-5 grid gap-3 text-sm text-muted">
+                {duration && (
+                  <li className="flex items-center gap-2">
+                    <Clock3 size={17} />
+                    {duration}
+                  </li>
+                )}
+                {course.delivery && (
+                  <li className="flex items-center gap-2">
+                    {course.delivery === 'IN_PERSON' ? <MapPin size={17} /> : <Video size={17} />}
+                    {course.delivery === 'IN_PERSON'
+                      ? t('برگزاری حضوری در آموزشگاه', 'Held in person at the institute')
+                      : t('برگزاری آنلاین و زنده', 'Live online sessions')}
+                  </li>
+                )}
                 <li className="flex items-center gap-2">
-                  <FileText size={17} />
-                  {formatNumber(lessons, locale)} {t('درس و فایل تمرینی', 'lessons and practice materials')}
+                  <GraduationCap size={17} />
+                  {t('مدرس', 'Teacher')}: {teacher}
                 </li>
               </ul>
             </div>
@@ -132,77 +164,105 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
         <div className="page-shell grid gap-8 py-12 lg:grid-cols-[1fr_320px]">
           <div className="grid gap-8">
             <section className="surface-card p-6 md:p-8">
-              <h2 className="text-2xl font-black">{t('در این دوره چه یاد می‌گیرید؟', 'What will you learn?')}</h2>
-              <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                {outcomes.map((item) => (
-                  <p key={item} className="flex items-start gap-3 text-sm leading-7">
-                    <Check className="mt-1 shrink-0 text-green" size={19} />
-                    {item}
-                  </p>
+              <p className="text-sm font-black text-purple">{t('درباره دوره', 'About this course')}</p>
+              <h2 className="mt-2 text-2xl font-black">{title}</h2>
+              <div className="mt-4 grid gap-4 leading-9 text-muted">
+                {paragraphs.map((paragraph) => (
+                  <p key={paragraph}>{paragraph}</p>
                 ))}
               </div>
-            </section>
-            <section>
-              <p className="text-sm font-black text-purple">{t('برنامه دوره', 'Curriculum')}</p>
-              <h2 className="mt-2 text-2xl font-black">{t('فصل‌ها و درس‌ها', 'Chapters and lessons')}</h2>
-              <div className="mt-5 grid gap-3">
-                {course.chapters.length ? (
-                  course.chapters.map((chapter, chapterIndex) => (
-                    <details key={chapter.id} open={chapterIndex === 0} className="surface-card group overflow-hidden">
-                      <summary className="flex cursor-pointer list-none items-center gap-4 p-5">
-                        <span className="grid size-10 place-items-center rounded-xl bg-lavender font-black text-purple">
-                          {(chapterIndex + 1).toLocaleString(english ? 'en-US' : 'fa-IR')}
-                        </span>
-                        <strong className="flex-1">
-                          {localized({ fa: chapter.titleFa, en: chapter.titleEn }, locale)}
-                        </strong>
-                        <ChevronLeft
-                          className={`text-muted transition group-open:-rotate-90 ${english ? 'rotate-180' : ''}`}
-                          size={18}
-                        />
-                      </summary>
-                      <div className="border-t hairline bg-[#fbfbfe] px-5 py-2">
-                        {chapter.lessons.map((lesson) => (
-                          <div
-                            key={lesson.id}
-                            className="flex items-center gap-3 border-b hairline py-3 text-sm last:border-0"
-                          >
-                            <PlayCircle size={17} className="text-purple" />
-                            <span className="flex-1">
-                              {localized({ fa: lesson.titleFa, en: lesson.titleEn }, locale)}
-                            </span>
-                            <small className="text-muted">
-                              {Math.max(1, Math.round(lesson.durationSeconds / 60)).toLocaleString(
-                                english ? 'en-US' : 'fa-IR',
-                              )}{' '}
-                              {t('دقیقه', 'min')}
-                            </small>
-                          </div>
-                        ))}
-                      </div>
-                    </details>
-                  ))
-                ) : (
-                  <div className="rounded-2xl border border-dashed hairline p-8 text-center text-muted">
-                    {t('سرفصل دوره در حال تکمیل است.', 'The curriculum is being prepared.')}
-                  </div>
-                )}
-              </div>
-            </section>
-            <section className="surface-card p-6 md:p-8">
-              <p className="text-sm font-black text-purple">{t('درباره دوره', 'About this course')}</p>
-              <h2 className="mt-2 text-2xl font-black">
-                {t('یک مسیر منظم و قابل پیگیری', 'A structured route you can follow')}
-              </h2>
-              <p className="mt-4 leading-9 text-muted">{description}</p>
               <div className="mt-6 flex flex-wrap gap-3 text-sm">
                 <span className="chip">
                   <BookOpen size={16} />
-                  {formatNumber(lessons, locale)} {t('درس', 'lessons')}
+                  {course.category === 'writing-correction'
+                    ? `${formatNumber(lessons, locale)} ${t('رایتینگ', 'essays')}`
+                    : `${formatNumber(lessons, locale)} ${t('جلسه', 'sessions')}`}
                 </span>
-                <span className="chip latin">Level {course.level}</span>
+                <span className="chip">{localizedCourseLevel(course.level, locale)}</span>
+                {course.delivery && <span className="chip">{localizedCourseDelivery(course.delivery, locale)}</span>}
               </div>
             </section>
+            {outcomes.length > 0 && (
+              <section className="surface-card p-6 md:p-8">
+                <h2 className="text-2xl font-black">{t('در این دوره چه یاد می‌گیرید؟', 'What will you learn?')}</h2>
+                <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                  {outcomes.map((item) => (
+                    <p key={item} className="flex items-start gap-3 text-sm leading-7">
+                      <Check className="mt-1 shrink-0 text-green" size={19} />
+                      {item}
+                    </p>
+                  ))}
+                </div>
+              </section>
+            )}
+            {audience.length > 0 && (
+              <section className="surface-card p-6 md:p-8">
+                <h2 className="text-2xl font-black">
+                  {t('این دوره برای چه کسانی مناسب است؟', 'Who is this course for?')}
+                </h2>
+                <ul className="mt-6 grid gap-3">
+                  {audience.map((item) => (
+                    <li key={item} className="flex items-start gap-3 text-sm leading-7">
+                      <Users className="mt-1 shrink-0 text-purple" size={18} />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+            {course.chapters.length > 0 && (
+              <section>
+                <p className="text-sm font-black text-purple">{t('برنامه دوره', 'Curriculum')}</p>
+                <h2 className="mt-2 text-2xl font-black">{t('فصل‌ها و درس‌ها', 'Chapters and lessons')}</h2>
+                <div className="mt-5 grid gap-3">
+                  {course.chapters.length ? (
+                    course.chapters.map((chapter, chapterIndex) => (
+                      <details
+                        key={chapter.id}
+                        open={chapterIndex === 0}
+                        className="surface-card group overflow-hidden"
+                      >
+                        <summary className="flex cursor-pointer list-none items-center gap-4 p-5">
+                          <span className="grid size-10 place-items-center rounded-xl bg-lavender font-black text-purple">
+                            {(chapterIndex + 1).toLocaleString(english ? 'en-US' : 'fa-IR')}
+                          </span>
+                          <strong className="flex-1">
+                            {localized({ fa: chapter.titleFa, en: chapter.titleEn }, locale)}
+                          </strong>
+                          <ChevronLeft
+                            className={`text-muted transition group-open:-rotate-90 ${english ? 'rotate-180' : ''}`}
+                            size={18}
+                          />
+                        </summary>
+                        <div className="border-t hairline bg-[#fbfbfe] px-5 py-2">
+                          {chapter.lessons.map((lesson) => (
+                            <div
+                              key={lesson.id}
+                              className="flex items-center gap-3 border-b hairline py-3 text-sm last:border-0"
+                            >
+                              <PlayCircle size={17} className="text-purple" />
+                              <span className="flex-1">
+                                {localized({ fa: lesson.titleFa, en: lesson.titleEn }, locale)}
+                              </span>
+                              <small className="text-muted">
+                                {Math.max(1, Math.round(lesson.durationSeconds / 60)).toLocaleString(
+                                  english ? 'en-US' : 'fa-IR',
+                                )}{' '}
+                                {t('دقیقه', 'min')}
+                              </small>
+                            </div>
+                          ))}
+                        </div>
+                      </details>
+                    ))
+                  ) : (
+                    <div className="rounded-2xl border border-dashed hairline p-8 text-center text-muted">
+                      {t('سرفصل دوره در حال تکمیل است.', 'The curriculum is being prepared.')}
+                    </div>
+                  )}
+                </div>
+              </section>
+            )}
           </div>
           <aside>
             <div className="surface-card p-6 lg:sticky lg:top-24">
@@ -214,14 +274,14 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
                 <div>
                   <strong>{teacher}</strong>
                   <p className="mt-1 text-xs text-muted">
-                    {t('مدرس', 'Teacher of')} {language}
+                    {t('مدرس زبان', 'Teacher of')} {language}
                   </p>
                 </div>
               </div>
               <p className="mt-5 text-sm leading-7 text-muted">
                 {t(
-                  'محتوا با تمرکز بر تمرین کاربردی و بازخورد روشن طراحی شده است.',
-                  'The course focuses on practical exercises and clear feedback.',
+                  'جلسات با تمرکز بر تمرین کاربردی و بازخورد روشن برگزار می‌شود.',
+                  'Sessions focus on practical exercises and clear feedback.',
                 )}
               </p>
             </div>

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 750" width="1200" height="750">
+<defs>
+<linearGradient id="g19" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0f766e"/><stop offset="1" stop-color="#2dd4bf"/></linearGradient>
+<pattern id="g19d" width="28" height="28" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="2" fill="#fff" opacity=".22"/></pattern>
+</defs>
+<rect width="1200" height="750" fill="url(#g19)"/>
+<circle cx="220" cy="640" r="260" fill="#fff" opacity=".1"/>
+<circle cx="980" cy="80" r="180" fill="#fff" opacity=".08"/>
+<rect x="860" y="60" width="280" height="170" fill="url(#g19d)"/>
+<g transform="translate(600 375) rotate(3)">
+<rect x="-400" y="-190" width="800" height="380" rx="44" fill="#e7faf6"/>
+<rect x="-400" y="-190" width="800" height="380" rx="44" fill="none" stroke="#fff" stroke-opacity=".7" stroke-width="3"/>
+<g transform="translate(-230 0)"><path d="M0 72 V-10" stroke="#0f766e" stroke-width="12" stroke-linecap="round"/><path d="M0 -4 C-10 -60 -70 -70 -86 -52 C-80 -12 -30 4 0 -4Z" fill="#0f766e"/><path d="M0 22 C14 -30 74 -38 88 -18 C78 20 30 32 0 22Z" fill="#0f766e" opacity=".5"/></g>
+<text x="-80" y="22" font-family="Inter, 'Segoe UI', Arial, sans-serif" font-size="58" font-weight="800" fill="#0f766e" letter-spacing="-1">Never too late</text>
+<rect x="-80" y="58" width="320" height="12" rx="6" fill="#2dd4bf" opacity=".55"/>
+</g>
+</svg>

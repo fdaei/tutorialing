@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 750" width="1200" height="750">
+<defs>
+<linearGradient id="g5" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#b45309"/><stop offset="1" stop-color="#f59e0b"/></linearGradient>
+<pattern id="g5d" width="28" height="28" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="2" fill="#fff" opacity=".22"/></pattern>
+</defs>
+<rect width="1200" height="750" fill="url(#g5)"/>
+<circle cx="220" cy="640" r="260" fill="#fff" opacity=".1"/>
+<circle cx="980" cy="80" r="180" fill="#fff" opacity=".08"/>
+<rect x="860" y="60" width="280" height="170" fill="url(#g5d)"/>
+<g transform="translate(600 375) rotate(3)">
+<rect x="-400" y="-190" width="800" height="380" rx="44" fill="#fff7e6"/>
+<rect x="-400" y="-190" width="800" height="380" rx="44" fill="none" stroke="#fff" stroke-opacity=".7" stroke-width="3"/>
+<g transform="translate(-230 0)"><path d="M-60 -70 V74" stroke="#b45309" stroke-width="12" stroke-linecap="round"/><path d="M-54 -64 C-10 -84 20 -44 76 -60 V20 C20 36 -10 -4 -54 16Z" fill="#b45309"/></g>
+<text x="-80" y="22" font-family="Inter, 'Segoe UI', Arial, sans-serif" font-size="76" font-weight="800" fill="#b45309" letter-spacing="-1">Hallo!</text>
+<rect x="-80" y="58" width="156" height="12" rx="6" fill="#f59e0b" opacity=".55"/>
+</g>
+</svg>

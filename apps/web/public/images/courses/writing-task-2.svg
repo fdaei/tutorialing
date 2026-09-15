@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 750" width="1200" height="750">
+<defs><linearGradient id="c6" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9f1239"/><stop offset="1" stop-color="#e11d48"/></linearGradient>
+<pattern id="c6d" width="28" height="28" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="2" fill="#fff" opacity=".22"/></pattern></defs>
+<rect width="1200" height="750" fill="url(#c6)"/>
+<circle cx="980" cy="120" r="260" fill="#fff" opacity=".1"/><circle cx="220" cy="700" r="180" fill="#fff" opacity=".08"/>
+<rect x="60" y="520" width="280" height="170" fill="url(#c6d)"/>
+<g transform="translate(600 375) rotate(-3)">
+<rect x="-420" y="-190" width="840" height="380" rx="44" fill="#fff"/>
+<rect x="-320" y="-70" width="120" height="150" rx="12" fill="#9f1239"/><path d="M-300 -35 h80 M-300 -5 h80 M-300 25 h80 M-300 55 h45" stroke="#fff" stroke-width="9" stroke-linecap="round"/>
+<text x="-130" y="0" font-family="Inter, 'Segoe UI', Arial, sans-serif" font-size="64" font-weight="800" fill="#9f1239" letter-spacing="-1">Writing Task 2</text>
+<text x="-130" y="62" font-family="Inter, 'Segoe UI', Arial, sans-serif" font-size="34" font-weight="600" fill="#475569">Academic essay</text>
+</g></svg>

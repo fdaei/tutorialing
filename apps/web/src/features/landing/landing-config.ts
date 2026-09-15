@@ -119,8 +119,21 @@ export type LandingConfig = {
     radius: string;
     shadow: string;
     containerWidth: string;
+    /** Persian UI font; one of SITE_FONTS. */
+    fontFamily: SiteFont;
+    /** Root font size in px (14–19). */
+    baseFontSize: string;
+    headingWeight: string;
   };
 };
+
+export const SITE_FONTS = {
+  vazirmatn: { label: 'Vazirmatn', stack: "'Vazirmatn Variable', Vazirmatn, Tahoma, sans-serif" },
+  estedad: { label: 'Estedad', stack: "'Estedad Variable', 'Vazirmatn Variable', Tahoma, sans-serif" },
+  noto: { label: 'Noto Sans Arabic', stack: "'Noto Sans Arabic Variable', 'Vazirmatn Variable', Tahoma, sans-serif" },
+} as const;
+export type SiteFont = keyof typeof SITE_FONTS;
+export const HEADING_WEIGHTS = ['600', '700', '750', '800', '900'] as const;
 
 const text = (fa: string, en: string): LocaleText => ({ fa, en });
 
@@ -302,6 +315,9 @@ export const defaultLandingConfig: LandingConfig = {
     radius: '24px',
     shadow: '0 18px 55px rgba(48, 31, 112, 0.09)',
     containerWidth: '1240px',
+    fontFamily: 'vazirmatn',
+    baseFontSize: '16px',
+    headingWeight: '750',
   },
 };
 
@@ -456,8 +472,29 @@ export function normalizeLandingConfig(value: unknown): LandingConfig {
       columns: Array.isArray(footer.columns) ? footer.columns as LandingConfig['footer']['columns'] : defaultLandingConfig.footer.columns,
     },
     sections: normalizedSections,
-    theme: { ...defaultLandingConfig.theme, ...theme },
+    theme: normalizeTheme(theme),
   };
+}
+
+/** Theme values land in inline styles, so anything outside the known set falls back to the default. */
+export function normalizeTheme(value: unknown): LandingConfig['theme'] {
+  const theme = { ...defaultLandingConfig.theme, ...record(value) } as LandingConfig['theme'];
+  const size = Number.parseFloat(String(theme.baseFontSize));
+  return {
+    ...theme,
+    fontFamily: theme.fontFamily in SITE_FONTS ? theme.fontFamily : defaultLandingConfig.theme.fontFamily,
+    baseFontSize: Number.isFinite(size) && size >= 14 && size <= 19 ? `${size}px` : defaultLandingConfig.theme.baseFontSize,
+    headingWeight: (HEADING_WEIGHTS as readonly string[]).includes(String(theme.headingWeight)) ? String(theme.headingWeight) : defaultLandingConfig.theme.headingWeight,
+  };
+}
+
+/** Site-wide typography variables consumed by globals.css. */
+export function typographyStyle(theme: LandingConfig['theme']) {
+  return {
+    '--site-font-fa': SITE_FONTS[theme.fontFamily].stack,
+    '--heading-weight': theme.headingWeight,
+    fontSize: theme.baseFontSize,
+  } as React.CSSProperties;
 }
 
 export function localizedText(value: LocaleText, locale: 'fa' | 'en') {
