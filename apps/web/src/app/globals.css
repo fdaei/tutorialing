@@ -75,7 +75,7 @@ p {
 }
 /* Persian glyphs carry dots and marks above and below the baseline; Latin-tight line boxes clip and crowd them. */
 html:lang(fa) :is(h1, h2, h3) {
-  line-height: 1.55 !important;
+  line-height: 1.55;
 }
 /*
  * Persian is a cursive script: any letter-spacing pulls joined letters apart
