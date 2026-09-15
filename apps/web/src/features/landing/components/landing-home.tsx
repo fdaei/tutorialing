@@ -105,7 +105,7 @@ function HeroSection({ config, locale, section }: LandingRenderProps) {
           </div>
           <div className="landing-trust-row">
             <span><Check size={15} /> {english ? 'Verified teachers' : 'مدرس‌های تأییدشده'}</span>
-            <span><Check size={15} /> {english ? 'Flexible schedule' : 'برنامه منعطف'}</span>
+            <span><Check size={15} /> {english ? 'Book at a time that suits you' : 'رزرو در ساعت دلخواه'}</span>
           </div>
         </div>
         <div className="landing-hero-visual">
@@ -115,11 +115,11 @@ function HeroSection({ config, locale, section }: LandingRenderProps) {
           </div>
           <div className="landing-hero-note landing-hero-note-top">
             <span className="landing-note-icon"><MessageCircle size={16} /></span>
-            <span><small>{english ? 'Your next step' : 'قدم بعدی تو'}</small><strong>{english ? 'Start with clarity' : 'با اطمینان شروع کن'}</strong></span>
+            <span><small>{english ? 'Online lessons' : 'کلاس آنلاین'}</small><strong>{english ? 'One-to-one with a teacher' : 'خصوصی و یک‌به‌یک'}</strong></span>
           </div>
           <div className="landing-hero-note landing-hero-note-bottom">
             <span className="landing-note-avatar">A1</span>
-            <span><small>{english ? 'Placement' : 'تعیین سطح'}</small><strong>{english ? 'A route made for you' : 'مسیر مخصوص تو'}</strong></span>
+            <span><small>{english ? 'Placement test' : 'تعیین سطح'}</small><strong>{english ? 'Free, under 20 minutes' : 'رایگان، زیر ۲۰ دقیقه'}</strong></span>
           </div>
           <div className="landing-hero-index">01 <span>/</span> 08</div>
         </div>
