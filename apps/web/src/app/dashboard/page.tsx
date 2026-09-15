@@ -157,7 +157,7 @@ export default function Dashboard() {
               return (
                 <div key={String(title)} className="flex items-center gap-4 py-5">
                   <span
-                    className={`grid size-11 place-items-center rounded-xl ${done ? 'bg-[#eef2ff] text-blue' : 'bg-[#f4f5f8] text-muted'}`}
+                    className={`grid size-11 place-items-center rounded-xl ${done ? 'bg-primary-soft text-blue' : 'bg-canvas text-muted'}`}
                   >
                     <Icon size={21} />
                   </span>
@@ -182,7 +182,7 @@ export default function Dashboard() {
             })}
           </div>
         </article>
-        <aside className="relative overflow-hidden rounded-[24px] bg-[#111b4a] p-7 text-white shadow-brand">
+        <aside className="relative overflow-hidden rounded-[24px] bg-ink p-7 text-white shadow-brand">
           <span className="grid size-14 place-items-center rounded-full bg-purple/25 text-violet">
             <LifeBuoy />
           </span>

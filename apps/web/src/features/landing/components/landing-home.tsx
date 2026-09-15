@@ -91,10 +91,10 @@ function HeroSection({ config, locale, section }: LandingRenderProps) {
     <section className={`landing-hero ${config.hero.imageSide === 'left' ? 'landing-hero-reversed' : ''}`} style={sectionStyle(section, config.theme)}>
       <div className="landing-container landing-hero-grid">
         <div className="landing-hero-copy">
-          <span className="landing-kicker">{t(config.hero.eyebrow)}</span>
-          <h1>{t(config.hero.title)}</h1>
-          <p>{t(config.hero.description)}</p>
-          <div className="landing-actions">
+          <span className="landing-kicker text-primary">{t(config.hero.eyebrow)}</span>
+          <h1 className="mt-2 text-4xl font-extrabold leading-tight text-ink md:text-5xl lg:text-6xl">{t(config.hero.title)}</h1>
+          <p className="mt-5 max-w-2xl text-lg leading-relaxed text-muted">{t(config.hero.description)}</p>
+          <div className="landing-actions mt-8">
             <Link href={path(config.hero.primaryButton.href)} className="landing-button landing-button-primary">
               {t(config.hero.primaryButton.label)}
               <ForwardArrow locale={locale} size={17} />

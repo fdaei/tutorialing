@@ -28,7 +28,8 @@ const MAX_PAGE_SIZE = 50;
 const AUTHOR = { select: { id: true, name: true, avatarKey: true } } as const;
 
 function readingTimeMinutes(content?: string | null) {
-  const words = (content || '').trim().split(/\s+/).filter(Boolean).length;
+  if (!content) return 1;
+  const words = content.trim().split(/\s+/).filter(Boolean).length;
   return Math.max(1, Math.ceil(words / 180));
 }
 
