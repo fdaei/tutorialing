@@ -15,9 +15,16 @@ export class S3ObjectStorageAdapter implements ObjectStorage {
     credentials: { accessKeyId: this.cfg.accessKey, secretAccessKey: this.cfg.secretKey },
   });
 
+  private readonly publicClient = new S3Client({
+    region: this.cfg.region,
+    endpoint: this.cfg.publicEndpoint,
+    forcePathStyle: this.cfg.forcePathStyle,
+    credentials: { accessKeyId: this.cfg.accessKey, secretAccessKey: this.cfg.secretKey },
+  });
+
   createUploadUrl(input: { key: string; contentType: string; contentLength: number; checksum: string }) {
     return getSignedUrl(
-      this.client,
+      this.publicClient,
       new PutObjectCommand({
         Bucket: this.cfg.bucket,
         Key: input.key,
@@ -50,7 +57,7 @@ export class S3ObjectStorageAdapter implements ObjectStorage {
   }
 
   createDownloadUrl(key: string) {
-    return getSignedUrl(this.client, new GetObjectCommand({ Bucket: this.cfg.bucket, Key: key }), {
+    return getSignedUrl(this.publicClient, new GetObjectCommand({ Bucket: this.cfg.bucket, Key: key }), {
       expiresIn: this.cfg.downloadUrlTtlSeconds,
     });
   }
