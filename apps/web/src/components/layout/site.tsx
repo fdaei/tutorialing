@@ -14,8 +14,8 @@ import { usePublicNavigation } from '@/features/navigation/navigation-config';
 import { defaultLandingConfig, type LandingConfig } from '@/features/landing';
 
 /** The LingoSpeak logo. The artwork carries the wordmark, so the name is the image's accessible text. */
-export function BrandLogo({ name = 'LingoSpeak' }: { name?: string }) {
-  return <img src={brandAssets.logo} alt={name} width={160} height={44} className="landing-brand-logo" />;
+export function BrandLogo({ name = 'LingoSpeak', src }: { name?: string; src?: string }) {
+  return <img src={src || brandAssets.logo} alt={name} width={160} height={44} className="landing-brand-logo" />;
 }
 
 type HeaderProps = {
@@ -61,7 +61,7 @@ export function Header({ config }: HeaderProps = {}) {
     <header className={header.sticky ? 'landing-header landing-header-sticky' : 'landing-header'} style={{ backgroundColor: header.background }}>
       <div className="landing-container landing-header-inner">
         <Link href={p('/')} className="landing-brand">
-          <BrandLogo name={brand.name} />
+          <BrandLogo name={brand.name} src={brand.logo} />
         </Link>
         <nav aria-label={t('mainNavigation')} aria-busy={loading} className="landing-desktop-nav">
           {loading

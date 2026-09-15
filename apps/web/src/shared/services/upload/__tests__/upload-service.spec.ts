@@ -1,6 +1,6 @@
 import { webcrypto } from 'node:crypto';
 import { api } from '@/shared/services/api';
-import { calculateSha256 } from '../checksum';
+import { calculateSha256, sha256HexToBase64 } from '../checksum';
 import { UploadError } from '../upload-errors';
 import { upload } from '../upload-service';
 
@@ -43,13 +43,29 @@ describe('shared upload workflow', () => {
     );
   });
 
+  it('converts the hex digest to the base64 form of x-amz-checksum-sha256', () => {
+    expect(sha256HexToBase64('2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824')).toBe(
+      'LPJNul+wow4m6DsqxbninhsWHlwfp0JecwQzYpOLmCQ=',
+    );
+  });
+
   it('uses the signed upload as the primary path and finalizes it', async () => {
     await expect(upload(source())).resolves.toEqual({ fileId: 'file-1' });
+    // The API signs exactly these headers into the URL (S3ObjectStorageAdapter.createUploadUrl);
+    // any other set is refused by storage, so the whole object is pinned, not a subset.
     expect(global.fetch).toHaveBeenCalledWith(
       signedUrl,
-      expect.objectContaining({ method: 'PUT', headers: expect.objectContaining({ 'x-amz-meta-checksum': expect.any(String) }) }),
+      expect.objectContaining({
+        method: 'PUT',
+        headers: {
+          'content-type': 'text/plain',
+          'x-amz-meta-checksum': '2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824',
+          'x-amz-checksum-sha256': 'LPJNul+wow4m6DsqxbninhsWHlwfp0JecwQzYpOLmCQ=',
+        },
+      }),
     );
     expect(mockedApi).toHaveBeenCalledTimes(2);
+    expect(mockedApi).not.toHaveBeenCalledWith('/files/uploads/file-1/content', expect.anything());
     expect(mockedApi).toHaveBeenLastCalledWith('/files/file-1/complete', expect.objectContaining({ method: 'POST' }));
   });
 
@@ -66,7 +82,7 @@ describe('shared upload workflow', () => {
 
   it.each([
     ['network failure', () => Promise.reject(new TypeError('network unavailable'))],
-    ['non-ok storage response', () => Promise.resolve({ ok: false })],
+    ['storage edge 5xx', () => Promise.resolve({ ok: false, status: 503 })],
   ])('uses fallback after an allowed signed-upload %s', async (_label, result) => {
     global.fetch = jest.fn().mockImplementation(result);
     await upload(source());
@@ -78,6 +94,12 @@ describe('shared upload workflow', () => {
     expect(mockedApi).toHaveBeenNthCalledWith(3, '/files/file-1/complete', expect.objectContaining({ method: 'POST' }));
   });
 
+  it.each([400, 403])('surfaces a %s storage rejection instead of hiding it behind the fallback', async (status) => {
+    global.fetch = jest.fn().mockResolvedValue({ ok: false, status });
+    await expect(upload(source())).rejects.toMatchObject({ stage: 'storage' });
+    expect(mockedApi).toHaveBeenCalledTimes(1);
+  });
+
   it('does not fallback or finalize when the signed upload is aborted', async () => {
     global.fetch = jest.fn().mockRejectedValue(new DOMException('cancelled', 'AbortError'));
     await expect(upload(source())).rejects.toMatchObject({ stage: 'cancelled' });
@@ -85,7 +107,7 @@ describe('shared upload workflow', () => {
   });
 
   it('does not finalize after fallback failure', async () => {
-    global.fetch = jest.fn().mockResolvedValue({ ok: false });
+    global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 503 });
     mockedApi.mockRejectedValueOnce(new Error('private fallback response'));
     await expect(upload(source())).rejects.toMatchObject({ stage: 'fallback' });
     expect(mockedApi).toHaveBeenCalledTimes(2);

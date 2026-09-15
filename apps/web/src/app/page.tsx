@@ -19,30 +19,44 @@ function withFallback<T>(endpoint: string, request: Promise<T>, fallback: T): Pr
   });
 }
 
-async function resolveMedia(value: string) {
+async function resolveMedia(value: string, fallback = defaultLandingConfig.hero.image) {
   const id = mediaReference(value);
   if (!id) return value;
   const result = await withFallback(`/files/public/${id}`, publicApi<{ url: string }>(`/files/public/${id}`), { url: '' });
-  return result.url || defaultLandingConfig.hero.image;
+  return result.url || fallback;
 }
 
 async function hydrateMedia(config: LandingConfig): Promise<LandingConfig> {
-  const [heroImage, placementImage, languageCards] = await Promise.all([
+  const [logo, heroImage, placementImage, languageCards] = await Promise.all([
+    resolveMedia(config.brand.logo, ''),
     resolveMedia(config.hero.image),
     resolveMedia(config.placement.image),
     Promise.all(config.languages.cards.map(async (card) => ({ ...card, image: await resolveMedia(card.image) }))),
   ]);
   return {
     ...config,
+    brand: { ...config.brand, logo },
     hero: { ...config.hero, image: heroImage },
     placement: { ...config.placement, image: placementImage },
     languages: { ...config.languages, cards: languageCards },
   };
 }
 
+// The image uploaded in the admin language manager is stored as imageId; like
+// /languages, resolve it here so the landing cards can show it.
+function withLanguageImages(items: EducationalLanguage[]) {
+  return Promise.all(
+    items.map(async (language) => {
+      if (!language.imageId) return language;
+      const media = await withFallback(`/files/public/${language.imageId}`, publicApi<{ url: string }>(`/files/public/${language.imageId}`), { url: '' });
+      return media.url ? { ...language, imageUrl: media.url } : language;
+    }),
+  );
+}
+
 export default async function Home() {
   const [languages, courses, posts, settings, locale] = await Promise.all([
-    withFallback('/languages', publicApi<EducationalLanguage[]>('/languages'), []),
+    withFallback('/languages', publicApi<EducationalLanguage[]>('/languages').then(withLanguageImages), []),
     withFallback('/courses', publicApi<Course[]>('/courses'), []),
     withFallback('/blog/posts', publicApi<BlogPostsPage>('/blog/posts?pageSize=3'), EMPTY_POSTS),
     withFallback('/support/public-settings', publicApi<PublicSetting[]>('/support/public-settings'), []),

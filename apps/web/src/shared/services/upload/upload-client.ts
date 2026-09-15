@@ -1,4 +1,5 @@
 import { api } from '@/shared/services/api';
+import { sha256HexToBase64 } from './checksum';
 import { UploadError, isAbortError } from './upload-errors';
 import type { CreateUploadRequest, UploadResponse } from './types';
 
@@ -23,7 +24,13 @@ export async function createUpload(request: CreateUploadRequest, signal?: AbortS
   }
 }
 
-/** Returns false only when the existing server fallback transport should be used. */
+/**
+ * Returns false only when storage couldn't be reached (network/CORS failure or a
+ * 5xx from the storage edge), which is what the server fallback transport is for.
+ * A 4xx means storage refused this exact request (expired URL, signature or
+ * checksum mismatch); re-sending the bytes through the API would only hide that,
+ * as it once hid every direct upload failing on unsigned headers.
+ */
 export async function uploadToSignedUrl(
   uploadUrl: string,
   body: Blob,
@@ -31,18 +38,27 @@ export async function uploadToSignedUrl(
   checksum: string,
   signal?: AbortSignal,
 ): Promise<boolean> {
+  let response: Response;
   try {
-    const response = await fetch(uploadUrl, {
+    response = await fetch(uploadUrl, {
       method: 'PUT',
       body,
-      headers: { 'content-type': mimeType, 'x-amz-meta-checksum': checksum },
+      // Exactly the headers the API signs into the URL (S3ObjectStorageAdapter.createUploadUrl);
+      // one added, dropped or changed here makes storage reject the PUT.
+      headers: {
+        'content-type': mimeType,
+        'x-amz-meta-checksum': checksum,
+        'x-amz-checksum-sha256': sha256HexToBase64(checksum),
+      },
       signal,
     });
-    return response.ok;
   } catch (error) {
     if (isAbortError(error) || signal?.aborted) throw new UploadError('cancelled', error);
     return false;
   }
+  if (response.ok) return true;
+  if (response.status < 500) throw new UploadError('storage');
+  return false;
 }
 
 export async function uploadThroughFallback(

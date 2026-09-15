@@ -160,7 +160,7 @@ function LanguagesSection({ config, locale, languages, section }: LandingRenderP
                 style={{ '--language-accent': card?.accent ?? '#ede9fe' } as React.CSSProperties}
               >
                 <div className="landing-language-image">
-                  <img src={card?.image ?? config.hero.image} alt="" />
+                  <img src={language.imageUrl || card?.image || config.hero.image} alt="" />
                   <span>{language.flag || '🌐'}</span>
                 </div>
                 <div className="landing-language-body">
@@ -349,7 +349,7 @@ function LandingFooter({ config, locale }: { config: LandingConfig; locale: Loca
     <footer className="landing-footer">
       <div className="landing-container landing-footer-grid">
         <div className="landing-footer-brand">
-          <Link href={path('/')} className="landing-brand"><BrandLogo name={config.brand.name} /></Link>
+          <Link href={path('/')} className="landing-brand"><BrandLogo name={config.brand.name} src={config.brand.logo} /></Link>
           <p>{t(config.footer.description)}</p>
           <div className="landing-socials"><a href={`tel:${config.footer.phone}`} aria-label={english ? 'Phone' : 'تلفن'}><Phone size={16} /></a><a href={`mailto:${config.footer.email}`} aria-label={english ? 'Email' : 'ایمیل'}><Mail size={16} /></a><a href={path('/contact')} aria-label={english ? 'Contact' : 'تماس'}><MessageCircle size={16} /></a></div>
         </div>

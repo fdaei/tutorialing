@@ -30,6 +30,8 @@ export type LandingConfig = {
   brand: {
     name: string;
     mark: string;
+    /** Logo image: a public path, URL, or `media:<fileId>`. Empty uses the shipped artwork. */
+    logo: string;
   };
   header: {
     sticky: boolean;
@@ -123,7 +125,7 @@ export type LandingConfig = {
 const text = (fa: string, en: string): LocaleText => ({ fa, en });
 
 export const defaultLandingConfig: LandingConfig = {
-  brand: { name: 'LingoSpeak', mark: 'LS' },
+  brand: { name: 'LingoSpeak', mark: 'LS', logo: '' },
   header: {
     sticky: true,
     background: '#ffffff',
