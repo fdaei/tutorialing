@@ -4,6 +4,7 @@ import { PanelActions, PanelShell, ResourceView, adminNav } from '@/features/pan
 import {
   AdminFinanceCenter,
   AdminCourseManager,
+  AdminTeachersManager,
   AdminTestManager,
   AdminUsersManager,
   CmsManager,
@@ -46,6 +47,7 @@ export default async function Section({ params }: { params: Promise<{ section: s
         <AdminUsersManager />
       </>
     );
+  else if (section === 'teachers') content = <AdminTeachersManager />;
   else if (section === 'test-reviews') content = <ExaminerReviewManager />;
   else if (section === 'tickets') content = <TicketManager />;
   else if (section === 'languages') content = <LanguageManager />;

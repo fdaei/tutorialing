@@ -1,6 +1,7 @@
 export { AdminFinanceCenter } from './components/admin-finance-center';
 export { AdminCourseManager } from './components/admin-course-manager';
 export { AdminTestManager } from './components/admin-test-manager';
+export { AdminTeachersManager } from './components/admin-teachers-manager';
 export { AdminUsersManager } from './components/admin-users-manager';
 export { CmsManager } from './components/cms-manager';
 export { CountryManager } from './components/country-manager';

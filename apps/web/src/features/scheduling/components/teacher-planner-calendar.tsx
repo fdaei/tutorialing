@@ -1,5 +1,6 @@
 'use client';
 
+import { Portal } from '@/shared/components/ui/portal';
 import { localized, isDefaultLocale, translate } from '@/lib/i18n';
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -279,80 +280,82 @@ function NoteDialog({
   add: (note: Note) => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/30 p-4 backdrop-blur-sm" onClick={close}>
-      <form
-        className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl"
-        onClick={(event) => event.stopPropagation()}
-        onSubmit={(event) => {
-          event.preventDefault();
-          const data = new FormData(event.currentTarget);
-          add({
-            id: crypto.randomUUID(),
-            date: String(data.get('date')),
-            time: String(data.get('time')),
-            title: String(data.get('title')).trim(),
-            color: String(data.get('color')) as Note['color'],
-          });
-        }}
-      >
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-bold text-blue">
-              {translate(fa, 'schedulingteacherPlannerCalendarPersonalPlanning')}
-            </p>
-            <h3 className="mt-1 text-xl font-black">
-              {translate(fa, 'schedulingteacherPlannerCalendarNewEventOrNote')}
-            </h3>
+    <Portal>
+      <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/30 p-4 backdrop-blur-sm" onClick={close}>
+        <form
+          className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl"
+          onClick={(event) => event.stopPropagation()}
+          onSubmit={(event) => {
+            event.preventDefault();
+            const data = new FormData(event.currentTarget);
+            add({
+              id: crypto.randomUUID(),
+              date: String(data.get('date')),
+              time: String(data.get('time')),
+              title: String(data.get('title')).trim(),
+              color: String(data.get('color')) as Note['color'],
+            });
+          }}
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-bold text-blue">
+                {translate(fa, 'schedulingteacherPlannerCalendarPersonalPlanning')}
+              </p>
+              <h3 className="mt-1 text-xl font-black">
+                {translate(fa, 'schedulingteacherPlannerCalendarNewEventOrNote')}
+              </h3>
+            </div>
+            <button type="button" onClick={close} className="grid size-9 place-items-center rounded-full bg-slate-100">
+              <X size={18} />
+            </button>
           </div>
-          <button type="button" onClick={close} className="grid size-9 place-items-center rounded-full bg-slate-100">
-            <X size={18} />
-          </button>
-        </div>
-        <div className="mt-5 grid gap-4">
-          <label>
-            <span className="mb-2 block text-sm font-bold">
-              {translate(fa, 'schedulingteacherPlannerCalendarTitle')}
-            </span>
-            <input
-              name="title"
-              required
-              maxLength={80}
-              autoFocus
-              className="input"
-              placeholder={translate(fa, 'schedulingteacherPlannerCalendarEGPrepareSpeakingLesson')}
-            />
-          </label>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="mt-5 grid gap-4">
             <label>
               <span className="mb-2 block text-sm font-bold">
-                {translate(fa, 'schedulingteacherPlannerCalendarDate')}
+                {translate(fa, 'schedulingteacherPlannerCalendarTitle')}
               </span>
-              <input name="date" type="date" required defaultValue={date} className="input latin" />
+              <input
+                name="title"
+                required
+                maxLength={80}
+                autoFocus
+                className="input"
+                placeholder={translate(fa, 'schedulingteacherPlannerCalendarEGPrepareSpeakingLesson')}
+              />
             </label>
+            <div className="grid grid-cols-2 gap-3">
+              <label>
+                <span className="mb-2 block text-sm font-bold">
+                  {translate(fa, 'schedulingteacherPlannerCalendarDate')}
+                </span>
+                <input name="date" type="date" required defaultValue={date} className="input latin" />
+              </label>
+              <label>
+                <span className="mb-2 block text-sm font-bold">
+                  {translate(fa, 'schedulingteacherPlannerCalendarTime')}
+                </span>
+                <input name="time" type="time" required defaultValue="09:00" className="input latin" />
+              </label>
+            </div>
             <label>
               <span className="mb-2 block text-sm font-bold">
-                {translate(fa, 'schedulingteacherPlannerCalendarTime')}
+                {translate(fa, 'schedulingteacherPlannerCalendarColor')}
               </span>
-              <input name="time" type="time" required defaultValue="09:00" className="input latin" />
+              <select name="color" className="input">
+                <option value="indigo">{translate(fa, 'schedulingteacherPlannerCalendarBlueWork')}</option>
+                <option value="amber">{translate(fa, 'schedulingteacherPlannerCalendarYellowReminder')}</option>
+                <option value="emerald">{translate(fa, 'schedulingteacherPlannerCalendarGreenPersonal')}</option>
+              </select>
             </label>
+            <button className="primary-button justify-center">
+              <Plus size={18} />
+              {translate(fa, 'schedulingteacherPlannerCalendarSaveToCalendar')}
+            </button>
           </div>
-          <label>
-            <span className="mb-2 block text-sm font-bold">
-              {translate(fa, 'schedulingteacherPlannerCalendarColor')}
-            </span>
-            <select name="color" className="input">
-              <option value="indigo">{translate(fa, 'schedulingteacherPlannerCalendarBlueWork')}</option>
-              <option value="amber">{translate(fa, 'schedulingteacherPlannerCalendarYellowReminder')}</option>
-              <option value="emerald">{translate(fa, 'schedulingteacherPlannerCalendarGreenPersonal')}</option>
-            </select>
-          </label>
-          <button className="primary-button justify-center">
-            <Plus size={18} />
-            {translate(fa, 'schedulingteacherPlannerCalendarSaveToCalendar')}
-          </button>
-        </div>
-      </form>
-    </div>
+        </form>
+      </div>
+    </Portal>
   );
 }
 function startMonth(date: Date) {

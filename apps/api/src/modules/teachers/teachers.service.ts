@@ -22,7 +22,7 @@ export type TeacherApplicationInput = {
 
 export type AdminTeacherInput = TeacherApplicationInput & {
   phone: string;
-  email?: string;
+  email?: string | null;
   trialPrice?: number;
   regularPrice?: number;
   approvedTrialPrice?: number | null;
@@ -237,7 +237,7 @@ export class TeachersService {
     }
     const normalized = await this.adminTeacherData(actorId, {
       phone: input.phone ?? before.user.phone ?? '',
-      email: input.email !== undefined ? input.email : before.user.email ?? undefined,
+      email: input.email !== undefined ? input.email ?? undefined : before.user.email ?? undefined,
       nameFa: input.nameFa ?? before.nameFa,
       nameEn: input.nameEn ?? before.nameEn,
       bioFa: input.bioFa ?? before.bioFa,
@@ -265,7 +265,7 @@ export class TeachersService {
         where: { id: before.userId },
         data: {
           ...(input.phone !== undefined && { phone: input.phone.trim() }),
-          ...(input.email !== undefined && { email: input.email.trim() || null }),
+          ...(input.email !== undefined && { email: input.email?.trim() || null }),
           name: normalized.teacherData.nameFa,
           ...(normalized.avatarKey !== undefined && { avatarKey: normalized.avatarKey }),
         },

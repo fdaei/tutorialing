@@ -3,7 +3,7 @@ import { TeacherStatus } from '@prisma/client';
 import { AuthUser, CurrentUser, RateLimit, RATE_LIMIT_TIERS, Roles } from '../../common';
 import { PermissionKeys, RequirePermissions } from '../auth/authorization';
 import { TransitionDto } from './dto/admin/transition.dto';
-import { AdminTeacherDto } from './dto/admin/teacher.dto';
+import { AdminTeacherDto, AdminUpdateTeacherDto } from './dto/admin/teacher.dto';
 import { TeachersService } from './teachers.service';
 import { ApiTags } from '@nestjs/swagger';
 
@@ -42,7 +42,7 @@ export class AdminTeachersController {
 
   @RateLimit(RATE_LIMIT_TIERS.adminWrite)
   @Patch('teachers/:id')
-  update(@CurrentUser() actor: AuthUser, @Param('id') id: string, @Body() dto: AdminTeacherDto) {
+  update(@CurrentUser() actor: AuthUser, @Param('id') id: string, @Body() dto: AdminUpdateTeacherDto) {
     return this.teachers.adminUpdate(actor.id, id, dto);
   }
 

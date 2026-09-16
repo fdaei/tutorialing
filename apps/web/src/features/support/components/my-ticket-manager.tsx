@@ -1,5 +1,6 @@
 'use client';
 
+import { Portal } from '@/shared/components/ui/portal';
 import { localized, isDefaultLocale, translate } from '@/lib/i18n';
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -273,7 +274,10 @@ export function MyTicketManager() {
                       </label>
                       {reply.isError && (
                         <p role="alert" className="text-sm text-red-700">
-                          {uploadErrorMessage(reply.error, translate(locale, 'supportmyTicketManagerCouldNotSendTheReply'))}
+                          {uploadErrorMessage(
+                            reply.error,
+                            translate(locale, 'supportmyTicketManagerCouldNotSendTheReply'),
+                          )}
                         </p>
                       )}
                       <button
@@ -294,177 +298,179 @@ export function MyTicketManager() {
         </div>
       )}
       {creating && (
-        <div
-          className="fixed inset-0 z-50 grid place-items-center overflow-hidden bg-slate-950/45 p-4 backdrop-blur-[2px]"
-          onMouseDown={closeCreateModal}
-          role="presentation"
-        >
-          <form
-            noValidate
-            onSubmit={submitTicket}
-            onMouseDown={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="create-ticket-title"
-            className="flex max-h-[calc(100vh-32px)] max-h-[calc(100dvh-32px)] w-full max-w-[560px] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_24px_80px_rgba(15,23,42,.22)]"
+        <Portal>
+          <div
+            className="fixed inset-0 z-50 grid place-items-center overflow-hidden bg-slate-950/45 p-4 backdrop-blur-[2px]"
+            onMouseDown={closeCreateModal}
+            role="presentation"
           >
-            <div className="h-1 shrink-0 bg-gradient-to-l from-purple via-blue to-violet" />
-            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-6 py-5">
-              <div>
-                <h2 id="create-ticket-title" className="text-xl font-bold text-slate-900">
-                  ایجاد تیکت جدید
-                </h2>
-                <p className="mt-1 text-xs text-muted">
-                  درخواستتان را بنویسید؛ تیم پشتیبانی پاسخ را همین‌جا ارسال می‌کند.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={closeCreateModal}
-                aria-label="بستن پنجره ایجاد تیکت"
-                className="grid size-10 shrink-0 place-items-center rounded-xl text-slate-500 hover:bg-slate-100 hover:text-slate-900"
-              >
-                <X size={20} />
-              </button>
-            </div>
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5 [scrollbar-gutter:stable]">
-              <div className="grid gap-5 sm:grid-cols-2">
-                <label className="sm:col-span-2">
-                  <span className="mb-2 block text-sm font-semibold text-slate-900">عنوان تیکت</span>
-                  <input
-                    ref={subjectRef}
-                    minLength={3}
-                    maxLength={160}
-                    name="subject"
-                    aria-invalid={!!createErrors.subject}
-                    aria-describedby={createErrors.subject ? 'subject-error' : undefined}
-                    onChange={() =>
-                      createErrors.subject && setCreateErrors((value) => ({ ...value, subject: undefined }))
-                    }
-                    className={`input h-12 rounded-xl px-3.5 py-2.5 placeholder:text-slate-400 ${createErrors.subject ? 'border-red-400 ring-4 ring-red-50 focus:border-red-500 focus:shadow-none' : ''}`}
-                    placeholder="موضوع درخواست خود را کوتاه بنویسید"
-                  />
-                  <FieldError id="subject-error" message={createErrors.subject} />
-                </label>
-                <div className="sm:col-span-2">
-                  <span className="mb-2 block text-sm font-semibold text-slate-900">
-                    ضمیمه <span className="font-normal text-muted">(اختیاری)</span>
-                  </span>
-                  <div
-                    className={`relative flex min-h-[76px] items-center gap-3 rounded-xl border border-dashed px-4 py-3 transition hover:border-purple hover:bg-lavender/20 ${createErrors.attachment ? 'border-red-400 bg-red-50/50' : 'border-slate-300'}`}
-                  >
-                    <label htmlFor="ticket-attachment" className="absolute inset-0 cursor-pointer rounded-xl">
-                      <span className="sr-only">انتخاب فایل ضمیمه</span>
-                    </label>
-                    <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-lavender text-purple">
-                      <Upload size={19} />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-semibold text-slate-800">
-                        {createFile?.name || 'انتخاب فایل'}
-                      </span>
-                      <span className="mt-1 block text-xs text-muted">PNG، JPG یا PDF تا حداکثر ۱۰ مگابایت</span>
-                    </span>
-                    {createFile && (
-                      <button
-                        type="button"
-                        aria-label="حذف فایل انتخاب‌شده"
-                        onClick={() => {
-                          setCreateFile(undefined);
-                          setCreateErrors((value) => ({ ...value, attachment: undefined }));
-                          if (fileRef.current) fileRef.current.value = '';
-                        }}
-                        className="relative z-10 grid size-9 place-items-center rounded-lg text-slate-500 hover:bg-red-50 hover:text-red-600"
-                      >
-                        <Trash2 size={17} />
-                      </button>
-                    )}
-                  </div>
-                  <input
-                    ref={fileRef}
-                    id="ticket-attachment"
-                    type="file"
-                    name="attachment"
-                    accept={SUPPORT_ATTACHMENT_TYPES.join(',')}
-                    className="sr-only"
-                    onChange={(event) => {
-                      setCreateFile(event.target.files?.[0]);
-                      setCreateErrors((value) => ({ ...value, attachment: undefined }));
-                    }}
-                  />
-                  <FieldError id="attachment-error" message={createErrors.attachment} />
-                </div>
-                <label>
-                  <span className="mb-2 block text-sm font-semibold text-slate-900">دسته‌بندی</span>
-                  <span className="relative block">
-                    <select name="category" className="input h-12 appearance-none rounded-xl px-3.5 py-2.5 ps-10">
-                      <option value="general">عمومی</option>
-                      <option value="class">کلاس</option>
-                      <option value="payment">پرداخت</option>
-                      <option value="technical">فنی</option>
-                    </select>
-                    <ChevronDown
-                      size={17}
-                      className="pointer-events-none absolute start-3.5 top-1/2 -translate-y-1/2 text-muted"
-                    />
-                  </span>
-                </label>
-                <label>
-                  <span className="mb-2 block text-sm font-semibold text-slate-900">اولویت</span>
-                  <span className="relative block">
-                    <select name="priority" className="input h-12 appearance-none rounded-xl px-3.5 py-2.5 ps-10">
-                      <option value="normal">عادی</option>
-                      <option value="high">زیاد</option>
-                      <option value="urgent">فوری</option>
-                      <option value="low">کم</option>
-                    </select>
-                    <ChevronDown
-                      size={17}
-                      className="pointer-events-none absolute start-3.5 top-1/2 -translate-y-1/2 text-muted"
-                    />
-                  </span>
-                </label>
-                <label className="sm:col-span-2">
-                  <span className="mb-2 block text-sm font-semibold text-slate-900">توضیحات</span>
-                  <textarea
-                    ref={bodyRef}
-                    minLength={2}
-                    maxLength={5000}
-                    name="body"
-                    aria-invalid={!!createErrors.body}
-                    aria-describedby={createErrors.body ? 'body-error' : undefined}
-                    onChange={() => createErrors.body && setCreateErrors((value) => ({ ...value, body: undefined }))}
-                    className={`input min-h-[120px] resize-y rounded-xl px-3.5 py-3 leading-7 placeholder:text-slate-400 ${createErrors.body ? 'border-red-400 ring-4 ring-red-50 focus:border-red-500 focus:shadow-none' : ''}`}
-                    placeholder="مشکل یا درخواست خود را با جزئیات توضیح دهید…"
-                  />
-                  <FieldError id="body-error" message={createErrors.body} />
-                </label>
-                {create.isError && (
-                  <p role="alert" className="sm:col-span-2 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">
-                    {uploadErrorMessage(create.error, 'تیکت ایجاد نشد. دوباره تلاش کنید.')}
+            <form
+              noValidate
+              onSubmit={submitTicket}
+              onMouseDown={(e) => e.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="create-ticket-title"
+              className="flex max-h-[calc(100vh-32px)] max-h-[calc(100dvh-32px)] w-full max-w-[560px] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_24px_80px_rgba(15,23,42,.22)]"
+            >
+              <div className="h-1 shrink-0 bg-gradient-to-l from-purple via-blue to-violet" />
+              <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-6 py-5">
+                <div>
+                  <h2 id="create-ticket-title" className="text-xl font-bold text-slate-900">
+                    ایجاد تیکت جدید
+                  </h2>
+                  <p className="mt-1 text-xs text-muted">
+                    درخواستتان را بنویسید؛ تیم پشتیبانی پاسخ را همین‌جا ارسال می‌کند.
                   </p>
-                )}
+                </div>
+                <button
+                  type="button"
+                  onClick={closeCreateModal}
+                  aria-label="بستن پنجره ایجاد تیکت"
+                  className="grid size-10 shrink-0 place-items-center rounded-xl text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                >
+                  <X size={20} />
+                </button>
               </div>
-            </div>
-            <div className="flex shrink-0 items-center justify-end gap-3 border-t border-slate-100 bg-slate-50/70 px-6 py-4">
-              <button
-                type="button"
-                onClick={closeCreateModal}
-                disabled={create.isPending}
-                className="secondary-button min-h-[44px] rounded-xl disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                انصراف
-              </button>
-              <button
-                disabled={create.isPending}
-                className="primary-button min-h-[44px] min-w-28 justify-center rounded-xl disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {create.isPending && <LoaderCircle size={17} className="animate-spin" />}
-                {create.isPending ? 'در حال ثبت…' : 'ثبت تیکت'}
-              </button>
-            </div>
-          </form>
-        </div>
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5 [scrollbar-gutter:stable]">
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <label className="sm:col-span-2">
+                    <span className="mb-2 block text-sm font-semibold text-slate-900">عنوان تیکت</span>
+                    <input
+                      ref={subjectRef}
+                      minLength={3}
+                      maxLength={160}
+                      name="subject"
+                      aria-invalid={!!createErrors.subject}
+                      aria-describedby={createErrors.subject ? 'subject-error' : undefined}
+                      onChange={() =>
+                        createErrors.subject && setCreateErrors((value) => ({ ...value, subject: undefined }))
+                      }
+                      className={`input h-12 rounded-xl px-3.5 py-2.5 placeholder:text-slate-400 ${createErrors.subject ? 'border-red-400 ring-4 ring-red-50 focus:border-red-500 focus:shadow-none' : ''}`}
+                      placeholder="موضوع درخواست خود را کوتاه بنویسید"
+                    />
+                    <FieldError id="subject-error" message={createErrors.subject} />
+                  </label>
+                  <div className="sm:col-span-2">
+                    <span className="mb-2 block text-sm font-semibold text-slate-900">
+                      ضمیمه <span className="font-normal text-muted">(اختیاری)</span>
+                    </span>
+                    <div
+                      className={`relative flex min-h-[76px] items-center gap-3 rounded-xl border border-dashed px-4 py-3 transition hover:border-purple hover:bg-lavender/20 ${createErrors.attachment ? 'border-red-400 bg-red-50/50' : 'border-slate-300'}`}
+                    >
+                      <label htmlFor="ticket-attachment" className="absolute inset-0 cursor-pointer rounded-xl">
+                        <span className="sr-only">انتخاب فایل ضمیمه</span>
+                      </label>
+                      <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-lavender text-purple">
+                        <Upload size={19} />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-semibold text-slate-800">
+                          {createFile?.name || 'انتخاب فایل'}
+                        </span>
+                        <span className="mt-1 block text-xs text-muted">PNG، JPG یا PDF تا حداکثر ۱۰ مگابایت</span>
+                      </span>
+                      {createFile && (
+                        <button
+                          type="button"
+                          aria-label="حذف فایل انتخاب‌شده"
+                          onClick={() => {
+                            setCreateFile(undefined);
+                            setCreateErrors((value) => ({ ...value, attachment: undefined }));
+                            if (fileRef.current) fileRef.current.value = '';
+                          }}
+                          className="relative z-10 grid size-9 place-items-center rounded-lg text-slate-500 hover:bg-red-50 hover:text-red-600"
+                        >
+                          <Trash2 size={17} />
+                        </button>
+                      )}
+                    </div>
+                    <input
+                      ref={fileRef}
+                      id="ticket-attachment"
+                      type="file"
+                      name="attachment"
+                      accept={SUPPORT_ATTACHMENT_TYPES.join(',')}
+                      className="sr-only"
+                      onChange={(event) => {
+                        setCreateFile(event.target.files?.[0]);
+                        setCreateErrors((value) => ({ ...value, attachment: undefined }));
+                      }}
+                    />
+                    <FieldError id="attachment-error" message={createErrors.attachment} />
+                  </div>
+                  <label>
+                    <span className="mb-2 block text-sm font-semibold text-slate-900">دسته‌بندی</span>
+                    <span className="relative block">
+                      <select name="category" className="input h-12 appearance-none rounded-xl px-3.5 py-2.5 ps-10">
+                        <option value="general">عمومی</option>
+                        <option value="class">کلاس</option>
+                        <option value="payment">پرداخت</option>
+                        <option value="technical">فنی</option>
+                      </select>
+                      <ChevronDown
+                        size={17}
+                        className="pointer-events-none absolute start-3.5 top-1/2 -translate-y-1/2 text-muted"
+                      />
+                    </span>
+                  </label>
+                  <label>
+                    <span className="mb-2 block text-sm font-semibold text-slate-900">اولویت</span>
+                    <span className="relative block">
+                      <select name="priority" className="input h-12 appearance-none rounded-xl px-3.5 py-2.5 ps-10">
+                        <option value="normal">عادی</option>
+                        <option value="high">زیاد</option>
+                        <option value="urgent">فوری</option>
+                        <option value="low">کم</option>
+                      </select>
+                      <ChevronDown
+                        size={17}
+                        className="pointer-events-none absolute start-3.5 top-1/2 -translate-y-1/2 text-muted"
+                      />
+                    </span>
+                  </label>
+                  <label className="sm:col-span-2">
+                    <span className="mb-2 block text-sm font-semibold text-slate-900">توضیحات</span>
+                    <textarea
+                      ref={bodyRef}
+                      minLength={2}
+                      maxLength={5000}
+                      name="body"
+                      aria-invalid={!!createErrors.body}
+                      aria-describedby={createErrors.body ? 'body-error' : undefined}
+                      onChange={() => createErrors.body && setCreateErrors((value) => ({ ...value, body: undefined }))}
+                      className={`input min-h-[120px] resize-y rounded-xl px-3.5 py-3 leading-7 placeholder:text-slate-400 ${createErrors.body ? 'border-red-400 ring-4 ring-red-50 focus:border-red-500 focus:shadow-none' : ''}`}
+                      placeholder="مشکل یا درخواست خود را با جزئیات توضیح دهید…"
+                    />
+                    <FieldError id="body-error" message={createErrors.body} />
+                  </label>
+                  {create.isError && (
+                    <p role="alert" className="sm:col-span-2 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">
+                      {uploadErrorMessage(create.error, 'تیکت ایجاد نشد. دوباره تلاش کنید.')}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center justify-end gap-3 border-t border-slate-100 bg-slate-50/70 px-6 py-4">
+                <button
+                  type="button"
+                  onClick={closeCreateModal}
+                  disabled={create.isPending}
+                  className="secondary-button min-h-[44px] rounded-xl disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  انصراف
+                </button>
+                <button
+                  disabled={create.isPending}
+                  className="primary-button min-h-[44px] min-w-28 justify-center rounded-xl disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {create.isPending && <LoaderCircle size={17} className="animate-spin" />}
+                  {create.isPending ? 'در حال ثبت…' : 'ثبت تیکت'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </Portal>
       )}
     </section>
   );

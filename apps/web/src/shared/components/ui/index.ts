@@ -7,6 +7,7 @@ export { EmptyState, ErrorState, LoadingState, Skeleton } from './feedback';
 export { ChipGroup, FilterChip, FilterLabel, ResponsiveFilters, SearchField } from './filters';
 export { FormField, Input, Select, Textarea } from './form';
 export { Pagination } from './pagination';
+export { Portal } from './portal';
 export { Sheet } from './sheet';
 export { Tabs } from './tabs';
 export { ToastProvider, useToast } from './toast';

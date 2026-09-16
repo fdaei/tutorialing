@@ -1,5 +1,6 @@
 'use client';
 
+import { Portal } from '@/shared/components/ui/portal';
 import { localized, isDefaultLocale, translate } from '@/lib/i18n';
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -298,68 +299,70 @@ export function AdminFinanceCenter() {
       </section>
 
       {selected && (
-        <div
-          className="fixed inset-0 z-50 grid place-items-center bg-navy/35 p-4 backdrop-blur-sm"
-          onMouseDown={() => setSelected(null)}
-        >
-          <form
-            className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl"
-            onMouseDown={(event) => event.stopPropagation()}
-            onSubmit={(event) => {
-              event.preventDefault();
-              if (reference.trim()) transfer.mutate({ id: selected.id, bankReference: reference.trim() });
-            }}
+        <Portal>
+          <div
+            className="fixed inset-0 z-50 grid place-items-center bg-navy/35 p-4 backdrop-blur-sm"
+            onMouseDown={() => setSelected(null)}
           >
-            <p className="text-xs font-bold text-blue">
-              {translate(locale, 'adminadminFinanceCenterConfirmBankTransfer')}
-            </p>
-            <h2 className="mt-2 text-2xl font-black">{money(selected.amount)}</h2>
-            <div className="mt-5 rounded-2xl bg-[#f7f8fc] p-4 text-sm">
-              <p className="font-bold">
-                {localized({ fa: selected.teacher.nameFa, en: selected.teacher.nameEn }, locale)}
+            <form
+              className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl"
+              onMouseDown={(event) => event.stopPropagation()}
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (reference.trim()) transfer.mutate({ id: selected.id, bankReference: reference.trim() });
+              }}
+            >
+              <p className="text-xs font-bold text-blue">
+                {translate(locale, 'adminadminFinanceCenterConfirmBankTransfer')}
               </p>
-              <p className="latin mt-2 text-muted">{selected.iban}</p>
-            </div>
-            <label className="mt-5 block">
-              <span className="mb-2 block text-sm font-bold">
-                {translate(locale, 'adminadminFinanceCenterBankReference')}
-              </span>
-              <input
-                value={reference}
-                onChange={(event) => setReference(event.target.value)}
-                required
-                dir="ltr"
-                className="input latin"
-                placeholder="مثلاً 847291035"
-              />
-            </label>
-            <p className="mt-3 text-xs leading-6 text-muted">
-              {translate(locale, 'adminadminFinanceCenterAfterConfirmationTheAmountIsDebitedFromThe')}
-            </p>
-            {transfer.isError && (
-              <p role="alert" className="mt-3 rounded-xl bg-red-50 p-3 text-xs text-red-700">
-                {apiMessage(transfer.error, translate(locale, 'adminadminFinanceCenterTransferFailed'))}
+              <h2 className="mt-2 text-2xl font-black">{money(selected.amount)}</h2>
+              <div className="mt-5 rounded-2xl bg-[#f7f8fc] p-4 text-sm">
+                <p className="font-bold">
+                  {localized({ fa: selected.teacher.nameFa, en: selected.teacher.nameEn }, locale)}
+                </p>
+                <p className="latin mt-2 text-muted">{selected.iban}</p>
+              </div>
+              <label className="mt-5 block">
+                <span className="mb-2 block text-sm font-bold">
+                  {translate(locale, 'adminadminFinanceCenterBankReference')}
+                </span>
+                <input
+                  value={reference}
+                  onChange={(event) => setReference(event.target.value)}
+                  required
+                  dir="ltr"
+                  className="input latin"
+                  placeholder="مثلاً 847291035"
+                />
+              </label>
+              <p className="mt-3 text-xs leading-6 text-muted">
+                {translate(locale, 'adminadminFinanceCenterAfterConfirmationTheAmountIsDebitedFromThe')}
               </p>
-            )}
-            <div className="mt-5 flex gap-3">
-              <button
-                type="button"
-                onClick={() => setSelected(null)}
-                className="secondary-button flex-1 justify-center"
-              >
-                {translate(locale, 'admincountryManagerCancel')}
-              </button>
-              <button
-                disabled={!reference.trim() || transfer.isPending}
-                className="primary-button flex-1 justify-center disabled:opacity-50"
-              >
-                {transfer.isPending
-                  ? translate(locale, 'adminadminFinanceCenterSaving')
-                  : translate(locale, 'adminadminFinanceCenterConfirm')}
-              </button>
-            </div>
-          </form>
-        </div>
+              {transfer.isError && (
+                <p role="alert" className="mt-3 rounded-xl bg-red-50 p-3 text-xs text-red-700">
+                  {apiMessage(transfer.error, translate(locale, 'adminadminFinanceCenterTransferFailed'))}
+                </p>
+              )}
+              <div className="mt-5 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setSelected(null)}
+                  className="secondary-button flex-1 justify-center"
+                >
+                  {translate(locale, 'admincountryManagerCancel')}
+                </button>
+                <button
+                  disabled={!reference.trim() || transfer.isPending}
+                  className="primary-button flex-1 justify-center disabled:opacity-50"
+                >
+                  {transfer.isPending
+                    ? translate(locale, 'adminadminFinanceCenterSaving')
+                    : translate(locale, 'adminadminFinanceCenterConfirm')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </Portal>
       )}
     </div>
   );

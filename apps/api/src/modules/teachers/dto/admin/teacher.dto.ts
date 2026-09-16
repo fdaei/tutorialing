@@ -1,3 +1,4 @@
+import { PartialType } from '@nestjs/swagger';
 import { TeacherStatus } from '@prisma/client';
 import {
   ArrayMaxSize,
@@ -16,7 +17,7 @@ import { IsIranianPhone } from '../../../../common/validators/is-iranian-phone.d
 
 export class AdminTeacherDto {
   @IsIranianPhone() phone!: string;
-  @IsOptional() @IsEmail() email?: string;
+  @IsOptional() @IsEmail() email?: string | null;
   @IsString() @Length(2, 80) nameFa!: string;
   @IsString() @Length(2, 80) nameEn!: string;
   @IsString() @Length(40, 3000) bioFa!: string;
@@ -37,3 +38,6 @@ export class AdminTeacherDto {
   @IsOptional() @IsString() @Length(1, 100) avatarFileId?: string | null;
   @IsOptional() @IsEnum(TeacherStatus) status?: TeacherStatus;
 }
+
+/** PATCH body: every field optional — the service falls back to the stored value. */
+export class AdminUpdateTeacherDto extends PartialType(AdminTeacherDto) {}
