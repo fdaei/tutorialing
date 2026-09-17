@@ -23,7 +23,7 @@ export function TeacherCard({ teacher, reason, score }: { teacher: PublicTeacher
       new Intl.NumberFormat(translate(locale, 'commercepricingManagerEnUS2')).format(teacher.approvedTrialPrice ?? 0) +
       translate(locale, 'commercepricingManagerIrr');
   return (
-    <article className="surface-card lift relative overflow-hidden p-5">
+    <article className="teacher-product-card surface-card lift relative overflow-hidden p-5">
       {score != null && (
         <span className="absolute start-4 top-4 z-10 rounded-full bg-lavender px-3 py-1 text-xs font-black text-purple">
           {score}% {translate(locale, 'teacherteacherCardMatch')}
@@ -48,11 +48,14 @@ export function TeacherCard({ teacher, reason, score }: { teacher: PublicTeacher
               <>
                 <span className="latin">{teacher.rating.toFixed(1)}</span>
                 <span className="font-normal text-muted">
-                  {teacher.reviewsCount.toLocaleString(locale === 'en' ? 'en-US' : 'fa-IR')} {locale === 'en' ? 'reviews' : 'نظر'}
+                  {teacher.reviewsCount.toLocaleString(locale === 'en' ? 'en-US' : 'fa-IR')}{' '}
+                  {locale === 'en' ? 'reviews' : 'نظر'}
                 </span>
               </>
             ) : (
-              <span className="font-normal text-muted">{locale === 'en' ? 'No ratings yet' : 'هنوز امتیازی ثبت نشده'}</span>
+              <span className="font-normal text-muted">
+                {locale === 'en' ? 'No ratings yet' : 'هنوز امتیازی ثبت نشده'}
+              </span>
             )}
           </p>
         </div>
@@ -77,7 +80,7 @@ export function TeacherCard({ teacher, reason, score }: { teacher: PublicTeacher
         )}
         <Link
           href={localePath(`/teachers/${teacher.slug}`, locale)}
-          className="rounded-xl border border-blue px-4 py-2.5 text-sm font-bold text-blue hover:bg-blue hover:text-white"
+          className="rounded-xl bg-blue px-4 py-2.5 text-sm font-bold text-white shadow-sm hover:-translate-y-0.5 hover:bg-primary-hover"
         >
           {translate(locale, 'teacherteacherCardViewBook')}
         </Link>

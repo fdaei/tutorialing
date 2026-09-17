@@ -5,7 +5,7 @@ import { Suspense, useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'next/navigation';
 import { Search, RotateCcw, SlidersHorizontal } from 'lucide-react';
-import { Header, Footer, Empty } from '@/components/layout/site';
+import { Header, Footer, Empty, PublicPageHero } from '@/components/layout/site';
 import { TeacherCard } from '@/features/teacher/components/teacher-card';
 import { TeacherLanguageFilter } from '@/features/teacher/components/teacher-language-filter';
 import { publicApi, type Paginated } from '@/shared/services/api';
@@ -51,18 +51,23 @@ function DirectoryContent() {
   return (
     <>
       <Header />
-      <main className="mx-auto max-w-7xl px-6 py-14">
-        <p className="text-sm font-bold text-purple">{translate(locale, 'teachersVerifiedTeachers')}</p>
-        <h1 className="mt-3 max-w-3xl text-4xl font-black md:text-6xl">
-          {translate(locale, 'teachersFindATeacherBuiltAroundYourGoal')}
-        </h1>
+      <main className="page-shell section-space">
+        <PublicPageHero
+          eyebrow={translate(locale, 'teachersVerifiedTeachers')}
+          title={translate(locale, 'teachersFindATeacherBuiltAroundYourGoal')}
+          description={
+            english
+              ? 'Compare expertise, teaching style, availability and learner feedback before you choose. Every published profile has passed our review process.'
+              : 'تخصص، سبک تدریس، زمان‌های آزاد و بازخورد زبان‌آموزان را پیش از انتخاب مقایسه کن. هر پروفایل منتشرشده فرایند بررسی ما را گذرانده است.'
+          }
+        />
         <form
           onSubmit={(e) => {
             e.preventDefault();
             setSearch(q);
             setPage(1);
           }}
-          className="sticky top-20 z-20 mt-8 grid gap-3 rounded-3xl border hairline bg-white/95 p-4 shadow-soft sm:grid-cols-2 xl:grid-cols-[minmax(220px,1fr)_140px_140px_130px_160px_auto]"
+          className="sticky top-24 z-20 mt-8 grid gap-3 rounded-3xl border hairline bg-white/95 p-4 shadow-[0_18px_45px_rgba(26,29,65,.10)] backdrop-blur-xl sm:grid-cols-2 xl:grid-cols-[minmax(220px,1fr)_140px_140px_130px_160px_auto]"
         >
           <label className="flex items-center gap-3 rounded-2xl bg-ivory px-4">
             <Search />

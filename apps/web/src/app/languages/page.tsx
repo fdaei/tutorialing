@@ -1,4 +1,4 @@
-import { Footer, Header } from '@/components/layout/site';
+import { Footer, Header, PublicPageHero } from '@/components/layout/site';
 import { publicApi } from '@/shared/services/api';
 import type { EducationalLanguage } from '@/features/languages';
 import { LanguageDiscoveryCard } from '@/features/languages/components/language-discovery-card';
@@ -31,11 +31,15 @@ export default async function LanguagesPage() {
     <>
       <Header config={headerConfig} />
       <main className="page-shell section-space">
-        <p className="text-sm font-black text-purple">چه زبانی می‌خواهید یاد بگیرید؟</p>
-        <h1 className="mt-3 text-4xl font-black md:text-5xl">زبان‌ها</h1>
-        <p className="mt-4 max-w-2xl leading-8 text-muted">
-          زبان را انتخاب کنید تا دوره‌ها، تعیین سطح و مدرس‌های مرتبط را در یک مسیر روشن ببینید.
-        </p>
+        <PublicPageHero
+          eyebrow={locale === 'en' ? 'Choose your learning path' : 'مسیر یادگیریت را انتخاب کن'}
+          title={locale === 'en' ? 'One language. A clear route forward.' : 'یک زبان، یک مسیر روشن برای پیشرفت.'}
+          description={
+            locale === 'en'
+              ? 'Choose a language to see its CEFR route, focused courses, placement options and verified teachers in one place.'
+              : 'زبان را انتخاب کن تا مسیر CEFR، دوره‌های هدفمند، تعیین سطح و مدرس‌های مرتبط را یکجا ببینی.'
+          }
+        />
         {items.length ? (
           <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {items.map((language) => (
