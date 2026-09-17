@@ -4,6 +4,7 @@ import { CalendarDays, LineChart, Users, WalletCards } from 'lucide-react';
 import { Footer, Header } from '@/components/layout/site';
 import { localePath, localized } from '@/lib/i18n';
 import { requestLocale } from '@/lib/server-locale';
+import { resolveHeaderConfig } from '@/lib/header-config';
 
 const items = [
   [Users, { fa: 'زبان‌آموزان تازه', en: 'New learners' }],
@@ -13,12 +14,12 @@ const items = [
 ] as const;
 
 export default async function TeachPage() {
-  const locale = await requestLocale();
+  const [locale, headerConfig] = await Promise.all([requestLocale(), resolveHeaderConfig()]);
   const t = (copy: { fa: string; en: string }) => localized(copy, locale);
 
   return (
     <>
-      <Header />
+      <Header config={headerConfig} />
       <main>
         <section className="hero-wash">
           <div className="page-shell grid items-center gap-10 py-16 lg:grid-cols-2">

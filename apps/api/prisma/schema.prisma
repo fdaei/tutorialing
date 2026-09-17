@@ -468,6 +468,12 @@ model Course {
   consultationOnly Boolean         @default(false)
   sortOrder        Int             @default(0)
 
+  // LIVE_ONLINE courses map their fixed session count onto an existing
+  // Package (its `credits` field is the number of sessions); actual class
+  // scheduling then goes through the ordinary Enrollment/Booking flow.
+  packageId String?  @unique
+  package   Package? @relation(fields: [packageId], references: [id], onDelete: SetNull)
+
   enrollments CourseEnrollment[]
   reviews     CourseReview[]
   chapters    CourseChapter[]
@@ -773,6 +779,7 @@ model Package {
   approvedById    String?
   enrollments     Enrollment[]
   recommendations PackageRecommendation[]
+  course          Course?
   createdAt       DateTime                @default(now())
 }
 

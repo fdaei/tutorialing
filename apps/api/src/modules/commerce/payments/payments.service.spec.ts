@@ -126,6 +126,10 @@ function callbackHarness(
     notification: { create: jest.fn().mockResolvedValue({}) },
     discount: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
     courseEnrollment: { upsert: jest.fn().mockResolvedValue({}) },
+    course: { findUnique: jest.fn().mockResolvedValue(null) },
+    enrollment: { findFirst: jest.fn().mockResolvedValue(null), create: jest.fn() },
+    creditEntry: { create: jest.fn() },
+    package: { findUniqueOrThrow: jest.fn() },
   };
   const db = {
     payment: { findUnique: jest.fn().mockImplementation(() => Promise.resolve({ ...payment })) },

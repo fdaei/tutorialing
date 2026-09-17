@@ -4,6 +4,7 @@ import type { Course } from '@/lib/marketplace-data';
 import { BookOpen } from 'lucide-react';
 import { CourseDirectory } from '@/features/courses/components/course-directory';
 import { requestLocale } from '@/lib/server-locale';
+import { resolveHeaderConfig } from '@/lib/header-config';
 import type { EducationalLanguage } from '@/features/languages';
 export const dynamic = 'force-dynamic';
 export default async function CoursesPage({
@@ -13,12 +14,13 @@ export default async function CoursesPage({
 }) {
   const query = await searchParams;
   const requestedLanguage = query.language?.trim() ?? '';
-  const [courses, locale, languages] = await Promise.all([
+  const [courses, locale, languages, headerConfig] = await Promise.all([
     publicApi<Course[]>('/courses'),
     requestLocale(),
     requestedLanguage
       ? publicApi<EducationalLanguage[]>('/languages').catch(() => [] as EducationalLanguage[])
       : Promise.resolve([] as EducationalLanguage[]),
+    resolveHeaderConfig(),
   ]);
   const language = languages.find((item) => item.code === requestedLanguage || item.id === requestedLanguage);
   const languageCandidates = [
@@ -33,7 +35,7 @@ export default async function CoursesPage({
   const english = locale === 'en';
   return (
     <>
-      <Header />
+      <Header config={headerConfig} />
       <main className="page-shell section-space">
         <p className="text-sm font-black text-purple">{english ? 'Structured learning' : 'یادگیری ساختاریافته'}</p>
         <h1 className="mt-3 text-4xl font-black md:text-5xl">{english ? 'Language courses' : 'دوره‌های زبان'}</h1>

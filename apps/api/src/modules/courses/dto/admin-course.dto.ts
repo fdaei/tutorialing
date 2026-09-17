@@ -13,4 +13,7 @@ export class AdminCourseDto {
   @Type(() => Number) @IsInt() @Min(0) @Max(2_000_000_000) price!: number;
   @IsOptional() @IsString() @MaxLength(2_000) image?: string;
   @IsBoolean() published!: boolean;
+  @IsOptional() @IsIn(['SELF_PACED', 'LIVE_ONLINE']) format?: 'SELF_PACED' | 'LIVE_ONLINE';
+  // Package whose `credits` count the course's sessions; required for LIVE_ONLINE.
+  @IsOptional() @IsString() packageId?: string;
 }

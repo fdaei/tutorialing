@@ -225,6 +225,110 @@ export class BookingsService {
     if (used) throw conflict('TRIAL_ALREADY_USED');
   }
 
+  /**
+   * Creates a session for a LIVE_ONLINE course. The time is negotiated
+   * directly between teacher and student (no self-serve slot picking, unlike
+   * `create()`), so this skips `AvailabilityService` and all payment/wallet
+   * machinery — the course was already paid for and one credit against its
+   * linked Package is consumed here instead.
+   */
+  async scheduleCourseSession(
+    actorId: string,
+    roles: string[],
+    data: { studentId: string; courseId: string; startsAt: string; endsAt: string; timezone: string; meetingUrl?: string },
+  ) {
+    const course = await this.db.course.findUnique({ where: { id: data.courseId }, include: { teacher: true } });
+    if (!course || course.format !== 'LIVE_ONLINE' || !course.packageId || !course.teacherId || !course.teacher) {
+      throw notFound('COURSE_NOT_FOUND');
+    }
+    if (roles.includes('INSTRUCTOR') && !roles.includes('ADMIN') && course.teacher.userId !== actorId) {
+      throw forbidden('BOOKING_OWNERSHIP_REQUIRED');
+    }
+    const startsAt = new Date(data.startsAt);
+    const endsAt = new Date(data.endsAt);
+    if (!Number.isFinite(startsAt.getTime()) || !Number.isFinite(endsAt.getTime()) || startsAt <= new Date() || endsAt <= startsAt) {
+      throw badRequest('BOOKING_START_INVALID');
+    }
+    const lock = await this.redis.lock(`booking:${course.teacherId}:${startsAt.toISOString()}`);
+    if (!lock) throw conflict('SLOT_LOCKED');
+    try {
+      const booking = await this.db.$transaction(
+        async (tx) => {
+          const enrollment = await tx.enrollment.findFirst({
+            where: { studentId: data.studentId, packageId: course.packageId!, active: true },
+          });
+          if (!enrollment) throw notFound('ENROLLMENT_NOT_FOUND');
+          const remaining = await this.remainingCredits(tx, enrollment.id);
+          if (remaining <= 0) throw badRequest('NO_CREDITS_REMAINING');
+
+          const teacherOverlap = await tx.booking.count({
+            where: {
+              teacherId: course.teacherId!,
+              status: { in: ['PENDING_PAYMENT', 'CONFIRMED'] },
+              startsAt: { lt: endsAt },
+              endsAt: { gt: startsAt },
+            },
+          });
+          if (teacherOverlap) throw conflict('TEACHER_BOOKING_OVERLAP');
+          const studentOverlap = await tx.booking.count({
+            where: {
+              studentId: data.studentId,
+              status: { in: ['PENDING_PAYMENT', 'CONFIRMED'] },
+              startsAt: { lt: endsAt },
+              endsAt: { gt: startsAt },
+            },
+          });
+          if (studentOverlap) throw conflict('STUDENT_BOOKING_OVERLAP');
+
+          const created = await tx.booking.create({
+            data: {
+              studentId: data.studentId,
+              teacherId: course.teacherId!,
+              enrollmentId: enrollment.id,
+              startsAt,
+              endsAt,
+              timezone: data.timezone,
+              type: 'course_session',
+              price: 0,
+              policySnapshot: {},
+              status: 'CONFIRMED',
+              meetingUrl: data.meetingUrl,
+            },
+          });
+          await tx.creditEntry.create({
+            data: {
+              enrollmentId: enrollment.id,
+              bookingId: created.id,
+              type: 'CONSUME',
+              amount: 1,
+              idempotencyKey: `schedule:${created.id}`,
+            },
+          });
+          await this.outbox.enqueue(tx, OUTBOX_EVENT_TYPES.bookingConfirmed, bookingConfirmedKey(created.id), {
+            bookingId: created.id,
+          });
+          return created;
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+      await this.queue.scheduleBooking(booking.id, booking.startsAt);
+      return booking;
+    } finally {
+      await lock.release();
+    }
+  }
+
+  /** Purchased credits minus consumed ones, plus any restored by cancellations. */
+  private async remainingCredits(tx: Prisma.TransactionClient, enrollmentId: string) {
+    const entries = await tx.creditEntry.groupBy({
+      by: ['type'],
+      where: { enrollmentId },
+      _sum: { amount: true },
+    });
+    const sum = (type: string) => entries.find((e) => e.type === type)?._sum.amount ?? 0;
+    return sum('PURCHASE') - sum('CONSUME') + sum('RESTORE');
+  }
+
   async list(userId: string, role: 'student' | 'teacher') {
     const bookings =
       role === 'student' ? await this.repo.findStudentBookings(userId) : await this.repo.findTeacherBookings(userId);

@@ -48,6 +48,7 @@ export type LearningEnrollment = {
     level: string;
     language: string;
     lessonsCount: number;
+    format: 'SELF_PACED' | 'LIVE_ONLINE';
   };
 };
 export type InstructorCourse = {
@@ -59,6 +60,8 @@ export type InstructorCourse = {
   level: string;
   language: string;
   updatedAt: string;
+  format: 'SELF_PACED' | 'LIVE_ONLINE';
   _count: { chapters: number; enrollments: number };
 };
+export type CourseSessionStudent = { studentId: string; name: string | null; remainingCredits: number };
 export type InstructorCurriculum = InstructorCourse & { chapters: CourseChapter[] };

@@ -10,6 +10,7 @@ import { TeacherBookingCard } from '@/features/teacher/components/teacher-bookin
 import { ReviewSection } from '@/components/reviews/review-section';
 import { publicPageMetadata } from '@/lib/public-metadata';
 import { TeacherIntroVideoDialog } from '@/features/teacher/components/teacher-intro-video-dialog';
+import { resolveHeaderConfig } from '@/lib/header-config';
 export const dynamic = 'force-dynamic';
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
@@ -32,7 +33,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
 export default async function Profile({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params,
-    locale = await requestLocale();
+    [locale, headerConfig] = await Promise.all([requestLocale(), resolveHeaderConfig()]);
   let t: PublicTeacher;
   try {
     t = await publicApi<PublicTeacher>(`/teachers/${id}`, { cache: 'no-store' });
@@ -44,7 +45,7 @@ export default async function Profile({ params }: { params: Promise<{ id: string
   const copy = (fa: string, en: string) => english ? en : fa;
   return (
     <>
-      <Header />
+      <Header config={headerConfig} />
       <main className="page-shell py-8 md:py-12">
         <div className="grid gap-8 lg:grid-cols-[1fr_360px]">
           <div>

@@ -11,6 +11,7 @@ import { BlogMarkdown } from '@/features/blog/components/blog-markdown';
 import type { BlogPostDetail, BlogPostSummary, BlogPostsPage } from '@/features/blog/types';
 import type { Metadata } from 'next';
 import { publicPageMetadata } from '@/lib/public-metadata';
+import { resolveHeaderConfig } from '@/lib/header-config';
 
 const copy = (locale: 'fa' | 'en', fa: string, en: string) => (locale === 'en' ? en : fa);
 
@@ -42,7 +43,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 }
 
 export default async function BlogDetail({ params }: { params: Promise<{ slug: string }> }) {
-  const [{ slug }, locale] = await Promise.all([params, requestLocale()]);
+  const [{ slug }, locale, headerConfig] = await Promise.all([params, requestLocale(), resolveHeaderConfig()]);
   let post: BlogPostDetail;
   try {
     post = await publicApi<BlogPostDetail>(`/blog/posts/${encodeURIComponent(slug)}`);
@@ -60,7 +61,7 @@ export default async function BlogDetail({ params }: { params: Promise<{ slug: s
 
   return (
     <>
-      <Header />
+      <Header config={headerConfig} />
       <main className="blog-article-page">
         <ViewTracker id={post.id} />
         <section className="blog-article-hero">

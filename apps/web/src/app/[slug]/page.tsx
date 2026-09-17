@@ -5,6 +5,7 @@ import { Header, Footer } from '@/components/layout/site';
 import { ApiError, publicApi } from '@/shared/services/api';
 import { requestLocale } from '@/lib/server-locale';
 import { publicPageMetadata } from '@/lib/public-metadata';
+import { resolveHeaderConfig } from '@/lib/header-config';
 import { contactPhoneHref, webConfig } from '@/config';
 import Link from 'next/link';
 import {
@@ -49,8 +50,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 }
 export default async function CmsPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params,
-    p = await load(slug),
-    locale = await requestLocale();
+    [p, locale, headerConfig] = await Promise.all([load(slug), requestLocale(), resolveHeaderConfig()]);
   if (!p) notFound();
   const content = localized({ fa: p.contentFa, en: p.contentEn }, locale);
   const paragraphs = content.paragraphs;
@@ -62,7 +62,7 @@ export default async function CmsPage({ params }: { params: Promise<{ slug: stri
   const Icon = meta.icon;
   return (
     <>
-      <Header />
+      <Header config={headerConfig} />
       <main className="min-h-[60vh] bg-canvas">
         <section className="content-hero">
           <div className="page-shell py-12 md:py-20">

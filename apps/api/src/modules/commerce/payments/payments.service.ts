@@ -433,6 +433,16 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
         create: { userId: payment.userId, courseId: payment.referenceId },
         update: {},
       });
+      // LIVE_ONLINE courses have no chapters/player — their sessions are
+      // scheduled through the ordinary Enrollment/Booking flow, so buying one
+      // also grants credits against the course's linked Package.
+      const course = await tx.course.findUnique({ where: { id: payment.referenceId } });
+      if (course?.format === 'LIVE_ONLINE' && course.packageId) {
+        const alreadyGranted = await tx.enrollment.findFirst({
+          where: { studentId: payment.userId, packageId: course.packageId },
+        });
+        if (!alreadyGranted) await this.createEnrollmentWithCredits(tx, payment.userId, course.packageId, payment.id);
+      }
       return;
     }
     if (payment.purpose === 'booking') {
@@ -457,18 +467,23 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
       });
       return;
     }
-    const pkg = await tx.package.findUniqueOrThrow({ where: { id: payment.referenceId } });
+    await this.createEnrollmentWithCredits(tx, payment.userId, payment.referenceId, payment.id);
+  }
+
+  private async createEnrollmentWithCredits(tx: Tx, studentId: string, packageId: string, paymentId: string) {
+    const pkg = await tx.package.findUniqueOrThrow({ where: { id: packageId } });
     const enrollment = await tx.enrollment.create({
-      data: { studentId: payment.userId, packageId: pkg.id, creditsPurchased: pkg.credits, paymentId: payment.id },
+      data: { studentId, packageId: pkg.id, creditsPurchased: pkg.credits, paymentId },
     });
     await tx.creditEntry.create({
       data: {
         enrollmentId: enrollment.id,
         type: 'PURCHASE',
         amount: pkg.credits,
-        idempotencyKey: `purchase:${payment.id}`,
+        idempotencyKey: `purchase:${paymentId}`,
       },
     });
+    return enrollment;
   }
 
   /**

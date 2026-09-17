@@ -31,6 +31,7 @@ import {
 } from '@/features/courses/course-localization';
 import { CourseEnrollmentCta } from '@/features/courses/components/course-enrollment-cta';
 import type { CourseChapter } from '@/features/courses/course-types';
+import { resolveHeaderConfig } from '@/lib/header-config';
 
 export const dynamic = 'force-dynamic';
 type CourseDetail = Course & {
@@ -60,7 +61,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 }
 
 export default async function CoursePage({ params }: { params: Promise<{ slug: string }> }) {
-  const [{ slug }, locale] = await Promise.all([params, requestLocale()]);
+  const [{ slug }, locale, headerConfig] = await Promise.all([params, requestLocale(), resolveHeaderConfig()]);
   let course: CourseDetail;
   try {
     course = await publicApi<CourseDetail>(`/courses/${slug}`);
@@ -87,7 +88,7 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
     .slice(0, 3);
   return (
     <>
-      <Header />
+      <Header config={headerConfig} />
       <main>
         <section className="course-hero">
           <div className="page-shell grid gap-8 py-10 lg:grid-cols-[1fr_410px] lg:py-12">

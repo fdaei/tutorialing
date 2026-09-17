@@ -83,27 +83,42 @@ export function MyCourses() {
                 </div>
                 {item.completedAt && <CheckCircle2 className="shrink-0 text-green" />}
               </div>
-              <div className="mt-5">
-                <div className="mb-2 flex justify-between text-xs">
-                  <span className="text-muted">{english ? 'Course progress' : 'پیشرفت دوره'}</span>
-                  <b className="latin">{item.progressPercent}%</b>
+              {item.course.format === 'LIVE_ONLINE' ? (
+                <p className="mt-5 text-xs text-muted">
+                  {english
+                    ? 'This is a live scheduled course — your class times and join links appear in your calendar.'
+                    : 'این یک دوره‌ی کلاس زنده است — زمان‌بندی و لینک کلاس‌هایتان در تقویم شما نمایش داده می‌شود.'}
+                </p>
+              ) : (
+                <div className="mt-5">
+                  <div className="mb-2 flex justify-between text-xs">
+                    <span className="text-muted">{english ? 'Course progress' : 'پیشرفت دوره'}</span>
+                    <b className="latin">{item.progressPercent}%</b>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-gray-100">
+                    <div className="h-full rounded-full bg-green" style={{ width: `${item.progressPercent}%` }} />
+                  </div>
                 </div>
-                <div className="h-2 overflow-hidden rounded-full bg-gray-100">
-                  <div className="h-full rounded-full bg-green" style={{ width: `${item.progressPercent}%` }} />
-                </div>
-              </div>
+              )}
               <Link
-                href={localePath(`/courses/${item.course.slug}/learn`, locale)}
+                href={localePath(
+                  item.course.format === 'LIVE_ONLINE' ? '/dashboard/classes' : `/courses/${item.course.slug}/learn`,
+                  locale,
+                )}
                 className="primary-button mt-5 w-full justify-center"
               >
                 <PlayCircle size={18} />
-                {item.progressPercent
+                {item.course.format === 'LIVE_ONLINE'
                   ? english
-                    ? 'Resume learning'
-                    : 'ادامه یادگیری'
-                  : english
-                    ? 'Start course'
-                    : 'شروع دوره'}
+                    ? 'View my classes'
+                    : 'مشاهده کلاس‌ها'
+                  : item.progressPercent
+                    ? english
+                      ? 'Resume learning'
+                      : 'ادامه یادگیری'
+                    : english
+                      ? 'Start course'
+                      : 'شروع دوره'}
               </Link>
             </div>
           </article>

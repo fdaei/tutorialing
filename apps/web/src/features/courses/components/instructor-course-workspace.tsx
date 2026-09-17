@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { BookOpen, ChevronDown, CirclePlus, FileText, Headphones, Play, Trash2, Video } from 'lucide-react';
 import { api, apiMessage } from '@/shared/services/api';
 import type { CourseChapter, CourseLesson, InstructorCourse, InstructorCurriculum, LessonType } from '../course-types';
+import { CourseSessionScheduler } from './course-session-scheduler';
 
 const lessonIcons = { VIDEO: Video, AUDIO: Headphones, TEXT: FileText, QUIZ: CirclePlus };
 const lessonLabels = { VIDEO: 'ویدئو', AUDIO: 'صوت', TEXT: 'متن', QUIZ: 'تمرین' };
@@ -58,10 +59,12 @@ export function InstructorCourseWorkspace() {
   useEffect(() => {
     if (!courseId && courses.data?.[0]) setCourseId(courses.data[0].id);
   }, [courseId, courses.data]);
+  const selectedCourse = courses.data?.find((course) => course.id === courseId);
+  const isLiveOnline = selectedCourse?.format === 'LIVE_ONLINE';
   const curriculum = useQuery({
     queryKey: ['instructor-curriculum', courseId],
     queryFn: () => api<InstructorCurriculum>(`/instructor/courses/${courseId}/curriculum`),
-    enabled: Boolean(courseId),
+    enabled: Boolean(courseId) && !isLiveOnline,
   });
   const changed = () => {
     setNotice('تغییرات ذخیره شد.');
@@ -144,7 +147,9 @@ export function InstructorCourseWorkspace() {
           {notice}
         </p>
       )}
-      {curriculum.isLoading ? (
+      {isLiveOnline ? (
+        <CourseSessionScheduler courseId={courseId} />
+      ) : curriculum.isLoading ? (
         <WorkspaceSkeleton compact />
       ) : curriculum.isError ? (
         <WorkspaceError message="دریافت سرفصل دوره ناموفق بود." retry={() => void curriculum.refetch()} />

@@ -3,6 +3,7 @@ import { publicApi } from '@/shared/services/api';
 import type { EducationalLanguage } from '@/features/languages';
 import { LanguageDiscoveryCard } from '@/features/languages/components/language-discovery-card';
 import { requestLocale } from '@/lib/server-locale';
+import { resolveHeaderConfig } from '@/lib/header-config';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,13 +22,14 @@ async function withImageUrls(items: EducationalLanguage[]) {
 }
 
 export default async function LanguagesPage() {
-  const [items, locale] = await Promise.all([
+  const [items, locale, headerConfig] = await Promise.all([
     publicApi<EducationalLanguage[]>('/languages').then(withImageUrls),
     requestLocale(),
+    resolveHeaderConfig(),
   ]);
   return (
     <>
-      <Header />
+      <Header config={headerConfig} />
       <main className="page-shell section-space">
         <p className="text-sm font-black text-purple">چه زبانی می‌خواهید یاد بگیرید؟</p>
         <h1 className="mt-3 text-4xl font-black md:text-5xl">زبان‌ها</h1>

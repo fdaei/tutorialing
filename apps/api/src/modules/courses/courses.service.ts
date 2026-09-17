@@ -74,6 +74,7 @@ export class CoursesService {
             level: true,
             language: true,
             lessonsCount: true,
+            format: true,
             chapters: {
               where: { published: true },
               select: { lessons: { where: { published: true }, select: { id: true } } },
@@ -198,6 +199,36 @@ export class CoursesService {
     return course;
   }
 
+  /** Students enrolled in a LIVE_ONLINE course, with remaining session credits, for the teacher's scheduling form. */
+  async courseSessionStudents(user: AuthUser, courseId: string) {
+    const course = await this.ownedCourseFull(user, courseId);
+    if (course.format !== 'LIVE_ONLINE' || !course.packageId) return [];
+    const enrollments = await this.db.enrollment.findMany({
+      where: { packageId: course.packageId, active: true },
+      include: { student: { select: { id: true, name: true } }, creditEntries: { select: { type: true, amount: true } } },
+    });
+    return enrollments.map((enrollment) => {
+      const sum = (type: string) =>
+        enrollment.creditEntries.filter((entry) => entry.type === type).reduce((total, entry) => total + entry.amount, 0);
+      return {
+        studentId: enrollment.studentId,
+        name: enrollment.student.name,
+        remainingCredits: sum('PURCHASE') - sum('CONSUME') + sum('RESTORE'),
+      };
+    });
+  }
+
+  private async ownedCourseFull(user: AuthUser, courseId: string) {
+    const course = await this.db.course.findFirst({
+      where: { OR: [{ id: courseId }, { slug: courseId }] },
+      include: { teacher: { select: { userId: true } } },
+    });
+    if (!course) throw notFound('COURSE_NOT_FOUND');
+    if (!user.roles.includes('ADMIN') && course.teacher?.userId !== user.id)
+      throw forbidden('COURSE_OWNERSHIP_REQUIRED');
+    return course;
+  }
+
   async instructorCourses(user: AuthUser) {
     return this.db.course.findMany({
       where: user.roles.includes('ADMIN') ? {} : { teacher: { userId: user.id } },
@@ -226,7 +257,9 @@ export class CoursesService {
 
   private async courseWriteData(input: AdminCourseDto, courseId?: string) {
     const teacherId = input.teacherId?.trim() || null;
-    const [duplicate, teacher, lessonsCount] = await Promise.all([
+    const format = input.format ?? 'SELF_PACED';
+    const packageId = input.packageId?.trim() || null;
+    const [duplicate, teacher, lessonsCount, pkg] = await Promise.all([
       this.db.course.findFirst({
         where: { slug: input.slug, ...(courseId ? { id: { not: courseId } } : {}) },
         select: { id: true },
@@ -242,11 +275,24 @@ export class CoursesService {
             where: { chapter: { courseId, published: true }, published: true },
           })
         : 0,
+      packageId
+        ? this.db.package.findUnique({
+            where: { id: packageId },
+            select: { id: true, teacherId: true, course: { select: { id: true } } },
+          })
+        : null,
     ]);
     if (duplicate) throw conflict('COURSE_SLUG_ALREADY_EXISTS');
     if (teacherId && !teacher) throw badRequest('COURSE_INSTRUCTOR_INVALID');
+    if (format === 'LIVE_ONLINE') {
+      if (!packageId || !pkg) throw badRequest('COURSE_PACKAGE_REQUIRED');
+      if (pkg.teacherId !== teacherId) throw badRequest('COURSE_PACKAGE_TEACHER_MISMATCH');
+      if (pkg.course && pkg.course.id !== courseId) throw conflict('COURSE_PACKAGE_ALREADY_LINKED');
+    }
     if (input.published && !teacher) throw badRequest('COURSE_PUBLISH_REQUIRES_INSTRUCTOR');
-    if (input.published && !lessonsCount) throw badRequest('COURSE_PUBLISH_REQUIRES_LESSONS');
+    // LIVE_ONLINE courses carry no chapters/lessons by design — their content
+    // is the scheduled sessions, not a video player.
+    if (input.published && format === 'SELF_PACED' && !lessonsCount) throw badRequest('COURSE_PUBLISH_REQUIRES_LESSONS');
     return {
       slug: input.slug,
       titleFa: input.titleFa.trim(),
@@ -261,6 +307,8 @@ export class CoursesService {
       image: input.image?.trim() || null,
       published: input.published,
       lessonsCount,
+      format,
+      packageId,
     };
   }
 

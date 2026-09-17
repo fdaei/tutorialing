@@ -6,6 +6,7 @@ import { BookingDto } from './dto/request/booking.dto';
 import { CancelDto } from './dto/request/cancel.dto';
 import { RescheduleDeclineDto, RescheduleDto } from './dto/request/reschedule.dto';
 import { AttendanceDto } from './dto/request/attendance.dto';
+import { ScheduleCourseSessionDto } from './dto/request/schedule-course-session.dto';
 import { BookingResponseDto } from './dto/response/booking-response.dto';
 
 @Controller('bookings')
@@ -62,5 +63,13 @@ export class BookingsController {
     @Param('id') id: string,
   ) {
     return this.s.complete(u.id, u.roles, id);
+  }
+  // Teacher/admin enters a time already agreed with the student directly
+  // (no self-serve slot picking) for a LIVE_ONLINE course session.
+  @Roles('INSTRUCTOR', 'ADMIN')
+  @Post('schedule-course-session')
+  async scheduleCourseSession(@CurrentUser() u: AuthUser, @Body() d: ScheduleCourseSessionDto) {
+    const b = await this.s.scheduleCourseSession(u.id, u.roles, d);
+    return plainToInstance(BookingResponseDto, b, { excludeExtraneousValues: true });
   }
 }

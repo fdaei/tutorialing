@@ -66,6 +66,10 @@ export class InstructorCoursesController {
     return this.service.instructorCurriculum(user, courseId);
   }
 
+  @Get(':courseId/session-students') sessionStudents(@CurrentUser() user: AuthUser, @Param('courseId') courseId: string) {
+    return this.service.courseSessionStudents(user, courseId);
+  }
+
   @Post(':courseId/chapters') createChapter(
     @CurrentUser() user: AuthUser,
     @Param('courseId') courseId: string,

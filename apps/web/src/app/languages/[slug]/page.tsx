@@ -8,15 +8,17 @@ import type { Course } from '@/lib/marketplace-data';
 import { requestLocale } from '@/lib/server-locale';
 import { localePath, localized } from '@/lib/i18n';
 import { featureFlags } from '@/config';
+import { resolveHeaderConfig } from '@/lib/header-config';
 
 const legacyCodes: Record<string, string> = { english: 'en', german: 'de', french: 'fr', spanish: 'es' };
 
 export default async function LanguagePage({ params }: { params: Promise<{ slug: string }> }) {
-  const [{ slug }, languages, allCourses, locale] = await Promise.all([
+  const [{ slug }, languages, allCourses, locale, headerConfig] = await Promise.all([
     params,
     publicApi<EducationalLanguage[]>('/languages'),
     publicApi<Course[]>('/courses'),
     requestLocale(),
+    resolveHeaderConfig(),
   ]);
   const code = legacyCodes[slug] ?? slug;
   const language = languages.find((item) => item.code === code);
@@ -27,7 +29,7 @@ export default async function LanguagePage({ params }: { params: Promise<{ slug:
   const courses = allCourses.filter((course) => course.language === language.nameFa || course.language === language.nameEn);
   return (
     <>
-      <Header />
+      <Header config={headerConfig} />
       <main>
         <section className="hero-wash section-space">
           <div className="page-shell">
