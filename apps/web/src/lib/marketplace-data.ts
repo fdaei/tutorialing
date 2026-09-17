@@ -25,6 +25,8 @@ export type Course = {
   lessons?: number;
   lessonsCount?: number;
   price: number;
+  format?: 'SELF_PACED' | 'LIVE_ONLINE';
+  teacherId?: string | null;
   image: string | null;
   summaryFa?: string | null;
   summaryEn?: string | null;

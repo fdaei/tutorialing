@@ -9,38 +9,71 @@ export function AdminSettingsActions({
   section,
 }: { endpoint: string; section: 'settings' | 'cms' } & Localized) {
   const action = useAction(endpoint);
+  const cardAction = useAction(endpoint);
   return (
     <div className="grid gap-5 xl:grid-cols-2">
       {section === 'settings' && (
-        <Shell title={translate(fa, 'legacyGeneralSetting')}>
-          <form
-            className="mt-4 grid gap-4"
-            onSubmit={(event) => {
-              event.preventDefault();
-              const form = new FormData(event.currentTarget);
-              action.mutate(() =>
-                api(`/admin/settings/${encodeURIComponent(value(form, 'key'))}`, {
-                  method: 'PUT',
-                  body: JSON.stringify({
-                    value: { value: value(form, 'settingValue') },
-                    public: form.get('public') === 'on',
+        <>
+          <Shell title={fa ? 'کارت دریافت وجه' : 'Payment card'}>
+            <form
+              className="mt-4 grid gap-4"
+              onSubmit={(event) => {
+                event.preventDefault();
+                const form = new FormData(event.currentTarget);
+                cardAction.mutate(() =>
+                  api('/admin/settings/payment.card', {
+                    method: 'PUT',
+                    body: JSON.stringify({
+                      value: {
+                        cardNumber: value(form, 'cardNumber'),
+                        holder: value(form, 'holder'),
+                        bank: value(form, 'bank'),
+                      },
+                      public: true,
+                    }),
                   }),
-                }),
-              );
-            }}
-          >
-            <Field name="key" label={translate(fa, 'legacyKey')} required dir="ltr" />
-            <Field name="settingValue" label={translate(fa, 'legacyValue')} required />
-            <label className="flex gap-2">
-              <input name="public" type="checkbox" />
-              {translate(fa, 'legacyPublic')}
-            </label>
-            <Submit fa={fa} busy={action.isPending}>
-              {translate(fa, 'legacySaveSetting')}
-            </Submit>
-          </form>
-          <Status fa={fa} error={action.error} ok={action.isSuccess} />
-        </Shell>
+                );
+              }}
+            >
+              <Field name="cardNumber" label={fa ? 'شماره کارت' : 'Card number'} required dir="ltr" />
+              <Field name="holder" label={fa ? 'نام صاحب حساب' : 'Account holder'} required />
+              <Field name="bank" label={fa ? 'نام بانک' : 'Bank'} required />
+              <Submit fa={fa} busy={cardAction.isPending}>
+                {fa ? 'ذخیره اطلاعات کارت' : 'Save payment card'}
+              </Submit>
+            </form>
+            <Status fa={fa} error={cardAction.error} ok={cardAction.isSuccess} />
+          </Shell>
+          <Shell title={translate(fa, 'legacyGeneralSetting')}>
+            <form
+              className="mt-4 grid gap-4"
+              onSubmit={(event) => {
+                event.preventDefault();
+                const form = new FormData(event.currentTarget);
+                action.mutate(() =>
+                  api(`/admin/settings/${encodeURIComponent(value(form, 'key'))}`, {
+                    method: 'PUT',
+                    body: JSON.stringify({
+                      value: { value: value(form, 'settingValue') },
+                      public: form.get('public') === 'on',
+                    }),
+                  }),
+                );
+              }}
+            >
+              <Field name="key" label={translate(fa, 'legacyKey')} required dir="ltr" />
+              <Field name="settingValue" label={translate(fa, 'legacyValue')} required />
+              <label className="flex gap-2">
+                <input name="public" type="checkbox" />
+                {translate(fa, 'legacyPublic')}
+              </label>
+              <Submit fa={fa} busy={action.isPending}>
+                {translate(fa, 'legacySaveSetting')}
+              </Submit>
+            </form>
+            <Status fa={fa} error={action.error} ok={action.isSuccess} />
+          </Shell>
+        </>
       )}
       {section === 'cms' && (
         <Shell title={translate(fa, 'legacyBilingualCMSPage')}>

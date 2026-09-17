@@ -7,8 +7,14 @@ export class BookingsRepository {
 
   adminList() {
     return this.prisma.booking.findMany({
-      include: { student: { select: { name: true, phone: true } }, teacher: { select: { nameFa: true, nameEn: true, slug: true } }, payment: true, classRecord: true },
-      orderBy: { startsAt: 'desc' }, take: 200,
+      include: {
+        student: { select: { name: true, phone: true } },
+        teacher: { select: { nameFa: true, nameEn: true, slug: true } },
+        payment: true,
+        classRecord: true,
+      },
+      orderBy: { startsAt: 'desc' },
+      take: 200,
     });
   }
 
@@ -33,7 +39,7 @@ export class BookingsRepository {
 
   findStudentBookings(userId: string) {
     return this.prisma.booking.findMany({
-      where: { studentId: userId },
+      where: { studentId: userId, NOT: { type: 'course_session', status: 'PENDING_PAYMENT' } },
       include: {
         teacher: {
           select: {
@@ -55,7 +61,7 @@ export class BookingsRepository {
 
   findTeacherBookings(userId: string) {
     return this.prisma.booking.findMany({
-      where: { teacher: { userId } },
+      where: { teacher: { userId }, NOT: { type: 'course_session', status: 'PENDING_PAYMENT' } },
       include: {
         teacher: {
           select: {

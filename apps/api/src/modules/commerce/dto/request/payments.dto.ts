@@ -1,5 +1,15 @@
-import { IsIn, IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
-
+import { Type } from 'class-transformer';
+import {
+  IsArray,
+  IsDateString,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  MaxLength,
+  Min,
+  ValidateNested,
+} from 'class-validator';
 
 export class PayDto {
   @IsIn(['booking', 'package']) purpose!: 'booking' | 'package';
@@ -34,7 +44,18 @@ export class ReceiptTopUpDto {
   @IsString() receiptFileId!: string;
   @IsString() idempotencyKey!: string;
   @IsOptional() @IsString() courseId?: string;
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CourseSessionSelectionDto)
+  sessions?: CourseSessionSelectionDto[];
   @IsOptional() @IsString() @MaxLength(500) note?: string;
+}
+
+export class CourseSessionSelectionDto {
+  @IsDateString() startsAt!: string;
+  @IsDateString() endsAt!: string;
+  @IsString() timezone!: string;
 }
 
 export class ReceiptApproveDto {
