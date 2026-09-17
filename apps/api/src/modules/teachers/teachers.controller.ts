@@ -1,7 +1,8 @@
-import { Body, Controller, Get, NotFoundException, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, NotFoundException, Param, Patch, Post, Put, Query } from '@nestjs/common';
 import { CurrentUser, Public, RateLimit, RATE_LIMIT_TIERS, Roles, type AuthUser } from '../../common';
 import { TeachersService } from './teachers.service';
 import { ApplicationDto } from './dto/request/application.dto';
+import { MeetingUrlDto } from './dto/request/meeting-url.dto';
 
 @Controller('teachers')
 export class TeachersController {
@@ -66,5 +67,14 @@ export class TeacherApplicationController {
   }
   @Post('submit') submit(@CurrentUser() user: AuthUser) {
     return this.service.submit(user.id);
+  }
+}
+
+@Controller('teacher/profile')
+export class TeacherProfileController {
+  constructor(private readonly service: TeachersService) {}
+  // The link persists across all lessons until the teacher changes or clears it.
+  @Roles('INSTRUCTOR') @Put('meeting-url') meetingUrl(@CurrentUser() user: AuthUser, @Body() body: MeetingUrlDto) {
+    return this.service.setMeetingUrl(user.id, body.meetingUrl?.trim() || null);
   }
 }

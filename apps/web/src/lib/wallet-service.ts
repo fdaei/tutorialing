@@ -26,6 +26,9 @@ export type Invoice = {
   status: string;
   createdAt: string;
   downloadUrl?: string;
+  hasReceipt?: boolean;
+  courseId?: string;
+  reviewNote?: string | null;
 };
 export type PaymentRequest = { amount: number; gateway: string; discountCode?: string };
 const invoiceTitle = (purpose: string) => {
@@ -34,6 +37,8 @@ const invoiceTitle = (purpose: string) => {
       return 'پرداخت کلاس';
     case 'package':
       return 'پرداخت بسته آموزشی';
+    case 'course':
+      return 'خرید دوره';
     case 'wallet_top_up':
       return 'افزایش موجودی کیف پول';
     default:
@@ -78,6 +83,9 @@ export const walletService = {
         status: string;
         createdAt: string;
         gatewayReference?: string;
+        receiptFileId?: string | null;
+        reviewNote?: string | null;
+        referenceId?: string;
       }>
     >('/payments/invoices');
     return rows.map((row) => ({
@@ -87,8 +95,16 @@ export const walletService = {
       amount: row.amount,
       status: row.status,
       createdAt: row.createdAt,
+      hasReceipt: Boolean(row.receiptFileId),
+      courseId: row.purpose === 'course' ? row.referenceId : undefined,
+      reviewNote: row.reviewNote,
     }));
   },
+  submitReceipt: (request: { amount: number; receiptFileId: string; note?: string; courseId?: string }) =>
+    api<{ id: string; status: string }>('/payments/wallet/receipts', {
+      method: 'POST',
+      body: JSON.stringify({ ...request, idempotencyKey: crypto.randomUUID() }),
+    }),
   topUp: async (request: PaymentRequest) => {
     return api<{ paymentId: string; status: string; url?: string }>('/payments/wallet/top-up', {
       method: 'POST',

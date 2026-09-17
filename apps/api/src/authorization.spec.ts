@@ -105,7 +105,7 @@ const SELF_SCOPED = new Set([
   'POST /bookings/:id/reschedule', 'POST /bookings/:id/reschedule/accept',
   'POST /bookings/:id/reschedule/decline',
   'GET /packages/enrollments/me',
-  'POST /payments', 'POST /payments/:id/gateway', 'GET /payments/wallet', 'POST /payments/wallet/top-up',
+  'POST /payments', 'POST /payments/:id/gateway', 'GET /payments/wallet', 'POST /payments/wallet/top-up', 'POST /payments/wallet/receipts',
   'GET /payments/wallet/transactions', 'GET /payments/invoices',
   'POST /files/uploads', 'POST /files/uploads/:id/content', 'POST /files/:id/complete',
   'GET /files/:id/download',

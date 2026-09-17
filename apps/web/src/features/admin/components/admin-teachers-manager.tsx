@@ -5,7 +5,7 @@ import { localized, isDefaultLocale } from '@/lib/i18n';
 import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, ImagePlus, LoaderCircle, Pencil, Plus, Search, Upload, X } from 'lucide-react';
-import { api, ApiError, Paginated } from '@/shared/services/api';
+import { api, apiField, ApiError, Paginated } from '@/shared/services/api';
 import { useTranslations } from '@/components/shared/locale-provider';
 import { uploadPanelFile } from '@/features/panel/services/upload-panel-file';
 import { uploadErrorMessage } from '@/shared/services/upload';
@@ -517,6 +517,7 @@ function TeacherEditor({ id, close, fa }: { id?: string; close: () => void; fa: 
                   required
                   minLength={2}
                   maxLength={80}
+                  error={apiField(save.error, 'nameFa')}
                 />
                 <Input
                   label={t('نام (انگلیسی)', 'Name (English)')}
@@ -526,6 +527,7 @@ function TeacherEditor({ id, close, fa }: { id?: string; close: () => void; fa: 
                   minLength={2}
                   maxLength={80}
                   dir="ltr"
+                  error={apiField(save.error, 'nameEn')}
                 />
                 <Input
                   label={t('موبایل', 'Phone')}
@@ -534,6 +536,7 @@ function TeacherEditor({ id, close, fa }: { id?: string; close: () => void; fa: 
                   required
                   dir="ltr"
                   placeholder="09xxxxxxxxx"
+                  error={apiField(save.error, 'phone')}
                 />
                 <Input
                   label={t('ایمیل', 'Email')}
@@ -541,6 +544,7 @@ function TeacherEditor({ id, close, fa }: { id?: string; close: () => void; fa: 
                   onChange={(v) => set('email', v)}
                   type="email"
                   dir="ltr"
+                  error={apiField(save.error, 'email')}
                 />
                 <Input
                   label={t('سال‌های سابقه', 'Years of experience')}
@@ -711,8 +715,9 @@ function TeacherEditor({ id, close, fa }: { id?: string; close: () => void; fa: 
 function Input({
   label,
   onChange,
+  error,
   ...props
-}: { label: string; onChange: (value: string) => void } & Omit<
+}: { label: string; onChange: (value: string) => void; error?: string } & Omit<
   React.InputHTMLAttributes<HTMLInputElement>,
   'onChange'
 >) {
@@ -720,6 +725,11 @@ function Input({
     <label className="grid gap-1.5 text-sm font-bold">
       {label}
       <input {...props} onChange={(e) => onChange(e.target.value)} className="input font-normal" />
+      {error && (
+        <span role="alert" className="text-xs font-normal text-red-700">
+          {error}
+        </span>
+      )}
     </label>
   );
 }

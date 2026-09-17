@@ -225,8 +225,11 @@ export class BookingsService {
     if (used) throw conflict('TRIAL_ALREADY_USED');
   }
 
-  list(userId: string, role: 'student' | 'teacher') {
-    return role === 'student' ? this.repo.findStudentBookings(userId) : this.repo.findTeacherBookings(userId);
+  async list(userId: string, role: 'student' | 'teacher') {
+    const bookings =
+      role === 'student' ? await this.repo.findStudentBookings(userId) : await this.repo.findTeacherBookings(userId);
+    // A per-booking link wins; otherwise the teacher's standing Meet room applies.
+    return bookings.map((booking) => ({ ...booking, meetingUrl: booking.meetingUrl ?? booking.teacher.meetingUrl }));
   }
 
   students(userId: string) {

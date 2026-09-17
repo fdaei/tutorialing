@@ -364,6 +364,9 @@ model Teacher {
   // 10-minute buffer and that decision was reversed. The field is kept so a
   // teacher can still opt into a break, but it must not be imposed by default.
   breakMinutes          Int                      @default(0)
+  // Teacher's standing Google Meet room, used for every lesson unless a booking
+  // carries its own link. Private: never part of the public profile select.
+  meetingUrl            String?
   proposedTrialPrice    Int?
   proposedRegularPrice  Int?
   approvedTrialPrice    Int?
@@ -894,6 +897,13 @@ model Payment {
   discountRule     DiscountRule?    @relation(fields: [discountRuleId], references: [id])
   callbackPayload  Json?
   verifiedAt       DateTime?
+  // Manual card-to-card top-ups (used until the Zarinpal gateway is live): the
+  // student uploads a bank receipt and an admin approves or rejects it.
+  receiptFileId    String?
+  receiptFile      StoredFile?      @relation("PaymentReceipt", fields: [receiptFileId], references: [id], onDelete: SetNull)
+  reviewedById     String?
+  reviewNote       String?
+  reviewedAt       DateTime?
   refunds          Refund[]
   reconciliations  Reconciliation[]
   createdAt        DateTime         @default(now())
@@ -901,6 +911,7 @@ model Payment {
 
   @@index([discountId])
   @@index([discountRuleId])
+  @@index([receiptFileId])
   // Backs WalletService.invoices() (GET /payments/invoices) and
   // AdminService.userDetail()'s nested payments read — both filter by userId
   // and sort by createdAt desc. Mirrors WalletEntry's [userId, createdAt] shape.
@@ -1304,6 +1315,7 @@ model StoredFile {
   questionAudio     Question[]         @relation("QuestionAudio")
   teacherIntroVideo Teacher?           @relation("TeacherIntroVideo")
   languageImages    Language[]         @relation("LanguageImage")
+  paymentReceipts   Payment[]          @relation("PaymentReceipt")
   createdAt         DateTime           @default(now())
 }
 

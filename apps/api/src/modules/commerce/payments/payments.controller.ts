@@ -6,7 +6,8 @@ import { PermissionKeys, RequirePermissions } from '../../auth/authorization';
 import { PaymentsService } from './payments.service';
 import { WalletService } from './wallet.service';
 import { RefundsService } from './refunds.service';
-import { PayDto, RefundDto, WalletTopUpDto } from '../dto/request/payments.dto';
+import { ReceiptTopUpsService } from './receipt-top-ups.service';
+import { PayDto, ReceiptTopUpDto, RefundDto, WalletTopUpDto } from '../dto/request/payments.dto';
 
 @Controller('payments')
 export class PaymentsController {
@@ -14,6 +15,7 @@ export class PaymentsController {
     private s: PaymentsService,
     private walletSvc: WalletService,
     private refundSvc: RefundsService,
+    private receipts: ReceiptTopUpsService,
   ) {}
 
   @RateLimit(RATE_LIMIT_TIERS.paymentInit)
@@ -65,6 +67,12 @@ export class PaymentsController {
   @Post('wallet/top-up')
   topUp(@CurrentUser() u: AuthUser, @Body() d: WalletTopUpDto) {
     return this.s.createWalletTopUp(u.id, d.amount, d.idempotencyKey);
+  }
+
+  @RateLimit(RATE_LIMIT_TIERS.paymentInit)
+  @Post('wallet/receipts')
+  submitReceipt(@CurrentUser() u: AuthUser, @Body() d: ReceiptTopUpDto) {
+    return this.receipts.submit(u.id, d);
   }
 
   @Get('wallet/transactions')

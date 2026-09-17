@@ -29,4 +29,6 @@ export class BookingResponseDto {
   student?: BookingStudentDto;
 
   @Expose() link?: string | null;
+  // Google Meet link set by the teacher; the list is already scoped to the caller's own bookings.
+  @Expose() meetingUrl?: string | null;
 }

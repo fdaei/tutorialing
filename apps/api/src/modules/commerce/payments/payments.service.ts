@@ -391,7 +391,7 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async failPayment(paymentId: string, payload: object) {
+  async failPayment(paymentId: string, payload: object) {
     return this.db.$transaction(async (tx) => {
       const payment = await tx.payment.findUniqueOrThrow({ where: { id: paymentId } });
       if (payment.status !== 'PENDING') return payment;
@@ -424,6 +424,15 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
         payment.id,
         `wallet-top-up:${payment.id}`,
       );
+      return;
+    }
+    if (payment.purpose === 'course') {
+      // Enrollment is what unlocks the player, "my courses" and course reviews.
+      await tx.courseEnrollment.upsert({
+        where: { userId_courseId: { userId: payment.userId, courseId: payment.referenceId } },
+        create: { userId: payment.userId, courseId: payment.referenceId },
+        update: {},
+      });
       return;
     }
     if (payment.purpose === 'booking') {

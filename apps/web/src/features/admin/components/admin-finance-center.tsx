@@ -17,6 +17,7 @@ import {
 import { api, apiMessage } from '@/shared/services/api';
 import { useTranslations } from '@/components/shared/locale-provider';
 import { formatMoney } from '@/lib/money';
+import { ReceiptReviewQueue, type ReceiptPayment } from './payment-receipts';
 
 type Aggregate = { status: string; _count: { _all: number }; _sum: Record<string, number | null> };
 type Reports = {
@@ -33,7 +34,7 @@ type Payment = {
   walletAmount: number;
   createdAt: string;
   user?: { name?: string; phone?: string };
-};
+} & ReceiptPayment;
 type Withdrawal = {
   id: string;
   amount: number;
@@ -60,6 +61,7 @@ export function AdminFinanceCenter() {
   const [reference, setReference] = useState('');
 
   const reports = useQuery({ queryKey: ['/admin/reports'], queryFn: () => api<Reports>('/admin/reports') });
+  const me = useQuery({ queryKey: ['me'], queryFn: () => api<{ id: string }>('/users/me') });
   const payments = useQuery({ queryKey: ['/admin/payments'], queryFn: () => api<Payment[]>('/admin/payments') });
   const withdrawals = useQuery({
     queryKey: ['/payouts/withdrawals'],
@@ -273,6 +275,8 @@ export function AdminFinanceCenter() {
           </div>
         )}
       </section>
+
+      <ReceiptReviewQueue payments={payments.data ?? []} fa={fa} currentUserId={me.data?.id} />
 
       <section className="panel-card mt-5 overflow-hidden">
         <div className="border-b hairline p-5 text-end">

@@ -6,6 +6,7 @@ import { GatewayService } from './payments/gateway.service';
 import { WalletService } from './payments/wallet.service';
 import { RefundsService } from './payments/refunds.service';
 import { ReconciliationService } from './payments/reconciliation.service';
+import { ReceiptTopUpsService } from './payments/receipt-top-ups.service';
 
 import { PayoutsController } from './payouts/payouts.controller';
 import { TeacherFinanceController } from './payouts/teacher-finance.controller';
@@ -34,6 +35,7 @@ import { AdminCommerceService } from './admin-commerce.service';
     WalletService,
     RefundsService,
     ReconciliationService,
+    ReceiptTopUpsService,
     PayoutsService,
     EarningsService,
     DiscountsService,

@@ -1,7 +1,8 @@
-import { IsBoolean, IsOptional, IsUrl } from 'class-validator';
+import { IsBoolean, IsOptional } from 'class-validator';
+import { IsGoogleMeetUrl } from '../../../../common/validators/is-google-meet-url.decorator';
 
 export class AttendanceDto {
   @IsOptional() @IsBoolean() student?: boolean;
   @IsOptional() @IsBoolean() teacher?: boolean;
-  @IsOptional() @IsUrl({ require_tld: false }) meetingUrl?: string;
+  @IsOptional() @IsGoogleMeetUrl() meetingUrl?: string;
 }

@@ -1,4 +1,4 @@
-import { IsIn, IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { IsIn, IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
 
 
 export class PayDto {
@@ -26,4 +26,21 @@ export class WalletAdjustmentDto {
   @IsIn(['CREDIT', 'DEBIT']) direction!: 'CREDIT' | 'DEBIT';
   @IsString() reason!: string;
   @IsString() idempotencyKey!: string;
+}
+
+export class ReceiptTopUpDto {
+  // Ignored for course receipts: the server charges the course price.
+  @IsInt() @Min(0) amount!: number;
+  @IsString() receiptFileId!: string;
+  @IsString() idempotencyKey!: string;
+  @IsOptional() @IsString() courseId?: string;
+  @IsOptional() @IsString() @MaxLength(500) note?: string;
+}
+
+export class ReceiptApproveDto {
+  @IsOptional() @IsString() @MaxLength(100) reference?: string;
+}
+
+export class ReceiptRejectDto {
+  @IsString() @MaxLength(500) reason!: string;
 }

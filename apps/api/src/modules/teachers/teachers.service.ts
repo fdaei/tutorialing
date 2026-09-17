@@ -607,6 +607,16 @@ export class TeachersService {
     return teacher;
   }
 
+  async setMeetingUrl(userId: string, meetingUrl: string | null) {
+    const teacher = await this.db.teacher.findUnique({ where: { userId }, select: { id: true } });
+    if (!teacher) throw notFound('TEACHER_NOT_FOUND');
+    return this.db.teacher.update({
+      where: { id: teacher.id },
+      data: { meetingUrl },
+      select: { meetingUrl: true },
+    });
+  }
+
   async submit(userId: string) {
     const teacher = await this.db.teacher.findUnique({
       where: { userId },

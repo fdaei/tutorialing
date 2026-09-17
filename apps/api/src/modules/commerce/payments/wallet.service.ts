@@ -35,7 +35,18 @@ export class WalletService {
       where: { userId },
       orderBy: { createdAt: 'desc' },
       take: 100,
-      select: { id: true, purpose: true, amount: true, status: true, gatewayReference: true, createdAt: true },
+      select: {
+        id: true,
+        purpose: true,
+        referenceId: true,
+        amount: true,
+        status: true,
+        gatewayReference: true,
+        createdAt: true,
+        receiptFileId: true,
+        reviewNote: true,
+        reviewedAt: true,
+      },
     });
   }
 

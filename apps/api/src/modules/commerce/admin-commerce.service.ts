@@ -6,10 +6,31 @@ import { badRequest, conflict } from '../../common';
 @Injectable()
 export class AdminCommerceService {
   constructor(private readonly db: PrismaService) {}
-  payments() {
-    return this.db.payment.findMany({
-      include: { refunds: true, reconciliations: true, user: { select: { phone: true, name: true } } },
+  async payments() {
+    const rows = await this.db.payment.findMany({
+      include: {
+        refunds: true,
+        reconciliations: true,
+        user: { select: { id: true, phone: true, name: true } },
+        receiptFile: { select: { id: true, originalName: true, mimeType: true } },
+      },
       orderBy: { createdAt: 'desc' }, take: 200,
+    });
+    const courseIds = [...new Set(rows.filter((row) => row.purpose === 'course').map((row) => row.referenceId))];
+    const courses = courseIds.length
+      ? await this.db.course.findMany({ where: { id: { in: courseIds } }, select: { id: true, titleFa: true, titleEn: true } })
+      : [];
+    return rows.map((row) => ({ ...row, course: courses.find((course) => course.id === row.referenceId) ?? null }));
+  }
+  userInvoices(userId: string) {
+    return this.db.payment.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+      select: {
+        id: true, purpose: true, amount: true, status: true, gatewayReference: true, createdAt: true,
+        receiptFileId: true, reviewNote: true, reviewedAt: true,
+      },
     });
   }
   async wallets() {

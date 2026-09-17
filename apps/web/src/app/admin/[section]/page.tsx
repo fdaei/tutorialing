@@ -7,6 +7,7 @@ import {
   AdminTeachersManager,
   AdminTestManager,
   AdminUsersManager,
+  AdminRoleSearch,
   CmsManager,
   CountryManager,
   ExaminerReviewManager,
@@ -65,6 +66,14 @@ export default async function Section({ params }: { params: Promise<{ section: s
       </div>
     );
   else if (section === 'magazine') content = <AdminArticleReviewWorkspace />;
+  else if (section === 'roles')
+    content = (
+      <div className="grid gap-6">
+        <PanelActions role="admin" section={section} endpoint={endpoint} />
+        <AdminRoleSearch />
+        <ResourceView title={localized({ fa: titleFa, en: titleEn }, locale)} endpoint={endpoint} />
+      </div>
+    );
   else
     content = (
       <>

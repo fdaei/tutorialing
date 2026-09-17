@@ -258,6 +258,38 @@ export const API_ERROR_MESSAGES: Record<string, Record<ApiLocale, string>> = {
     fa: 'این کلید پرداخت قبلاً استفاده شده است.',
     en: 'This payment key has already been used.',
   },
+  RECEIPT_SELF_REVIEW_FORBIDDEN: {
+    fa: 'رسید پرداخت خودتان را نمی‌توانید تأیید یا رد کنید؛ ادمین دیگری باید آن را بررسی کند.',
+    en: 'You cannot review your own payment receipt; another admin must review it.',
+  },
+  RECEIPT_ALREADY_REVIEWED: {
+    fa: 'این رسید قبلاً بررسی شده است.',
+    en: 'This receipt has already been reviewed.',
+  },
+  RECEIPT_REJECT_REASON_REQUIRED: {
+    fa: 'دلیل رد رسید را وارد کنید.',
+    en: 'Enter a reason for rejecting the receipt.',
+  },
+  RECEIPT_FILE_NOT_FOUND: {
+    fa: 'فایل رسید پیدا نشد؛ دوباره بارگذاری کنید.',
+    en: 'Receipt file not found; please upload it again.',
+  },
+  RECEIPT_ALREADY_SUBMITTED: {
+    fa: 'این رسید قبلاً ثبت شده است.',
+    en: 'This receipt has already been submitted.',
+  },
+  RECEIPT_AMOUNT_TOO_LOW: {
+    fa: 'حداقل مبلغ شارژ ۱۰٬۰۰۰ تومان است.',
+    en: 'The minimum top-up is 10,000 Toman.',
+  },
+  COURSE_ALREADY_ENROLLED: {
+    fa: 'شما قبلاً در این دوره ثبت‌نام کرده‌اید.',
+    en: 'You are already enrolled in this course.',
+  },
+  COURSE_RECEIPT_PENDING: {
+    fa: 'رسید پرداخت این دوره در انتظار تأیید است.',
+    en: 'A receipt for this course is already awaiting review.',
+  },
   DISCOUNT_INVALID: {
     fa: 'کد تخفیف معتبر نیست یا منقضی شده است.',
     en: 'The discount code is invalid or has expired.',

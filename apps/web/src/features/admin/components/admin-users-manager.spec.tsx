@@ -37,9 +37,11 @@ describe('AdminUsersManager', () => {
   beforeEach(() => {
     apiMock.mockImplementation((path) =>
       Promise.resolve(
-        String(path).includes('/user-1')
-          ? { ...user, bookings: [], attempts: [], payments: [], tickets: [], learningPlans: [], _count: {} }
-          : { data: [user], page: 1, totalPages: 1, total: 1 },
+        String(path).endsWith('/invoices')
+          ? []
+          : String(path).includes('/user-1')
+            ? { ...user, bookings: [], attempts: [], payments: [], tickets: [], learningPlans: [], _count: {} }
+            : { data: [user], page: 1, totalPages: 1, total: 1 },
       ),
     );
   });

@@ -494,7 +494,7 @@ export const studentNav: NavItem[] = [
     ? [{ href: '/dashboard/matches', label: 'مدرس‌های پیشنهادی', labelEn: 'Matched teachers', icon: Users }]
     : []),
   { href: '/dashboard/notifications', label: 'اعلان‌ها', labelEn: 'Notifications', icon: Bell },
-  { href: '/dashboard/wallet', label: 'پرداخت‌ها', labelEn: 'Payments', icon: Wallet },
+  // Wallet/payments menu entry hidden for students (enrollment now goes through receipt upload, not wallet top-up); route stays reachable at /dashboard/wallet.
   { href: '/dashboard/tickets', label: 'پشتیبانی', labelEn: 'Support', icon: LifeBuoy },
   { href: '/dashboard/profile', label: 'پروفایل و تنظیمات', labelEn: 'Profile & settings', icon: Settings },
 ];

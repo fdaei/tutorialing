@@ -4,7 +4,7 @@ import { Portal } from '@/shared/components/ui/portal';
 import { localized, isDefaultLocale, translate } from '@/lib/i18n';
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { CalendarPlus, ChevronLeft, ChevronRight, Clock3, Plus, Trash2, X } from 'lucide-react';
+import { CalendarPlus, ChevronLeft, ChevronRight, Clock3, Plus, Trash2, Video, X } from 'lucide-react';
 import { api } from '@/shared/services/api';
 import { useTranslations } from '@/components/shared/locale-provider';
 
@@ -16,6 +16,7 @@ type Booking = {
   startsAt: string;
   endsAt: string;
   status: string;
+  meetingUrl?: string | null;
   student?: { name?: string; phone?: string };
   teacher?: { nameFa?: string; nameEn?: string };
 };
@@ -205,6 +206,8 @@ export function TeacherPlannerCalendar({ mode = 'teacher' }: { mode?: CalendarMo
                 color="indigo"
                 time={`${time(item.startsAt)}–${time(item.endsAt)}`}
                 title={bookingTitle(item)}
+                meetingUrl={item.status === 'CONFIRMED' ? item.meetingUrl : null}
+                joinLabel={fa ? 'ورود به کلاس در Google Meet' : 'Join on Google Meet'}
               />
             ))}
             {selectedBlocks.map((item) => (
@@ -260,11 +263,35 @@ export function TeacherPlannerCalendar({ mode = 'teacher' }: { mode?: CalendarMo
   );
 }
 
-function Event({ color, time: label, title }: { color: string; time: string; title: string }) {
+function Event({
+  color,
+  time: label,
+  title,
+  meetingUrl,
+  joinLabel,
+}: {
+  color: string;
+  time: string;
+  title: string;
+  meetingUrl?: string | null;
+  joinLabel?: string;
+}) {
   return (
     <div className={`rounded-2xl border bg-white p-3 calendar-border-${color}`}>
       <strong className="block text-sm">{title}</strong>
       <small className="mt-1 block text-muted">{label}</small>
+      {meetingUrl && (
+        <a
+          href={meetingUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          dir="ltr"
+          className="mt-2 inline-flex items-center gap-1.5 text-sm font-bold text-blue"
+        >
+          <Video size={16} />
+          {joinLabel}
+        </a>
+      )}
     </div>
   );
 }

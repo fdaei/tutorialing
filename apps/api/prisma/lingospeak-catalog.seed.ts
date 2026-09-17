@@ -628,9 +628,14 @@ export async function seedLingoSpeakCatalog(db: PrismaClient, options: CatalogSe
     }
 
     // Reuse an account the teacher may already have created by signing in,
-    // rather than colliding with it on the unique phone.
-    const existingUser = await db.user.findUnique({ where: { phone }, select: { id: true } });
-    const userId = existingUser?.id ?? catalogUserId(teacher.key);
+    // rather than colliding with it on the unique phone. Also check by the
+    // deterministic catalog id: a prior seed run may have created it under a
+    // different placeholder phone, which would otherwise collide on the id.
+    const deterministicId = catalogUserId(teacher.key);
+    const existingUser =
+      (await db.user.findUnique({ where: { phone }, select: { id: true } })) ??
+      (await db.user.findUnique({ where: { id: deterministicId }, select: { id: true } }));
+    const userId = existingUser?.id ?? deterministicId;
     if (!existingUser)
       await db.user.create({
         data: {
@@ -644,6 +649,8 @@ export async function seedLingoSpeakCatalog(db: PrismaClient, options: CatalogSe
           status: 'ACTIVE',
         },
       });
+    else if (existingUser.id === deterministicId)
+      await db.user.update({ where: { id: deterministicId }, data: { phone } });
     await db.userRole.upsert({
       where: { userId_role: { userId, role: Role.INSTRUCTOR } },
       create: { userId, role: Role.INSTRUCTOR },

@@ -87,6 +87,7 @@ export class FilesService {
     const supportStaff = admin || (roles.includes('SUPPORT') && permissions.includes('tickets.read'));
     const teacherReviewer = admin || permissions.includes('teachers.verify');
     const testReviewer = admin || permissions.includes('tests.review');
+    const paymentReviewer = admin || permissions.includes('payments.read');
     const supportAttachment = await this.db.ticketReply.findFirst({
       where: {
         attachmentId: id,
@@ -103,6 +104,7 @@ export class FilesService {
             { ownerId: requesterId },
             ...(supportAttachment ? [{ id }] : []),
             ...(teacherReviewer ? [{ verificationItems: { some: {} } }, { purpose: 'teacher-intro-video' }] : []),
+            ...(paymentReviewer ? [{ purpose: 'payment-receipt', paymentReceipts: { some: {} } }] : []),
             ...(testReviewer ? [{ testAnswers: { some: { attempt: { status: 'UNDER_REVIEW' as const } } } }] : []),
           ],
         },

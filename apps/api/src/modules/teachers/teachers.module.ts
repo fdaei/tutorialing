@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { TeachersController, TeacherApplicationController } from './teachers.controller';
+import { TeachersController, TeacherApplicationController, TeacherProfileController } from './teachers.controller';
 import { VerificationController } from './verification.controller';
 import { TeachersService } from './teachers.service';
 import { VerificationService } from './verification.service';
@@ -15,6 +15,7 @@ import { FilesModule } from '../files/files.module';
   controllers: [
     TeachersController,
     TeacherApplicationController,
+    TeacherProfileController,
     VerificationController,
     TeacherPricingController,
     AdminPricingController,

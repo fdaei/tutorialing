@@ -137,7 +137,7 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
               <strong className="mt-5 block text-2xl">
                 {formatNumber(course.price, locale)} {t('تومان', 'Toman')}
               </strong>
-              <CourseEnrollmentCta slug={course.slug} />
+              <CourseEnrollmentCta slug={course.slug} courseId={course.id} price={course.price} />
               <ul className="mt-5 grid gap-3 text-sm text-muted">
                 {duration && (
                   <li className="flex items-center gap-2">

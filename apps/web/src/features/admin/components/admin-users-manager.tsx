@@ -8,6 +8,7 @@ import { ChevronLeft, ChevronRight, Eye, Search, ShieldCheck, UserRound, X } fro
 import { api, ApiError, Paginated } from '@/shared/services/api';
 import { useTranslations } from '@/components/shared/locale-provider';
 import { formatMoney } from '@/lib/money';
+import { AdminUserInvoices } from './payment-receipts';
 
 type Role = 'STUDENT' | 'INSTRUCTOR' | 'SUPPORT' | 'ADMIN';
 type User = {
@@ -443,12 +444,7 @@ function UserDetails({
                   fa={fa}
                   kind="booking"
                 />
-                <DetailList
-                  title={translate(fa, 'adminadminUsersManagerRecentPayments')}
-                  rows={user.payments}
-                  fa={fa}
-                  kind="payment"
-                />
+                <AdminUserInvoices userId={id} fa={fa} />
                 <DetailList
                   title={translate(fa, 'adminadminUsersManagerRecentTickets')}
                   rows={user.tickets}

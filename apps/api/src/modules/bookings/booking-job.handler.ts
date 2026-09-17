@@ -67,6 +67,9 @@ export class BookingJobHandler {
         // Same lesson time for both recipients, so it is formatted once. Rendered
         // in the booking's timezone rather than UTC — see `reminderToken`.
         const when = reminderToken(reminder.booking.startsAt, reminder.booking.timezone);
+        // The link itself is not put in the SMS: Kavenegar lookup tokens reject
+        // `:` and `/`. The SMS points users at the panel, where the link is shown.
+        const meet = reminder.booking.meetingUrl ?? reminder.booking.teacher.meetingUrl ?? null;
         for (const user of [reminder.booking.student, reminder.booking.teacher.user]) {
           const dedupeKey = `reminder:${reminder.id}:${user.id}`;
           const notification =
@@ -81,8 +84,9 @@ export class BookingJobHandler {
                 idempotencyKey: dedupeKey,
                 titleFa: 'یادآوری کلاس',
                 titleEn: 'Class reminder',
-                bodyFa: `کلاس شما در تاریخ ${when.date} ساعت ${when.time.replace('-', ':')} برگزار می‌شود.`,
-                bodyEn: `Your class starts on ${when.date} at ${when.time.replace('-', ':')}.`,
+                bodyFa: `کلاس شما در تاریخ ${when.date} ساعت ${when.time.replace('-', ':')} برگزار می‌شود.${meet ? ` لینک Google Meet: ${meet}` : ''}`,
+                bodyEn: `Your class starts on ${when.date} at ${when.time.replace('-', ':')}.${meet ? ` Google Meet link: ${meet}` : ''}`,
+                data: { bookingId: reminder.booking.id, meetingUrl: meet },
                 deliveries: { create: { channel: 'IN_APP', status: 'sent', sentAt: new Date() } },
               },
               include: { deliveries: true },

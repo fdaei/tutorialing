@@ -125,6 +125,7 @@ function callbackHarness(
     refund: { upsert: jest.fn().mockResolvedValue({ id: 'refund-1' }) },
     notification: { create: jest.fn().mockResolvedValue({}) },
     discount: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+    courseEnrollment: { upsert: jest.fn().mockResolvedValue({}) },
   };
   const db = {
     payment: { findUnique: jest.fn().mockImplementation(() => Promise.resolve({ ...payment })) },
@@ -162,6 +163,16 @@ describe('PaymentsService.callback', () => {
       'payment-1',
       'wallet-top-up:payment-1',
     );
+    expect(h.tx.booking.update).not.toHaveBeenCalled();
+  });
+
+  it('enrolls the student when a course payment settles', async () => {
+    const h = callbackHarness({ purpose: 'course' });
+    await h.svc.settleVerified('payment-1', undefined, { method: 'receipt' });
+    expect(h.tx.courseEnrollment.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({ create: { userId: USER, courseId: BOOKING.id } }),
+    );
+    expect(h.wallet.ledger).not.toHaveBeenCalled();
     expect(h.tx.booking.update).not.toHaveBeenCalled();
   });
 
