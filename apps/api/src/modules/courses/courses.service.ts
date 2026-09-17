@@ -21,6 +21,7 @@ export class CoursesService {
     const course = await this.db.course.findFirst({
       where: { OR: [{ id: slug }, { slug }], published: true },
       include: {
+        package: { select: { credits: true } },
         chapters: {
           where: { published: true },
           orderBy: { order: 'asc' },
@@ -205,11 +206,16 @@ export class CoursesService {
     if (course.format !== 'LIVE_ONLINE' || !course.packageId) return [];
     const enrollments = await this.db.enrollment.findMany({
       where: { packageId: course.packageId, active: true },
-      include: { student: { select: { id: true, name: true } }, creditEntries: { select: { type: true, amount: true } } },
+      include: {
+        student: { select: { id: true, name: true } },
+        creditEntries: { select: { type: true, amount: true } },
+      },
     });
     return enrollments.map((enrollment) => {
       const sum = (type: string) =>
-        enrollment.creditEntries.filter((entry) => entry.type === type).reduce((total, entry) => total + entry.amount, 0);
+        enrollment.creditEntries
+          .filter((entry) => entry.type === type)
+          .reduce((total, entry) => total + entry.amount, 0);
       return {
         studentId: enrollment.studentId,
         name: enrollment.student.name,
@@ -292,7 +298,8 @@ export class CoursesService {
     if (input.published && !teacher) throw badRequest('COURSE_PUBLISH_REQUIRES_INSTRUCTOR');
     // LIVE_ONLINE courses carry no chapters/lessons by design — their content
     // is the scheduled sessions, not a video player.
-    if (input.published && format === 'SELF_PACED' && !lessonsCount) throw badRequest('COURSE_PUBLISH_REQUIRES_LESSONS');
+    if (input.published && format === 'SELF_PACED' && !lessonsCount)
+      throw badRequest('COURSE_PUBLISH_REQUIRES_LESSONS');
     return {
       slug: input.slug,
       titleFa: input.titleFa.trim(),

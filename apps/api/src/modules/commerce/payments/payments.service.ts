@@ -338,19 +338,31 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
    * winner committed and returns it as an ordinary success instead.
    */
   async settleVerified(paymentId: string, reference: string | undefined, payload: object) {
-    const commit = () => this.db.$transaction(async tx => {
-      const current = await tx.payment.findUniqueOrThrow({ where: { id: paymentId } });
-      // Re-checked inside the transaction, not just before it: on the retry
-      // path the winner may have moved the payment on to PAID *or* straight to
-      // REFUNDED via `returnCapture`, and re-fulfilling either one would grant
-      // a second entitlement or undo the return.
-      if (!PaymentsService.SETTLEABLE.includes(current.status)) return current;
-      await tx.payment.update({ where: { id: paymentId }, data: { status: 'PAID', gatewayReference: reference, verifiedAt: new Date(), callbackPayload: payload as Prisma.InputJsonValue } });
-      await this.fulfill(tx, paymentId, current.status);
-      // `fulfill` can move the payment straight on to REFUNDED, so the row is
-      // re-read rather than returning the pre-fulfil update result.
-      return tx.payment.findUniqueOrThrow({ where: { id: paymentId } });
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    const commit = () =>
+      this.db.$transaction(
+        async (tx) => {
+          const current = await tx.payment.findUniqueOrThrow({ where: { id: paymentId } });
+          // Re-checked inside the transaction, not just before it: on the retry
+          // path the winner may have moved the payment on to PAID *or* straight to
+          // REFUNDED via `returnCapture`, and re-fulfilling either one would grant
+          // a second entitlement or undo the return.
+          if (!PaymentsService.SETTLEABLE.includes(current.status)) return current;
+          await tx.payment.update({
+            where: { id: paymentId },
+            data: {
+              status: 'PAID',
+              gatewayReference: reference,
+              verifiedAt: new Date(),
+              callbackPayload: payload as Prisma.InputJsonValue,
+            },
+          });
+          await this.fulfill(tx, paymentId, current.status);
+          // `fulfill` can move the payment straight on to REFUNDED, so the row is
+          // re-read rather than returning the pre-fulfil update result.
+          return tx.payment.findUniqueOrThrow({ where: { id: paymentId } });
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
 
     let paid;
     try {
@@ -407,6 +419,12 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
           `wallet-rollback:${payment.id}`,
         );
       await releaseDiscount(tx, payment.discountId);
+      if (payment.purpose === 'course') {
+        await tx.booking.updateMany({
+          where: { courseSessionPaymentId: payment.id, status: 'PENDING_PAYMENT' },
+          data: { status: 'CANCELLED', cancelledAt: new Date(), cancellationReason: 'payment receipt rejected' },
+        });
+      }
       return tx.payment.update({ where: { id: payment.id }, data: { status: 'FAILED', callbackPayload: payload } });
     });
   }
@@ -438,10 +456,32 @@ export class PaymentsService implements OnModuleInit, OnModuleDestroy {
       // also grants credits against the course's linked Package.
       const course = await tx.course.findUnique({ where: { id: payment.referenceId } });
       if (course?.format === 'LIVE_ONLINE' && course.packageId) {
-        const alreadyGranted = await tx.enrollment.findFirst({
+        let enrollment = await tx.enrollment.findFirst({
           where: { studentId: payment.userId, packageId: course.packageId },
         });
-        if (!alreadyGranted) await this.createEnrollmentWithCredits(tx, payment.userId, course.packageId, payment.id);
+        if (!enrollment)
+          enrollment = await this.createEnrollmentWithCredits(tx, payment.userId, course.packageId, payment.id);
+        const pendingSessions = await tx.booking.findMany({
+          where: { courseSessionPaymentId: payment.id, studentId: payment.userId, status: 'PENDING_PAYMENT' },
+        });
+        for (const session of pendingSessions) {
+          await tx.booking.update({
+            where: { id: session.id },
+            data: { enrollmentId: enrollment.id, status: 'CONFIRMED' },
+          });
+          await tx.creditEntry.create({
+            data: {
+              enrollmentId: enrollment.id,
+              bookingId: session.id,
+              type: 'CONSUME',
+              amount: 1,
+              idempotencyKey: `course-receipt-session:${session.id}`,
+            },
+          });
+          await this.outbox.enqueue(tx, OUTBOX_EVENT_TYPES.bookingConfirmed, bookingConfirmedKey(session.id), {
+            bookingId: session.id,
+          });
+        }
       }
       return;
     }

@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { FileText, History, ReceiptText, Upload, WalletCards } from 'lucide-react';
-import { apiMessage } from '@/shared/services/api';
+import { apiMessage, publicApi } from '@/shared/services/api';
 import { upload, uploadErrorMessage } from '@/shared/services/upload';
 import { digitsOnly, faNumber, jalali, toman } from '@/lib/format';
 import { walletService, type Invoice, type Transaction } from '@/lib/wallet-service';
@@ -244,8 +244,23 @@ const RECEIPT_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf
  * Card-to-card top-up: the student uploads the bank receipt and the wallet is
  * credited once an admin approves it in the finance center.
  */
-export function ReceiptTopUp({ course }: { course?: { id: string; price: number } }) {
+export function ReceiptTopUp({
+  course,
+  sessions,
+}: {
+  course?: { id: string; price: number };
+  sessions?: Array<{ startsAt: string; endsAt: string; timezone: string }>;
+}) {
   const queryClient = useQueryClient();
+  const paymentSettings = useQuery({
+    queryKey: ['public-payment-card'],
+    queryFn: async () => {
+      const settings = await publicApi<Array<{ key: string; value: unknown }>>('/support/public-settings');
+      return settings.find((item) => item.key === 'payment.card')?.value as
+        | { cardNumber?: string; holder?: string; bank?: string }
+        | undefined;
+    },
+  });
   const [typedAmount, setAmount] = useState(0),
     [file, setFile] = useState<File>(),
     [note, setNote] = useState('');
@@ -265,6 +280,7 @@ export function ReceiptTopUp({ course }: { course?: { id: string; price: number 
         receiptFileId: fileId,
         note: note.trim() || undefined,
         courseId: course?.id,
+        sessions,
       });
     },
     onSuccess: async () => {
@@ -283,6 +299,22 @@ export function ReceiptTopUp({ course }: { course?: { id: string; price: number 
           ? 'مبلغ دوره را کارت‌به‌کارت واریز کنید و تصویر یا PDF رسید را بارگذاری کنید. پس از تأیید پشتیبانی، دوره به «دوره‌های من» اضافه می‌شود.'
           : 'مبلغ را کارت‌به‌کارت واریز کنید و تصویر یا PDF رسید را بارگذاری کنید. پس از تأیید پشتیبانی، موجودی کیف پول شما افزایش می‌یابد.'}
       </p>
+      {course && paymentSettings.data?.cardNumber ? (
+        <div className="mt-4 rounded-2xl border hairline bg-slate-50 p-4 text-sm">
+          <p className="text-xs font-bold text-muted">واریز به کارت اعلام‌شده توسط مدیریت</p>
+          <p className="latin mt-2 text-lg font-black" dir="ltr">
+            {paymentSettings.data.cardNumber}
+          </p>
+          <p className="mt-1 text-xs text-muted">
+            {[paymentSettings.data.holder, paymentSettings.data.bank].filter(Boolean).join(' · ')}
+          </p>
+        </div>
+      ) : null}
+      {course && sessions?.length ? (
+        <p className="mt-4 rounded-xl bg-indigo-50 p-3 text-sm font-bold text-indigo-800">
+          {sessions.length.toLocaleString('fa-IR')} نوبت انتخاب شده همراه رسید برای تأیید مدیر ثبت می‌شود.
+        </p>
+      ) : null}
       <label className="mt-5 block">
         <span className="mb-2 block text-sm font-bold">مبلغ واریزی</span>
         <div className="relative">

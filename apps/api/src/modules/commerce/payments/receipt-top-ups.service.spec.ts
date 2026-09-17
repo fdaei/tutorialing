@@ -11,22 +11,30 @@ function harness(
 ) {
   const db = {
     payment: {
-      findUnique: jest.fn().mockImplementation(({ where }: { where: { id?: string } }) =>
-        Promise.resolve(where.id ? (opts.payment ?? null) : null),
-      ),
+      findUnique: jest
+        .fn()
+        .mockImplementation(({ where }: { where: { id?: string } }) =>
+          Promise.resolve(where.id ? (opts.payment ?? null) : null),
+        ),
       create: jest.fn().mockImplementation(({ data }: { data: Record<string, unknown> }) => Promise.resolve(data)),
       updateMany: jest.fn().mockResolvedValue({ count: opts.claimed ?? 1 }),
       findFirst: jest.fn().mockResolvedValue(null),
     },
     storedFile: {
-      findFirst: jest.fn().mockResolvedValue(
-        opts.file === undefined ? { id: 'file-1', _count: { paymentReceipts: 0 } } : opts.file,
-      ),
+      findFirst: jest
+        .fn()
+        .mockResolvedValue(opts.file === undefined ? { id: 'file-1', _count: { paymentReceipts: 0 } } : opts.file),
     },
     auditLog: { create: jest.fn().mockResolvedValue({}) },
-    course: { findFirst: jest.fn().mockResolvedValue(opts.course === undefined ? { id: 'course-1', price: 900_000 } : opts.course) },
+    course: {
+      findFirst: jest
+        .fn()
+        .mockResolvedValue(opts.course === undefined ? { id: 'course-1', price: 900_000 } : opts.course),
+    },
     courseEnrollment: { findUnique: jest.fn().mockResolvedValue(opts.enrolled ? { id: 'e-1' } : null) },
+    booking: { count: jest.fn().mockResolvedValue(0) },
   };
+  Object.assign(db, { $transaction: jest.fn((callback: (tx: typeof db) => unknown) => callback(db)) });
   const payments = {
     settleVerified: jest.fn().mockResolvedValue({ id: 'p-1', status: 'PAID' }),
     failPayment: jest.fn().mockResolvedValue({ id: 'p-1', status: 'FAILED' }),
@@ -40,7 +48,12 @@ describe('ReceiptTopUpsService', () => {
   it('creates a PENDING wallet top-up bound to the uploaded receipt', async () => {
     const h = harness();
     const payment = await h.svc.submit('student-1', { amount: 500_000, receiptFileId: 'file-1', idempotencyKey: 'k1' });
-    expect(payment).toMatchObject({ purpose: 'wallet_top_up', status: 'PENDING', amount: 500_000, receiptFileId: 'file-1' });
+    expect(payment).toMatchObject({
+      purpose: 'wallet_top_up',
+      status: 'PENDING',
+      amount: 500_000,
+      receiptFileId: 'file-1',
+    });
     expect(h.db.storedFile.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({ where: expect.objectContaining({ ownerId: 'student-1', status: 'SAFE' }) }),
     );
@@ -76,7 +89,9 @@ describe('ReceiptTopUpsService', () => {
 
   it('only one reviewer can act on a receipt', async () => {
     const h = harness({ payment: pending, claimed: 0 });
-    await expect(h.svc.approve('admin-1', 'p-1')).rejects.toMatchObject({ response: { code: 'RECEIPT_ALREADY_REVIEWED' } });
+    await expect(h.svc.approve('admin-1', 'p-1')).rejects.toMatchObject({
+      response: { code: 'RECEIPT_ALREADY_REVIEWED' },
+    });
     expect(h.payments.settleVerified).not.toHaveBeenCalled();
   });
 
@@ -96,6 +111,46 @@ describe('ReceiptTopUpsService', () => {
       courseId: 'course-1',
     });
     expect(payment).toMatchObject({ purpose: 'course', referenceId: 'course-1', amount: 900_000 });
+  });
+
+  it('holds every selected live-course slot until the receipt is reviewed', async () => {
+    const h = harness({
+      course: {
+        id: 'course-live',
+        price: 1_200_000,
+        format: 'LIVE_ONLINE',
+        teacherId: 'teacher-1',
+        package: { credits: 2 },
+        teacher: { meetingUrl: 'https://meet.google.com/abc-defg-hij' },
+      },
+    });
+    const sessions = [
+      { startsAt: '2099-01-01T09:00:00.000Z', endsAt: '2099-01-01T10:00:00.000Z', timezone: 'Asia/Tehran' },
+      { startsAt: '2099-01-03T09:00:00.000Z', endsAt: '2099-01-03T10:00:00.000Z', timezone: 'Asia/Tehran' },
+    ];
+    await h.svc.submit('student-1', {
+      amount: 0,
+      receiptFileId: 'file-1',
+      idempotencyKey: 'live-1',
+      courseId: 'course-live',
+      sessions,
+    });
+    expect(h.db.booking.count).toHaveBeenCalledTimes(2);
+    expect(h.db.payment.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          courseSessionBookings: {
+            create: expect.arrayContaining([
+              expect.objectContaining({
+                teacherId: 'teacher-1',
+                status: 'PENDING_PAYMENT',
+                meetingUrl: 'https://meet.google.com/abc-defg-hij',
+              }),
+            ]),
+          },
+        }),
+      }),
+    );
   });
 
   it('refuses a course receipt when already enrolled', async () => {
