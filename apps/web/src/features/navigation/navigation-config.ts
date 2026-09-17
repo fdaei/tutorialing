@@ -29,6 +29,9 @@ export function usePublicNavigation() {
     refetchOnMount: 'always',
   });
   const configured = normalizeNavigation(query.data);
-  const items = configured ?? (query.isError ? defaultLandingConfig.header.nav : []);
+  // `items: null` means no landing-page setting has been published yet. That is
+  // different from an intentionally published empty array, so keep the shipped
+  // navigation visible on fresh databases and after a failed request.
+  const items = configured ?? defaultLandingConfig.header.nav;
   return { ...query, items };
 }

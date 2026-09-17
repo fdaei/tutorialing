@@ -1,4 +1,4 @@
-import { Footer, Header } from '@/components/layout/site';
+import { Footer, Header, PublicPageHero } from '@/components/layout/site';
 import { publicApi } from '@/shared/services/api';
 import type { Course } from '@/lib/marketplace-data';
 import { BookOpen } from 'lucide-react';
@@ -37,13 +37,19 @@ export default async function CoursesPage({
     <>
       <Header config={headerConfig} />
       <main className="page-shell section-space">
-        <p className="text-sm font-black text-purple">{english ? 'Structured learning' : 'یادگیری ساختاریافته'}</p>
-        <h1 className="mt-3 text-4xl font-black md:text-5xl">{english ? 'Language courses' : 'دوره‌های زبان'}</h1>
-        <p className="mt-4 max-w-2xl leading-8 text-muted">
-          {english
-            ? 'Follow a clear learning route, informed by ratings from learners who enrolled in each course.'
-            : 'مسیرهای آموزشی منظم، با امتیازهای واقعی زبان‌آموزانی که در دوره شرکت کرده‌اند.'}
-        </p>
+        <PublicPageHero
+          eyebrow={english ? 'Structured learning' : 'یادگیری ساختاریافته'}
+          title={
+            english
+              ? 'Find the course that matches your next goal.'
+              : 'دوره‌ای را پیدا کن که با هدف بعدی تو هماهنگ است.'
+          }
+          description={
+            english
+              ? 'Compare level, format, teacher and real learner feedback—then start with a route you can confidently complete.'
+              : 'سطح، شیوه برگزاری، مدرس و بازخورد زبان‌آموزان را مقایسه کن و با مسیری شروع کن که می‌توانی با اطمینان ادامه بدهی.'
+          }
+        />
         {courses.length ? (
           <CourseDirectory courses={courses} initialLanguage={initialLanguage} initialLevel={initialLevel} />
         ) : (

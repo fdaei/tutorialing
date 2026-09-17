@@ -112,7 +112,7 @@ export function CourseCard({ course }: { course: Course }) {
     blurb = courseBlurb(english ? course.descriptionEn : course.descriptionFa);
   const href = localePath(`/courses/${course.slug}`, locale);
   return (
-    <article className="market-card lift flex flex-col overflow-hidden">
+    <article className="course-product-card market-card lift flex flex-col overflow-hidden">
       <Link href={href} tabIndex={-1} aria-hidden="true" className="relative block aspect-[8/5] bg-indigo-50">
         {course.image ? (
           <Image
@@ -120,7 +120,7 @@ export function CourseCard({ course }: { course: Course }) {
             alt=""
             fill
             sizes="(min-width:1024px) 33vw, (min-width:640px) 50vw, 100vw"
-            className="object-cover"
+            className="object-cover transition duration-500"
           />
         ) : (
           <span className="grid h-full place-items-center text-purple">
@@ -174,7 +174,10 @@ export function CourseCard({ course }: { course: Course }) {
         <div className="mt-auto pt-5">
           <div className="flex items-center justify-between border-t hairline pt-4">
             <strong className="text-sm">{money(course.price, locale)}</strong>
-            <Link href={href} className="text-sm font-black text-purple">
+            <Link
+              href={href}
+              className="rounded-xl bg-primary-soft px-3 py-2 text-sm font-black text-primary-hover hover:bg-primary hover:text-white"
+            >
               {english ? 'View course' : 'مشاهده دوره'}
             </Link>
           </div>
