@@ -27,10 +27,15 @@ export function CourseEnrollmentCta({
   sessionsCount: number;
 }) {
   const [selected, setSelected] = useState<Slot[]>([]);
-  const range = useMemo(() => {
+  const ranges = useMemo(() => {
     const from = new Date();
     from.setSeconds(0, 0);
-    return { from: from.toISOString(), to: new Date(from.getTime() + 60 * 86_400_000).toISOString() };
+    const middle = new Date(from.getTime() + 30 * 86_400_000);
+    const to = new Date(from.getTime() + 60 * 86_400_000);
+    return [
+      { from: from.toISOString(), to: middle.toISOString() },
+      { from: middle.toISOString(), to: to.toISOString() },
+    ];
   }, []);
   const { locale } = useTranslations(),
     english = locale === 'en',
@@ -51,11 +56,19 @@ export function CourseEnrollmentCta({
       enabled: notEnrolled,
     }),
     slots = useQuery({
-      queryKey: ['course-slots', teacherId, range.from, range.to],
-      queryFn: () =>
-        publicApi<Slot[]>(
-          `/availability/${teacherId}/slots?from=${encodeURIComponent(range.from)}&to=${encodeURIComponent(range.to)}&type=regular`,
-        ),
+      queryKey: ['course-slots', teacherId, ranges],
+      queryFn: async () => {
+        const chunks = await Promise.all(
+          ranges.map(({ from, to }) =>
+            publicApi<Slot[]>(
+              `/availability/${teacherId}/slots?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&type=regular`,
+            ),
+          ),
+        );
+        return [...new Map(chunks.flat().map((slot) => [slot.startsAt, slot])).values()].sort((a, b) =>
+          a.startsAt.localeCompare(b.startsAt),
+        );
+      },
       enabled: notEnrolled && format === 'LIVE_ONLINE' && Boolean(teacherId) && !pendingReceipt.data,
     });
   if (notEnrolled)
