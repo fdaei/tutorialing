@@ -705,46 +705,49 @@ model BlockedPeriod {
 }
 
 model Booking {
-  id                 String           @id @default(cuid())
-  studentId          String
-  student            User             @relation(fields: [studentId], references: [id])
-  teacherId          String
-  teacher            Teacher          @relation(fields: [teacherId], references: [id])
-  enrollmentId       String?
-  enrollment         Enrollment?      @relation(fields: [enrollmentId], references: [id])
-  startsAt           DateTime
-  endsAt             DateTime
-  timezone           String
-  type               String
-  status             BookingStatus    @default(PENDING_PAYMENT)
-  price              Int
-  policySnapshot     Json
-  paymentExpiresAt   DateTime?
-  meetingUrl         String?
-  attendanceStudent  Boolean?
-  attendanceTeacher  Boolean?
-  cancelledAt        DateTime?
-  cancellationReason String?
+  id                     String           @id @default(cuid())
+  studentId              String
+  student                User             @relation(fields: [studentId], references: [id])
+  teacherId              String
+  teacher                Teacher          @relation(fields: [teacherId], references: [id])
+  enrollmentId           String?
+  enrollment             Enrollment?      @relation(fields: [enrollmentId], references: [id])
+  startsAt               DateTime
+  endsAt                 DateTime
+  timezone               String
+  type                   String
+  status                 BookingStatus    @default(PENDING_PAYMENT)
+  price                  Int
+  policySnapshot         Json
+  paymentExpiresAt       DateTime?
+  meetingUrl             String?
+  attendanceStudent      Boolean?
+  attendanceTeacher      Boolean?
+  cancelledAt            DateTime?
+  cancellationReason     String?
   // Rescheduling requires both sides to agree, so a proposed new time is held
   // here until the counterparty accepts. Either party may propose; only the
   // other one can accept, which is what makes it mutual. All four are cleared
   // together once the proposal is accepted, declined, or superseded.
-  reschedulerId      String?
-  rescheduleStartsAt DateTime?
-  rescheduleTimezone String?
-  rescheduleAskedAt  DateTime?
-  payment            Payment?
-  creditReservations CreditEntry[]
-  classRecord        ClassRecord?
-  trialEvaluation    TrialEvaluation?
-  earning            Earning?
-  review             Review?
-  reminders          Reminder[]
-  createdAt          DateTime         @default(now())
-  updatedAt          DateTime         @updatedAt
+  reschedulerId          String?
+  rescheduleStartsAt     DateTime?
+  rescheduleTimezone     String?
+  rescheduleAskedAt      DateTime?
+  payment                Payment?
+  courseSessionPaymentId String?
+  courseSessionPayment   Payment?         @relation("CourseSessionPayment", fields: [courseSessionPaymentId], references: [id], onDelete: SetNull)
+  creditReservations     CreditEntry[]
+  classRecord            ClassRecord?
+  trialEvaluation        TrialEvaluation?
+  earning                Earning?
+  review                 Review?
+  reminders              Reminder[]
+  createdAt              DateTime         @default(now())
+  updatedAt              DateTime         @updatedAt
 
   @@index([teacherId, startsAt, endsAt])
   @@index([studentId, startsAt, endsAt])
+  @@index([courseSessionPaymentId])
 }
 
 model ClassRecord {
@@ -878,43 +881,44 @@ model Assignment {
 }
 
 model Payment {
-  id               String           @id @default(cuid())
-  bookingId        String?          @unique
-  booking          Booking?         @relation(fields: [bookingId], references: [id])
-  userId           String
-  user             User             @relation(fields: [userId], references: [id])
-  purpose          String
-  referenceId      String
-  subtotal         Int
-  discountAmount   Int              @default(0)
-  walletAmount     Int              @default(0)
-  gatewayAmount    Int
-  amount           Int
-  status           PaymentStatus    @default(PENDING)
-  authority        String?          @unique
-  gatewayReference String?
-  idempotencyKey   String           @unique
+  id                    String           @id @default(cuid())
+  bookingId             String?          @unique
+  booking               Booking?         @relation(fields: [bookingId], references: [id])
+  courseSessionBookings Booking[]        @relation("CourseSessionPayment")
+  userId                String
+  user                  User             @relation(fields: [userId], references: [id])
+  purpose               String
+  referenceId           String
+  subtotal              Int
+  discountAmount        Int              @default(0)
+  walletAmount          Int              @default(0)
+  gatewayAmount         Int
+  amount                Int
+  status                PaymentStatus    @default(PENDING)
+  authority             String?          @unique
+  gatewayReference      String?
+  idempotencyKey        String           @unique
   // Records which discount this payment reserved a use of, so the reservation
   // can be released again when the payment fails or expires.
-  discountId       String?
-  discount         Discount?        @relation(fields: [discountId], references: [id])
+  discountId            String?
+  discount              Discount?        @relation(fields: [discountId], references: [id])
   // Set instead of `discountId` when an automatic rule (e.g. birthday) gave the
   // better deal. At most one of the two applies to a payment.
-  discountRuleId   String?
-  discountRule     DiscountRule?    @relation(fields: [discountRuleId], references: [id])
-  callbackPayload  Json?
-  verifiedAt       DateTime?
+  discountRuleId        String?
+  discountRule          DiscountRule?    @relation(fields: [discountRuleId], references: [id])
+  callbackPayload       Json?
+  verifiedAt            DateTime?
   // Manual card-to-card top-ups (used until the Zarinpal gateway is live): the
   // student uploads a bank receipt and an admin approves or rejects it.
-  receiptFileId    String?
-  receiptFile      StoredFile?      @relation("PaymentReceipt", fields: [receiptFileId], references: [id], onDelete: SetNull)
-  reviewedById     String?
-  reviewNote       String?
-  reviewedAt       DateTime?
-  refunds          Refund[]
-  reconciliations  Reconciliation[]
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
+  receiptFileId         String?
+  receiptFile           StoredFile?      @relation("PaymentReceipt", fields: [receiptFileId], references: [id], onDelete: SetNull)
+  reviewedById          String?
+  reviewNote            String?
+  reviewedAt            DateTime?
+  refunds               Refund[]
+  reconciliations       Reconciliation[]
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
 
   @@index([discountId])
   @@index([discountRuleId])

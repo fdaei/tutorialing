@@ -1647,6 +1647,7 @@ async function seedTicketsCmsAndSettings() {
   // seeded rather than hardcoded so changing them never needs a deploy; each
   // reader falls back to the same default when the row is missing.
   const rules: [string, unknown, boolean][] = [
+    ['payment.card', { cardNumber: '0000-0000-0000-0000', holder: 'نام صاحب حساب', bank: 'نام بانک' }, true],
     ['commerce.commissionPercent', { value: 20 }, false],
     ['commerce.escrowHoldDays', { value: 7 }, false],
     ['booking.minLeadMinutes', { value: 120 }, true],

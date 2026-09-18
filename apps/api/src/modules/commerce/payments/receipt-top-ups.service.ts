@@ -24,7 +24,14 @@ export class ReceiptTopUpsService {
 
   async submit(
     userId: string,
-    input: { amount: number; receiptFileId: string; idempotencyKey: string; note?: string; courseId?: string },
+    input: {
+      amount: number;
+      receiptFileId: string;
+      idempotencyKey: string;
+      note?: string;
+      courseId?: string;
+      sessions?: Array<{ startsAt: string; endsAt: string; timezone: string }>;
+    },
   ) {
     const replay = await this.db.payment.findUnique({ where: { idempotencyKey: input.idempotencyKey } });
     if (replay) {
@@ -47,11 +54,25 @@ export class ReceiptTopUpsService {
     if (file._count.paymentReceipts > 0) throw conflict('RECEIPT_ALREADY_SUBMITTED');
     // A course receipt is charged the course's own price, never the amount the
     // client typed, and enrolls the student once approved (see `fulfill`).
-    let course: { id: string; price: number } | null = null;
+    let course: {
+      id: string;
+      price: number;
+      format: string;
+      teacherId: string | null;
+      package: { credits: number } | null;
+      teacher: { meetingUrl: string | null } | null;
+    } | null = null;
     if (input.courseId) {
       course = await this.db.course.findFirst({
         where: { OR: [{ id: input.courseId }, { slug: input.courseId }], published: true },
-        select: { id: true, price: true },
+        select: {
+          id: true,
+          price: true,
+          format: true,
+          teacherId: true,
+          package: { select: { credits: true } },
+          teacher: { select: { meetingUrl: true } },
+        },
       });
       if (!course) throw notFound('COURSE_NOT_FOUND');
       const enrolled = await this.db.courseEnrollment.findUnique({
@@ -65,26 +86,89 @@ export class ReceiptTopUpsService {
       });
       if (waiting) throw conflict('COURSE_RECEIPT_PENDING');
     }
+    const sessions = input.sessions ?? [];
+    if (course?.format === 'LIVE_ONLINE') {
+      if (!course.teacherId || !course.package) throw badRequest('COURSE_SCHEDULE_NOT_CONFIGURED');
+      if (sessions.length !== course.package.credits) throw badRequest('COURSE_SESSION_COUNT_INVALID');
+      const normalized = sessions
+        .map((session) => ({ ...session, startsAt: new Date(session.startsAt), endsAt: new Date(session.endsAt) }))
+        .sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
+      for (let index = 0; index < normalized.length; index += 1) {
+        const session = normalized[index]!;
+        if (
+          !Number.isFinite(session.startsAt.getTime()) ||
+          !Number.isFinite(session.endsAt.getTime()) ||
+          session.startsAt <= new Date() ||
+          session.endsAt <= session.startsAt ||
+          !session.timezone.trim()
+        )
+          throw badRequest('COURSE_SESSION_INVALID');
+        if (index > 0 && normalized[index - 1]!.endsAt > session.startsAt) {
+          throw conflict('COURSE_SESSIONS_OVERLAP');
+        }
+      }
+    } else if (sessions.length) {
+      throw badRequest('COURSE_SESSIONS_NOT_ALLOWED');
+    }
     const amount = course ? course.price : input.amount;
     if (!course && amount < 10_000) throw badRequest('RECEIPT_AMOUNT_TOO_LOW');
     const id = `receipt_${randomUUID()}`;
+    const paymentData = {
+      id,
+      userId,
+      purpose: course ? 'course' : 'wallet_top_up',
+      referenceId: course ? course.id : id,
+      subtotal: amount,
+      amount,
+      gatewayAmount: amount,
+      walletAmount: 0,
+      status: 'PENDING' as const,
+      idempotencyKey: input.idempotencyKey,
+      receiptFileId: file.id,
+      reviewNote: input.note?.trim() || null,
+    };
     try {
-      return await this.db.payment.create({
-        data: {
-          id,
-          userId,
-          purpose: course ? 'course' : 'wallet_top_up',
-          referenceId: course ? course.id : id,
-          subtotal: amount,
-          amount,
-          gatewayAmount: amount,
-          walletAmount: 0,
-          status: 'PENDING',
-          idempotencyKey: input.idempotencyKey,
-          receiptFileId: file.id,
-          reviewNote: input.note?.trim() || null,
+      if (course?.format !== 'LIVE_ONLINE' || !course.teacherId) {
+        return await this.db.payment.create({ data: paymentData });
+      }
+      return await this.db.$transaction(
+        async (tx) => {
+          for (const session of sessions) {
+            const startsAt = new Date(session.startsAt),
+              endsAt = new Date(session.endsAt);
+            const overlap = await tx.booking.count({
+              where: {
+                teacherId: course.teacherId!,
+                status: { in: ['PENDING_PAYMENT', 'CONFIRMED'] },
+                startsAt: { lt: endsAt },
+                endsAt: { gt: startsAt },
+              },
+            });
+            if (overlap) throw conflict('SLOT_NOT_AVAILABLE');
+          }
+          return tx.payment.create({
+            data: {
+              ...paymentData,
+              courseSessionBookings: {
+                create: sessions.map((session) => ({
+                  studentId: userId,
+                  teacherId: course.teacherId!,
+                  startsAt: new Date(session.startsAt),
+                  endsAt: new Date(session.endsAt),
+                  timezone: session.timezone,
+                  type: 'course_session',
+                  status: 'PENDING_PAYMENT',
+                  price: 0,
+                  policySnapshot: {},
+                  meetingUrl: course.teacher?.meetingUrl ?? null,
+                })),
+              },
+            },
+            include: { courseSessionBookings: true },
+          });
         },
-      });
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
     } catch (error) {
       if (!isPrismaKnownError(error) || error.code !== 'P2002') throw error;
       const raced = await this.db.payment.findUnique({ where: { idempotencyKey: input.idempotencyKey } });

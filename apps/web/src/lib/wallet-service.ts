@@ -100,7 +100,13 @@ export const walletService = {
       reviewNote: row.reviewNote,
     }));
   },
-  submitReceipt: (request: { amount: number; receiptFileId: string; note?: string; courseId?: string }) =>
+  submitReceipt: (request: {
+    amount: number;
+    receiptFileId: string;
+    note?: string;
+    courseId?: string;
+    sessions?: Array<{ startsAt: string; endsAt: string; timezone: string }>;
+  }) =>
     api<{ id: string; status: string }>('/payments/wallet/receipts', {
       method: 'POST',
       body: JSON.stringify({ ...request, idempotencyKey: crypto.randomUUID() }),
