@@ -440,7 +440,7 @@ a {
 .public-page-hero h1 {
   max-width: 800px;
   margin-top: 1.25rem;
-  font-size: clamp(2.25rem, 5vw, 4.5rem);
+  font-size: clamp(1.80rem, 3vw, 3rem);
   font-weight: 850;
   letter-spacing: -0.045em;
   line-height: 1.28;
@@ -882,7 +882,7 @@ a {
 .landing-hero-copy h1 {
   max-width: 680px;
   margin-top: 1.35rem;
-  font-size: clamp(2.25rem, 4.6vw, 4.25rem);
+  font-size: clamp(1.85rem, 3.4vw, 3.2rem);
   font-weight: var(--heading-weight, 750);
   letter-spacing: -0.035em;
   line-height: 1.3;
@@ -1040,7 +1040,7 @@ a {
 .landing-section-intro h2 {
   max-width: 710px;
   margin-top: 1rem;
-  font-size: clamp(1.85rem, 3.4vw, 3rem);
+  font-size: clamp(1.65rem, 2.7vw, 2.4rem);
   font-weight: var(--heading-weight, 750);
   letter-spacing: -0.03em;
   line-height: 1.25;
@@ -1209,7 +1209,7 @@ a {
 }
 .landing-placement-copy h2 {
   margin-top: 1rem;
-  font-size: clamp(2.25rem, 4vw, 4.2rem);
+  font-size: clamp(1.85rem, 3vw, 2.9rem);
   font-weight: 800;
   letter-spacing: -0.04em;
   line-height: 1.13;
@@ -1433,7 +1433,7 @@ a {
 .landing-final-cta h2 {
   max-width: 680px;
   margin-top: 0.9rem;
-  font-size: clamp(2rem, 4vw, 3.8rem);
+  font-size: clamp(1.7rem, 2.9vw, 2.7rem);
   font-weight: 800;
   letter-spacing: -0.04em;
   line-height: 1.16;
@@ -1568,7 +1568,7 @@ a {
     padding-block: 3.3rem 4rem;
   }
   .landing-hero-copy h1 {
-    font-size: clamp(2.35rem, 12vw, 3.75rem);
+    font-size: clamp(1.85rem, 7vw, 2.45rem);
   }
   .landing-hero-visual {
     min-height: 330px;
@@ -1598,7 +1598,7 @@ a {
     padding-block: 4rem;
   }
   .landing-section-intro h2 {
-    font-size: 2rem;
+    font-size: 1.65rem;
   }
   .landing-language-grid,
   .landing-course-grid,
@@ -1630,7 +1630,7 @@ a {
     padding: 2rem 1.35rem 1.4rem;
   }
   .landing-placement-copy h2 {
-    font-size: 2.25rem;
+    font-size: 1.75rem;
   }
   .landing-placement-art {
     min-height: 270px;
@@ -1643,7 +1643,7 @@ a {
     padding: 2rem 1.35rem;
   }
   .landing-final-cta h2 {
-    font-size: 2.1rem;
+    font-size: 1.7rem;
   }
   .landing-final-cta .landing-button {
     margin-top: 1.5rem;
@@ -1757,7 +1757,7 @@ a {
 }
 .landing-hero-copy h1 {
   margin-top: 1.5rem;
-  font-size: clamp(2.65rem, 5.2vw, 4.9rem);
+  font-size: clamp(2rem, 3.7vw, 3.35rem);
   font-weight: 850;
   line-height: 1.18;
 }
@@ -1865,7 +1865,7 @@ a {
 }
 .landing-section-intro h2 {
   margin-top: 1.2rem;
-  font-size: clamp(2rem, 3.8vw, 3.35rem);
+  font-size: clamp(1.7rem, 2.8vw, 2.45rem);
   font-weight: 850;
   line-height: 1.28;
 }
@@ -2257,7 +2257,7 @@ a {
     padding-block: 3.25rem 3rem;
   }
   .landing-hero-copy h1 {
-    font-size: clamp(2.35rem, 12vw, 3.4rem);
+    font-size: clamp(1.85rem, 7vw, 2.45rem);
   }
   .landing-hero-visual {
     min-height: 350px;
@@ -2347,7 +2347,7 @@ a {
   max-width: 640px;
   margin-top: 1.3rem;
   color: #161c3c;
-  font-size: clamp(2.35rem, 5vw, 4.8rem);
+  font-size: clamp(1.95rem, 3.6vw, 3.3rem);
   font-weight: 800;
   line-height: 1.2;
 }
@@ -3188,7 +3188,7 @@ a {
     padding-block: 3.5rem 2.5rem;
   }
   .placement-entry-copy h1 {
-    font-size: clamp(2.2rem, 11vw, 3.2rem);
+    font-size: clamp(1.8rem, 7vw, 2.4rem);
   }
   .placement-entry-copy p {
     font-size: 0.96rem;
@@ -3855,7 +3855,7 @@ html[dir='ltr'] .blog-aside-back svg {
 }
 .blog-hero-copy h1 {
   margin-top: 1.1rem;
-  font-size: clamp(2.2rem, 5vw, 3.75rem);
+  font-size: clamp(1.85rem, 3.5vw, 2.8rem);
   font-weight: 900;
   letter-spacing: -0.04em;
   line-height: 1.2;

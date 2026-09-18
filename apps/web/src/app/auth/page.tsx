@@ -81,6 +81,7 @@ export default function Auth() {
     [devCode, setDevCode] = useState<string>();
   const otpRefs = useRef<Array<HTMLInputElement | null>>([]),
     googleButton = useRef<HTMLDivElement | null>(null),
+    verifying = useRef(false),
     code = digits.join('');
   const country = countries.find((item) => item.code === countryCode) ?? countries[0];
   const internationalPhone = country ? `${country.dialCode}${phone.replace(/^0+/, '')}` : '';
@@ -193,6 +194,7 @@ export default function Auth() {
     }
   }
   async function verify() {
+    if (verifying.current) return;
     setError(undefined);
     if (code.length !== 6) {
       setError(
@@ -206,6 +208,7 @@ export default function Auth() {
       );
       return;
     }
+    verifying.current = true;
     setBusy(true);
     try {
       const response = await publicApi<{ accessToken: string; user?: PanelIdentity }>('/auth/otp/verify', {
@@ -216,6 +219,7 @@ export default function Auth() {
       storeAccessToken(response.accessToken);
       go(response.user ?? {});
     } catch (caught) {
+      verifying.current = false;
       setError(caught);
     } finally {
       setBusy(false);

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AuthDivider, AuthError, AuthHeading, AuthNotice, AuthShell, PrimaryButton } from './auth-shell';
 import { PasswordInput } from './auth-fields';
@@ -53,6 +53,7 @@ export function VerifyCodePage() {
   const [wait, setWait] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const verifying = useRef(false);
   const code = digits.join('');
 
   useEffect(() => {
@@ -66,17 +67,19 @@ export function VerifyCodePage() {
   }, [wait]);
 
   async function verify(submitted: string) {
-    if (busy) return;
+    if (verifying.current) return;
     setError('');
     if (submitted.length !== OTP_LENGTH) {
       setError(`لطفاً هر ${faNumber(OTP_LENGTH)} رقم کد تأیید را وارد کنید`);
       return;
     }
+    verifying.current = true;
     setBusy(true);
     try {
       await verifyRecoveryCode(submitted);
       router.push(localePath('/reset-password', locale));
     } catch (caught) {
+      verifying.current = false;
       setError(authMessage(caught, 'کد تأیید وارد شده صحیح نیست'));
     } finally {
       setBusy(false);
