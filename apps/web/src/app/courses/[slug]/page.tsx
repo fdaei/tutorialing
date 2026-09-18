@@ -31,6 +31,7 @@ import {
 } from '@/features/courses/course-localization';
 import { CourseEnrollmentCta } from '@/features/courses/components/course-enrollment-cta';
 import type { CourseChapter } from '@/features/courses/course-types';
+import type { PublicTeacher } from '@/features/teacher/types/public-teacher';
 import { resolveHeaderConfig } from '@/lib/header-config';
 
 export const dynamic = 'force-dynamic';
@@ -40,6 +41,7 @@ type CourseDetail = Course & {
   distribution: Record<string, number>;
   chapters: CourseChapter[];
   package?: { credits: number } | null;
+  teacher?: { id: string; nameFa: string; nameEn: string; user: { avatarKey: string | null } } | null;
 };
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
@@ -71,6 +73,9 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
     throw error;
   }
   const courses = await publicApi<Course[]>('/courses').catch(() => []);
+  const teacherProfile = course.teacherId
+    ? await publicApi<PublicTeacher>(`/teachers/${course.teacherId}`).catch(() => null)
+    : null;
   const english = locale === 'en';
   const t = (fa: string, en: string) => (english ? en : fa);
   const title = (english ? course.titleEn : course.titleFa) ?? course.title ?? t('دوره زبان', 'Language course');
@@ -139,14 +144,16 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
               <strong className="mt-5 block text-2xl">
                 {formatNumber(course.price, locale)} {t('تومان', 'Toman')}
               </strong>
-              <CourseEnrollmentCta
-                slug={course.slug}
-                courseId={course.id}
-                price={course.price}
-                format={course.format}
-                teacherId={course.teacherId}
-                sessionsCount={course.package?.credits ?? lessons}
-              />
+              {course.format === 'LIVE_ONLINE' ? (
+                <Link
+                  href={localePath(`/courses/${course.slug}/enroll`, locale)}
+                  className="brand-gradient mt-4 flex min-h-13 items-center justify-center rounded-xl font-black text-white"
+                >
+                  {t('مشاهده زمان‌های آزاد و پرداخت', 'View availability & pay')}
+                </Link>
+              ) : (
+                <CourseEnrollmentCta slug={course.slug} courseId={course.id} price={course.price} format={course.format} teacherId={course.teacherId} sessionsCount={lessons} />
+              )}
               <ul className="mt-5 grid gap-3 text-sm text-muted">
                 {duration && (
                   <li className="flex items-center gap-2">
@@ -277,8 +284,8 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
             <div className="surface-card p-6 lg:sticky lg:top-24">
               <p className="text-xs font-black text-purple">{t('مدرس دوره', 'Course teacher')}</p>
               <div className="mt-4 flex items-center gap-4">
-                <span className="grid size-14 place-items-center rounded-full bg-lavender text-purple">
-                  <GraduationCap />
+                <span className="relative grid size-14 place-items-center overflow-hidden rounded-full bg-lavender text-purple">
+                  {teacherProfile?.avatarUrl || course.teacherId === 'teacher-shahriar' || course.teacherId === 'teacher-arezoo' ? <Image src={teacherProfile?.avatarUrl ?? (course.teacherId === 'teacher-shahriar' ? '/images/teachers/shahriar-shahfar.png' : '/images/teachers/arezoo-ahmadi.png')} alt={teacher} fill className="!static size-full object-cover" sizes="56px" /> : <GraduationCap />}
                 </span>
                 <div>
                   <strong>{teacher}</strong>

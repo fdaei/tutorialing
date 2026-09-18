@@ -103,8 +103,13 @@ export function StudentHome() {
           ? copy(locale, `آخرین درس: ${resume.lastLesson.titleFa}`, `Last lesson: ${resume.lastLesson.titleEn}`)
           : copy(locale, 'از اولین درس شروع کنید.', 'Start from the first lesson.'),
         progress: resume.progressPercent,
-        cta: resume.progressPercent ? copy(locale, 'ادامه درس', 'Resume lesson') : copy(locale, 'شروع دوره', 'Start course'),
-        href: p(`/courses/${resume.course.slug}/learn`),
+        cta:
+          resume.course.format === 'LIVE_ONLINE'
+            ? copy(locale, 'مشاهده زمان جلسات', 'View meeting times')
+            : resume.progressPercent
+              ? copy(locale, 'ادامه درس', 'Resume lesson')
+              : copy(locale, 'شروع دوره', 'Start course'),
+        href: p(resume.course.format === 'LIVE_ONLINE' ? '/dashboard/classes' : `/courses/${resume.course.slug}/learn`),
       };
     return {
       icon: <GraduationCap size={22} />,

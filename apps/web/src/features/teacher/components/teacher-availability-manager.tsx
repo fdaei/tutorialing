@@ -3,7 +3,7 @@
 import { localized, isDefaultLocale, translate } from '@/lib/i18n';
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CalendarDays, Clock, Plus, Trash2 } from 'lucide-react';
+import { CalendarDays, Clock, Copy, Plus, Trash2 } from 'lucide-react';
 import { api, apiField, apiMessage } from '@/shared/services/api';
 import { useTranslations } from '@/components/shared/locale-provider';
 import { JalaliDateTimePicker } from '@/components/shared/jalali-date-time-picker';
@@ -135,6 +135,14 @@ export function TeacherAvailabilityManager() {
   function updateRule(index: number, patch: Partial<Rule>) {
     setRules((current) => current.map((row, i) => (i === index ? { ...row, ...patch } : row)));
   }
+  function repeatRule(index: number) {
+    setRules((current) => {
+      const source = current[index];
+      if (!source) return current;
+      const copy = { ...source, id: undefined, weekday: (source.weekday + 1) % 7 };
+      return [...current.slice(0, index + 1), copy, ...current.slice(index + 1)];
+    });
+  }
   if (query.isLoading)
     return (
       <div className="grid gap-4">
@@ -177,7 +185,7 @@ export function TeacherAvailabilityManager() {
             rules.map((rule, index) => (
               <div
                 key={rule.id ?? index}
-                className="grid gap-3 rounded-2xl border hairline p-4 md:grid-cols-[1.2fr_1fr_1fr_.8fr_.8fr_auto]"
+                className="grid gap-3 rounded-2xl border hairline p-4 md:grid-cols-[1.2fr_1fr_1fr_.8fr_.8fr_auto_auto]"
               >
                 <select
                   value={rule.weekday}
@@ -206,6 +214,15 @@ export function TeacherAvailabilityManager() {
                   label={translate(locale, 'teacherteacherAvailabilityManagerBreak')}
                   onChange={(breakMinutes) => updateRule(index, { breakMinutes })}
                 />
+                <button
+                  type="button"
+                  aria-label={translate(locale, 'teacherteacherAvailabilityManagerRepeatRange')}
+                  title={translate(locale, 'teacherteacherAvailabilityManagerRepeatRange')}
+                  onClick={() => repeatRule(index)}
+                  className="grid size-11 place-items-center rounded-xl text-purple hover:bg-purple/10"
+                >
+                  <Copy size={17} />
+                </button>
                 <button
                   aria-label={translate(locale, 'teacherteacherAvailabilityManagerRemoveRange')}
                   onClick={() => setRules((current) => current.filter((_, i) => i !== index))}

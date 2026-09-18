@@ -403,10 +403,6 @@ export default function Placement() {
                   </span>
                 ))}
               </div>
-              <div className="placement-preview-time">
-                <TimerReset size={20} />
-                <span><strong className="latin">10:00</strong><small>{copy('زمان پیشنهادی', 'Suggested time')}</small></span>
-              </div>
             </div>
           </div>
         </section>

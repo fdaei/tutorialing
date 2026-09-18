@@ -27,6 +27,19 @@ export function CourseEnrollmentCta({
   sessionsCount: number;
 }) {
   const [selected, setSelected] = useState<Slot[]>([]);
+  const [repeatWeekly, setRepeatWeekly] = useState(false);
+  const slotPattern = (slot: Slot) => {
+    const date = new Date(slot.startsAt);
+    return `${date.getDay()}-${date.getHours()}-${date.getMinutes()}`;
+  };
+  const toggleRepeatWeekly = (checked: boolean) => {
+    setRepeatWeekly(checked);
+    if (!checked || !selected.length || !slots.data) return;
+    const patterns = new Set(selected.map(slotPattern));
+    const selectedKeys = new Set(selected.map((slot) => slot.startsAt));
+    const repeated = slots.data.filter((slot) => patterns.has(slotPattern(slot)) && !selectedKeys.has(slot.startsAt));
+    setSelected([...selected, ...repeated].slice(0, sessionsCount));
+  };
   const ranges = useMemo(() => {
     const from = new Date();
     from.setSeconds(0, 0);
@@ -87,8 +100,8 @@ export function CourseEnrollmentCta({
           </div>
           <p className="mt-2 text-xs leading-6 text-muted">
             {english
-              ? `Choose ${sessionsCount} available times from the teacher before uploading your receipt.`
-              : `پیش از بارگذاری فیش، ${sessionsCount.toLocaleString('fa-IR')} نوبت از زمان‌های آزاد مدرس انتخاب کنید.`}
+              ? `Choose all ${sessionsCount} times now, or upload your receipt and schedule the sessions later.`
+              : `می‌توانید هر ${sessionsCount.toLocaleString('fa-IR')} نوبت را همین حالا انتخاب کنید یا ابتدا فیش را بفرستید و زمان‌بندی جلسات را بعداً انجام دهید.`}
           </p>
           {slots.isLoading ? <div className="skeleton mt-4 h-24 rounded-xl" /> : null}
           {slots.isError ? (
@@ -137,11 +150,30 @@ export function CourseEnrollmentCta({
               ? `${selected.length} of ${sessionsCount} selected`
               : `${selected.length.toLocaleString('fa-IR')} از ${sessionsCount.toLocaleString('fa-IR')} نوبت انتخاب شده`}
           </p>
+          <label className="mt-3 flex cursor-pointer items-center gap-3 rounded-xl border border-indigo-100 bg-indigo-50/60 px-3 py-3 text-sm font-bold text-indigo-900">
+            <input
+              type="checkbox"
+              checked={repeatWeekly}
+              disabled={!selected.length}
+              onChange={(event) => toggleRepeatWeekly(event.target.checked)}
+              className="size-4 accent-indigo-600"
+            />
+            <span>
+              {english
+                ? 'Would you like these time slots to repeat every week?'
+                : 'می‌خواهید نوبت‌های انتخاب‌شده هر هفته در همین ساعت‌ها تکرار شوند؟'}
+              <small className="mt-1 block text-xs font-medium text-indigo-700">
+                {english
+                  ? 'Select at least one time first; matching weekly times will be selected automatically.'
+                  : 'ابتدا حداقل یک ساعت را انتخاب کنید؛ زمان‌های مشابه هفته‌های بعد خودکار انتخاب می‌شوند.'}
+              </small>
+            </span>
+          </label>
         </div>
-        {selected.length === sessionsCount ? (
+        {selected.length === sessionsCount || selected.length === 0 ? (
           <ReceiptTopUp
             course={{ id: courseId, price }}
-            sessions={selected.map(({ startsAt, endsAt, timezone }) => ({ startsAt, endsAt, timezone }))}
+            sessions={selected.length ? selected.map(({ startsAt, endsAt, timezone }) => ({ startsAt, endsAt, timezone })) : undefined}
           />
         ) : null}
       </div>
@@ -151,17 +183,21 @@ export function CourseEnrollmentCta({
   if (query.data)
     return (
       <Link
-        href={localePath(`/courses/${slug}/learn`, locale)}
+        href={localePath(format === 'LIVE_ONLINE' ? '/dashboard/classes' : `/courses/${slug}/learn`, locale)}
         className="brand-gradient mt-4 flex min-h-13 items-center justify-center gap-2 rounded-xl font-black text-white"
       >
-        <PlayCircle size={19} />
-        {query.data.progressPercent
+        {format === 'LIVE_ONLINE' ? <CalendarDays size={19} /> : <PlayCircle size={19} />}
+        {format === 'LIVE_ONLINE'
           ? english
-            ? 'Resume learning'
-            : 'ادامه یادگیری'
-          : english
-            ? 'Start course'
-            : 'شروع دوره'}
+            ? 'View meeting times'
+            : 'مشاهده زمان جلسات'
+          : query.data.progressPercent
+            ? english
+              ? 'Resume learning'
+              : 'ادامه یادگیری'
+            : english
+              ? 'Start course'
+              : 'شروع دوره'}
       </Link>
     );
   return (

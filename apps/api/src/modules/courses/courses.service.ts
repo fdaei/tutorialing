@@ -21,6 +21,14 @@ export class CoursesService {
     const course = await this.db.course.findFirst({
       where: { OR: [{ id: slug }, { slug }], published: true },
       include: {
+        teacher: {
+          select: {
+            id: true,
+            nameFa: true,
+            nameEn: true,
+            user: { select: { avatarKey: true } },
+          },
+        },
         package: { select: { credits: true } },
         chapters: {
           where: { published: true },

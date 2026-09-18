@@ -477,7 +477,7 @@ export class TeachersService {
       _count: { rating: true },
     });
     const distribution = Object.fromEntries(distributionRows.map((row) => [row.rating, row._count.rating]));
-    return { ...teacher, successfulClasses, studentsCount: students.length, distribution };
+    return this.withAvatarUrl({ ...teacher, successfulClasses, studentsCount: students.length, distribution });
   }
 
   private publicSelect() {
@@ -500,6 +500,7 @@ export class TeachersService {
       targetBands: true,
       introVideoKey: true,
       approvedAt: true,
+      user: { select: { avatarKey: true } },
       languageLinks: {
         where: { active: true, language: { active: true } },
         select: {

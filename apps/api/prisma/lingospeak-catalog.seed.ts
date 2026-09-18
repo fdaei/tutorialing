@@ -708,6 +708,37 @@ export async function seedLingoSpeakCatalog(db: PrismaClient, options: CatalogSe
     for (let index = 0; index < CATALOG_COURSES.length; index += 1) {
       const course = CATALOG_COURSES[index]!;
       const slug = `${teacher.slug}-${course.key}`;
+      const packageId = `package-${teacher.key}-${course.key}`;
+
+      // LIVE_ONLINE catalog courses use a fixed package for their session
+      // count. Keep this deterministic so the catalog seed also repairs rows
+      // created before the Course.package relation was introduced.
+      await db.package.upsert({
+        where: { id: packageId },
+        create: {
+          id: packageId,
+          teacherId: row.id,
+          titleFa: course.titleFa,
+          titleEn: course.titleEn,
+          descriptionFa: course.descriptionFa,
+          descriptionEn: course.descriptionEn,
+          credits: course.lessonsCount,
+          lessonMinutes: 60,
+          listPrice: course.price,
+          price: course.price,
+          approvalStatus: 'APPROVED',
+          active: true,
+        },
+        update: {
+          teacherId: row.id,
+          credits: course.lessonsCount,
+          lessonMinutes: 60,
+          listPrice: course.price,
+          price: course.price,
+          approvalStatus: 'APPROVED',
+          active: true,
+        },
+      });
       await db.course.upsert({
         where: { slug },
         create: {
@@ -727,6 +758,7 @@ export async function seedLingoSpeakCatalog(db: PrismaClient, options: CatalogSe
           image: course.image,
           category: course.category,
           format: CourseFormat.LIVE_ONLINE,
+          packageId,
           delivery: course.delivery,
           durationFa: course.durationFa,
           durationEn: course.durationEn,
@@ -737,7 +769,11 @@ export async function seedLingoSpeakCatalog(db: PrismaClient, options: CatalogSe
           sortOrder: CATALOG_TEACHERS.indexOf(teacher) * 100 + index,
           published: true,
         },
-        update: {},
+        update: {
+          teacherId: row.id,
+          format: CourseFormat.LIVE_ONLINE,
+          packageId,
+        },
       });
     }
   }

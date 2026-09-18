@@ -22,6 +22,7 @@ export type PublicTeacher = {
   targetBands: number[];
   introVideoKey?: string;
   approvedAt: string;
+  avatarUrl?: string | null;
   successfulClasses?: number;
   studentsCount?: number;
   packages?: unknown[];

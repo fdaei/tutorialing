@@ -89,7 +89,12 @@ export class ReceiptTopUpsService {
     const sessions = input.sessions ?? [];
     if (course?.format === 'LIVE_ONLINE') {
       if (!course.teacherId || !course.package) throw badRequest('COURSE_SCHEDULE_NOT_CONFIGURED');
-      if (sessions.length !== course.package.credits) throw badRequest('COURSE_SESSION_COUNT_INVALID');
+      // Scheduling all sessions up front is optional. When no sessions are
+      // supplied, the student can pay first and schedule the package credits
+      // later from their learning area.
+      if (sessions.length !== 0 && sessions.length !== course.package.credits) {
+        throw badRequest('COURSE_SESSION_COUNT_INVALID');
+      }
       const normalized = sessions
         .map((session) => ({ ...session, startsAt: new Date(session.startsAt), endsAt: new Date(session.endsAt) }))
         .sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());

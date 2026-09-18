@@ -155,29 +155,6 @@ function HeroSection({ config, locale, section }: LandingRenderProps) {
           </div>
         </div>
       </div>
-      <div
-        className="landing-container landing-proof-strip"
-        aria-label={english ? 'Platform highlights' : 'ویژگی‌های کلیدی پلتفرم'}
-      >
-        <div>
-          <strong className="latin">1:1</strong>
-          <span>{english ? 'Live private lessons' : 'کلاس خصوصی زنده'}</span>
-        </div>
-        <div>
-          <strong className="latin">A1—C2</strong>
-          <span>{english ? 'CEFR-aligned paths' : 'مسیر استاندارد CEFR'}</span>
-        </div>
-        <div>
-          <strong className="latin">20 min</strong>
-          <span>{english ? 'Free level assessment' : 'تعیین سطح رایگان'}</span>
-        </div>
-        <div>
-          <strong>
-            <BadgeCheck size={24} />
-          </strong>
-          <span>{english ? 'Reviewed teacher profiles' : 'پروفایل مدرس بررسی‌شده'}</span>
-        </div>
-      </div>
     </section>
   );
 }
