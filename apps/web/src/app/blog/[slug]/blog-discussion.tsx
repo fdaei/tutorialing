@@ -41,7 +41,7 @@ export function BlogDiscussion({ postId }: { postId: string }) {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h2 className="flex items-center gap-2 text-2xl font-black">
           <MessageCircle className="text-purple" />
-          گفت‌وگوی محله
+          نظرات مقاله
         </h2>
         <button onClick={() => react.mutate()} className="secondary-button">
           <Heart size={18} />
