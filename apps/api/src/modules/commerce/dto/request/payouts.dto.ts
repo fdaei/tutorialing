@@ -11,6 +11,12 @@ export class PayoutApprovalDto {
   @IsOptional() @IsString() @Length(1, 200) reference?: string;
 }
 
+export class ManualTeacherPaymentDto {
+  @IsString() @Length(1, 120) teacherId!: string;
+  @IsInt() @Min(1) @Max(2_000_000_000) amount!: number;
+  @IsString() @Length(1, 200) reference!: string;
+}
+
 export class WithdrawalRequestDto {
   @IsInt() @Min(100_000) @Max(2_000_000_000)
   amount!: number;

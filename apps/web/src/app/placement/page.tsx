@@ -592,7 +592,6 @@ function ResultView({
 }) {
   const fa = isDefaultLocale(locale),
     copy = (faCopy: string, enCopy: string) => localized({ fa: faCopy, en: enCopy }, locale),
-    numberLocale = fa ? 'fa-IR' : 'en-US',
     recommendations = placementRecommendationPaths(languageCode, result.level, locale);
   const suggested = courses
     .filter(
@@ -638,11 +637,11 @@ function ResultView({
               <div className="grid gap-4 sm:grid-cols-3">
                 <Stat
                   label={copy('امتیاز نهایی', 'Final score')}
-                  value={`${result.score.toLocaleString(numberLocale)}%`}
+                  value={`${result.score.toLocaleString('en-US')}%`}
                 />
                 <Stat
                   label={copy('پاسخ درست', 'Correct answers')}
-                  value={`${result.correctAnswers.toLocaleString(numberLocale)} ${copy('از', 'of')} ${result.totalQuestions.toLocaleString(numberLocale)}`}
+                  value={`${result.correctAnswers.toLocaleString('en-US')} ${copy('از', 'of')} ${result.totalQuestions.toLocaleString('en-US')}`}
                 />
                 <Stat label={copy('سطح CEFR', 'CEFR level')} value={result.level} />
               </div>
@@ -740,7 +739,9 @@ function ResultView({
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-2xl bg-canvas p-5 text-center">
-      <strong className="latin block text-3xl text-purple">{value}</strong>
+      <strong dir="ltr" className="latin block whitespace-nowrap text-3xl text-purple">
+        {value}
+      </strong>
       <span className="mt-2 block text-xs text-muted">{label}</span>
     </div>
   );

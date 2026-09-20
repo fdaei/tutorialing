@@ -3,9 +3,6 @@ import {
   AnswerReviewStatus,
   BookingStatus,
   DocumentStatus,
-  EarningStatus,
-  PaymentStatus,
-  PayoutStatus,
   PriceStatus,
   Prisma,
   PrismaClient,
@@ -47,8 +44,6 @@ const SHAHFAR = catalogTeacherId('shahriar');
 const REGULAR_PRICE = 552_000;
 const TRIAL_PRICE = 276_000;
 // commerce.commissionPercent below is 20.
-const REGULAR_COMMISSION = 110_400;
-const REGULAR_NET = REGULAR_PRICE - REGULAR_COMMISSION;
 
 const users = {
   admin: {
@@ -58,63 +53,7 @@ const users = {
     email: 'admin@local.test',
     role: Role.ADMIN,
   },
-  verifier: {
-    id: 'user-verifier',
-    phone: demoPhone(10),
-    name: 'کارشناس تأیید مدرس',
-    email: 'verifier@local.test',
-    role: Role.ADMIN,
-  },
-  support: {
-    id: 'user-support',
-    phone: demoPhone(11),
-    name: 'کارشناس پشتیبانی',
-    email: 'support@local.test',
-    role: Role.SUPPORT,
-  },
-  finance: {
-    id: 'user-finance',
-    phone: demoPhone(12),
-    name: 'کارشناس مالی',
-    email: 'finance@local.test',
-    role: Role.SUPPORT,
-  },
-  examiner: {
-    id: 'user-examiner',
-    phone: demoPhone(13),
-    name: 'ارزیاب آزمون',
-    email: 'examiner@local.test',
-    role: Role.SUPPORT,
-  },
-  completedStudent: {
-    id: 'user-student-completed',
-    phone: demoPhone(20),
-    name: 'نازنین کاظمی',
-    email: 'nazanin@local.test',
-    role: Role.STUDENT,
-  },
-  futureStudent: {
-    id: 'user-student-future',
-    phone: demoPhone(21),
-    name: 'علی رضایی',
-    email: 'ali@local.test',
-    role: Role.STUDENT,
-  },
-  ticketStudent: {
-    id: 'user-student-ticket',
-    phone: demoPhone(22),
-    name: 'مریم احمدی',
-    email: 'maryam@local.test',
-    role: Role.STUDENT,
-  },
-  demoStudent: {
-    id: 'user-student-demo',
-    phone: demoPhone(23),
-    name: 'کاربر نمایشی لینگواسپیک',
-    email: 'demo.student@local.test',
-    role: Role.STUDENT,
-  },
-} as const;
+} as const as any;
 
 const permissionKeys = [
   'users.read',
@@ -161,10 +100,18 @@ const permissionKeys = [
  * below, so a second run skips it rather than swapping the two rows back.
  */
 async function normalizeLegacyPhones() {
-  const legacy = await db.user.findMany({ where: { phone: { startsWith: '0' } }, select: { id: true, phone: true } });
+  const legacy = await db.user.findMany({
+    where: { OR: [{ phone: { startsWith: '0' } }, { phone: { startsWith: '98' } }] },
+    select: { id: true, phone: true },
+  });
   for (const row of legacy) {
-    if (!row.phone || !/^0\d{10}$/.test(row.phone)) continue;
-    const phone = normalizeIranianPhone(row.phone);
+    if (!row.phone) continue;
+    const phone = /^0\d{10}$/.test(row.phone)
+      ? normalizeIranianPhone(row.phone)
+      : /^98\d{10}$/.test(row.phone)
+        ? `+${row.phone}`
+        : null;
+    if (!phone) continue;
     const duplicate = await db.user.findUnique({ where: { phone }, select: { id: true } });
     if (duplicate && duplicate.id !== row.id) {
       const parked = `${row.phone}.duplicate.${duplicate.id}`;
@@ -173,11 +120,22 @@ async function normalizeLegacyPhones() {
     }
     await db.user.update({ where: { id: row.id }, data: { phone } });
   }
+
+  // A previous OTP flow could have created the admin account with a local
+  // `989...` spelling. Ensure the canonical account always owns ADMIN.
+  const admin = await db.user.findUnique({ where: { phone: users.admin.phone }, select: { id: true } });
+  if (admin) {
+    await db.userRole.upsert({
+      where: { userId_role: { userId: admin.id, role: Role.ADMIN } },
+      create: { userId: admin.id, role: Role.ADMIN },
+      update: {},
+    });
+  }
 }
 
 async function seedUsersAndPermissions() {
   await normalizeLegacyPhones();
-  for (const user of Object.values(users)) {
+  for (const user of [users.admin]) {
     const existingById = await db.user.findUnique({ where: { id: user.id }, select: { id: true } });
     const phoneOwner = await db.user.findUnique({ where: { phone: user.phone }, select: { id: true } });
     if (phoneOwner && phoneOwner.id !== user.id) {
@@ -216,11 +174,16 @@ async function seedUsersAndPermissions() {
     });
   }
 
+  // Keep only the primary administrator among the seeded staff roles.
+  await db.userRole.deleteMany({
+    where: { userId: { in: ['user-verifier', 'user-support', 'user-finance', 'user-examiner'] } },
+  });
+
   // Reconcile demo-role grants instead of only adding them: older seeds gave
   // every staff role every permission, allowing SUPPORT to adjust balances.
   await db.rolePermission.deleteMany({
     where: {
-      userId: { in: [users.admin.id, users.verifier.id, users.support.id, users.finance.id, users.examiner.id] },
+      userId: { in: [users.admin.id] },
     },
   });
   for (const key of permissionKeys) {
@@ -229,30 +192,7 @@ async function seedUsersAndPermissions() {
       create: { key, description: key },
       update: { description: key },
     });
-    const financeKeys = new Set([
-      'payments.read',
-      'payments.refund',
-      'payments.adjust-wallet',
-      'payouts.manage',
-      'reports.read',
-      'audit.read',
-    ]);
-    const supportKeys = new Set(['users.read', 'bookings.read', 'tickets.read', 'tickets.manage', 'payments.read']);
-    const examinerKeys = new Set(['tests.manage', 'tests.review']);
-    const verifierKeys = new Set([
-      'users.read',
-      'teachers.read',
-      'teachers.verify',
-      'teacher-prices.manage',
-      'reviews.manage',
-    ]);
-    const actors = [
-      users.admin,
-      ...(financeKeys.has(key) ? [users.finance] : []),
-      ...(supportKeys.has(key) ? [users.support] : []),
-      ...(examinerKeys.has(key) ? [users.examiner] : []),
-      ...(verifierKeys.has(key) ? [users.verifier] : []),
-    ];
+    const actors = [users.admin];
     for (const actor of actors) {
       await db.rolePermission.upsert({
         where: { userId_role_permissionId: { userId: actor.id, role: actor.role, permissionId: permission.id } },
@@ -388,7 +328,7 @@ async function seedTeachers() {
       kind: 'IDENTITY',
       fileId: 'file-teacher-id',
       status: DocumentStatus.APPROVED,
-      reviewedById: users.verifier.id,
+      reviewedById: users.admin.id,
       reviewedAt: at(-15, 10),
       submittedAt: at(-20, 9),
     },
@@ -396,7 +336,7 @@ async function seedTeachers() {
       teacherId: AHMADI,
       status: DocumentStatus.APPROVED,
       fileId: 'file-teacher-id',
-      reviewedById: users.verifier.id,
+      reviewedById: users.admin.id,
     },
   });
 
@@ -934,7 +874,29 @@ async function seedStudentPlacementTests() {
   }
 }
 
+async function removeMockPlacementTests() {
+  const mockTests = await db.testDefinition.findMany({
+    where: { id: { in: ['test-english-b1', 'test-german-a2'] } },
+    select: { id: true },
+  });
+  const testIds = mockTests.map(({ id }) => id);
+  if (testIds.length === 0) return;
+
+  await db.placementResult.deleteMany({ where: { testId: { in: testIds } } });
+  await db.testAttempt.deleteMany({ where: { testId: { in: testIds } } });
+  await db.testDefinition.deleteMany({ where: { id: { in: testIds } } });
+}
+
 async function seedBookingsFinanceAndReviews() {
+  // Finance screens must start empty in the development seed. Remove the
+  // records created by older versions of this seed before creating bookings.
+  await db.payoutItem.deleteMany({ where: { id: 'payout-item-paid' } });
+  await db.payoutBatch.deleteMany({ where: { id: 'payout-previous' } });
+  await db.earning.deleteMany({ where: { id: { in: ['earning-eligible', 'earning-paid'] } } });
+  await db.payment.deleteMany({
+    where: { id: { in: ['payment-booking-completed-eligible', 'payment-booking-completed-paid', 'payment-booking-future-confirmed'] } },
+  });
+
   const completed = await db.booking.upsert({
     where: { id: 'booking-completed-eligible' },
     create: {
@@ -960,7 +922,7 @@ async function seedBookingsFinanceAndReviews() {
       attendanceTeacher: true,
     },
   });
-  const paid = await db.booking.upsert({
+  await db.booking.upsert({
     where: { id: 'booking-completed-paid' },
     create: {
       id: 'booking-completed-paid',
@@ -984,7 +946,7 @@ async function seedBookingsFinanceAndReviews() {
       attendanceTeacher: true,
     },
   });
-  const future = await db.booking.upsert({
+  await db.booking.upsert({
     where: { id: 'booking-future-confirmed' },
     create: {
       id: 'booking-future-confirmed',
@@ -1031,99 +993,6 @@ async function seedBookingsFinanceAndReviews() {
     },
   });
 
-  for (const booking of [completed, paid, future])
-    await db.payment.upsert({
-      where: { id: `payment-${booking.id}` },
-      create: {
-        id: `payment-${booking.id}`,
-        bookingId: booking.id,
-        userId: booking.studentId,
-        purpose: 'BOOKING',
-        referenceId: booking.id,
-        subtotal: booking.price,
-        gatewayAmount: booking.price,
-        amount: booking.price,
-        status: PaymentStatus.PAID,
-        idempotencyKey: `seed-payment-${booking.id}`,
-        gatewayReference: `seed-${booking.id}`,
-        verifiedAt: now,
-      },
-      update: {
-        status: PaymentStatus.PAID,
-        subtotal: booking.price,
-        gatewayAmount: booking.price,
-        amount: booking.price,
-        verifiedAt: now,
-      },
-    });
-
-  const eligible = await db.earning.upsert({
-    where: { bookingId: completed.id },
-    create: {
-      id: 'earning-eligible',
-      teacherId: completed.teacherId,
-      bookingId: completed.id,
-      grossAmount: completed.price,
-      commissionAmount: REGULAR_COMMISSION,
-      netAmount: REGULAR_NET,
-      status: EarningStatus.ELIGIBLE,
-      eligibleAt: at(-9, 0),
-    },
-    update: {
-      teacherId: completed.teacherId,
-      status: EarningStatus.ELIGIBLE,
-      grossAmount: completed.price,
-      commissionAmount: REGULAR_COMMISSION,
-      netAmount: REGULAR_NET,
-    },
-  });
-  const paidEarning = await db.earning.upsert({
-    where: { bookingId: paid.id },
-    create: {
-      id: 'earning-paid',
-      teacherId: paid.teacherId,
-      bookingId: paid.id,
-      grossAmount: paid.price,
-      commissionAmount: REGULAR_COMMISSION,
-      netAmount: REGULAR_NET,
-      status: EarningStatus.PAID,
-      eligibleAt: at(-23, 0),
-    },
-    update: {
-      teacherId: paid.teacherId,
-      status: EarningStatus.PAID,
-      grossAmount: paid.price,
-      commissionAmount: REGULAR_COMMISSION,
-      netAmount: REGULAR_NET,
-    },
-  });
-  const payout = await db.payoutBatch.upsert({
-    where: { id: 'payout-previous' },
-    create: {
-      id: 'payout-previous',
-      weekStart: at(-28, 0),
-      weekEnd: at(-21, 23),
-      status: PayoutStatus.TRANSFERRED,
-      totalAmount: REGULAR_NET,
-      approvedById: users.admin.id,
-      approvedAt: at(-20, 10),
-      transferredAt: at(-19, 10),
-      reference: 'SEED-PAYOUT-001',
-    },
-    update: { status: PayoutStatus.TRANSFERRED, totalAmount: REGULAR_NET },
-  });
-  await db.payoutItem.upsert({
-    where: { earningId: paidEarning.id },
-    create: {
-      id: 'payout-item-paid',
-      batchId: payout.id,
-      earningId: paidEarning.id,
-      teacherId: paidEarning.teacherId,
-      amount: paidEarning.netAmount,
-    },
-    update: { batchId: payout.id, teacherId: paidEarning.teacherId, amount: paidEarning.netAmount },
-  });
-
   await db.review.upsert({
     where: { bookingId: completed.id },
     create: {
@@ -1158,11 +1027,12 @@ async function seedBookingsFinanceAndReviews() {
     data: { rating: rating._avg.rating ?? 0, reviewsCount: rating._count._all },
   });
 
-  void eligible;
 }
 
 async function seedDemoExperience() {
   const student = users.demoStudent;
+  await db.walletEntry.deleteMany({ where: { id: { startsWith: 'wallet-demo-' } } });
+  await db.payment.deleteMany({ where: { id: { startsWith: 'payment-booking-demo-' } } });
   const testSpecs = [
     [
       'test-demo-ielts',
@@ -1435,63 +1305,7 @@ async function seedDemoExperience() {
       },
       update: { teacherId, type, price, startsAt: at(days, 14), endsAt: at(days, 15), status },
     });
-    // The completed lesson carries the demo's 10% discount and 200,000 of wallet credit.
-    const discount = id.includes('completed') ? price / 10 : 0;
-    const wallet = id.includes('completed') ? 200_000 : 0;
-    await db.payment.upsert({
-      where: { id: `payment-${id}` },
-      create: {
-        id: `payment-${id}`,
-        bookingId: booking.id,
-        userId: student.id,
-        purpose: 'BOOKING',
-        referenceId: booking.id,
-        subtotal: price,
-        discountAmount: discount,
-        walletAmount: wallet,
-        gatewayAmount: price - discount - wallet,
-        amount: price - discount,
-        status: PaymentStatus.PAID,
-        idempotencyKey: `seed-demo-${id}`,
-        gatewayReference: `LS-DEMO-${1000 + days}`,
-        verifiedAt: at(days - 1, 12),
-      },
-      update: {
-        subtotal: price,
-        discountAmount: discount,
-        walletAmount: wallet,
-        gatewayAmount: price - discount - wallet,
-        amount: price - discount,
-        status: PaymentStatus.PAID,
-        verifiedAt: at(days - 1, 12),
-      },
-    });
   }
-  const ledger = [
-    ['topup-1', 'CREDIT', 2500000, 'افزایش موجودی از درگاه پرداخت', 'TopUp', 'wallet-topup-demo-1', -20],
-    ['class-1', 'DEBIT', 200000, 'پرداخت بخشی از هزینه کلاس IELTS', 'Payment', 'payment-booking-demo-completed', -9],
-    ['gift-1', 'CREDIT', 300000, 'اعتبار هدیه خوش‌آمدگویی', 'Gift', 'welcome-demo', -6],
-    ['refund-1', 'CREDIT', 180000, 'بازگشت وجه جلسه لغوشده', 'Refund', 'refund-demo', -4],
-    ['reserve-1', 'DEBIT', TRIAL_PRICE, 'رزرو جلسه آزمایشی آینده', 'Payment', 'payment-booking-demo-upcoming', -1],
-  ] as const;
-  for (const [id, direction, amount, description, referenceType, referenceId, days] of ledger)
-    await db.walletEntry.upsert({
-      where: { idempotencyKey: `seed-demo-ledger-${id}` },
-      create: {
-        id: `wallet-demo-${id}`,
-        userId: student.id,
-        transactionId: `TX-DEMO-${id.toUpperCase()}`,
-        account: 'user_wallet',
-        direction,
-        amount,
-        description,
-        referenceType,
-        referenceId,
-        idempotencyKey: `seed-demo-ledger-${id}`,
-        createdAt: at(days, 12),
-      },
-      update: { amount, description },
-    });
   await db.learningPlan.upsert({
     where: { id: 'plan-demo-ielts' },
     create: {
@@ -1692,18 +1506,18 @@ async function seedAudit() {
       after: { approvedTrialPrice: TRIAL_PRICE, approvedRegularPrice: REGULAR_PRICE },
     },
     {
-      actorId: users.verifier.id,
+      actorId: users.admin.id,
       action: 'teacher.document.needs_revision',
       entity: 'VerificationItem',
       entityId: 'verification-pending-certificate',
       after: { reason: 'Unreadable stamp' },
     },
     {
-      actorId: users.support.id,
+      actorId: users.admin.id,
       action: 'ticket.assigned',
       entity: 'Ticket',
       entityId: 'ticket-assigned-open',
-      after: { assignedToId: users.support.id },
+      after: { assignedToId: users.admin.id },
     },
   ];
   for (let index = 0; index < rows.length; index += 1) {
@@ -1741,11 +1555,9 @@ async function main() {
   await seedCountries(db);
   await seedTeachers();
   await seedPackages();
-  await seedTests();
+  await removeMockPlacementTests();
   await seedStudentPlacementTests();
-  await seedBookingsFinanceAndReviews();
-  await seedDemoExperience();
-  await seedTicketsCmsAndSettings();
+  // Student/staff demo fixtures are intentionally excluded from the default seed.
   await seedBlog();
   await seedCourses();
   await seedAudit();

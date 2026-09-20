@@ -59,6 +59,14 @@ export function AdminFinanceCenter() {
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Withdrawal | null>(null);
   const [reference, setReference] = useState('');
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manualTeacherId, setManualTeacherId] = useState('');
+  const [manualAmount, setManualAmount] = useState('');
+  const [manualReference, setManualReference] = useState('');
+  const manualPayment = useMutation({
+    mutationFn: () => api('/payouts/teachers/manual-payment', { method: 'POST', body: JSON.stringify({ teacherId: manualTeacherId.trim(), amount: Number(manualAmount), reference: manualReference.trim() }) }),
+    onSuccess: () => { setManualOpen(false); setManualTeacherId(''); setManualAmount(''); setManualReference(''); },
+  });
 
   const reports = useQuery({ queryKey: ['/admin/reports'], queryFn: () => api<Reports>('/admin/reports') });
   const me = useQuery({ queryKey: ['me'], queryFn: () => api<{ id: string }>('/users/me') });
@@ -114,10 +122,13 @@ export function AdminFinanceCenter() {
   return (
     <div className="admin-finance">
       <header className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
-        <button type="button" onClick={refresh} disabled={loading} className="secondary-button self-start">
-          <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-          {translate(locale, 'adminadminFinanceCenterRefresh')}
-        </button>
+        <div className="flex flex-wrap gap-3 self-start">
+          <button type="button" onClick={() => setManualOpen(true)} className="primary-button">ثبت واریز به مدرس</button>
+          <button type="button" onClick={refresh} disabled={loading} className="secondary-button">
+            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+            {translate(locale, 'adminadminFinanceCenterRefresh')}
+          </button>
+        </div>
         <div className="text-end">
           <p className="text-xs font-bold text-blue">{translate(locale, 'adminadminFinanceCenterFinanceOperations')}</p>
           <h1 className="mt-2 text-3xl font-black">{translate(locale, 'adminadminFinanceCenterFinancePayouts')}</h1>
@@ -367,6 +378,14 @@ export function AdminFinanceCenter() {
             </form>
           </div>
         </Portal>
+      )}
+      {manualOpen && (
+        <Portal><div className="fixed inset-0 z-50 grid place-items-center bg-navy/35 p-4 backdrop-blur-sm"><form className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl" onSubmit={(e) => { e.preventDefault(); manualPayment.mutate(); }}>
+          <p className="text-xs font-bold text-blue">پرداخت دستی</p><h2 className="mt-2 text-2xl font-black">ثبت واریز برای مدرس</h2>
+          <div className="mt-5 grid gap-4"><label><span className="mb-2 block text-sm font-bold">شناسه مدرس</span><input className="input latin w-full" dir="ltr" value={manualTeacherId} onChange={(e) => setManualTeacherId(e.target.value)} required /></label><label><span className="mb-2 block text-sm font-bold">مبلغ (تومان)</span><input className="input latin w-full" type="number" min="1" value={manualAmount} onChange={(e) => setManualAmount(e.target.value)} required /></label><label><span className="mb-2 block text-sm font-bold">شماره پیگیری بانکی</span><input className="input latin w-full" dir="ltr" value={manualReference} onChange={(e) => setManualReference(e.target.value)} required /></label></div>
+          {manualPayment.isError && <p role="alert" className="mt-3 rounded-xl bg-red-50 p-3 text-xs text-red-700">{apiMessage(manualPayment.error, 'ثبت واریز ناموفق بود.')}</p>}
+          <div className="mt-5 flex gap-3"><button type="button" onClick={() => setManualOpen(false)} className="secondary-button flex-1 justify-center">انصراف</button><button disabled={manualPayment.isPending} className="primary-button flex-1 justify-center">{manualPayment.isPending ? 'در حال ثبت...' : 'تأیید و ثبت واریز'}</button></div>
+        </form></div></Portal>
       )}
     </div>
   );

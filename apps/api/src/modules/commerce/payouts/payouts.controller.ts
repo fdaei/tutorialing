@@ -3,7 +3,7 @@ import { CurrentUser, RateLimit, RATE_LIMIT_TIERS, Roles, type AuthUser } from '
 import { PermissionKeys, RequirePermissions } from '../../auth/authorization';
 import { PayoutsService } from './payouts.service';
 import { DiscountsService } from '../discounts/discounts.service';
-import { DiscountDto, PayoutApprovalDto, PayoutWindowDto } from '../dto/request/payouts.dto';
+import { DiscountDto, ManualTeacherPaymentDto, PayoutApprovalDto, PayoutWindowDto } from '../dto/request/payouts.dto';
 
 @Roles('ADMIN', 'SUPPORT')
 @RequirePermissions(PermissionKeys.Payouts.Manage)
@@ -33,6 +33,11 @@ export class PayoutsController {
   @Post('withdrawals/:id/transfer')
   transferWithdrawal(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() d: PayoutApprovalDto) {
     return this.s.transferWithdrawal(id, u.id, d.reference);
+  }
+
+  @Post('teachers/manual-payment')
+  manualTeacherPayment(@CurrentUser() u: AuthUser, @Body() d: ManualTeacherPaymentDto) {
+    return this.s.manualTeacherPayment(d.teacherId, d.amount, d.reference, u.id);
   }
 
   @Post('discounts')

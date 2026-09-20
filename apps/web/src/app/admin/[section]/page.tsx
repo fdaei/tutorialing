@@ -8,6 +8,7 @@ import {
   AdminTestManager,
   AdminUsersManager,
   AdminRoleSearch,
+  AdminReviewsManager,
   CmsManager,
   CountryManager,
   ExaminerReviewManager,
@@ -50,6 +51,7 @@ export default async function Section({ params }: { params: Promise<{ section: s
     );
   else if (section === 'teachers') content = <AdminTeachersManager />;
   else if (section === 'test-reviews') content = <ExaminerReviewManager />;
+  else if (section === 'reviews') content = <AdminReviewsManager />;
   else if (section === 'tickets') content = <TicketManager />;
   else if (section === 'languages') content = <LanguageManager />;
   else if (section === 'countries') content = <CountryManager />;

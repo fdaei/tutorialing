@@ -206,7 +206,7 @@ export function TeacherPlannerCalendar({ mode = 'teacher' }: { mode?: CalendarMo
                 color="indigo"
                 time={`${time(item.startsAt)}–${time(item.endsAt)}`}
                 title={bookingTitle(item)}
-                meetingUrl={item.status === 'CONFIRMED' ? item.meetingUrl : null}
+                meetingUrl={item.meetingUrl}
                 joinLabel={fa ? 'ورود به کلاس در Google Meet' : 'Join on Google Meet'}
               />
             ))}

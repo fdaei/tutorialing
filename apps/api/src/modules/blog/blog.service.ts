@@ -127,9 +127,11 @@ export class BlogService {
 
   reviewQueue() {
     return this.db.blogPost.findMany({
-      where: { status: 'PENDING_REVIEW' },
+      // The admin magazine is the editorial workspace, not only a moderation
+      // queue: editors must be able to edit and unpublish existing articles.
+      where: { status: { not: 'ARCHIVED' } },
       include: { category: true, tags: true, author: AUTHOR },
-      orderBy: { submittedAt: 'asc' },
+      orderBy: { updatedAt: 'desc' },
     });
   }
 

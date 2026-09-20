@@ -3066,7 +3066,7 @@ a {
   background: #f3f0ff;
 }
 .placement-prompt-wrap {
-  max-width: 780px;
+  max-width: 900px;
   margin: 3.2rem auto 0;
   text-align: center;
 }
@@ -3078,9 +3078,14 @@ a {
 .placement-prompt {
   margin-top: 1rem;
   color: #171d3d;
-  font-size: clamp(1.7rem, 3.4vw, 2.75rem);
+  font-size: clamp(1.1rem, 1.8vw, 1.5rem);
   font-weight: 700;
-  line-height: 1.65;
+  line-height: 1.75;
+}
+.placement-prompt[dir='ltr'] {
+  max-width: 900px;
+  margin-inline: auto;
+  text-align: start;
 }
 .placement-blank {
   display: inline-block;
@@ -3272,6 +3277,10 @@ a {
   }
   .placement-test-shell {
     width: min(100% - 1.25rem, 1080px);
+  }
+  .placement-prompt {
+    font-size: 1.1rem;
+    line-height: 1.8;
   }
   .placement-test-page {
     padding-block: 0.75rem 2.5rem;

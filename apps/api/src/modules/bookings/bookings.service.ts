@@ -582,7 +582,7 @@ export class BookingsService {
   async complete(actorId: string, roles: string[], id: string) {
     return this.db.$transaction(
       async (tx) => {
-        const booking = await tx.booking.findUnique({ where: { id }, include: { teacher: true } });
+        const booking = await tx.booking.findUnique({ where: { id }, include: { teacher: true, payment: true } });
         if (!booking) throw notFound('BOOKING_NOT_FOUND');
         const isStaff = roles.some((role) => ['ADMIN'].includes(role));
         if (!isStaff && booking.teacher.userId !== actorId) throw forbidden('BOOKING_OWNERSHIP_REQUIRED');
@@ -590,6 +590,30 @@ export class BookingsService {
         if (booking.endsAt > new Date()) throw badRequest('BOOKING_NOT_ENDED');
         if (!booking.attendanceTeacher) throw badRequest('TEACHER_ATTENDANCE_REQUIRED');
         const status = booking.attendanceStudent === false ? 'NO_SHOW' : 'COMPLETED';
+
+        // Older/manual bookings could be confirmed without creating the
+        // wallet debit at booking time. Settle those at completion as a
+        // one-time, idempotent fallback. Normal bookings already have this
+        // entry, so they are not charged twice. Package/course sessions have
+        // no wallet amount and are settled through credit entries instead.
+        if (status === 'COMPLETED' && booking.payment?.walletAmount && booking.payment.walletAmount > 0) {
+          const debitKey = `wallet:${booking.payment.id}`;
+          const existingDebit = await tx.walletEntry.findUnique({ where: { idempotencyKey: debitKey } });
+          if (!existingDebit) {
+            const balance = await this.wallet.walletBalance(booking.studentId, tx);
+            if (balance < booking.payment.walletAmount) throw badRequest('INSUFFICIENT_WALLET_BALANCE');
+            await this.wallet.ledger(
+              tx,
+              booking.studentId,
+              'DEBIT',
+              booking.payment.walletAmount,
+              'teacher booking payment',
+              'Payment',
+              booking.payment.id,
+              debitKey,
+            );
+          }
+        }
         await tx.booking.update({ where: { id }, data: { status } });
         await tx.classRecord.upsert({
           where: { bookingId: id },

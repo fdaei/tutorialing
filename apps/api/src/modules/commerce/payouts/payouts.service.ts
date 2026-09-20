@@ -7,6 +7,24 @@ import { badRequest, conflict, isPrismaKnownError } from '../../../common';
 export class PayoutsService {
   constructor(private db: PrismaService) {}
 
+  async manualTeacherPayment(teacherId: string, amount: number, reference: string, actorId: string) {
+    const teacher = await this.db.teacher.findUnique({ where: { id: teacherId }, select: { userId: true } });
+    if (!teacher) throw badRequest('TEACHER_NOT_FOUND');
+    return this.db.walletEntry.create({
+      data: {
+        userId: teacher.userId,
+        transactionId: `manual-payout:${reference}`,
+        account: 'user_wallet',
+        direction: 'CREDIT',
+        amount,
+        description: `manual teacher payment by ${actorId}`,
+        referenceType: 'ManualTeacherPayment',
+        referenceId: reference,
+        idempotencyKey: `manual-teacher-payment:${reference}`,
+      },
+    });
+  }
+
   async generatePayout(weekStart: Date, weekEnd: Date) {
     if (!Number.isFinite(weekStart.getTime()) || !Number.isFinite(weekEnd.getTime()) || weekEnd <= weekStart) {
       throw badRequest('PAYOUT_PERIOD_INVALID');

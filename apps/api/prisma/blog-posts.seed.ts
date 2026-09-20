@@ -64,8 +64,22 @@ export async function seedBlogPosts(db: PrismaClient, { authorId, overwrite = fa
 
   let written = 0;
   for (const [index, { category, tags, ...post }] of BLOG_POSTS.entries()) {
-    const existing = await db.blogPost.findUnique({ where: { slug: post.slug }, select: { id: true } });
-    if (existing && !overwrite) continue;
+    const existing = await db.blogPost.findUnique({
+      where: { slug: post.slug },
+      select: { id: true, status: true },
+    });
+    if (existing && !overwrite) {
+      // The editorial baseline is already published content, not a review
+      // submission. Repair databases seeded by older versions that left these
+      // rows in the admin queue, while leaving all other editor changes alone.
+      if (existing.status === BlogPostStatus.PENDING_REVIEW) {
+        await db.blogPost.update({
+          where: { id: existing.id },
+          data: { status: BlogPostStatus.PUBLISHED, publishedAt: now },
+        });
+      }
+      continue;
+    }
 
     const categoryId = categoryIds.get(category);
     if (!categoryId) throw new Error(`Blog post ${post.slug} references unknown category ${category}`);

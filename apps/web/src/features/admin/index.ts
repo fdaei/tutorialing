@@ -7,6 +7,7 @@ export { AdminRoleSearch } from './components/admin-role-search';
 export { CmsManager } from './components/cms-manager';
 export { CountryManager } from './components/country-manager';
 export { ExaminerReviewManager } from './components/examiner-review-manager';
+export { AdminReviewsManager } from './components/admin-reviews-manager';
 export { LanguageManager } from './components/language-manager';
 export { TeacherDocumentsManager } from './components/teacher-documents-manager';
 export { WebsiteBuilder } from './components/website-builder';

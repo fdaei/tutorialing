@@ -270,6 +270,14 @@ export class TeachersService {
           ...(normalized.avatarKey !== undefined && { avatarKey: normalized.avatarKey }),
         },
       });
+      // A phone number may previously have been used for OTP sign-in, which
+      // creates a STUDENT account. Ensure that linking/updating a teacher
+      // always grants the role required by the teacher panel as well.
+      await tx.userRole.upsert({
+        where: { userId_role: { userId: before.userId, role: 'INSTRUCTOR' } },
+        create: { userId: before.userId, role: 'INSTRUCTOR' },
+        update: {},
+      });
       const updated = await tx.teacher.update({
         where: { id },
         data: normalized.teacherData,
