@@ -11,6 +11,7 @@ import { JwtService } from '@nestjs/jwt';
 import type { Request } from 'express';
 import { PUBLIC_KEY } from '../../common/http/constants/auth.constants';
 import { AuthUser } from '../../common/types/authenticated-user.type';
+import { Role } from '@prisma/client';
 import { TokenRevocationService } from './token-revocation.service';
 
 /**
@@ -24,7 +25,10 @@ import { TokenRevocationService } from './token-revocation.service';
  * that can move money or change privileges — and fails open for ordinary
  * student/teacher traffic, which degrades to the previous behaviour.
  */
-const PRIVILEGED_ROLES = ['ADMIN', 'SUPPORT'];
+// Exported so `access-token.guard.spec.ts` can assert it still covers every
+// staff role in the `Role` enum. A role added to the schema without being
+// listed here would silently fail open during a Redis outage.
+export const REVOCATION_CRITICAL_ROLES: readonly Role[] = ['ADMIN', 'SUPPORT'];
 
 @Injectable()
 export class AccessGuard implements CanActivate {
@@ -60,7 +64,7 @@ export class AccessGuard implements CanActivate {
   }
 
   private async assertNotRevoked(payload: AuthUser & { iat?: number }) {
-    const privileged = payload.roles.some((role) => PRIVILEGED_ROLES.includes(role));
+    const privileged = payload.roles.some((role) => (REVOCATION_CRITICAL_ROLES as readonly string[]).includes(role));
     let revokedAt: number;
     try {
       revokedAt = await this.revocation.revokedAt(payload.id);

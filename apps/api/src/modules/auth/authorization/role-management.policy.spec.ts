@@ -1,3 +1,4 @@
+import { Role } from '@prisma/client';
 import { ELEVATED_PERMISSIONS, PRIVILEGED_ROLES, RoleManagementPolicy } from './role-management.policy';
 
 const ACTOR = 'actor-1';
@@ -70,5 +71,32 @@ describe('RoleManagementPolicy.assertMayGrantPermission', () => {
     const { p, findUnique } = policy([]);
     await expect(p.assertMayGrantPermission(ACTOR, 'tickets.manage')).resolves.toBeUndefined();
     expect(findUnique).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * SEC-207's tier table is a hand-maintained list, so it can only stay correct
+ * if adding a role to the schema forces a decision about which tier it lands
+ * in. These pin the roles the enum has today: a new one fails this test, and
+ * whoever adds it has to either put it in `PRIVILEGED_ROLES` or record here
+ * that it is tier 3.
+ */
+describe('SEC-207 tier coverage', () => {
+  /** Tier 3 — grantable by any holder of `roles.manage`. */
+  const STANDARD_ROLES: readonly Role[] = ['STUDENT', 'INSTRUCTOR', 'SUPPORT'];
+
+  it('assigns every role in the schema to a tier', () => {
+    const classified = [...STANDARD_ROLES, ...PRIVILEGED_ROLES, 'ADMIN' as Role];
+    expect([...Object.values(Role)].sort()).toEqual([...classified].sort());
+  });
+
+  it('keeps the tier-2 role list free of roles the schema does not define', () => {
+    for (const role of PRIVILEGED_ROLES) expect(Object.values(Role)).toContain(role);
+  });
+
+  it('never lets a tier-2 permission drop out of the elevated set', () => {
+    expect([...ELEVATED_PERMISSIONS].sort()).toEqual(
+      ['payments.refund', 'payouts.manage', 'roles.manage', 'settings.manage'].sort(),
+    );
   });
 });

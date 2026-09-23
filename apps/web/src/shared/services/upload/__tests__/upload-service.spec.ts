@@ -4,7 +4,10 @@ import { calculateSha256, sha256HexToBase64 } from '../checksum';
 import { UploadError } from '../upload-errors';
 import { upload } from '../upload-service';
 
-jest.mock('@/shared/services/api', () => ({ api: jest.fn() }));
+jest.mock('@/shared/services/api', () => ({
+  ...jest.requireActual('@/shared/services/api'),
+  api: jest.fn(),
+}));
 
 const mockedApi = jest.mocked(api);
 const signedUrl = 'https://storage.invalid/private-signature';

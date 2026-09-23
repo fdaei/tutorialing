@@ -221,3 +221,20 @@ describe('BlogService reader writes (SEC-213)', () => {
     expect(include).not.toHaveProperty('ratings');
   });
 });
+
+describe('BlogService.publishedSlugs', () => {
+  // Anonymous and unpaginated, so it must select only what a sitemap needs:
+  // drafts would leak unreleased posts and the bodies would make it an export.
+  it('selects published slugs and dates only', async () => {
+    const findMany = jest.fn().mockResolvedValue([]);
+    const service = new BlogService({ blogPost: { findMany } } as never, {} as never);
+
+    await service.publishedSlugs();
+
+    expect(findMany).toHaveBeenCalledWith({
+      where: { status: 'PUBLISHED' },
+      select: { slug: true, publishedAt: true, updatedAt: true },
+      orderBy: { publishedAt: 'desc' },
+    });
+  });
+});

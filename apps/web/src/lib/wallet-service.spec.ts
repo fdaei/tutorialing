@@ -1,7 +1,10 @@
 import { api } from '@/shared/services/api';
 import { walletService } from './wallet-service';
 
-jest.mock('@/shared/services/api', () => ({ api: jest.fn() }));
+jest.mock('@/shared/services/api', () => ({
+  ...jest.requireActual('@/shared/services/api'),
+  api: jest.fn(),
+}));
 
 const mockedApi = jest.mocked(api);
 

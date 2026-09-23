@@ -290,6 +290,38 @@ export const API_ERROR_MESSAGES: Record<string, Record<ApiLocale, string>> = {
     fa: 'رسید پرداخت این دوره در انتظار تأیید است.',
     en: 'A receipt for this course is already awaiting review.',
   },
+  COURSE_NOT_FOUND: {
+    fa: 'دوره پیدا نشد.',
+    en: 'The course was not found.',
+  },
+  COURSE_SLUG_ALREADY_EXISTS: {
+    fa: 'دوره دیگری با همین slug وجود دارد؛ یک slug دیگر انتخاب کنید.',
+    en: 'Another course already uses this slug. Pick a different one.',
+  },
+  COURSE_INSTRUCTOR_INVALID: {
+    fa: 'مدرس انتخاب‌شده معتبر یا تأییدشده نیست.',
+    en: 'The selected instructor is not valid or not approved.',
+  },
+  COURSE_PUBLISH_REQUIRES_INSTRUCTOR: {
+    fa: 'برای انتشار دوره باید یک مدرس انتخاب کنید.',
+    en: 'Publishing a course requires an instructor.',
+  },
+  COURSE_PUBLISH_REQUIRES_LESSONS: {
+    fa: 'دوره ویدیویی برای انتشار حداقل به یک درس منتشرشده نیاز دارد. اگر این دوره کلاس زنده است، نوع دوره را روی «کلاس زنده» بگذارید.',
+    en: 'A self-paced course needs at least one published lesson before it can go live. If this is a live class, set the course format to “Live class”.',
+  },
+  COURSE_PACKAGE_REQUIRED: {
+    fa: 'برای دوره کلاس زنده باید یک پکیج جلسات انتخاب شود.',
+    en: 'A live class course must be linked to a session package.',
+  },
+  COURSE_PACKAGE_TEACHER_MISMATCH: {
+    fa: 'پکیج انتخاب‌شده متعلق به مدرس این دوره نیست.',
+    en: 'The selected package belongs to a different instructor.',
+  },
+  COURSE_PACKAGE_ALREADY_LINKED: {
+    fa: 'این پکیج قبلاً به دوره دیگری وصل شده است.',
+    en: 'This package is already linked to another course.',
+  },
   DISCOUNT_INVALID: {
     fa: 'کد تخفیف معتبر نیست یا منقضی شده است.',
     en: 'The discount code is invalid or has expired.',

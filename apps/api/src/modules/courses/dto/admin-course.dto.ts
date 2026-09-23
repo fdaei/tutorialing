@@ -8,7 +8,11 @@ export class AdminCourseDto {
   @IsString() @MinLength(20) @MaxLength(10_000) descriptionFa!: string;
   @IsString() @MinLength(20) @MaxLength(10_000) descriptionEn!: string;
   @IsString() @MinLength(2) @MaxLength(80) language!: string;
-  @IsIn(['A1', 'A2', 'B1', 'B2', 'C1', 'C2']) level!: string;
+  // Free text, not a CEFR enum: the institute catalog also sells levels like
+  // `IELTS`, `A1–C1` and `All levels`, and the web renders them through
+  // `localizedCourseLevel`. Locking this to A1..C2 made every catalog course
+  // unsavable from the admin panel.
+  @IsString() @MinLength(2) @MaxLength(40) level!: string;
   @IsOptional() @IsString() teacherId?: string;
   @Type(() => Number) @IsInt() @Min(0) @Max(2_000_000_000) price!: number;
   @IsOptional() @IsString() @MaxLength(2_000) image?: string;

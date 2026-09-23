@@ -262,9 +262,28 @@ export class CoursesService {
   }
 
   courseInstructors() {
+    // Packages ride along with the instructor list so the admin course form can
+    // offer the right `packageId` for a LIVE_ONLINE course without a second
+    // round trip. `course` tells the form which packages are already taken.
     return this.db.teacher.findMany({
       where: { status: 'APPROVED' },
-      select: { id: true, nameFa: true, nameEn: true, slug: true },
+      select: {
+        id: true,
+        nameFa: true,
+        nameEn: true,
+        slug: true,
+        packages: {
+          select: {
+            id: true,
+            titleFa: true,
+            titleEn: true,
+            credits: true,
+            active: true,
+            course: { select: { id: true } },
+          },
+          orderBy: { credits: 'asc' },
+        },
+      },
       orderBy: { nameFa: 'asc' },
     });
   }
@@ -292,7 +311,7 @@ export class CoursesService {
       packageId
         ? this.db.package.findUnique({
             where: { id: packageId },
-            select: { id: true, teacherId: true, course: { select: { id: true } } },
+            select: { id: true, teacherId: true, credits: true, course: { select: { id: true } } },
           })
         : null,
     ]);
@@ -321,7 +340,9 @@ export class CoursesService {
       price: input.price,
       image: input.image?.trim() || null,
       published: input.published,
-      lessonsCount,
+      // A LIVE_ONLINE course has no chapters, so its session count is the
+      // linked package's credits; counting published lessons would zero it out.
+      lessonsCount: format === 'LIVE_ONLINE' ? (pkg?.credits ?? 0) : lessonsCount,
       format,
       packageId,
     };

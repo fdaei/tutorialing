@@ -21,4 +21,18 @@ describe('ContentService', () => {
       update: { titleFa: 'درباره تازه' },
     });
   });
+
+  // The sitemap is anonymous, so this query must stay narrow: drafts would leak
+  // unreleased pages, and selecting the bodies would turn it into a bulk export.
+  it('lists only published slugs, without page bodies', async () => {
+    const findMany = jest.fn().mockResolvedValue([{ slug: 'about', updatedAt: new Date(0) }]);
+    const service = new ContentService({ cmsPage: { findMany } } as never);
+
+    await expect(service.publishedSlugs()).resolves.toEqual([{ slug: 'about', updatedAt: new Date(0) }]);
+    expect(findMany).toHaveBeenCalledWith({
+      where: { published: true },
+      select: { slug: true, updatedAt: true },
+      orderBy: { slug: 'asc' },
+    });
+  });
 });

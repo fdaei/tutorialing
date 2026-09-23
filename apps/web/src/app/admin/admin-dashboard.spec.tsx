@@ -5,7 +5,10 @@ import { LocaleProvider } from '@/components/shared/locale-provider';
 import { api } from '@/shared/services/api';
 import Admin from './page';
 
-jest.mock('@/shared/services/api', () => ({ api: jest.fn() }));
+jest.mock('@/shared/services/api', () => ({
+  ...jest.requireActual('@/shared/services/api'),
+  api: jest.fn(),
+}));
 jest.mock('@/features/panel', () => ({
   adminNav: [],
   PanelShell: ({ children }: { children: React.ReactNode }) => <main>{children}</main>,

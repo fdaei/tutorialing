@@ -6,6 +6,7 @@ import { LocaleProvider } from '@/components/shared/locale-provider';
 import { authPath } from '@/lib/i18n';
 
 jest.mock('@/shared/services/api', () => ({
+  ...jest.requireActual('@/shared/services/api'),
   api: jest.fn(),
   apiMessage: (error: unknown, fallback: string) => error instanceof Error ? error.message : fallback,
   readAccessToken: jest.fn(),

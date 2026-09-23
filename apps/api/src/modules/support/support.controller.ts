@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, Patch, Post, Put, Query } from '@nestjs/common';
-import { CurrentUser, Public, Roles, type AuthUser } from '../../common';
+import { CurrentUser, Public, RateLimit, RATE_LIMIT_TIERS, Roles, type AuthUser } from '../../common';
 import { PermissionKeys, RequirePermissions } from '../auth/authorization';
 import { SupportService } from './support.service';
 import { TicketDto } from './dto/request/ticket.dto';
@@ -21,6 +21,11 @@ export class SupportController {
   }
   @Public() @Get('navigation') navigation() {
     return this.settingsService.publicNavigation();
+  }
+  // Rate-limited unlike its siblings: this one enumerates every published page
+  // in a single call, so it is the cheap one to scrape in a loop.
+  @Public() @RateLimit(RATE_LIMIT_TIERS.publicRead) @Get('pages') pages() {
+    return this.contentService.publishedSlugs();
   }
   @Public() @Get('pages/:slug') page(@Param('slug') slug: string) {
     return this.contentService.publishedPage(slug);

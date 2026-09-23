@@ -6,6 +6,7 @@ import { api } from '@/shared/services/api';
 import { AdminTestManager } from './admin-test-manager';
 
 jest.mock('@/shared/services/api', () => ({
+  ...jest.requireActual('@/shared/services/api'),
   api: jest.fn(),
   ApiError: class ApiError extends Error {},
 }));

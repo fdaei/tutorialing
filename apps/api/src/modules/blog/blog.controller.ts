@@ -35,6 +35,14 @@ export class BlogController {
     return this.blog.list(query);
   }
 
+  // Declared before `posts/:slug` so the literal wins the route match. Narrow on
+  // purpose: the sitemap needs slugs and dates, and the full list pulls every
+  // post body to compute reading time, which is wasted work for a crawler feed.
+  @PublicRateLimit(RATE_LIMIT_TIERS.publicRead) @Get('posts/slugs')
+  slugs() {
+    return this.blog.publishedSlugs();
+  }
+
   @Public() @Get('posts/:slug')
   detail(@Param('slug') slug: string) {
     return this.blog.detail(slug);

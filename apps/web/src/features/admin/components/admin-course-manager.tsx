@@ -22,8 +22,22 @@ import { localePath, isDefaultLocale } from '@/lib/i18n';
 import { formatMoney } from '@/lib/money';
 import { api, apiMessage } from '@/shared/services/api';
 
-type CourseLevel = 'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2';
-type CourseInstructor = { id: string; nameFa: string; nameEn: string; slug: string };
+type CourseFormat = 'SELF_PACED' | 'LIVE_ONLINE';
+type CoursePackage = {
+  id: string;
+  titleFa: string;
+  titleEn: string;
+  credits: number;
+  active: boolean;
+  course: { id: string } | null;
+};
+type CourseInstructor = {
+  id: string;
+  nameFa: string;
+  nameEn: string;
+  slug: string;
+  packages?: CoursePackage[];
+};
 type AdminCourse = {
   id: string;
   slug: string;
@@ -35,6 +49,8 @@ type AdminCourse = {
   level: string;
   teacherId?: string | null;
   teacherName: string;
+  format?: CourseFormat | null;
+  packageId?: string | null;
   teacher?: { id: string; nameFa: string; nameEn: string; status: string } | null;
   lessonsCount: number;
   price: number;
@@ -52,8 +68,10 @@ type CourseForm = {
   descriptionFa: string;
   descriptionEn: string;
   language: string;
-  level: CourseLevel;
+  level: string;
   teacherId: string;
+  format: CourseFormat;
+  packageId: string;
   price: number;
   image: string;
   published: boolean;
@@ -68,13 +86,17 @@ const emptyForm: CourseForm = {
   language: '',
   level: 'A1',
   teacherId: '',
+  format: 'SELF_PACED',
+  packageId: '',
   price: 0,
   image: '',
   published: false,
 };
 const inputClass =
   'w-full rounded-xl border border-[#dce1ee] bg-white px-3.5 py-3 outline-none transition focus:border-purple focus:ring-4 focus:ring-violet/10';
-const levels: CourseLevel[] = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
+// Suggestions only. The catalog also sells levels like `IELTS` and `All levels`,
+// so the field stays free text and must never coerce an unknown value.
+const levelSuggestions = ['A1', 'A2', 'A1–C1', 'B1', 'B2', 'C1', 'C2', 'IELTS', 'All levels'];
 
 function formOf(course: AdminCourse): CourseForm {
   return {
@@ -84,8 +106,10 @@ function formOf(course: AdminCourse): CourseForm {
     descriptionFa: course.descriptionFa,
     descriptionEn: course.descriptionEn,
     language: course.language,
-    level: levels.includes(course.level as CourseLevel) ? (course.level as CourseLevel) : 'A1',
+    level: course.level,
     teacherId: course.teacherId ?? '',
+    format: course.format ?? 'SELF_PACED',
+    packageId: course.packageId ?? '',
     price: course.price,
     image: course.image ?? '',
     published: course.published,
@@ -127,8 +151,12 @@ export function AdminCourseManager() {
         descriptionFa: payload.descriptionFa.trim(),
         descriptionEn: payload.descriptionEn.trim(),
         language: payload.language.trim(),
-        level: payload.level,
+        level: payload.level.trim(),
         teacherId: payload.teacherId || undefined,
+        // Always sent: the API defaults a missing `format` to SELF_PACED, which
+        // would silently unlink a live course's package and reject the save.
+        format: payload.format,
+        packageId: payload.format === 'LIVE_ONLINE' ? payload.packageId || undefined : undefined,
         price: Number(payload.price),
         image: payload.image.trim() || undefined,
         published: payload.published,
@@ -160,6 +188,14 @@ export function AdminCourseManager() {
     });
   }, [courses.data, search, status]);
 
+  const teacherPackages = useMemo(() => {
+    const teacher = (instructors.data ?? []).find((entry) => entry.id === form.teacherId);
+    return (teacher?.packages ?? []).filter(
+      // A package can back only one course, so hide ones already taken by another.
+      (pkg) => (pkg.active || pkg.id === form.packageId) && (!pkg.course || pkg.course.id === editing?.id),
+    );
+  }, [instructors.data, form.teacherId, form.packageId, editing?.id]);
+
   const publishedCount = courses.data?.filter((course) => course.published).length ?? 0;
   const draftCount = (courses.data?.length ?? 0) - publishedCount;
 
@@ -178,7 +214,13 @@ export function AdminCourseManager() {
   }
 
   function update<K extends keyof CourseForm>(key: K, value: CourseForm[K]) {
-    setForm((current) => ({ ...current, [key]: value }));
+    setForm((current) => {
+      const next = { ...current, [key]: value };
+      // A package belongs to one instructor, so switching instructor (or leaving
+      // the live format) drops a selection the API would reject anyway.
+      if (key === 'teacherId' || (key === 'format' && value !== 'LIVE_ONLINE')) next.packageId = '';
+      return next;
+    });
   }
 
   function submit(event: React.FormEvent<HTMLFormElement>) {
@@ -476,17 +518,65 @@ export function AdminCourseManager() {
                   maxLength={80}
                 />
               </Field>
-              <Field label={fa ? 'سطح' : 'Level'}>
-                <select
+              <Field
+                label={fa ? 'سطح' : 'Level'}
+                hint={fa ? 'مثل A1، A1–C1، IELTS یا All levels' : 'e.g. A1, A1–C1, IELTS or All levels'}
+              >
+                <input
                   value={form.level}
-                  onChange={(event) => update('level', event.target.value as CourseLevel)}
+                  onChange={(event) => update('level', event.target.value)}
+                  className={inputClass}
+                  list="course-level-suggestions"
+                  aria-label={fa ? 'سطح' : 'Level'}
+                  required
+                  minLength={2}
+                  maxLength={40}
+                />
+                <datalist id="course-level-suggestions">
+                  {levelSuggestions.map((level) => (
+                    <option key={level} value={level} />
+                  ))}
+                </datalist>
+              </Field>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label={fa ? 'نوع دوره' : 'Course format'}>
+                <select
+                  value={form.format}
+                  onChange={(event) => update('format', event.target.value as CourseFormat)}
                   className={inputClass}
                 >
-                  {levels.map((level) => (
-                    <option key={level}>{level}</option>
-                  ))}
+                  <option value="SELF_PACED">{fa ? 'ویدیویی (خودخوان)' : 'Self-paced'}</option>
+                  <option value="LIVE_ONLINE">{fa ? 'کلاس زنده' : 'Live class'}</option>
                 </select>
               </Field>
+              {form.format === 'LIVE_ONLINE' && (
+                <Field
+                  label={fa ? 'پکیج جلسات' : 'Session package'}
+                  hint={fa ? 'تعداد جلسات دوره از این پکیج خوانده می‌شود.' : 'The course session count comes from this package.'}
+                >
+                  <select
+                    value={form.packageId}
+                    onChange={(event) => update('packageId', event.target.value)}
+                    className={inputClass}
+                    aria-label={fa ? 'پکیج جلسات' : 'Session package'}
+                    disabled={!form.teacherId}
+                    required
+                  >
+                    <option value="">{fa ? 'انتخاب کنید' : 'Select a package'}</option>
+                    {teacherPackages.map((pkg) => (
+                      <option key={pkg.id} value={pkg.id}>
+                        {`${fa ? pkg.titleFa : pkg.titleEn} — ${pkg.credits} ${fa ? 'جلسه' : 'sessions'}`}
+                      </option>
+                    ))}
+                  </select>
+                  {form.teacherId && teacherPackages.length === 0 && (
+                    <span className="mt-1 block text-xs text-red-600">
+                      {fa ? 'این مدرس پکیج فعالی ندارد.' : 'This instructor has no available package.'}
+                    </span>
+                  )}
+                </Field>
+              )}
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label={fa ? 'مدرس' : 'Instructor'}>
@@ -546,8 +636,8 @@ export function AdminCourseManager() {
                 <strong className="block">{fa ? 'انتشار دوره' : 'Publish course'}</strong>
                 <span className="mt-1 block text-xs leading-6 text-muted">
                   {fa
-                    ? 'برای انتشار، مدرس و حداقل یک درس منتشرشده لازم است.'
-                    : 'Publishing requires an instructor and at least one published lesson.'}
+                    ? 'برای انتشار، مدرس لازم است؛ دوره ویدیویی حداقل یک درس منتشرشده و کلاس زنده یک پکیج جلسات می‌خواهد.'
+                    : 'Publishing requires an instructor; a self-paced course also needs a published lesson and a live class needs a session package.'}
                 </span>
               </span>
             </label>

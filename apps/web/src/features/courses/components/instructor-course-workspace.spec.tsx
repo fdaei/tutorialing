@@ -5,6 +5,7 @@ import { api } from '@/shared/services/api';
 import { InstructorCourseWorkspace } from './instructor-course-workspace';
 
 jest.mock('@/shared/services/api', () => ({
+  ...jest.requireActual('@/shared/services/api'),
   api: jest.fn(),
   apiMessage: (_error: unknown, fallback: string) => fallback,
 }));

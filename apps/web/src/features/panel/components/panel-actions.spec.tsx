@@ -7,6 +7,7 @@ import { PanelActions } from './panel-actions';
 import { uploadPanelFile } from '../services/upload-panel-file';
 
 jest.mock('@/shared/services/api', () => ({
+  ...jest.requireActual('@/shared/services/api'),
   api: jest.fn(),
   ApiError: class ApiError extends Error {},
   apiMessage: (_error: unknown, fallback: string) => fallback,
@@ -31,6 +32,17 @@ function field(form: HTMLFormElement, name: string): Element {
   const control = form.elements.namedItem(name);
   if (!(control instanceof Element)) throw new Error(`Expected form control: ${name}`);
   return control;
+}
+
+/**
+ * A section can render several forms — settings shows the payment card above
+ * the general setting — so tests address a form by a control it owns rather
+ * than by position, which silently retargets when a form is added above.
+ */
+function formWith(container: HTMLElement, name: string): HTMLFormElement {
+  const form = Array.from(container.querySelectorAll('form')).find((candidate) => candidate.elements.namedItem(name));
+  if (!form) throw new Error(`Expected a form containing: ${name}`);
+  return form;
 }
 
 describe('PanelActions characterization', () => {
@@ -93,8 +105,7 @@ describe('PanelActions characterization', () => {
 
   it('dispatches admin settings and preserves setting payload', async () => {
     const view = renderAction('admin', 'settings', '/admin/settings');
-    const form = view.container.querySelector('form');
-    if (!form) throw new Error('Expected admin setting form');
+    const form = formWith(view.container, 'key');
     fireEvent.change(field(form, 'key'), { target: { value: 'site.title' } });
     fireEvent.change(field(form, 'settingValue'), { target: { value: 'LingoSpeak' } });
     fireEvent.submit(form);
@@ -102,6 +113,26 @@ describe('PanelActions characterization', () => {
       expect(mockedApi).toHaveBeenCalledWith('/admin/settings/site.title', {
         method: 'PUT',
         body: JSON.stringify({ value: { value: 'LingoSpeak' }, public: false }),
+      }),
+    );
+  });
+
+  // The payment card is what students are told to transfer to, so a wrong or
+  // silently-private value stops manual top-ups. It is saved public on purpose.
+  it('saves the payment card as a public setting', async () => {
+    const view = renderAction('admin', 'settings', '/admin/settings');
+    const form = formWith(view.container, 'cardNumber');
+    fireEvent.change(field(form, 'cardNumber'), { target: { value: '6037991234567890' } });
+    fireEvent.change(field(form, 'holder'), { target: { value: 'سارا دادخواه' } });
+    fireEvent.change(field(form, 'bank'), { target: { value: 'ملی' } });
+    fireEvent.submit(form);
+    await waitFor(() =>
+      expect(mockedApi).toHaveBeenCalledWith('/admin/settings/payment.card', {
+        method: 'PUT',
+        body: JSON.stringify({
+          value: { cardNumber: '6037991234567890', holder: 'سارا دادخواه', bank: 'ملی' },
+          public: true,
+        }),
       }),
     );
   });

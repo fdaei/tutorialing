@@ -1,5 +1,6 @@
+import { Role } from '@prisma/client';
 import { Logger } from '@nestjs/common';
-import { AccessGuard } from './access-token.guard';
+import { AccessGuard, REVOCATION_CRITICAL_ROLES } from './access-token.guard';
 
 // The store-unreachable cases below log deliberately; without this the expected
 // stack traces drown out real failures in the test output.
@@ -95,5 +96,25 @@ describe('AccessGuard revocation (SEC-005)', () => {
     const g = guard(admin);
     g.jwt.verifyAsync.mockRejectedValue(new Error('bad signature'));
     await expect(g.build(c.reflector).canActivate(c.ctx)).rejects.toMatchObject({ status: 401 });
+  });
+});
+
+/**
+ * The fail-closed list is a hand-maintained subset of the `Role` enum, and the
+ * cost of it drifting is silent: a new staff role would fail *open* during a
+ * Redis outage, letting a demoted holder keep its old claims for the life of
+ * the token. `STUDENT`/`INSTRUCTOR` are deliberately excluded — ordinary
+ * traffic degrades rather than taking the API down with Redis.
+ */
+describe('REVOCATION_CRITICAL_ROLES', () => {
+  const NON_STAFF: readonly Role[] = ['STUDENT', 'INSTRUCTOR'];
+
+  it('covers every staff role defined in the schema', () => {
+    const staffRoles = Object.values(Role).filter((role) => !NON_STAFF.includes(role));
+    expect([...REVOCATION_CRITICAL_ROLES].sort()).toEqual([...staffRoles].sort());
+  });
+
+  it('names only roles that exist', () => {
+    for (const role of REVOCATION_CRITICAL_ROLES) expect(Object.values(Role)).toContain(role);
   });
 });

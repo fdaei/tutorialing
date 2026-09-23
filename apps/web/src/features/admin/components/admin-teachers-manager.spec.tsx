@@ -5,10 +5,13 @@ import { LocaleProvider } from '@/components/shared/locale-provider';
 import { api } from '@/shared/services/api';
 import { AdminTeachersManager } from './admin-teachers-manager';
 
+// Only the network call is stubbed. Listing the module's exports by hand is
+// what broke this suite before: the editor started reading per-field validation
+// errors through `apiField`, which the hand-written double did not have, and the
+// dialog crashed instead of rendering.
 jest.mock('@/shared/services/api', () => ({
+  ...jest.requireActual('@/shared/services/api'),
   api: jest.fn(),
-  ApiError: class ApiError extends Error {},
-  Paginated: {},
 }));
 jest.mock('@/features/panel/services/upload-panel-file', () => ({ uploadPanelFile: jest.fn() }));
 

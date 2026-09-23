@@ -4,11 +4,16 @@ import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { forbidden } from '../../../common';
 
 /**
- * Roles that carry systemic or financial authority. Granting one of these to
- * anyone — including via a fresh account — requires the actor to already
- * hold ADMIN. `ADMIN` itself is handled separately (it keeps its original,
- * more specific error code); this is the tier-2 set from
- * ROLE_MANAGEMENT_POLICY.md.
+ * Roles that carry systemic or financial authority beyond `ADMIN` itself.
+ * Granting one requires the actor to already hold ADMIN; `ADMIN` is handled
+ * separately because it keeps its own, more specific error code.
+ *
+ * Empty on purpose. `ROLE_MANAGEMENT_POLICY.md` describes `FINANCE` as the
+ * tier-2 role, but the `Role` enum has never carried it — money-moving routes
+ * are gated on the `payments.refund`/`payouts.manage` permissions below
+ * instead. `role-management.policy.spec.ts` fails if a role is added to the
+ * schema without a decision being recorded here, so this stays empty only for
+ * as long as no such role exists.
  */
 export const PRIVILEGED_ROLES: readonly Role[] = [];
 

@@ -42,6 +42,11 @@ jobs:
       - name: Generate Prisma client
         run: npm run db:generate
 
+      # Catches a schema edited without `prisma format`/`validate`, which
+      # otherwise only surfaces when a migration is generated locally.
+      - name: Validate Prisma schema
+        run: npm run db:validate
+
       - name: Typecheck
         run: npm run typecheck
 

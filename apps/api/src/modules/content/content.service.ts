@@ -16,6 +16,19 @@ export class ContentService {
     return this.db.cmsPage.findMany({ orderBy: { slug: 'asc' } });
   }
 
+  /**
+   * Slugs of the published pages, for the web sitemap. Deliberately not the
+   * page bodies: this is an anonymous enumeration endpoint, and the title and
+   * content are already served per slug by `publishedPage`.
+   */
+  publishedSlugs() {
+    return this.db.cmsPage.findMany({
+      where: { published: true },
+      select: { slug: true, updatedAt: true },
+      orderBy: { slug: 'asc' },
+    });
+  }
+
   upsert(
     slug: string,
     data: {

@@ -67,6 +67,19 @@ export class BlogService {
   }
 
   /**
+   * Slugs of the published posts, for the web sitemap. `publishedAt` can be
+   * null on a post published before the column existed, so `updatedAt` rides
+   * along as the fallback the caller can use for `lastModified`.
+   */
+  publishedSlugs() {
+    return this.db.blogPost.findMany({
+      where: { status: 'PUBLISHED' },
+      select: { slug: true, publishedAt: true, updatedAt: true },
+      orderBy: { publishedAt: 'desc' },
+    });
+  }
+
+  /**
    * Ratings used to come back as raw rows, which put the user id of every
    * person who had rated a post on an unauthenticated endpoint. The reader only
    * ever needs the aggregate.

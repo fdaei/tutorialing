@@ -6,6 +6,7 @@ import { api } from '@/shared/services/api';
 import { ExaminerReviewManager } from './examiner-review-manager';
 
 jest.mock('@/shared/services/api', () => ({
+  ...jest.requireActual('@/shared/services/api'),
   api: jest.fn(),
   apiMessage: (_error: unknown, fallback: string) => fallback,
 }));
