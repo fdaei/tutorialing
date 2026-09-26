@@ -609,7 +609,7 @@ export const generatedMessages = {
     layoutsiteHome: 'صفحه اصلی',
     layoutsiteCourses: 'دوره‌ها',
     layoutsiteLanguages: 'زبان‌ها',
-    layoutsiteMagazine: 'مجله',
+    layoutsiteMagazine: 'مقالات',
     layoutsiteAboutUs: 'درباره ما',
     layoutsiteTeachWithUs: 'تدریس کنید',
     layoutsiteSmartIELTSTeacherMatchingFromAssessmentToA:
@@ -1300,7 +1300,7 @@ export const generatedMessages = {
     layoutsiteHome: 'Home',
     layoutsiteCourses: 'Courses',
     layoutsiteLanguages: 'Languages',
-    layoutsiteMagazine: 'Magazine',
+    layoutsiteMagazine: 'Articles',
     layoutsiteAboutUs: 'About us',
     layoutsiteTeachWithUs: 'Teach with us',
     layoutsiteSmartIELTSTeacherMatchingFromAssessmentToA:

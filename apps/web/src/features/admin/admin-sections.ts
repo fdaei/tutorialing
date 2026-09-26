@@ -25,7 +25,7 @@ export const adminSectionConfig = {
   audit: ['گزارش فعالیت', 'Audit log', '/admin/audit-logs'],
   cms: ['مدیریت محتوا', 'CMS', '/admin/cms'],
   'website-builder': ['سازنده سایت', 'Website builder', '/admin/settings'],
-  magazine: ['بررسی مجله', 'Magazine review', '/blog/review/queue'],
+  magazine: ['بررسی مقالات', 'Article review', '/blog/review/queue'],
   settings: ['تنظیمات', 'Settings', '/admin/settings'],
   search: ['جستجوی سراسری', 'Global search', '/admin/dashboard'],
 } as const satisfies Record<string, readonly [titleFa: string, titleEn: string, endpoint: string]>;

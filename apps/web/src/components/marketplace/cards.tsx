@@ -101,7 +101,7 @@ export function TeacherMarketCard({ teacher }: { teacher: Teacher }) {
   );
 }
 
-export function CourseCard({ course }: { course: Course }) {
+export function CourseCard({ course, trial }: { course: Course; trial?: Course }) {
   const { locale } = useTranslations();
   const english = locale === 'en';
   const title =
@@ -172,6 +172,15 @@ export function CourseCard({ course }: { course: Course }) {
           </span>
         </div>
         <div className="mt-auto pt-5">
+          {trial && (
+            <Link
+              href={localePath(`/courses/${trial.slug}`, locale)}
+              className="mb-3 flex items-center justify-between gap-2 rounded-xl bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-800 hover:bg-emerald-100"
+            >
+              <span>{english ? 'Trial session' : 'جلسه آزمایشی'}</span>
+              <span>{money(trial.price, locale)}</span>
+            </Link>
+          )}
           <div className="flex items-center justify-between border-t hairline pt-4">
             <strong className="text-sm">{money(course.price, locale)}</strong>
             <Link

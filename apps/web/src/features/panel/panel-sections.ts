@@ -28,7 +28,7 @@ export const teacherSectionConfig = {
   reviews: ['نظرات و امتیازها', 'Reviews and ratings', '/teacher/application'],
   notifications: ['اعلان‌ها', 'Notifications', '/notifications'],
   settings: ['تنظیمات', 'Settings', '/users/me'],
-  magazine: ['مجله', 'Magazine', '/blog/instructor/posts'],
+  magazine: ['مقالات', 'Articles', '/blog/instructor/posts'],
   courses: ['دوره‌های من', 'My courses', '/instructor/courses'],
   pricing: ['قیمت‌گذاری', 'Pricing', '/teacher-prices/me'],
   more: ['ابزارهای بیشتر', 'More tools', '/users/me'],

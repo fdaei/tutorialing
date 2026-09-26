@@ -21,7 +21,7 @@ const sectionTypeOptions: Array<[LandingSectionId, string, string]> = [
   ['benefits', 'مزیت‌ها', 'Benefits'],
   ['placement', 'تعیین سطح', 'Placement'],
   ['courses', 'دوره‌ها', 'Courses'],
-  ['blog', 'مجله', 'Journal'],
+  ['blog', 'مقالات', 'Articles'],
   ['faq', 'سؤالات متداول', 'FAQ'],
   ['finalCta', 'دعوت نهایی', 'Final CTA'],
 ];

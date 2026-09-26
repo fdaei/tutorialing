@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
 export default async function CoursesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ language?: string; level?: string }>;
+  searchParams: Promise<{ language?: string; level?: string; category?: string }>;
 }) {
   const query = await searchParams;
   const requestedLanguage = query.language?.trim() ?? '';
@@ -51,7 +51,12 @@ export default async function CoursesPage({
           }
         />
         {courses.length ? (
-          <CourseDirectory courses={courses} initialLanguage={initialLanguage} initialLevel={initialLevel} />
+          <CourseDirectory
+            courses={courses}
+            initialLanguage={initialLanguage}
+            initialLevel={initialLevel}
+            initialCategory={query.category?.trim() ?? ''}
+          />
         ) : (
           <div className="review-empty mt-10">
             <BookOpen />

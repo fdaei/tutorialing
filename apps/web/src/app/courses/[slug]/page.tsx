@@ -30,6 +30,7 @@ import {
   localizedCourseLevel,
 } from '@/features/courses/course-localization';
 import { CourseEnrollmentCta } from '@/features/courses/components/course-enrollment-cta';
+import { trialSessionFor } from '@/features/courses/course-trial';
 import type { CourseChapter } from '@/features/courses/course-types';
 import type { PublicTeacher } from '@/features/teacher/types/public-teacher';
 import { resolveHeaderConfig } from '@/lib/header-config';
@@ -88,8 +89,9 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
   const paragraphs = description.split(/\n\s*\n/).filter((item) => item.trim());
   const duration = english ? course.durationEn : course.durationFa;
   const category = course.category ? localizedCourseCategory(course.category, locale) : language;
+  const trial = trialSessionFor(course, courses);
   const related = courses
-    .filter((item) => item.slug !== slug)
+    .filter((item) => item.slug !== slug && item.slug !== trial?.slug)
     .sort((a, b) => Number(b.category === course.category) - Number(a.category === course.category))
     .slice(0, 3);
   return (
@@ -153,6 +155,25 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
                 </Link>
               ) : (
                 <CourseEnrollmentCta slug={course.slug} courseId={course.id} price={course.price} format={course.format} teacherId={course.teacherId} sessionsCount={lessons} />
+              )}
+              {trial && (
+                <Link
+                  href={localePath(`/courses/${trial.slug}`, locale)}
+                  className="mt-4 block rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm hover:border-emerald-400"
+                >
+                  <span className="flex items-center justify-between gap-3 font-black text-emerald-800">
+                    <span>{t('جلسه آزمایشی', 'Trial session')}</span>
+                    <span>
+                      {formatNumber(trial.price, locale)} {t('تومان', 'Toman')}
+                    </span>
+                  </span>
+                  <span className="mt-1 block text-xs leading-6 text-emerald-700">
+                    {t(
+                      'قبل از ثبت‌نام در ترم کامل، یک جلسه با همین مدرس را امتحان کنید.',
+                      'Try one session with this teacher before booking the full term.',
+                    )}
+                  </span>
+                </Link>
               )}
               <ul className="mt-5 grid gap-3 text-sm text-muted">
                 {duration && (
@@ -320,7 +341,7 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
               <h2 className="text-2xl font-black">{t('دوره‌های مرتبط', 'Related courses')}</h2>
               <div className="mt-7 grid gap-5 md:grid-cols-3">
                 {related.map((item) => (
-                  <CourseCard key={item.slug} course={item} />
+                  <CourseCard key={item.slug} course={item} trial={trialSessionFor(item, courses)} />
                 ))}
               </div>
             </div>

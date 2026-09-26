@@ -10,10 +10,10 @@ jest.mock('@/shared/services/api', () => ({
   ...jest.requireActual('@/shared/services/api'),
   api: jest.fn(),
   apiMessage: (_error: unknown, fallback: string) => fallback,
-}));
+}));dffdfd
 
 const apiMock = jest.mocked(api);
-
+dsdsdsdsdsds
 function renderManager(manager: React.ReactNode) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   return render(

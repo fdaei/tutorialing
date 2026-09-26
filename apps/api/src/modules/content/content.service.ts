@@ -17,14 +17,15 @@ export class ContentService {
   }
 
   /**
-   * Slugs of the published pages, for the web sitemap. Deliberately not the
-   * page bodies: this is an anonymous enumeration endpoint, and the title and
-   * content are already served per slug by `publishedPage`.
+   * Slugs and titles of the published pages, for the web sitemap and the
+   * landing footer links. Deliberately not the page bodies: this is an
+   * anonymous enumeration endpoint, and the content is already served per slug
+   * by `publishedPage`.
    */
   publishedSlugs() {
     return this.db.cmsPage.findMany({
       where: { published: true },
-      select: { slug: true, updatedAt: true },
+      select: { slug: true, titleFa: true, titleEn: true, updatedAt: true },
       orderBy: { slug: 'asc' },
     });
   }

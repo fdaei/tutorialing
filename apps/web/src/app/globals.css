@@ -1446,7 +1446,7 @@ a {
   display: grid;
   gap: 2rem;
   padding-block: 4rem;
-  grid-template-columns: 1.5fr repeat(2, 0.75fr) 1.15fr;
+  grid-template-columns: 1.5fr repeat(var(--landing-footer-columns, 2), 0.75fr) 1.15fr;
 }
 .landing-footer-brand p {
   max-width: 260px;

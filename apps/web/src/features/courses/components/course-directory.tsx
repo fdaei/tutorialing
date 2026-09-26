@@ -11,6 +11,7 @@ import {
   localizedCourseLanguage,
   localizedCourseLevel,
 } from '../course-localization';
+import { courseMatchesLevel, trialSessionFor } from '../course-trial';
 
 type Sort = 'featured' | 'price-asc' | 'price-desc' | 'rating';
 
@@ -28,10 +29,12 @@ export function CourseDirectory({
   courses,
   initialLanguage = '',
   initialLevel = '',
+  initialCategory = '',
 }: {
   courses: Course[];
   initialLanguage?: string;
   initialLevel?: string;
+  initialCategory?: string;
 }) {
   const { locale } = useTranslations();
   const english = locale === 'en';
@@ -50,7 +53,7 @@ export function CourseDirectory({
   );
 
   const [query, setQuery] = useState('');
-  const [category, setCategory] = useState('');
+  const [category, setCategory] = useState(() => (options.categories.includes(initialCategory) ? initialCategory : ''));
   const [delivery, setDelivery] = useState('');
   const [teacher, setTeacher] = useState('');
   const [sort, setSort] = useState<Sort>('featured');
@@ -62,18 +65,13 @@ export function CourseDirectory({
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase();
-    const matchesLevel = (courseLevel: string) =>
-      !level ||
-      courseLevel === level ||
-      courseLevel === 'All levels' ||
-      (courseLevel === 'A1–C1' && /^(?:A1|A2|B1|B2|C1)$/.test(level));
     const list = courses.filter(
       (course) =>
         (!language || course.language === language) &&
         (!category || course.category === category) &&
         (!delivery || course.delivery === delivery) &&
         (!teacher || (course.teacherName ?? course.teacher) === teacher) &&
-        matchesLevel(course.level) &&
+        courseMatchesLevel(course.level, level) &&
         (!needle ||
           [course.titleFa, course.titleEn, course.title, course.descriptionFa, course.descriptionEn, course.teacherName]
             .filter(Boolean)
@@ -216,7 +214,7 @@ export function CourseDirectory({
       {filtered.length ? (
         <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((course) => (
-            <CourseCard key={course.slug} course={course} />
+            <CourseCard key={course.slug} course={course} trial={trialSessionFor(course, courses)} />
           ))}
         </div>
       ) : (

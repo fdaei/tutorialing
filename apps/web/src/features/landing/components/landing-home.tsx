@@ -37,6 +37,8 @@ type LandingHomeProps = {
   languages: EducationalLanguage[];
   courses: Course[];
   posts: BlogPostsPage;
+  /** Published pages from the admin CMS (/admin/cms), linked from the footer. */
+  pages?: { slug: string; titleFa: string; titleEn: string }[];
 };
 
 type LandingRenderProps = LandingHomeProps & {
@@ -76,7 +78,7 @@ export function LandingHome(props: LandingHomeProps) {
             <LandingSection key={section.id} {...props} section={section} />
           ))}
       </main>
-      <LandingFooter config={config} locale={locale} />
+      <LandingFooter config={config} locale={locale} pages={props.pages ?? []} />
     </div>
   );
 }
@@ -612,13 +614,26 @@ function SectionIntro({ eyebrow, title, description }: { eyebrow: string; title:
   );
 }
 
-function LandingFooter({ config, locale }: { config: LandingConfig; locale: Locale }) {
+function LandingFooter({
+  config,
+  locale,
+  pages,
+}: {
+  config: LandingConfig;
+  locale: Locale;
+  pages: NonNullable<LandingHomeProps['pages']>;
+}) {
   const english = locale === 'en';
+  const linked = new Set(config.footer.columns.flatMap((column) => column.links.map((link) => link.href)));
+  const infoPages = pages.filter((page) => !linked.has(`/${page.slug}`));
   const path = (href: string) => localePath(href, locale);
   const t = (value: { fa: string; en: string }) => localizedText(value, locale);
   return (
     <footer className="landing-footer">
-      <div className="landing-container landing-footer-grid">
+      <div
+        className="landing-container landing-footer-grid"
+        style={{ '--landing-footer-columns': config.footer.columns.length + (infoPages.length ? 1 : 0) } as React.CSSProperties}
+      >
         <div className="landing-footer-brand">
           <Link href={path('/')} className="landing-brand">
             <BrandLogo name={config.brand.name} src={config.brand.logo} />
@@ -650,6 +665,18 @@ function LandingFooter({ config, locale }: { config: LandingConfig; locale: Loca
             </div>
           </div>
         ))}
+        {infoPages.length > 0 && (
+          <div>
+            <h3>{english ? 'Information' : 'اطلاعات'}</h3>
+            <div className="landing-footer-links">
+              {infoPages.map((page) => (
+                <Link href={path(`/${page.slug}`)} key={page.slug}>
+                  {t({ fa: page.titleFa, en: page.titleEn })}
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
         <div className="landing-footer-contact">
           <h3>{english ? 'Contact' : 'تماس با ما'}</h3>
           <p>

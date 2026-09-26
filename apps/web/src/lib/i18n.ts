@@ -70,7 +70,7 @@ export const messages = {
     genericError: 'درخواست انجام نشد. لطفاً دوباره تلاش کنید.',
     required: 'این فیلد الزامی است.',
     invalid: 'اطلاعات واردشده معتبر نیست.',
-    blogEyebrow: 'مجله لینگواسپیک',
+    blogEyebrow: 'مقالات لینگواسپیک',
     blogTitle: 'ایده‌هایی برای یادگیری بهتر',
     blogSearch: 'جست‌وجو',
     blogLoading: 'در حال بارگذاری…',

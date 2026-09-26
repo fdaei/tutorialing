@@ -91,4 +91,19 @@ describe('CourseDirectory', () => {
     expect(screen.getByText('مکالمه انگلیسی')).toBeInTheDocument();
     expect(screen.queryByText('شروع آلمانی')).not.toBeInTheDocument();
   });
+
+  it('opens on the single-session category and shows each class its trial session price', () => {
+    const catalog: Course[] = [
+      { ...courses[0]!, slug: 'term', title: 'ترم جنرال', category: 'private-class', teacherId: 't1', price: 8_280_000 },
+      { ...courses[0]!, slug: 'trial', title: 'تک جلسه جنرال', category: 'single-session', teacherId: 't1', price: 552_000 },
+    ];
+    render(<CourseDirectory courses={catalog} initialCategory="single-session" />);
+
+    expect(screen.getAllByRole('article')).toHaveLength(1);
+    expect(screen.getByText('تک جلسه جنرال')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /همه انواع/ }));
+    expect(screen.getByRole('link', { name: /جلسه آزمایشی/ })).toHaveAttribute('href', '/courses/trial');
+    expect(screen.getByRole('link', { name: /جلسه آزمایشی/ })).toHaveTextContent('۵۵۲٬۰۰۰ تومان');
+  });
 });

@@ -505,13 +505,13 @@ export const teacherNav: NavItem[] = [
   { href: '/teacher-panel/students', label: 'زبان‌آموزان', labelEn: 'Students', icon: Users, tab: true },
   { href: '/teacher-panel/courses', label: 'دوره‌های من', labelEn: 'My courses', icon: BookOpen },
   { href: '/teacher-panel/profile', label: 'پروفایل و تأیید', labelEn: 'Profile & verification', icon: UserCog },
-  { href: '/teacher-panel/magazine', label: 'مجله', labelEn: 'Magazine', icon: FileEdit },
+  { href: '/teacher-panel/magazine', label: 'مقالات', labelEn: 'Articles', icon: FileEdit },
   { href: '/teacher-panel/earnings', label: 'مالی', labelEn: 'Finance', icon: Wallet, tab: true },
   { href: '/teacher-panel/more', label: 'بیشتر', labelEn: 'More', icon: MoreHorizontal },
 ];
 export const adminNav: NavItem[] = [
   { href: '/admin', label: 'داشبورد', labelEn: 'Dashboard', icon: Grid2X2, roles: ['ADMIN'] },
-  { href: '/admin/magazine', label: 'بررسی مجله', labelEn: 'Magazine review', icon: FileEdit, roles: ['ADMIN'], permission: 'cms.manage' },
+  { href: '/admin/magazine', label: 'بررسی مقالات', labelEn: 'Article review', icon: FileEdit, roles: ['ADMIN'], permission: 'cms.manage' },
   { href: '/admin/users', label: 'کاربران', labelEn: 'Users', icon: Users, roles: ['ADMIN'], permission: 'users.read' },
   { href: '/admin/teachers', label: 'مدرس‌ها', labelEn: 'Teachers', icon: GraduationCap, roles: ['ADMIN'], permission: 'teachers.verify' },
   { href: '/admin/teacher-applications', label: 'درخواست‌های مدرس', labelEn: 'Teacher applications', icon: FileCheck, roles: ['ADMIN'], permission: 'teachers.verify' },

@@ -11,6 +11,7 @@ export const dynamic = 'force-dynamic';
 
 const EMPTY_POSTS: BlogPostsPage = { items: [], page: 1, pageSize: 0 };
 type PublicSetting = { key: string; value: unknown; public: boolean };
+type PublishedPage = { slug: string; titleFa: string; titleEn: string };
 
 function withFallback<T>(endpoint: string, request: Promise<T>, fallback: T): Promise<T> {
   return request.catch((error: unknown) => {
@@ -55,11 +56,12 @@ function withLanguageImages(items: EducationalLanguage[]) {
 }
 
 export default async function Home() {
-  const [languages, courses, posts, settings, locale] = await Promise.all([
+  const [languages, courses, posts, settings, pages, locale] = await Promise.all([
     withFallback('/languages', publicApi<EducationalLanguage[]>('/languages').then(withLanguageImages), []),
     withFallback('/courses', publicApi<Course[]>('/courses'), []),
     withFallback('/blog/posts', publicApi<BlogPostsPage>('/blog/posts?pageSize=3'), EMPTY_POSTS),
     withFallback('/support/public-settings', publicApi<PublicSetting[]>('/support/public-settings'), []),
+    withFallback('/support/pages', publicApi<PublishedPage[]>('/support/pages'), []),
     requestLocale(),
   ]);
   const landingSetting = settings.find((setting) => setting.key === 'landing.page')?.value;
@@ -68,5 +70,5 @@ export default async function Home() {
     ...((landingSetting && typeof landingSetting === 'object' ? landingSetting : {}) as Record<string, unknown>),
     theme: themeSetting,
   });
-  return <LandingHome config={await hydrateMedia(config)} locale={locale} languages={languages} courses={courses} posts={posts} />;
+  return <LandingHome config={await hydrateMedia(config)} locale={locale} languages={languages} courses={courses} posts={posts} pages={pages} />;
 }

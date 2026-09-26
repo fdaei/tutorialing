@@ -28,7 +28,8 @@ import { CourseCard } from '@/components/marketplace/cards';
 import { api, publicApi } from '@/shared/services/api';
 import type { EducationalLanguage } from '@/features/languages';
 import { ACCESS_TOKEN_KEY } from '@/shared/services/api';
-import { courses } from '@/lib/marketplace-data';
+import type { Course } from '@/lib/marketplace-data';
+import { courseMatchesLevel, isSingleSessionCourse } from '@/features/courses/course-trial';
 import { useTranslations } from '@/components/shared/locale-provider';
 import { isDefaultLocale, localePath, localized } from '@/lib/i18n';
 import { featureFlags } from '@/config';
@@ -593,14 +594,17 @@ function ResultView({
   const fa = isDefaultLocale(locale),
     copy = (faCopy: string, enCopy: string) => localized({ fa: faCopy, en: enCopy }, locale),
     recommendations = placementRecommendationPaths(languageCode, result.level, locale);
-  const suggested = courses
+  const catalog = useQuery({ queryKey: ['courses'], queryFn: () => publicApi<Course[]>('/courses') });
+  // After placement only the single-session (trial) courses are offered: a
+  // learner meets the teacher at their level before committing to a term.
+  const suggested = (catalog.data ?? [])
     .filter(
       (course) =>
+        isSingleSessionCourse(course) &&
         (!languageName || course.language === languageName) &&
-        (course.level === result.level ||
-          course.level === ({ A1: 'A2', A2: 'B1', B1: 'B2', B2: 'B2', C1: 'B2', C2: 'B2' } as const)[result.level]),
+        courseMatchesLevel(course.level, result.level),
     )
-    .slice(0, 3);
+    .slice(0, 6);
   return (
     <>
       <Header />
@@ -642,6 +646,7 @@ function ResultView({
                 <Stat
                   label={copy('پاسخ درست', 'Correct answers')}
                   value={`${result.correctAnswers.toLocaleString('en-US')} ${copy('از', 'of')} ${result.totalQuestions.toLocaleString('en-US')}`}
+                  dir={locale === 'fa' ? 'rtl' : 'ltr'}
                 />
                 <Stat label={copy('سطح CEFR', 'CEFR level')} value={result.level} />
               </div>
@@ -721,7 +726,7 @@ function ResultView({
           <section className="border-t hairline bg-white py-14">
             <div className="page-shell">
               <h2 className="text-2xl font-black">
-                {copy(`دوره‌های مناسب سطح ${result.level}`, `Courses for level ${result.level}`)}
+                {copy(`جلسات تک‌جلسه‌ای مناسب سطح ${result.level}`, `Single sessions for level ${result.level}`)}
               </h2>
               <div className="mt-7 grid gap-5 md:grid-cols-3">
                 {suggested.map((course) => (
@@ -736,10 +741,10 @@ function ResultView({
     </>
   );
 }
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ label, value, dir = 'ltr' }: { label: string; value: string; dir?: 'ltr' | 'rtl' }) {
   return (
     <div className="rounded-2xl bg-canvas p-5 text-center">
-      <strong dir="ltr" className="latin block whitespace-nowrap text-3xl text-purple">
+      <strong dir={dir} className={`${dir === 'ltr' ? 'latin ' : ''}block whitespace-nowrap text-3xl text-purple`}>
         {value}
       </strong>
       <span className="mt-2 block text-xs text-muted">{label}</span>
