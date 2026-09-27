@@ -283,7 +283,9 @@ export function MyTicketManager() {
       {creating && (
         <Sheet open onOpenChange={(open) => !open && closeCreateModal()} title="ایجاد تیکت جدید">
           <form noValidate onSubmit={submitTicket}>
-            <p className="-mt-2 text-xs text-muted">درخواستتان را بنویسید؛ تیم پشتیبانی پاسخ را همین‌جا ارسال می‌کند.</p>
+            <p className="-mt-2 text-xs text-muted">
+              درخواستتان را بنویسید؛ تیم پشتیبانی پاسخ را همین‌جا ارسال می‌کند.
+            </p>
             <div className="mt-5 grid gap-5 sm:grid-cols-2">
               <label className="sm:col-span-2">
                 <span className="mb-2 block text-sm font-semibold text-slate-900">عنوان تیکت</span>
