@@ -13,10 +13,10 @@ import {
   Max,
   Min,
 } from 'class-validator';
-import { IsIranianPhone } from '../../../../common/validators/is-iranian-phone.decorator';
+import { IsInternationalPhone } from '../../../../common/validators/is-international-phone.decorator';
 
 export class AdminTeacherDto {
-  @IsIranianPhone() phone!: string;
+  @IsInternationalPhone() phone!: string;
   @IsOptional() @IsEmail() email?: string | null;
   @IsString() @Length(2, 80) nameFa!: string;
   @IsString() @Length(2, 80) nameEn!: string;

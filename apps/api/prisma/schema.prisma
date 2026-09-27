@@ -449,6 +449,8 @@ model Course {
   published     Boolean  @default(false)
   rating        Float    @default(0)
   reviewsCount  Int      @default(0)
+  /// Draft/sample course used for testing, kept out of any "real" reporting distinct from `published`.
+  isTest        Boolean  @default(false)
 
   // Catalog metadata for the public institute site. `SELF_PACED` courses are the
   // original video/lesson products played through the course player; `LIVE_ONLINE`

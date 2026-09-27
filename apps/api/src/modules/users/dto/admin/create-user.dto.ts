@@ -1,9 +1,9 @@
 import { Role } from '@prisma/client';
 import { IsArray, IsEmail, IsEnum, IsIn, IsOptional, IsString } from 'class-validator';
-import { IsIranianPhone } from '../../../../common/validators/is-iranian-phone.decorator';
+import { IsInternationalPhone } from '../../../../common/validators/is-international-phone.decorator';
 
 export class CreateUserDto {
-  @IsIranianPhone() phone!: string;
+  @IsInternationalPhone() phone!: string;
   @IsString() name!: string;
   @IsOptional() @IsEmail() email?: string;
   @IsOptional() @IsIn(['fa', 'en']) locale?: string;

@@ -53,6 +53,53 @@ export class PricingService {
     }
   }
 
+  async propose(userId: string, trialPrice: number, regularPrice: number) {
+    this.validatePrices(trialPrice, regularPrice);
+    return this.db.$transaction(async (tx) => {
+      const teacher = await tx.teacher.findUnique({ where: { userId } });
+      if (!teacher) throw notFound('TEACHER_NOT_FOUND');
+      if (teacher.priceStatus === 'COUNTER_OFFER') throw badRequest('PRICE_COUNTER_OFFER_PENDING');
+      if (['SUBMITTED', 'UNDER_REVIEW'].includes(teacher.priceStatus)) {
+        throw badRequest('PRICE_ALREADY_UNDER_REVIEW');
+      }
+      const updated = await tx.teacher.update({
+        where: { id: teacher.id },
+        data: {
+          proposedTrialPrice: trialPrice,
+          proposedRegularPrice: regularPrice,
+          counterTrialPrice: null,
+          counterRegularPrice: null,
+          priceStatus: 'SUBMITTED',
+          priceReviewNote: null,
+          priceReviewedAt: null,
+          priceReviewedById: null,
+        },
+      });
+      await tx.teacherPriceHistory.create({
+        data: {
+          teacherId: teacher.id,
+          actorId: userId,
+          actorRole: 'INSTRUCTOR',
+          action: 'teacher.price.proposed',
+          status: 'SUBMITTED',
+          proposedTrialPrice: trialPrice,
+          proposedRegularPrice: regularPrice,
+        },
+      });
+      await tx.auditLog.create({
+        data: {
+          actorId: userId,
+          action: 'teacher.price.proposed',
+          entity: 'Teacher',
+          entityId: teacher.id,
+          before: { status: teacher.priceStatus },
+          after: { status: 'SUBMITTED', proposedTrialPrice: trialPrice, proposedRegularPrice: regularPrice },
+        },
+      });
+      return updated;
+    });
+  }
+
   async acceptCounter(userId: string) {
     return this.db.$transaction(async (tx) => {
       const teacher = await tx.teacher.findUnique({ where: { userId } });

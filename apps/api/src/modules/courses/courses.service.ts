@@ -3,12 +3,17 @@ import { Prisma } from '@prisma/client';
 import { PrismaService, type DbClient } from '../../infrastructure/database/prisma.service';
 import { badRequest, conflict, forbidden, notFound } from '../../common';
 import type { AuthUser } from '../../common';
+import { PackagesService } from '../commerce/packages/packages.service';
 import type { CourseChapterDto, CourseLessonDto } from './dto/course-curriculum.dto';
 import type { AdminCourseDto } from './dto/admin-course.dto';
+import type { InstructorCourseDto } from './dto/instructor-course.dto';
 
 @Injectable()
 export class CoursesService {
-  constructor(private readonly db: PrismaService) {}
+  constructor(
+    private readonly db: PrismaService,
+    private readonly packages: PackagesService,
+  ) {}
 
   list() {
     return this.db.course.findMany({
@@ -241,6 +246,49 @@ export class CoursesService {
     if (!user.roles.includes('ADMIN') && course.teacher?.userId !== user.id)
       throw forbidden('COURSE_OWNERSHIP_REQUIRED');
     return course;
+  }
+
+  /**
+   * Lets an instructor stand up their own LIVE_ONLINE course, session count
+   * included, instead of waiting on an admin to create it. Reuses
+   * `PackagesService.createPackage` so the sellable-tier check, the
+   * price-must-already-be-approved guard and the price math itself stay in
+   * one place. The course starts unpublished — an admin still reviews and
+   * publishes it via the existing admin course screen.
+   */
+  async createInstructorCourse(user: AuthUser, input: InstructorCourseDto) {
+    if (await this.db.course.findFirst({ where: { slug: input.slug }, select: { id: true } }))
+      throw conflict('COURSE_SLUG_ALREADY_EXISTS');
+    const pkg = await this.packages.createPackage(user.id, {
+      titleFa: input.titleFa,
+      titleEn: input.titleEn,
+      descriptionFa: input.descriptionFa,
+      descriptionEn: input.descriptionEn,
+      credits: input.credits,
+      lessonMinutes: input.lessonMinutes,
+      discountPercent: input.discountPercent,
+    });
+    const teacher = await this.db.teacher.findUniqueOrThrow({ where: { id: pkg.teacherId }, select: { nameFa: true } });
+    return this.db.course.create({
+      data: {
+        slug: input.slug,
+        titleFa: input.titleFa.trim(),
+        titleEn: input.titleEn.trim(),
+        descriptionFa: input.descriptionFa.trim(),
+        descriptionEn: input.descriptionEn.trim(),
+        language: input.language.trim(),
+        level: input.level,
+        teacherId: pkg.teacherId,
+        teacherName: teacher.nameFa,
+        price: pkg.price,
+        image: input.image?.trim() || null,
+        published: false,
+        isTest: input.isTest ?? false,
+        lessonsCount: pkg.credits,
+        format: 'LIVE_ONLINE',
+        packageId: pkg.id,
+      },
+    });
   }
 
   async instructorCourses(user: AuthUser) {

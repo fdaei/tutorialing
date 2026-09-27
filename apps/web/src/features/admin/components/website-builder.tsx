@@ -17,6 +17,7 @@ type BuilderTab = 'builder' | 'theme' | 'media' | 'header-footer';
 
 const sectionTypeOptions: Array<[LandingSectionId, string, string]> = [
   ['hero', 'هیرو', 'Hero'],
+  ['about', 'درباره', 'About'],
   ['languages', 'زبان‌ها', 'Languages'],
   ['benefits', 'مزیت‌ها', 'Benefits'],
   ['placement', 'تعیین سطح', 'Placement'],
@@ -270,6 +271,16 @@ function ContentEditor({ config, section, fa, onChange }: { config: LandingConfi
       <TextPair labelFa="توضیح Hero" labelEn="Hero description" value={config.hero.description} area onChange={(value) => onChange((draft) => { draft.hero.description = value; })} />
       <div className="grid gap-4 md:grid-cols-2"><ButtonEditor title={fa ? 'دکمه اصلی' : 'Primary button'} value={config.hero.primaryButton} onChange={(value) => onChange((draft) => { draft.hero.primaryButton = value; })} /><ButtonEditor title={fa ? 'دکمه دوم' : 'Secondary button'} value={config.hero.secondaryButton} onChange={(value) => onChange((draft) => { draft.hero.secondaryButton = value; })} /></div>
       <div className="grid gap-4 md:grid-cols-2"><MediaField label={fa ? 'تصویر Hero' : 'Hero image'} value={config.hero.image} onChange={(image) => onChange((draft) => { draft.hero.image = image; })} fa={fa} /><Field label={fa ? 'جایگاه تصویر' : 'Image side'}><select className="input" value={config.hero.imageSide} onChange={(event) => onChange((draft) => { draft.hero.imageSide = event.target.value as 'left' | 'right'; })}><option value="right">{fa ? 'راست' : 'Right'}</option><option value="left">{fa ? 'چپ' : 'Left'}</option></select></Field></div>
+      <TextPair labelFa="نقل‌قول کوچک روی تصویر" labelEn="Small quote over image" value={config.hero.quote} area onChange={(value) => onChange((draft) => { draft.hero.quote = value; })} />
+      <div className="grid gap-4 md:grid-cols-2"><TextPair labelFa="نام مؤسس/مدرس" labelEn="Founder/teacher name" value={config.hero.founderName} onChange={(value) => onChange((draft) => { draft.hero.founderName = value; })} /><TextPair labelFa="عنوان مؤسس/مدرس" labelEn="Founder/teacher title" value={config.hero.founderTitle} onChange={(value) => onChange((draft) => { draft.hero.founderTitle = value; })} /></div>
+    </fieldset>;
+  }
+  if (section.type === 'about') {
+    return <fieldset className="grid gap-4"><legend className="text-sm font-black">{fa ? 'درباره' : 'About'}</legend>
+      <TextPair labelFa="عنوان بخش درباره" labelEn="About title" value={config.about.title} onChange={(value) => onChange((draft) => { draft.about.title = value; })} />
+      <TextPair labelFa="بیوگرافی" labelEn="Bio" value={config.about.bio} area onChange={(value) => onChange((draft) => { draft.about.bio = value; })} />
+      <MediaField label={fa ? 'عکس بخش درباره (اختیاری، در نبود آن از عکس Hero استفاده می‌شود)' : 'About photo (optional, falls back to the Hero photo)'} value={config.about.photo} fa={fa} onChange={(value) => onChange((draft) => { draft.about.photo = value; })} />
+      <Repeater title={fa ? 'اصول آموزشی' : 'Teaching philosophy'} onAdd={() => onChange((draft) => draft.about.philosophy.push({ title: { fa: 'اصل جدید', en: 'New principle' }, description: { fa: 'توضیح', en: 'Description' } }))}>{config.about.philosophy.map((item, index) => <div key={`${item.title.en}-${index}`} className="grid gap-3 rounded-2xl border hairline p-4"><TextPair labelFa="عنوان" labelEn="Title" value={item.title} onChange={(value) => onChange((draft) => { itemAt(draft.about.philosophy, index).title = value; })} /><TextPair labelFa="توضیح" labelEn="Description" value={item.description} area onChange={(value) => onChange((draft) => { itemAt(draft.about.philosophy, index).description = value; })} /></div>)}</Repeater>
     </fieldset>;
   }
   if (section.type === 'languages') {

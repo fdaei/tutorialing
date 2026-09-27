@@ -8,6 +8,7 @@ import { api, apiMessage, type Paginated } from '@/shared/services/api';
 import type { Country } from '@/features/languages';
 import { useTranslations } from '@/components/shared/locale-provider';
 import { adminDeleteConfirmation } from '../admin-confirmation';
+import { DataTable, type Column } from '@/shared/components/ui';
 
 const emptyForm = {
   code: '',
@@ -65,6 +66,71 @@ export function CountryManager() {
       order: item.order,
     });
   };
+  const columns: Column<Country>[] = [
+    {
+      key: 'name',
+      header: translate(locale, 'admincountryManagerCountry'),
+      primary: true,
+      cell: (item) => (
+        <>
+          {item.flag} {localized({ fa: item.nameFa, en: item.nameEn }, locale)}
+        </>
+      ),
+    },
+    { key: 'code', header: 'ISO', cell: (item) => <span className="latin">{item.code}</span> },
+    {
+      key: 'dialCode',
+      header: translate(locale, 'admincountryManagerDialCode'),
+      cell: (item) => <span className="latin">{item.dialCode}</span>,
+    },
+    {
+      key: 'length',
+      header: translate(locale, 'admincountryManagerLength'),
+      hideOnMobile: true,
+      cell: (item) => (
+        <span className="latin">
+          {item.minLength}–{item.maxLength}
+        </span>
+      ),
+    },
+    {
+      key: 'status',
+      header: translate(locale, 'commercepricingManagerStatus'),
+      cell: (item) =>
+        item.active
+          ? translate(locale, 'admincountryManagerActive')
+          : translate(locale, 'admincountryManagerInactive'),
+    },
+    {
+      key: 'actions',
+      header: '',
+      align: 'end',
+      cell: (item) => (
+        <div className="flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => edit(item)}
+            className="rounded-lg border hairline px-3 py-2 font-bold text-blue"
+          >
+            {translate(locale, 'admincountryManagerEdit')}
+          </button>
+          <button
+            type="button"
+            aria-label={translate(locale, 'admincountryManagerDeleteCountry')}
+            disabled={remove.isPending}
+            onClick={() =>
+              window.confirm(
+                adminDeleteConfirmation(localized({ fa: item.nameFa, en: item.nameEn }, locale), locale),
+              ) && remove.mutate(item.id)
+            }
+            className="grid size-9 place-items-center rounded-lg text-red-600 hover:bg-red-50"
+          >
+            <Trash2 size={17} />
+          </button>
+        </div>
+      ),
+    },
+  ];
 
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_400px]">
@@ -86,70 +152,18 @@ export function CountryManager() {
             placeholder={translate(locale, 'admincountryManagerSearchCountries')}
           />
         </div>
-        {query.isLoading ? (
-          <div className="mt-6 skeleton h-80 rounded-2xl" />
-        ) : query.isError ? (
+        {query.isError ? (
           <p role="alert" className="mt-6 rounded-xl bg-red-50 p-4 text-red-800">
             {apiMessage(query.error, translate(locale, 'admincountryManagerCouldNotLoadCountries'))}
           </p>
         ) : (
-          <div className="mt-6 overflow-x-auto">
-            <table className="w-full min-w-[650px] text-sm">
-              <thead>
-                <tr className="border-b hairline text-muted">
-                  <th className="p-3 text-start">{translate(locale, 'admincountryManagerCountry')}</th>
-                  <th className="p-3 text-start">ISO</th>
-                  <th className="p-3 text-start">{translate(locale, 'admincountryManagerDialCode')}</th>
-                  <th className="p-3 text-start">{translate(locale, 'admincountryManagerLength')}</th>
-                  <th className="p-3 text-start">{translate(locale, 'commercepricingManagerStatus')}</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {query.data?.data.map((item) => (
-                  <tr key={item.id} className="border-b hairline">
-                    <td className="p-3 font-bold">
-                      {item.flag} {localized({ fa: item.nameFa, en: item.nameEn }, locale)}
-                    </td>
-                    <td className="p-3 latin">{item.code}</td>
-                    <td className="p-3 latin">{item.dialCode}</td>
-                    <td className="p-3 latin">
-                      {item.minLength}–{item.maxLength}
-                    </td>
-                    <td className="p-3">
-                      {item.active
-                        ? translate(locale, 'admincountryManagerActive')
-                        : translate(locale, 'admincountryManagerInactive')}
-                    </td>
-                    <td className="p-3">
-                      <div className="flex justify-end gap-2">
-                        <button
-                          type="button"
-                          onClick={() => edit(item)}
-                          className="rounded-lg border hairline px-3 py-2 font-bold text-blue"
-                        >
-                          {translate(locale, 'admincountryManagerEdit')}
-                        </button>
-                        <button
-                          type="button"
-                          aria-label={translate(locale, 'admincountryManagerDeleteCountry')}
-                          disabled={remove.isPending}
-                          onClick={() =>
-                            window.confirm(
-                              adminDeleteConfirmation(localized({ fa: item.nameFa, en: item.nameEn }, locale), locale),
-                            ) && remove.mutate(item.id)
-                          }
-                          className="grid size-9 place-items-center rounded-lg text-red-600 hover:bg-red-50"
-                        >
-                          <Trash2 size={17} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            className="mt-6"
+            columns={columns}
+            rows={query.data?.data}
+            rowKey={(item) => item.id}
+            loading={query.isLoading}
+          />
         )}
         {remove.isError && (
           <p role="alert" className="mt-4 rounded-xl bg-red-50 p-3 text-red-800">

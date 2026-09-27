@@ -1,8 +1,7 @@
 'use client';
 
-import { Portal } from '@/shared/components/ui/portal';
 import { localized, isDefaultLocale, translate } from '@/lib/i18n';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowDownToLine,
@@ -18,6 +17,8 @@ import { api, apiMessage } from '@/shared/services/api';
 import { useTranslations } from '@/components/shared/locale-provider';
 import { formatMoney } from '@/lib/money';
 import { ReceiptReviewQueue, type ReceiptPayment } from './payment-receipts';
+import { ApprovedTeacherSelect } from '@/features/panel/components/actions/shared/entity-selects';
+import { DataTable, Sheet, type Column } from '@/shared/components/ui';
 
 type Aggregate = { status: string; _count: { _all: number }; _sum: Record<string, number | null> };
 type Reports = {
@@ -60,12 +61,22 @@ export function AdminFinanceCenter() {
   const [selected, setSelected] = useState<Withdrawal | null>(null);
   const [reference, setReference] = useState('');
   const [manualOpen, setManualOpen] = useState(false);
-  const [manualTeacherId, setManualTeacherId] = useState('');
+  const manualFormRef = useRef<HTMLFormElement>(null);
   const [manualAmount, setManualAmount] = useState('');
   const [manualReference, setManualReference] = useState('');
   const manualPayment = useMutation({
-    mutationFn: () => api('/payouts/teachers/manual-payment', { method: 'POST', body: JSON.stringify({ teacherId: manualTeacherId.trim(), amount: Number(manualAmount), reference: manualReference.trim() }) }),
-    onSuccess: () => { setManualOpen(false); setManualTeacherId(''); setManualAmount(''); setManualReference(''); },
+    mutationFn: () => {
+      const teacherId = String(new FormData(manualFormRef.current!).get('teacherId') ?? '').trim();
+      return api('/payouts/teachers/manual-payment', {
+        method: 'POST',
+        body: JSON.stringify({ teacherId, amount: Number(manualAmount), reference: manualReference.trim() }),
+      });
+    },
+    onSuccess: () => {
+      setManualOpen(false);
+      setManualAmount('');
+      setManualReference('');
+    },
   });
 
   const reports = useQuery({ queryKey: ['/admin/reports'], queryFn: () => api<Reports>('/admin/reports') });
@@ -119,11 +130,71 @@ export function AdminFinanceCenter() {
       timeStyle: 'short',
     }).format(new Date(value));
 
+  const columns: Column<Withdrawal>[] = [
+    {
+      key: 'teacher',
+      header: translate(locale, 'schedulingteacherPlannerCalendarTeacher'),
+      primary: true,
+      cell: (item) => (
+        <>
+          <strong className="block">{localized({ fa: item.teacher.nameFa, en: item.teacher.nameEn }, locale)}</strong>
+          <small className="mt-1 block text-muted latin">{item.teacher.user?.phone || '—'}</small>
+        </>
+      ),
+    },
+    {
+      key: 'amount',
+      header: translate(locale, 'teacherteacherFinanceAmount'),
+      cell: (item) => <span className="font-black">{money(item.amount)}</span>,
+    },
+    {
+      key: 'iban',
+      header: translate(locale, 'teacherteacherFinanceIban'),
+      hideOnMobile: true,
+      cell: (item) => <span className="latin text-xs">{maskIban(item.iban)}</span>,
+    },
+    {
+      key: 'requested',
+      header: translate(locale, 'adminadminFinanceCenterRequested'),
+      hideOnMobile: true,
+      cell: (item) => <span className="whitespace-nowrap text-xs text-muted">{date(item.createdAt)}</span>,
+    },
+    {
+      key: 'status',
+      header: translate(locale, 'commercepricingManagerStatus'),
+      cell: (item) => <WithdrawalStatus status={item.status} fa={fa} />,
+    },
+    {
+      key: 'action',
+      header: translate(locale, 'adminadminFinanceCenterAction'),
+      align: 'end',
+      cell: (item) =>
+        ['PENDING', 'APPROVED'].includes(item.status) ? (
+          <button
+            type="button"
+            onClick={() => {
+              setSelected(item);
+              setReference('');
+              transfer.reset();
+            }}
+            className="primary-button !px-3 !py-2 text-xs"
+          >
+            <ArrowDownToLine size={15} />
+            {translate(locale, 'adminadminFinanceCenterTransfer')}
+          </button>
+        ) : (
+          <span className="latin text-xs text-muted">{item.reference || '—'}</span>
+        ),
+    },
+  ];
+
   return (
     <div className="admin-finance">
       <header className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
         <div className="flex flex-wrap gap-3 self-start">
-          <button type="button" onClick={() => setManualOpen(true)} className="primary-button">ثبت واریز به مدرس</button>
+          <button type="button" onClick={() => setManualOpen(true)} className="primary-button">
+            ثبت واریز به مدرس
+          </button>
           <button type="button" onClick={refresh} disabled={loading} className="secondary-button">
             <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
             {translate(locale, 'adminadminFinanceCenterRefresh')}
@@ -222,69 +293,20 @@ export function AdminFinanceCenter() {
           </label>
         </div>
 
-        {withdrawals.isLoading ? (
-          <div className="p-8">
-            <div className="skeleton h-52 rounded-2xl" />
-          </div>
-        ) : filtered.length ? (
-          <div className="overflow-x-auto">
-            <table className="finance-table">
-              <thead>
-                <tr>
-                  <th>{translate(locale, 'schedulingteacherPlannerCalendarTeacher')}</th>
-                  <th>{translate(locale, 'teacherteacherFinanceAmount')}</th>
-                  <th>{translate(locale, 'teacherteacherFinanceIban')}</th>
-                  <th>{translate(locale, 'adminadminFinanceCenterRequested')}</th>
-                  <th>{translate(locale, 'commercepricingManagerStatus')}</th>
-                  <th>{translate(locale, 'adminadminFinanceCenterAction')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((item) => (
-                  <tr key={item.id}>
-                    <td>
-                      <strong className="block">
-                        {localized({ fa: item.teacher.nameFa, en: item.teacher.nameEn }, locale)}
-                      </strong>
-                      <small className="mt-1 block text-muted latin">{item.teacher.user?.phone || '—'}</small>
-                    </td>
-                    <td className="font-black">{money(item.amount)}</td>
-                    <td className="latin text-xs">{maskIban(item.iban)}</td>
-                    <td className="whitespace-nowrap text-xs text-muted">{date(item.createdAt)}</td>
-                    <td>
-                      <WithdrawalStatus status={item.status} fa={fa} />
-                    </td>
-                    <td>
-                      {['PENDING', 'APPROVED'].includes(item.status) ? (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelected(item);
-                            setReference('');
-                            transfer.reset();
-                          }}
-                          className="primary-button !px-3 !py-2 text-xs"
-                        >
-                          <ArrowDownToLine size={15} />
-                          {translate(locale, 'adminadminFinanceCenterTransfer')}
-                        </button>
-                      ) : (
-                        <span className="latin text-xs text-muted">{item.reference || '—'}</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="p-12 text-center">
-            <CreditCard className="mx-auto text-[#c4cada]" />
-            <p className="mt-3 text-sm font-bold">
-              {translate(locale, 'adminadminFinanceCenterNoRequestsMatchTheseFilters')}
-            </p>
-          </div>
-        )}
+        <DataTable
+          columns={columns}
+          rows={filtered}
+          rowKey={(item) => item.id}
+          loading={withdrawals.isLoading}
+          empty={
+            <div className="p-12 text-center">
+              <CreditCard className="mx-auto text-[#c4cada]" />
+              <p className="mt-3 text-sm font-bold">
+                {translate(locale, 'adminadminFinanceCenterNoRequestsMatchTheseFilters')}
+              </p>
+            </div>
+          }
+        />
       </section>
 
       <ReceiptReviewQueue payments={payments.data ?? []} fa={fa} currentUserId={me.data?.id} />
@@ -314,78 +336,118 @@ export function AdminFinanceCenter() {
       </section>
 
       {selected && (
-        <Portal>
-          <div
-            className="fixed inset-0 z-50 grid place-items-center bg-navy/35 p-4 backdrop-blur-sm"
-            onMouseDown={() => setSelected(null)}
+        <Sheet
+          open
+          onOpenChange={(open) => !open && setSelected(null)}
+          title={translate(locale, 'adminadminFinanceCenterConfirmBankTransfer')}
+        >
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (reference.trim()) transfer.mutate({ id: selected.id, bankReference: reference.trim() });
+            }}
           >
-            <form
-              className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl"
-              onMouseDown={(event) => event.stopPropagation()}
-              onSubmit={(event) => {
-                event.preventDefault();
-                if (reference.trim()) transfer.mutate({ id: selected.id, bankReference: reference.trim() });
-              }}
-            >
-              <p className="text-xs font-bold text-blue">
-                {translate(locale, 'adminadminFinanceCenterConfirmBankTransfer')}
+            <h2 className="text-2xl font-black">{money(selected.amount)}</h2>
+            <div className="mt-5 rounded-2xl bg-[#f7f8fc] p-4 text-sm">
+              <p className="font-bold">
+                {localized({ fa: selected.teacher.nameFa, en: selected.teacher.nameEn }, locale)}
               </p>
-              <h2 className="mt-2 text-2xl font-black">{money(selected.amount)}</h2>
-              <div className="mt-5 rounded-2xl bg-[#f7f8fc] p-4 text-sm">
-                <p className="font-bold">
-                  {localized({ fa: selected.teacher.nameFa, en: selected.teacher.nameEn }, locale)}
-                </p>
-                <p className="latin mt-2 text-muted">{selected.iban}</p>
-              </div>
-              <label className="mt-5 block">
-                <span className="mb-2 block text-sm font-bold">
-                  {translate(locale, 'adminadminFinanceCenterBankReference')}
-                </span>
-                <input
-                  value={reference}
-                  onChange={(event) => setReference(event.target.value)}
-                  required
-                  dir="ltr"
-                  className="input latin"
-                  placeholder="مثلاً 847291035"
-                />
-              </label>
-              <p className="mt-3 text-xs leading-6 text-muted">
-                {translate(locale, 'adminadminFinanceCenterAfterConfirmationTheAmountIsDebitedFromThe')}
+              <p className="latin mt-2 text-muted">{selected.iban}</p>
+            </div>
+            <label className="mt-5 block">
+              <span className="mb-2 block text-sm font-bold">
+                {translate(locale, 'adminadminFinanceCenterBankReference')}
+              </span>
+              <input
+                value={reference}
+                onChange={(event) => setReference(event.target.value)}
+                required
+                dir="ltr"
+                className="input latin"
+                placeholder="مثلاً 847291035"
+              />
+            </label>
+            <p className="mt-3 text-xs leading-6 text-muted">
+              {translate(locale, 'adminadminFinanceCenterAfterConfirmationTheAmountIsDebitedFromThe')}
+            </p>
+            {transfer.isError && (
+              <p role="alert" className="mt-3 rounded-xl bg-red-50 p-3 text-xs text-red-700">
+                {apiMessage(transfer.error, translate(locale, 'adminadminFinanceCenterTransferFailed'))}
               </p>
-              {transfer.isError && (
-                <p role="alert" className="mt-3 rounded-xl bg-red-50 p-3 text-xs text-red-700">
-                  {apiMessage(transfer.error, translate(locale, 'adminadminFinanceCenterTransferFailed'))}
-                </p>
-              )}
-              <div className="mt-5 flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => setSelected(null)}
-                  className="secondary-button flex-1 justify-center"
-                >
-                  {translate(locale, 'admincountryManagerCancel')}
-                </button>
-                <button
-                  disabled={!reference.trim() || transfer.isPending}
-                  className="primary-button flex-1 justify-center disabled:opacity-50"
-                >
-                  {transfer.isPending
-                    ? translate(locale, 'adminadminFinanceCenterSaving')
-                    : translate(locale, 'adminadminFinanceCenterConfirm')}
-                </button>
-              </div>
-            </form>
-          </div>
-        </Portal>
+            )}
+            <div className="mt-5 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setSelected(null)}
+                className="secondary-button flex-1 justify-center"
+              >
+                {translate(locale, 'admincountryManagerCancel')}
+              </button>
+              <button
+                disabled={!reference.trim() || transfer.isPending}
+                className="primary-button flex-1 justify-center disabled:opacity-50"
+              >
+                {transfer.isPending
+                  ? translate(locale, 'adminadminFinanceCenterSaving')
+                  : translate(locale, 'adminadminFinanceCenterConfirm')}
+              </button>
+            </div>
+          </form>
+        </Sheet>
       )}
       {manualOpen && (
-        <Portal><div className="fixed inset-0 z-50 grid place-items-center bg-navy/35 p-4 backdrop-blur-sm"><form className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl" onSubmit={(e) => { e.preventDefault(); manualPayment.mutate(); }}>
-          <p className="text-xs font-bold text-blue">پرداخت دستی</p><h2 className="mt-2 text-2xl font-black">ثبت واریز برای مدرس</h2>
-          <div className="mt-5 grid gap-4"><label><span className="mb-2 block text-sm font-bold">شناسه مدرس</span><input className="input latin w-full" dir="ltr" value={manualTeacherId} onChange={(e) => setManualTeacherId(e.target.value)} required /></label><label><span className="mb-2 block text-sm font-bold">مبلغ (تومان)</span><input className="input latin w-full" type="number" min="1" value={manualAmount} onChange={(e) => setManualAmount(e.target.value)} required /></label><label><span className="mb-2 block text-sm font-bold">شماره پیگیری بانکی</span><input className="input latin w-full" dir="ltr" value={manualReference} onChange={(e) => setManualReference(e.target.value)} required /></label></div>
-          {manualPayment.isError && <p role="alert" className="mt-3 rounded-xl bg-red-50 p-3 text-xs text-red-700">{apiMessage(manualPayment.error, 'ثبت واریز ناموفق بود.')}</p>}
-          <div className="mt-5 flex gap-3"><button type="button" onClick={() => setManualOpen(false)} className="secondary-button flex-1 justify-center">انصراف</button><button disabled={manualPayment.isPending} className="primary-button flex-1 justify-center">{manualPayment.isPending ? 'در حال ثبت...' : 'تأیید و ثبت واریز'}</button></div>
-        </form></div></Portal>
+        <Sheet open onOpenChange={(open) => !open && setManualOpen(false)} title="پرداخت دستی">
+          <form
+            ref={manualFormRef}
+            onSubmit={(e) => {
+              e.preventDefault();
+              manualPayment.mutate();
+            }}
+          >
+            <h2 className="text-2xl font-black">ثبت واریز برای مدرس</h2>
+            <div className="mt-5 grid gap-4">
+              <ApprovedTeacherSelect fa={fa} />
+              <label>
+                <span className="mb-2 block text-sm font-bold">مبلغ (تومان)</span>
+                <input
+                  className="input latin w-full"
+                  type="number"
+                  min="1"
+                  value={manualAmount}
+                  onChange={(e) => setManualAmount(e.target.value)}
+                  required
+                />
+              </label>
+              <label>
+                <span className="mb-2 block text-sm font-bold">شماره پیگیری بانکی</span>
+                <input
+                  className="input latin w-full"
+                  dir="ltr"
+                  value={manualReference}
+                  onChange={(e) => setManualReference(e.target.value)}
+                  required
+                />
+              </label>
+            </div>
+            {manualPayment.isError && (
+              <p role="alert" className="mt-3 rounded-xl bg-red-50 p-3 text-xs text-red-700">
+                {apiMessage(manualPayment.error, 'ثبت واریز ناموفق بود.')}
+              </p>
+            )}
+            <div className="mt-5 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setManualOpen(false)}
+                className="secondary-button flex-1 justify-center"
+              >
+                انصراف
+              </button>
+              <button disabled={manualPayment.isPending} className="primary-button flex-1 justify-center">
+                {manualPayment.isPending ? 'در حال ثبت...' : 'تأیید و ثبت واریز'}
+              </button>
+            </div>
+          </form>
+        </Sheet>
       )}
     </div>
   );

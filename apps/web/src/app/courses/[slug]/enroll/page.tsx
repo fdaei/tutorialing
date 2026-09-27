@@ -9,6 +9,7 @@ import { localePath } from '@/lib/i18n';
 import type { Course } from '@/lib/marketplace-data';
 import type { PublicTeacher } from '@/features/teacher/types/public-teacher';
 import { CourseEnrollmentCta } from '@/features/courses/components/course-enrollment-cta';
+import { isSingleSessionCourse } from '@/features/courses/course-trial';
 import { resolveHeaderConfig } from '@/lib/header-config';
 
 type CourseData = Course & { id: string; package?: { credits: number } | null };
@@ -50,7 +51,15 @@ export default async function CourseEnrollmentPage({ params }: { params: Promise
               <p className="mt-3 text-sm leading-7 text-muted">
                 {english ? `Select ${sessions} available time${sessions === 1 ? '' : 's'} below. Times are shown in your local timezone.` : `${sessions.toLocaleString('fa-IR')} زمان آزاد را انتخاب کنید. ساعت‌ها با منطقه زمانی شما نمایش داده می‌شوند.`}
               </p>
-              <CourseEnrollmentCta slug={course.slug} courseId={course.id} price={course.price} format={course.format} teacherId={course.teacherId} sessionsCount={sessions} />
+              <CourseEnrollmentCta
+                slug={course.slug}
+                courseId={course.id}
+                price={course.price}
+                format={course.format}
+                teacherId={course.teacherId}
+                sessionsCount={sessions}
+                isTrial={isSingleSessionCourse(course)}
+              />
             </div>
           </section>
           <aside className="surface-card h-fit p-6 lg:sticky lg:top-24">

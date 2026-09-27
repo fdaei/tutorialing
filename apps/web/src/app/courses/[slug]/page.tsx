@@ -29,8 +29,9 @@ import {
   localizedCourseLanguage,
   localizedCourseLevel,
 } from '@/features/courses/course-localization';
+import { CourseCoverImage } from '@/features/courses/components/course-cover-image';
 import { CourseEnrollmentCta } from '@/features/courses/components/course-enrollment-cta';
-import { trialSessionFor } from '@/features/courses/course-trial';
+import { isSingleSessionCourse, trialSessionFor } from '@/features/courses/course-trial';
 import type { CourseChapter } from '@/features/courses/course-types';
 import type { PublicTeacher } from '@/features/teacher/types/public-teacher';
 import { resolveHeaderConfig } from '@/lib/header-config';
@@ -133,13 +134,10 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
             <div className="course-purchase-card">
               <div className="relative aspect-video overflow-hidden rounded-2xl bg-indigo-50">
                 {course.image && (
-                  <Image
-                    src={course.image}
+                  <CourseCoverImage
+                    image={course.image}
                     alt={t(`تصویر دوره ${title}`, `Course cover for ${title}`)}
-                    fill
-                    priority
-                    sizes="410px"
-                    className="object-cover"
+                    className="absolute inset-0 h-full w-full object-cover"
                   />
                 )}
               </div>
@@ -154,7 +152,15 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
                   {t('مشاهده زمان‌های آزاد و پرداخت', 'View availability & pay')}
                 </Link>
               ) : (
-                <CourseEnrollmentCta slug={course.slug} courseId={course.id} price={course.price} format={course.format} teacherId={course.teacherId} sessionsCount={lessons} />
+                <CourseEnrollmentCta
+                  slug={course.slug}
+                  courseId={course.id}
+                  price={course.price}
+                  format={course.format}
+                  teacherId={course.teacherId}
+                  sessionsCount={lessons}
+                  isTrial={isSingleSessionCourse(course)}
+                />
               )}
               {trial && (
                 <Link

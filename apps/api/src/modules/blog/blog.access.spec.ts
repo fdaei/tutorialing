@@ -16,7 +16,7 @@ import { BlogViewDto } from './dto/request/blog-interaction.dto';
  * rather than restating them, so removing one fails the test.
  */
 
-const EDITORIAL = ['create', 'update', 'publish', 'archive'] as const;
+const EDITORIAL = ['create', 'update', 'publish', 'archive', 'moderateComment', 'adminComments'] as const;
 const READER_WRITES = ['react', 'rate'] as const;
 
 const guard = new AuthorizationGuard(new Reflector());

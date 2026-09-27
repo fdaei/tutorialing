@@ -2,7 +2,7 @@ import { ApiError, publicApi } from '@/shared/services/api';
 import { ViewTracker } from '../view-tracker';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowRight, BookOpenText, CalendarDays, Clock3, MessageCircle, UserRound } from 'lucide-react';
+import { ArrowRight, BookOpenText, CalendarDays, Clock3, Heart, MessageCircle, UserRound } from 'lucide-react';
 import { requestLocale } from '@/lib/server-locale';
 import { formatNumber, localePath, localized, translate } from '@/lib/i18n';
 import { Footer, Header } from '@/components/layout/site';
@@ -100,6 +100,7 @@ export default async function BlogDetail({ params }: { params: Promise<{ slug: s
             <BlogMarkdown content={localized({ fa: post.contentFa, en: post.contentEn }, locale)} />
             <div className="blog-article-stats">
               <span><MessageCircle size={16} aria-hidden="true" />{formatNumber(post._count?.comments || 0, locale)} {copy(locale, 'دیدگاه', 'comments')}</span>
+              <span><Heart size={16} aria-hidden="true" />{formatNumber(post.likeCount || 0, locale)} {copy(locale, 'پسند', 'likes')}</span>
               <span>{formatNumber(post._count?.views || 0, locale)} {translate(locale, 'blogViews')}</span>
             </div>
           </article>
@@ -118,7 +119,7 @@ export default async function BlogDetail({ params }: { params: Promise<{ slug: s
         </div>
 
         <div className="page-shell">
-          <BlogDiscussion postId={post.id} />
+          <BlogDiscussion postId={post.id} initialLikeCount={post.likeCount ?? 0} />
           {related.length > 0 && (
             <section className="blog-related">
               <div className="blog-related-heading">

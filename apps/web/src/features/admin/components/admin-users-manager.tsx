@@ -1,14 +1,14 @@
 'use client';
 
-import { Portal } from '@/shared/components/ui/portal';
 import { localized, isDefaultLocale, translate } from '@/lib/i18n';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight, Eye, Search, ShieldCheck, UserRound, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Eye, Search, ShieldCheck, UserRound } from 'lucide-react';
 import { api, ApiError, Paginated } from '@/shared/services/api';
 import { useTranslations } from '@/components/shared/locale-provider';
 import { formatMoney } from '@/lib/money';
 import { AdminUserInvoices } from './payment-receipts';
+import { DataTable, Drawer, type Column } from '@/shared/components/ui';
 
 type Role = 'STUDENT' | 'INSTRUCTOR' | 'SUPPORT' | 'ADMIN';
 type User = {
@@ -84,6 +84,72 @@ export function AdminUsersManager() {
     setPage(1);
     setSearch(draft.trim());
   }
+  const columns: Column<User>[] = [
+    {
+      key: 'user',
+      header: translate(locale, 'adminadminUsersManagerUser'),
+      primary: true,
+      cell: (user) => (
+        <span className="flex items-center gap-3">
+          <span className="brand-gradient grid size-10 place-items-center rounded-full font-black text-white">
+            {(user.name ?? 'U').slice(0, 1)}
+          </span>
+          <strong>{user.name || translate(locale, 'adminadminUsersManagerUnnamed')}</strong>
+        </span>
+      ),
+    },
+    {
+      key: 'contact',
+      header: translate(locale, 'adminadminUsersManagerContact'),
+      cell: (user) => (
+        <>
+          <span dir="ltr" className="block">
+            {user.phone}
+          </span>
+          {user.email && <small className="text-muted">{user.email}</small>}
+        </>
+      ),
+    },
+    {
+      key: 'roles',
+      header: translate(locale, 'adminadminUsersManagerRoles'),
+      cell: (user) => (
+        <div className="flex flex-wrap gap-1.5">
+          {user.roles.map(({ role }) => (
+            <span key={role} className="rounded-full bg-lavender px-2.5 py-1 text-xs font-bold text-purple">
+              {localized({ fa: roleFa[role], en: roleLabel(role) }, locale)}
+            </span>
+          ))}
+        </div>
+      ),
+    },
+    {
+      key: 'status',
+      header: translate(locale, 'commercepricingManagerStatus'),
+      cell: (user) => <Status value={user.status} fa={fa} />,
+    },
+    {
+      key: 'joined',
+      header: translate(locale, 'adminadminUsersManagerJoined'),
+      hideOnMobile: true,
+      cell: (user) => <span className="text-muted">{date(user.createdAt, fa)}</span>,
+    },
+    {
+      key: 'actions',
+      header: translate(locale, 'adminadminUsersManagerActions'),
+      align: 'end',
+      cell: (user) => (
+        <button
+          type="button"
+          onClick={() => setSelected(user.id)}
+          className="inline-flex items-center gap-2 rounded-xl border hairline px-3 py-2 font-bold text-blue"
+        >
+          <Eye size={16} />
+          {translate(locale, 'adminadminUsersManagerDetails')}
+        </button>
+      ),
+    },
+  ];
   return (
     <section>
       <div className="mb-6">
@@ -123,79 +189,25 @@ export function AdminUsersManager() {
             {translate(locale, 'adminadminUsersManagerSearch')}
           </button>
         </form>
-        {query.isLoading ? (
-          <div className="grid gap-3 p-5">
-            <div className="skeleton h-20 rounded-2xl" />
-            <div className="skeleton h-20 rounded-2xl" />
-          </div>
-        ) : query.isError ? (
+        {query.isError ? (
           <ErrorBox fa={fa} error={query.error} retry={() => query.refetch()} />
-        ) : data?.data.length ? (
-          <>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[850px] text-sm">
-                <thead className="bg-[#f8f9fd] text-muted">
-                  <tr>
-                    <th className="p-4 text-start">{translate(locale, 'adminadminUsersManagerUser')}</th>
-                    <th className="p-4 text-start">{translate(locale, 'adminadminUsersManagerContact')}</th>
-                    <th className="p-4 text-start">{translate(locale, 'adminadminUsersManagerRoles')}</th>
-                    <th className="p-4 text-start">{translate(locale, 'commercepricingManagerStatus')}</th>
-                    <th className="p-4 text-start">{translate(locale, 'adminadminUsersManagerJoined')}</th>
-                    <th className="p-4 text-start">{translate(locale, 'adminadminUsersManagerActions')}</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y hairline">
-                  {data.data.map((user) => (
-                    <tr key={user.id} className="hover:bg-[#fafbff]">
-                      <td className="p-4">
-                        <span className="flex items-center gap-3">
-                          <span className="brand-gradient grid size-10 place-items-center rounded-full font-black text-white">
-                            {(user.name ?? 'U').slice(0, 1)}
-                          </span>
-                          <strong>{user.name || translate(locale, 'adminadminUsersManagerUnnamed')}</strong>
-                        </span>
-                      </td>
-                      <td className="p-4">
-                        <span dir="ltr" className="block">
-                          {user.phone}
-                        </span>
-                        {user.email && <small className="text-muted">{user.email}</small>}
-                      </td>
-                      <td className="p-4">
-                        <div className="flex flex-wrap gap-1.5">
-                          {user.roles.map(({ role }) => (
-                            <span
-                              key={role}
-                              className="rounded-full bg-lavender px-2.5 py-1 text-xs font-bold text-purple"
-                            >
-                              {localized({ fa: roleFa[role], en: roleLabel(role) }, locale)}
-                            </span>
-                          ))}
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        <Status value={user.status} fa={fa} />
-                      </td>
-                      <td className="p-4 text-muted">{date(user.createdAt, fa)}</td>
-                      <td className="p-4">
-                        <button
-                          type="button"
-                          onClick={() => setSelected(user.id)}
-                          className="inline-flex items-center gap-2 rounded-xl border hairline px-3 py-2 font-bold text-blue"
-                        >
-                          <Eye size={16} />
-                          {translate(locale, 'adminadminUsersManagerDetails')}
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <Pagination page={data.page} pages={data.totalPages} total={data.total} setPage={setPage} fa={fa} />
-          </>
         ) : (
-          <div className="p-12 text-center text-muted">{translate(locale, 'adminadminUsersManagerNoUsersFound')}</div>
+          <>
+            <DataTable
+              columns={columns}
+              rows={data?.data}
+              rowKey={(user) => user.id}
+              loading={query.isLoading}
+              empty={
+                <div className="p-12 text-center text-muted">
+                  {translate(locale, 'adminadminUsersManagerNoUsersFound')}
+                </div>
+              }
+            />
+            {data && data.data.length > 0 && (
+              <Pagination page={data.page} pages={data.totalPages} total={data.total} setPage={setPage} fa={fa} />
+            )}
+          </>
         )}
       </div>
       {selected && (
@@ -278,19 +290,10 @@ function UserDetails({
   invalidate: () => Promise<void>;
 }) {
   const { locale } = useTranslations();
-  const dialogRef = useRef<HTMLElement>(null);
   const qc = useQueryClient(),
     query = useQuery({ queryKey: ['admin-user-detail', id], queryFn: () => api<Detail>(`/admin/users/${id}`) }),
     [roles, setRoles] = useState<Role[]>([]),
     [status, setStatus] = useState('ACTIVE');
-  useEffect(() => {
-    dialogRef.current?.focus();
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') close();
-    };
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
-  }, [close]);
   useEffect(() => {
     if (query.data) {
       setRoles(query.data.roles.map((r) => r.role));
@@ -314,155 +317,138 @@ function UserDetails({
   });
   const user = query.data;
   return (
-    <Portal>
-      <div className="fixed inset-0 z-[80] bg-navy/35 p-3 backdrop-blur-sm" onClick={close}>
-        <aside
-          ref={dialogRef}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="admin-user-details-title"
-          tabIndex={-1}
-          className={`h-full w-full max-w-3xl overflow-y-auto bg-[#f8f9fd] p-5 shadow-2xl md:p-7 ${translate(fa, 'adminadminUsersManagerMlAutoRoundedR28px')}`}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <button
-            type="button"
-            onClick={close}
-            className="grid size-10 place-items-center rounded-full border hairline bg-white"
-            aria-label={translate(fa, 'adminadminUsersManagerClose')}
-          >
-            <X />
-          </button>
-          {query.isLoading ? (
-            <div className="skeleton mt-6 h-64 rounded-3xl" />
-          ) : query.isError ? (
-            <ErrorBox fa={fa} error={query.error} retry={() => query.refetch()} />
-          ) : (
-            user && (
-              <>
-                <div className="mt-5 flex items-center gap-4">
-                  <span className="brand-gradient grid size-16 place-items-center rounded-full text-2xl font-black text-white">
-                    {(user.name ?? 'U').slice(0, 1)}
-                  </span>
-                  <div>
-                    <h2 id="admin-user-details-title" className="text-2xl font-black">
-                      {user.name || translate(fa, 'adminadminUsersManagerUnnamed')}
-                    </h2>
-                    <p dir="ltr" className={`${translate(fa, 'adminadminUsersManagerTextLeft')} text-sm text-muted`}>
-                      {user.phone}
-                      {user.email ? ` · ${user.email}` : ''}
-                    </p>
-                  </div>
+    <Drawer
+      open
+      onOpenChange={(open) => !open && close()}
+      title={
+        user
+          ? user.name || translate(fa, 'adminadminUsersManagerUnnamed')
+          : localized({ fa: 'در حال بارگذاری...', en: 'Loading...' }, fa)
+      }
+    >
+      {query.isLoading ? (
+        <div className="skeleton h-64 rounded-3xl" />
+      ) : query.isError ? (
+        <ErrorBox fa={fa} error={query.error} retry={() => query.refetch()} />
+      ) : (
+        user && (
+          <>
+            <div className="flex items-center gap-4">
+              <span className="brand-gradient grid size-16 place-items-center rounded-full text-2xl font-black text-white">
+                {(user.name ?? 'U').slice(0, 1)}
+              </span>
+              <p dir="ltr" className={`${translate(fa, 'adminadminUsersManagerTextLeft')} text-sm text-muted`}>
+                {user.phone}
+                {user.email ? ` · ${user.email}` : ''}
+              </p>
+            </div>
+            <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-3">
+              {Object.entries(user._count).map(([key, value]) => (
+                <div key={key} className="rounded-2xl border hairline bg-white p-4">
+                  <strong className="text-2xl">{value}</strong>
+                  <p className="mt-1 text-xs text-muted">{countLabel(key, fa)}</p>
                 </div>
-                <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-3">
-                  {Object.entries(user._count).map(([key, value]) => (
-                    <div key={key} className="rounded-2xl border hairline bg-white p-4">
-                      <strong className="text-2xl">{value}</strong>
-                      <p className="mt-1 text-xs text-muted">{countLabel(key, fa)}</p>
-                    </div>
-                  ))}
-                </div>
-                <section className="panel-card mt-5 p-5">
-                  <h3 className="flex items-center gap-2 font-black">
-                    <ShieldCheck size={18} className="text-purple" />
-                    {translate(fa, 'adminadminUsersManagerRolesAndStatus')}
-                  </h3>
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {allRoles.map((role) => (
-                      <label
-                        key={role}
-                        className={`cursor-pointer rounded-full border px-3 py-2 text-sm font-bold ${roles.includes(role) ? 'border-purple bg-lavender text-purple' : 'hairline bg-white text-muted'}`}
-                      >
-                        <input
-                          className="sr-only"
-                          type="checkbox"
-                          checked={roles.includes(role)}
-                          onChange={(e) =>
-                            setRoles((current) =>
-                              e.target.checked ? [...current, role] : current.filter((r) => r !== role),
-                            )
-                          }
-                        />
-                        {localized({ fa: roleFa[role], en: roleLabel(role) }, locale)}
-                      </label>
-                    ))}
-                  </div>
-                  <div className="mt-4 flex flex-wrap gap-3">
-                    <button
-                      type="button"
-                      disabled={!roles.length || saveRoles.isPending}
-                      onClick={() => saveRoles.mutate()}
-                      className="brand-gradient rounded-xl px-5 py-3 font-black text-white disabled:opacity-40"
-                    >
-                      {translate(fa, 'adminadminUsersManagerSaveRoles')}
-                    </button>
-                    <select
-                      aria-label={translate(fa, 'commercepricingManagerStatus')}
-                      value={status}
-                      onChange={(e) => setStatus(e.target.value)}
-                      className="rounded-xl border hairline bg-white px-4"
-                    >
-                      <option value="ACTIVE">{translate(fa, 'admincountryManagerActive')}</option>
-                      <option value="SUSPENDED">{translate(fa, 'adminadminUsersManagerSuspended')}</option>
-                      <option value="DELETED">{translate(fa, 'adminadminUsersManagerDeleted')}</option>
-                    </select>
-                    <button
-                      type="button"
-                      disabled={saveStatus.isPending}
-                      onClick={() => saveStatus.mutate()}
-                      className="rounded-xl border hairline bg-white px-5 py-3 font-black"
-                    >
-                      {translate(fa, 'adminadminUsersManagerSaveStatus')}
-                    </button>
-                  </div>
-                  {(saveRoles.error || saveStatus.error) && (
-                    <p className="mt-3 text-sm text-red-700">{errorMessage(saveRoles.error || saveStatus.error, fa)}</p>
-                  )}
-                </section>
-                {user.teacher && (
-                  <section className="panel-card mt-5 p-5">
-                    <h3 className="font-black">{translate(fa, 'teacherteacherProfileHubTeacherProfile')}</h3>
-                    <p className="mt-3">
-                      {localized({ fa: user.teacher.nameFa, en: user.teacher.nameEn }, fa)} ·{' '}
-                      <Status value={user.teacher.status} fa={fa} />
-                    </p>
-                    <p className="mt-2 text-sm text-muted">
-                      {translate(fa, 'adminadminUsersManagerRating')} {user.teacher.rating} ·{' '}
-                      {user.teacher.reviewsCount} {translate(fa, 'adminadminUsersManagerReviews')}
-                    </p>
-                  </section>
-                )}
-                <DetailList
-                  title={translate(fa, 'adminadminUsersManagerRecentTests')}
-                  rows={user.attempts}
-                  fa={fa}
-                  kind="attempt"
-                />
-                <DetailList
-                  title={translate(fa, 'adminadminUsersManagerRecentBookings')}
-                  rows={user.bookings}
-                  fa={fa}
-                  kind="booking"
-                />
-                <AdminUserInvoices userId={id} fa={fa} />
-                <DetailList
-                  title={translate(fa, 'adminadminUsersManagerRecentTickets')}
-                  rows={user.tickets}
-                  fa={fa}
-                  kind="ticket"
-                />
-                <DetailList
-                  title={translate(fa, 'adminadminUsersManagerLearningPlans')}
-                  rows={user.learningPlans}
-                  fa={fa}
-                  kind="plan"
-                />
-              </>
-            )
-          )}
-        </aside>
-      </div>
-    </Portal>
+              ))}
+            </div>
+            <section className="panel-card mt-5 p-5">
+              <h3 className="flex items-center gap-2 font-black">
+                <ShieldCheck size={18} className="text-purple" />
+                {translate(fa, 'adminadminUsersManagerRolesAndStatus')}
+              </h3>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {allRoles.map((role) => (
+                  <label
+                    key={role}
+                    className={`cursor-pointer rounded-full border px-3 py-2 text-sm font-bold ${roles.includes(role) ? 'border-purple bg-lavender text-purple' : 'hairline bg-white text-muted'}`}
+                  >
+                    <input
+                      className="sr-only"
+                      type="checkbox"
+                      checked={roles.includes(role)}
+                      onChange={(e) =>
+                        setRoles((current) =>
+                          e.target.checked ? [...current, role] : current.filter((r) => r !== role),
+                        )
+                      }
+                    />
+                    {localized({ fa: roleFa[role], en: roleLabel(role) }, locale)}
+                  </label>
+                ))}
+              </div>
+              <div className="mt-4 flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  disabled={!roles.length || saveRoles.isPending}
+                  onClick={() => saveRoles.mutate()}
+                  className="brand-gradient rounded-xl px-5 py-3 font-black text-white disabled:opacity-40"
+                >
+                  {translate(fa, 'adminadminUsersManagerSaveRoles')}
+                </button>
+                <select
+                  aria-label={translate(fa, 'commercepricingManagerStatus')}
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value)}
+                  className="rounded-xl border hairline bg-white px-4"
+                >
+                  <option value="ACTIVE">{translate(fa, 'admincountryManagerActive')}</option>
+                  <option value="SUSPENDED">{translate(fa, 'adminadminUsersManagerSuspended')}</option>
+                  <option value="DELETED">{translate(fa, 'adminadminUsersManagerDeleted')}</option>
+                </select>
+                <button
+                  type="button"
+                  disabled={saveStatus.isPending}
+                  onClick={() => saveStatus.mutate()}
+                  className="rounded-xl border hairline bg-white px-5 py-3 font-black"
+                >
+                  {translate(fa, 'adminadminUsersManagerSaveStatus')}
+                </button>
+              </div>
+              {(saveRoles.error || saveStatus.error) && (
+                <p className="mt-3 text-sm text-red-700">{errorMessage(saveRoles.error || saveStatus.error, fa)}</p>
+              )}
+            </section>
+            {user.teacher && (
+              <section className="panel-card mt-5 p-5">
+                <h3 className="font-black">{translate(fa, 'teacherteacherProfileHubTeacherProfile')}</h3>
+                <p className="mt-3">
+                  {localized({ fa: user.teacher.nameFa, en: user.teacher.nameEn }, fa)} ·{' '}
+                  <Status value={user.teacher.status} fa={fa} />
+                </p>
+                <p className="mt-2 text-sm text-muted">
+                  {translate(fa, 'adminadminUsersManagerRating')} {user.teacher.rating} ·{' '}
+                  {user.teacher.reviewsCount} {translate(fa, 'adminadminUsersManagerReviews')}
+                </p>
+              </section>
+            )}
+            <DetailList
+              title={translate(fa, 'adminadminUsersManagerRecentTests')}
+              rows={user.attempts}
+              fa={fa}
+              kind="attempt"
+            />
+            <DetailList
+              title={translate(fa, 'adminadminUsersManagerRecentBookings')}
+              rows={user.bookings}
+              fa={fa}
+              kind="booking"
+            />
+            <AdminUserInvoices userId={id} fa={fa} />
+            <DetailList
+              title={translate(fa, 'adminadminUsersManagerRecentTickets')}
+              rows={user.tickets}
+              fa={fa}
+              kind="ticket"
+            />
+            <DetailList
+              title={translate(fa, 'adminadminUsersManagerLearningPlans')}
+              rows={user.learningPlans}
+              fa={fa}
+              kind="plan"
+            />
+          </>
+        )
+      )}
+    </Drawer>
   );
 }
 

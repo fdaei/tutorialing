@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { LocaleProvider } from '@/components/shared/locale-provider';
 import { api } from '@/shared/services/api';
 import { AdminCourseManager } from './admin-course-manager';
@@ -141,7 +141,8 @@ describe('AdminCourseManager', () => {
 
     renderManager();
 
-    fireEvent.click(await screen.findByRole('button', { name: 'ویرایش' }));
+    const table = await screen.findByRole('table');
+    fireEvent.click(within(table).getByRole('button', { name: 'ویرایش' }));
 
     expect(await screen.findByLabelText('سطح')).toHaveValue('IELTS');
     expect(screen.getByLabelText('نوع دوره')).toHaveValue('LIVE_ONLINE');

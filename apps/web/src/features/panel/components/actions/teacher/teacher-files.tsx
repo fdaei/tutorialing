@@ -152,7 +152,7 @@ export function TeacherFiles({ endpoint, fa }: { endpoint: string } & Localized)
           action.mutate(() => api('/teacher/application/submit', { method: 'POST' }));
         }}
       >
-        <Submit fa={fa} busy={action.isPending || application.isLoading || !applicationReady}>
+        <Submit fa={fa} busy={action.isPending} disabled={application.isLoading || !applicationReady}>
           {translate(fa, 'legacySubmitForReview')}
         </Submit>
       </form>

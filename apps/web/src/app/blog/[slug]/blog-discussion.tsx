@@ -7,10 +7,12 @@ import { api, publicApi } from '@/shared/services/api';
 import { useTranslations } from '@/components/shared/locale-provider';
 import { localePath } from '@/lib/i18n';
 type Comment = { id: string; body: string; createdAt: string; user?: { name?: string }; replies: Comment[] };
-export function BlogDiscussion({ postId }: { postId: string }) {
+export function BlogDiscussion({ postId, initialLikeCount = 0 }: { postId: string; initialLikeCount?: number }) {
   const { locale } = useTranslations();
   const qc = useQueryClient(),
     [notice, setNotice] = useState(''),
+    [liked, setLiked] = useState(false),
+    [likeCount, setLikeCount] = useState(initialLikeCount),
     comments = useQuery({
       queryKey: ['blog-comments', postId],
       queryFn: () => publicApi<Comment[]>(`/blog/posts/${postId}/comments`),
@@ -18,7 +20,11 @@ export function BlogDiscussion({ postId }: { postId: string }) {
     react = useMutation({
       mutationFn: () =>
         api(`/blog/posts/${postId}/reaction`, { method: 'POST', body: JSON.stringify({ type: 'LIKE' }) }),
-      onSuccess: () => setNotice('پسند شما ثبت شد.'),
+      onSuccess: () => {
+        setNotice('پسند شما ثبت شد.');
+        setLiked(true);
+        setLikeCount((count) => count + 1);
+      },
       onError: () => setNotice('برای پسندیدن مقاله وارد حساب شوید.'),
     }),
     comment = useMutation({
@@ -43,9 +49,15 @@ export function BlogDiscussion({ postId }: { postId: string }) {
           <MessageCircle className="text-purple" />
           نظرات مقاله
         </h2>
-        <button onClick={() => react.mutate()} className="secondary-button">
-          <Heart size={18} />
-          پسندیدن
+        <button
+          onClick={() => react.mutate()}
+          disabled={liked || react.isPending}
+          className="secondary-button"
+          aria-pressed={liked}
+        >
+          <Heart size={18} fill={liked ? 'currentColor' : 'none'} />
+          {liked ? 'پسندیده شد' : 'پسندیدن'}
+          {likeCount > 0 && <span className="blog-like-count">{likeCount}</span>}
         </button>
       </div>
       {notice && (

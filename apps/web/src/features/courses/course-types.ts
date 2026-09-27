@@ -59,6 +59,7 @@ export type InstructorCourse = {
   published: boolean;
   level: string;
   language: string;
+  isTest: boolean;
   updatedAt: string;
   format: 'SELF_PACED' | 'LIVE_ONLINE';
   _count: { chapters: number; enrollments: number };

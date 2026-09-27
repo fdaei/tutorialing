@@ -5,6 +5,7 @@ export type LocaleText = {
 
 export type LandingSectionId =
   | 'hero'
+  | 'about'
   | 'languages'
   | 'benefits'
   | 'placement'
@@ -50,6 +51,18 @@ export type LandingConfig = {
     imageAlt: LocaleText;
     imageSide: 'left' | 'right';
     overlay: number;
+    founderName: LocaleText;
+    founderTitle: LocaleText;
+    quote: LocaleText;
+  };
+  about: {
+    eyebrow: LocaleText;
+    title: LocaleText;
+    bio: LocaleText;
+    /** Falls back to `hero.image` when empty, so a second photo is optional. */
+    photo: string;
+    photoAlt: LocaleText;
+    philosophy: Array<{ title: LocaleText; description: LocaleText }>;
   };
   languages: {
     eyebrow: LocaleText;
@@ -165,6 +178,48 @@ export const defaultLandingConfig: LandingConfig = {
     imageAlt: text('زبان‌آموز در حال یادگیری با لپ‌تاپ', 'A language learner studying with a laptop'),
     imageSide: 'right',
     overlay: 0,
+    founderName: text('آرزو احمدی', 'Arezoo Ahmadi'),
+    founderTitle: text('بنیان‌گذار و مدرس ارشد لینگواسپیک', 'Founder & lead teacher at LingoSpeak'),
+    quote: text(
+      '«زبان را یاد می‌گیریم که حرف بزنیم، نه فقط که امتحان بدهیم.»',
+      '“We learn a language to speak it, not just to pass a test.”',
+    ),
+  },
+  about: {
+    eyebrow: text('درباره آرزو', 'About Arezoo'),
+    title: text(
+      'معلمی که کنار زبان‌آموزش می‌ایستد، نه فقط جلوی کلاس',
+      'A teacher who stands beside her students, not just in front of the class',
+    ),
+    bio: text(
+      'آرزو احمدی مدرس زبان انگلیسی است و لینگواسپیک را برای همان چیزی ساخت که خودش در مسیر یادگیری زبان بیشتر از همه به آن نیاز داشت: برنامه‌ای شفاف، بازخورد واقعی و کسی که واقعاً پیگیر پیشرفت آدم باشد. اینجا هر زبان‌آموز به‌جای عبور از یک برنامه‌ی از پیش تعیین‌شده، بر اساس هدف و سرعت خودش جلو می‌رود.',
+      'Arezoo Ahmadi teaches English, and she built LingoSpeak around the thing she needed most on her own path with languages: a clear plan, honest feedback, and someone genuinely invested in her progress. Here, every learner moves at their own pace and toward their own goal, instead of following a one-size-fits-all program.',
+    ),
+    photo: '',
+    photoAlt: text('آرزو احمدی، بنیان‌گذار لینگواسپیک', 'Arezoo Ahmadi, founder of LingoSpeak'),
+    philosophy: [
+      {
+        title: text('یادگیری با مکالمه واقعی', 'Learning through real conversation'),
+        description: text(
+          'به‌جای حفظ قواعد، از همان جلسه‌ی اول تمرین می‌کنی که حرف بزنی.',
+          'Instead of memorizing rules, you practise speaking from the very first session.',
+        ),
+      },
+      {
+        title: text('بازخورد شخصی، نه عمومی', 'Personal feedback, not generic'),
+        description: text(
+          'هر بازخوردی که می‌گیری، مخصوص نقطه‌ضعف و هدف خودت است.',
+          'Every piece of feedback is shaped around your specific weak points and goal.',
+        ),
+      },
+      {
+        title: text('صداقت درباره‌ی پیشرفت', 'Honesty about progress'),
+        description: text(
+          'اگر جایی کندتر پیش می‌روی، صادقانه بهت می‌گوییم و مسیر را با هم اصلاح می‌کنیم.',
+          'If something is moving slower than it should, we say so honestly and adjust the plan together.',
+        ),
+      },
+    ],
   },
   languages: {
     eyebrow: text('زبان‌ها', 'Languages'),
@@ -299,6 +354,7 @@ export const defaultLandingConfig: LandingConfig = {
   },
   sections: [
     { id: 'hero', type: 'hero', label: text('هیرو', 'Hero'), visible: true, style: {} },
+    { id: 'about', type: 'about', label: text('درباره آرزو', 'About Arezoo'), visible: true, style: {} },
     { id: 'languages', type: 'languages', label: text('زبان‌ها', 'Languages'), visible: true, style: {} },
     { id: 'benefits', type: 'benefits', label: text('مزیت‌ها', 'Benefits'), visible: true, style: {} },
     { id: 'placement', type: 'placement', label: text('تعیین سطح', 'Placement'), visible: true, style: {} },
@@ -348,6 +404,7 @@ export function normalizeLandingConfig(value: unknown): LandingConfig {
   const raw = record(value);
   const header = record(raw.header);
   const hero = record(raw.hero);
+  const about = record(raw.about);
   const languages = record(raw.languages);
   const benefits = record(raw.benefits);
   const placement = record(raw.placement);
@@ -411,6 +468,18 @@ export function normalizeLandingConfig(value: unknown): LandingConfig {
       imageAlt: textValue(hero.imageAlt, defaultLandingConfig.hero.imageAlt),
       primaryButton: mergeText(record(hero.primaryButton), defaultLandingConfig.hero.primaryButton),
       secondaryButton: mergeText(record(hero.secondaryButton), defaultLandingConfig.hero.secondaryButton),
+      founderName: textValue(hero.founderName, defaultLandingConfig.hero.founderName),
+      founderTitle: textValue(hero.founderTitle, defaultLandingConfig.hero.founderTitle),
+      quote: textValue(hero.quote, defaultLandingConfig.hero.quote),
+    },
+    about: {
+      ...defaultLandingConfig.about,
+      ...about,
+      eyebrow: textValue(about.eyebrow, defaultLandingConfig.about.eyebrow),
+      title: textValue(about.title, defaultLandingConfig.about.title),
+      bio: textValue(about.bio, defaultLandingConfig.about.bio),
+      photoAlt: textValue(about.photoAlt, defaultLandingConfig.about.photoAlt),
+      philosophy: Array.isArray(about.philosophy) ? about.philosophy as LandingConfig['about']['philosophy'] : defaultLandingConfig.about.philosophy,
     },
     languages: {
       ...defaultLandingConfig.languages,

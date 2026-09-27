@@ -66,21 +66,21 @@ export default function Dashboard() {
   const nextStepHref = hasClass ? '/dashboard/classes' : '/matching';
   return (
     <PanelShell title={t('studentPanel')} items={studentNav}>
-      <section className="soft-gradient panel-card relative overflow-hidden p-7 md:p-10">
-        <div className="relative grid items-center gap-8 lg:grid-cols-[1fr_320px]">
+      <section className="soft-gradient panel-card relative overflow-hidden p-6 md:p-8">
+        <div className="relative grid items-center gap-6 lg:grid-cols-[1fr_300px]">
           <div>
-            <span className="inline-flex rounded-full bg-white/75 px-4 py-2 text-xs font-bold text-purple">
+            <span className="inline-flex rounded-full bg-white/80 px-3.5 py-1.5 text-xs font-bold text-purple">
               {t('dashboardMotto')}
             </span>
-            <h1 className="mt-7 text-5xl font-black leading-tight md:text-6xl">
+            <h1 className="mt-5 text-3xl font-black leading-tight md:text-4xl">
               {t('dashboardGreeting')} {me.data?.name ?? t('dashboardGuest')}
               <br />
               <span className="brand-text">{t('dashboardStayInFlow')}</span>
             </h1>
-            <p className="mt-5 max-w-xl leading-8 text-muted">{t('dashboardIntro')}</p>
+            <p className="mt-3 max-w-xl leading-7 text-muted">{t('dashboardIntro')}</p>
             <Link
               href={p(assessmentDone ? '/dashboard/plan' : '/placement')}
-              className="brand-gradient brand-glow mt-7 inline-flex items-center gap-3 rounded-xl px-7 py-4 font-black text-white"
+              className="brand-gradient brand-glow mt-6 inline-flex items-center gap-3 rounded-xl px-6 py-3.5 font-black text-white"
             >
               {t(assessmentDone ? 'continueLearningPlan' : 'startPlacement')}
               <ArrowRight className="rtl:rotate-180" size={19} />
@@ -90,21 +90,21 @@ export default function Dashboard() {
             <Stat label={t('tests')} value={(attempts.data?.length ?? 0) + (placement.data?.length ?? 0)} />
             <Stat label={t('classes')} value={bookings.data?.length ?? 0} />
             {last && (
-              <div className="panel-card col-span-2 p-5">
+              <div className="panel-card col-span-2 p-4">
                 <small className="block text-muted">{t('latestApprovedBand')}</small>
-                <strong className="latin mt-2 block text-3xl text-purple">{last.overallBand}</strong>
+                <strong className="latin mt-1.5 block text-2xl text-purple">{last.overallBand}</strong>
               </div>
             )}
             {!last && latestPlacement && (
-              <div className="panel-card col-span-2 p-5">
+              <div className="panel-card col-span-2 p-4">
                 <small className="block text-muted">آخرین نتیجه تعیین سطح</small>
-                <strong className="latin mt-2 block text-3xl text-purple">{latestPlacement.level} · {latestPlacement.score}%</strong>
+                <strong className="latin mt-1.5 block text-2xl text-purple">{latestPlacement.level} · {latestPlacement.score}%</strong>
               </div>
             )}
           </div>
         </div>
       </section>
-      <section className="mt-6 grid gap-4 md:grid-cols-2">
+      <section className="mt-5 grid gap-4 md:grid-cols-2">
         {isLinkEnabled(nextStepHref) && (
         <Link
           href={p(nextStepHref)}
@@ -144,25 +144,25 @@ export default function Dashboard() {
           <ArrowRight className="rtl:rotate-180" />
         </Link>
       </section>
-      <section className="mt-6 grid gap-5 xl:grid-cols-[1fr_330px]">
-        <article className="panel-card p-6 md:p-8">
+      <section className="mt-5 grid gap-4 xl:grid-cols-[1fr_320px]">
+        <article className="panel-card p-6">
           <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-black">{t('learningJourney')}</h2>
+            <h2 className="text-xl font-black">{t('learningJourney')}</h2>
             <Link href={p('/dashboard/plan')} className="text-sm font-bold text-blue">
               {t('viewAll')}
             </Link>
           </div>
-          <div className="mt-6 divide-y hairline">
+          <div className="mt-4 divide-y hairline">
             {journey.map(({ icon: Icon, title, status, done, href }) => {
               return (
-                <div key={String(title)} className="flex items-center gap-4 py-5">
+                <div key={String(title)} className="flex items-center gap-4 py-4">
                   <span
-                    className={`grid size-11 place-items-center rounded-xl ${done ? 'bg-[#eef2ff] text-blue' : 'bg-[#f4f5f8] text-muted'}`}
+                    className={`grid size-10 place-items-center rounded-xl ${done ? 'bg-[#eef2ff] text-blue' : 'bg-[#f4f5f8] text-muted'}`}
                   >
-                    <Icon size={21} />
+                    <Icon size={19} />
                   </span>
                   <p className="flex-1">
-                    <strong>{title}</strong>
+                    <strong className="text-sm">{title}</strong>
                     <small className="mt-1 block text-muted">{status}</small>
                   </p>
                   {done ? (
@@ -182,15 +182,15 @@ export default function Dashboard() {
             })}
           </div>
         </article>
-        <aside className="relative overflow-hidden rounded-[24px] bg-[#111b4a] p-7 text-white shadow-brand">
-          <span className="grid size-14 place-items-center rounded-full bg-purple/25 text-violet">
-            <LifeBuoy />
+        <aside className="relative overflow-hidden rounded-[24px] bg-[#111b4a] p-6 text-white shadow-brand">
+          <span className="grid size-12 place-items-center rounded-full bg-purple/25 text-violet">
+            <LifeBuoy size={20} />
           </span>
-          <h2 className="mt-10 text-3xl font-black">{t('needHelp')}</h2>
-          <p className="mt-4 text-sm leading-7 text-white/60">{t('supportIntro')}</p>
+          <h2 className="mt-6 text-xl font-black">{t('needHelp')}</h2>
+          <p className="mt-3 text-sm leading-7 text-white/75">{t('supportIntro')}</p>
           <Link
             href={p('/dashboard/tickets')}
-            className="brand-gradient mt-8 flex items-center justify-center gap-3 rounded-xl px-5 py-4 font-black"
+            className="brand-gradient mt-6 flex items-center justify-center gap-3 rounded-xl px-5 py-3.5 font-black"
           >
             <MessageCircle size={19} />
             {t('createTicket')}
@@ -202,9 +202,9 @@ export default function Dashboard() {
 }
 function Stat({ label, value }: { label: string; value: number }) {
   return (
-    <div className="panel-card p-5">
+    <div className="panel-card p-4">
       <small className="block text-muted">{label}</small>
-      <strong className="latin mt-2 block text-3xl">{value}</strong>
+      <strong className="latin mt-1.5 block text-2xl">{value}</strong>
     </div>
   );
 }

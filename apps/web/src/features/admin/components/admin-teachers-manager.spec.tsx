@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { LocaleProvider } from '@/components/shared/locale-provider';
 import { api } from '@/shared/services/api';
 import { AdminTeachersManager } from './admin-teachers-manager';
@@ -71,13 +71,15 @@ describe('AdminTeachersManager', () => {
 
   it('lists teachers from the admin teachers endpoint', async () => {
     renderManager();
-    expect(await screen.findByText('سارا')).toBeInTheDocument();
+    const table = await screen.findByRole('table');
+    expect(within(table).getByText('سارا')).toBeInTheDocument();
     expect(apiMock).toHaveBeenCalledWith(expect.stringContaining('/admin/teachers?page=1'));
   });
 
   it('loads a teacher into the editor and saves changes with PATCH', async () => {
     renderManager();
-    fireEvent.click(await screen.findByRole('button', { name: /ویرایش/ }));
+    const table = await screen.findByRole('table');
+    fireEvent.click(within(table).getByRole('button', { name: /ویرایش/ }));
     expect(await screen.findByRole('dialog', { name: 'ویرایش مدرس' })).toBeInTheDocument();
 
     const nameInput = await screen.findByDisplayValue('سارا');

@@ -18,6 +18,7 @@ export function CourseEnrollmentCta({
   format,
   teacherId,
   sessionsCount,
+  isTrial = false,
 }: {
   slug: string;
   courseId: string;
@@ -25,6 +26,7 @@ export function CourseEnrollmentCta({
   format?: 'SELF_PACED' | 'LIVE_ONLINE';
   teacherId?: string | null;
   sessionsCount: number;
+  isTrial?: boolean;
 }) {
   const [selected, setSelected] = useState<Slot[]>([]);
   const [repeatWeekly, setRepeatWeekly] = useState(false);
@@ -68,13 +70,14 @@ export function CourseEnrollmentCta({
         ),
       enabled: notEnrolled,
     }),
+    slotType = isTrial ? 'trial' : 'regular',
     slots = useQuery({
-      queryKey: ['course-slots', teacherId, ranges],
+      queryKey: ['course-slots', teacherId, ranges, slotType],
       queryFn: async () => {
         const chunks = await Promise.all(
           ranges.map(({ from, to }) =>
             publicApi<Slot[]>(
-              `/availability/${teacherId}/slots?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&type=regular`,
+              `/availability/${teacherId}/slots?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&type=${slotType}`,
             ),
           ),
         );
@@ -135,9 +138,13 @@ export function CourseEnrollmentCta({
                   className={`flex items-center justify-between rounded-xl border px-3 py-3 text-xs font-bold ${active ? 'border-indigo-600 bg-indigo-50 text-indigo-800' : 'hairline bg-white'}`}
                 >
                   <span>
-                    {new Intl.DateTimeFormat(english ? 'en-US' : 'fa-IR', {
-                      dateStyle: 'medium',
-                      timeStyle: 'short',
+                    {new Intl.DateTimeFormat(english ? 'en-US' : 'fa-IR-u-ca-persian', {
+                      weekday: 'short',
+                      month: 'short',
+                      day: 'numeric',
+                      hour: english ? 'numeric' : '2-digit',
+                      minute: '2-digit',
+                      hour12: english,
                     }).format(new Date(slot.startsAt))}
                   </span>
                   {active ? <Check size={16} /> : null}

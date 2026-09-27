@@ -1,4 +1,5 @@
 import { BlogReactionType } from '@prisma/client';
+import { Type } from 'class-transformer';
 import { IsEnum, IsIn, IsInt, IsOptional, IsString, Length, Matches, Max, MaxLength, Min, MinLength } from 'class-validator';
 
 /** Reader-facing writes: reaction, rating, and the anonymous view counter. */
@@ -29,4 +30,10 @@ export class BlogCommentDto {
 
 export class ModerateBlogCommentDto {
   @IsIn(['APPROVED', 'REJECTED']) status!: 'APPROVED' | 'REJECTED';
+}
+
+export class AdminListBlogCommentsDto {
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) page?: number;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) limit?: number;
+  @IsOptional() @IsIn(['PENDING', 'APPROVED', 'REJECTED']) status?: 'PENDING' | 'APPROVED' | 'REJECTED';
 }

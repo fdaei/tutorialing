@@ -21,6 +21,13 @@ export class ReviewsController {
   ) {
     return this.service.eligibility(user.id, teacherId);
   }
+  @Roles('INSTRUCTOR') @Get('mine') mine(
+    @CurrentUser() user: AuthUser,
+    @Query('page') page = '1',
+    @Query('limit') limit = '20',
+  ) {
+    return this.service.mine(user.id, Math.max(1, Number(page)), Math.min(100, Math.max(1, Number(limit))));
+  }
   @Patch(':id') update(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: UpdateReviewDto) {
     return this.service.update(user.id, id, body.rating, body.comment);
   }

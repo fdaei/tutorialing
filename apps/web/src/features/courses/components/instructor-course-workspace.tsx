@@ -2,10 +2,39 @@
 
 import { FormEvent, useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { BookOpen, ChevronDown, CirclePlus, FileText, Headphones, Play, Trash2, Video } from 'lucide-react';
+import {
+  BookOpen,
+  ChevronDown,
+  CirclePlus,
+  FileText,
+  GraduationCap,
+  Headphones,
+  ImagePlus,
+  Play,
+  Trash2,
+  Upload,
+  Video,
+} from 'lucide-react';
+import { PACKAGE_TIERS } from '@lingospeak/contracts';
 import { api, apiMessage } from '@/shared/services/api';
+import { uploadPanelFile } from '@/features/panel/services/upload-panel-file';
 import type { CourseChapter, CourseLesson, InstructorCourse, InstructorCurriculum, LessonType } from '../course-types';
 import { CourseSessionScheduler } from './course-session-scheduler';
+
+type CourseCreateInput = {
+  slug: string;
+  titleFa: string;
+  titleEn: string;
+  descriptionFa: string;
+  descriptionEn: string;
+  language: string;
+  level: string;
+  image?: string;
+  credits: number;
+  lessonMinutes: number;
+  discountPercent: number;
+  isTest: boolean;
+};
 
 const lessonIcons = { VIDEO: Video, AUDIO: Headphones, TEXT: FileText, QUIZ: CirclePlus };
 const lessonLabels = { VIDEO: 'ویدئو', AUDIO: 'صوت', TEXT: 'متن', QUIZ: 'تمرین' };
@@ -23,6 +52,8 @@ type LessonInput = {
   preview: boolean;
   published: boolean;
 };
+
+type Language = { code: string; nameFa: string; nameEn: string };
 
 const json = (method: string, body: unknown): RequestInit => ({ method, body: JSON.stringify(body) });
 const nextOrder = <T extends { order: number }>(rows: T[]) => Math.max(0, ...rows.map((row) => row.order)) + 1;
@@ -71,6 +102,15 @@ export function InstructorCourseWorkspace() {
     return qc.invalidateQueries({ queryKey: ['instructor-curriculum', courseId] });
   };
   const failed = (fallback: string) => (error: unknown) => setNotice(apiMessage(error, fallback));
+  const createCourse = useMutation({
+    mutationFn: (body: CourseCreateInput) => api<{ id: string }>('/instructor/courses', json('POST', body)),
+    onSuccess: (created) => {
+      setNotice('دوره به‌صورت پیش‌نویس ساخته شد؛ پس از تأیید مدیریت برای دانشجویان قابل مشاهده و رزرو خواهد بود.');
+      setCourseId(created.id);
+      return qc.invalidateQueries({ queryKey: ['instructor-courses'] });
+    },
+    onError: failed('ساخت دوره ناموفق بود.'),
+  });
   const chapter = useMutation({
     mutationFn: (body: ChapterInput) => api(`/instructor/courses/${courseId}/chapters`, json('POST', body)),
     onSuccess: changed,
@@ -106,10 +146,18 @@ export function InstructorCourseWorkspace() {
     return <WorkspaceError message="دریافت دوره‌های مدرس ناموفق بود." retry={() => void courses.refetch()} />;
   if (!courses.data?.length)
     return (
-      <WorkspaceEmpty
-        title="هنوز دوره‌ای به شما اختصاص داده نشده است"
-        description="پس از ایجاد و تخصیص دوره توسط مدیر، مدیریت محتوای آن در این بخش فعال می‌شود."
-      />
+      <section className="grid gap-6">
+        <CreateLiveCourseForm pending={createCourse.isPending} onCreate={(body) => createCourse.mutate(body)} />
+        {notice && (
+          <p role="status" className="rounded-xl border hairline bg-white px-4 py-3 text-sm">
+            {notice}
+          </p>
+        )}
+        <WorkspaceEmpty
+          title="هنوز دوره‌ای نساخته‌اید"
+          description="یک دوره زنده با تعداد جلسه دلخواه بسازید، یا منتظر بمانید تا مدیر دوره‌ای به شما اختصاص دهد."
+        />
+      </section>
     );
   const busy =
     chapter.isPending || lesson.isPending || toggleChapter.isPending || toggleLesson.isPending || remove.isPending;
@@ -137,11 +185,13 @@ export function InstructorCourseWorkspace() {
             {courses.data.map((course) => (
               <option key={course.id} value={course.id}>
                 {course.titleFa}
+                {course.isTest ? ' (آزمایشی)' : ''}
               </option>
             ))}
           </select>
         </label>
       </div>
+      <CreateLiveCourseForm pending={createCourse.isPending} onCreate={(body) => createCourse.mutate(body)} />
       {notice && (
         <p role="status" className="rounded-xl border hairline bg-white px-4 py-3 text-sm">
           {notice}
@@ -193,11 +243,118 @@ export function InstructorCourseWorkspace() {
   );
 }
 
+function CreateLiveCourseForm({
+  pending,
+  onCreate,
+}: {
+  pending: boolean;
+  onCreate: (body: CourseCreateInput) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [image, setImage] = useState('');
+  const languages = useQuery({
+    queryKey: ['languages'],
+    queryFn: () => api<Language[]>('/languages'),
+    enabled: open,
+  });
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget,
+      data = new FormData(form);
+    onCreate({
+      slug: String(data.get('slug')),
+      titleFa: String(data.get('titleFa')),
+      titleEn: String(data.get('titleEn')),
+      descriptionFa: String(data.get('descriptionFa')),
+      descriptionEn: String(data.get('descriptionEn')),
+      language: String(data.get('language')),
+      level: String(data.get('level')),
+      image: image || undefined,
+      credits: Number(data.get('credits')),
+      lessonMinutes: Number(data.get('lessonMinutes')),
+      discountPercent: Number(data.get('discountPercent')),
+      isTest: data.get('isTest') === 'on',
+    });
+    form.reset();
+    setImage('');
+    setOpen(false);
+  }
+  return (
+    <div className="panel-card p-5">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="flex w-full items-center justify-between gap-3 text-start font-black"
+      >
+        <span className="flex items-center gap-2">
+          <GraduationCap className="text-purple" />
+          ساخت دوره زنده جدید
+        </span>
+        <ChevronDown className={open ? 'rotate-180 transition' : 'transition'} />
+      </button>
+      {open && (
+        <form onSubmit={submit} className="mt-5 grid gap-4 md:grid-cols-2">
+          <Field name="titleFa" label="عنوان فارسی" />
+          <Field name="titleEn" label="عنوان انگلیسی" dir="ltr" />
+          <Field name="slug" label="نامک (slug، لاتین)" dir="ltr" />
+          <label className="grid gap-2 text-sm font-bold">
+            زبان دوره
+            <select name="language" className="input" defaultValue="" required>
+              <option value="" disabled>
+                انتخاب زبان
+              </option>
+              {languages.data?.map((lang) => (
+                <option key={lang.code} value={lang.code}>
+                  {lang.nameFa}
+                </option>
+              ))}
+            </select>
+          </label>
+          <Field name="level" label="سطح" defaultValue="A1" />
+          <CourseImageField value={image} onChange={setImage} />
+          <label className="grid gap-2 text-sm font-bold">
+            تعداد جلسات
+            <select name="credits" className="input" defaultValue={PACKAGE_TIERS[0]}>
+              {PACKAGE_TIERS.map((tier) => (
+                <option key={tier} value={tier}>
+                  {tier} جلسه
+                </option>
+              ))}
+            </select>
+          </label>
+          <Field name="lessonMinutes" label="مدت هر جلسه (دقیقه)" type="number" defaultValue="60" />
+          <label className="grid gap-2 text-sm font-bold">
+            تخفیف پکیج (٪)
+            <input className="input" name="discountPercent" type="number" min={0} max={80} defaultValue={0} />
+          </label>
+          <div className="md:col-span-2">
+            <Field name="descriptionFa" label="توضیح فارسی" area />
+          </div>
+          <div className="md:col-span-2">
+            <Field name="descriptionEn" label="توضیح انگلیسی" area dir="ltr" />
+          </div>
+          <label className="flex items-center gap-2 text-sm font-bold md:col-span-2">
+            <input name="isTest" type="checkbox" />
+            دوره آزمایشی (نه دوره واقعی)
+          </label>
+          <p className="text-xs text-muted md:col-span-2">
+            قیمت هر جلسه از نرخ تأییدشده شما توسط مدیریت محاسبه می‌شود؛ دوره تا تأیید مدیریت به‌صورت پیش‌نویس باقی می‌ماند.
+          </p>
+          <button disabled={pending} className="primary-button justify-center md:col-span-2">
+            {pending ? 'در حال ساخت...' : 'ساخت دوره پیش‌نویس'}
+          </button>
+        </form>
+      )}
+    </div>
+  );
+}
+
 function CourseSummary({ course }: { course: InstructorCurriculum }) {
   const lessons = course.chapters.reduce((count, row) => count + row.lessons.length, 0);
   return (
-    <div className="panel-card grid gap-4 p-5 sm:grid-cols-3">
+    <div className="panel-card grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-4">
       <Summary label="وضعیت دوره" value={course.published ? 'منتشرشده' : 'پیش‌نویس'} />
+      <Summary label="نوع دوره" value={course.isTest ? 'آزمایشی' : 'واقعی'} />
       <Summary label="فصل‌ها" value={String(course.chapters.length)} />
       <Summary label="درس‌های ساخته‌شده" value={String(lessons)} />
     </div>
@@ -497,6 +654,55 @@ function Field({
     </label>
   );
 }
+function CourseImageField({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const [busy, setBusy] = useState(false);
+  const [preview, setPreview] = useState('');
+  useEffect(() => {
+    if (!value) {
+      setPreview('');
+      return;
+    }
+    api<{ url: string }>(`/files/public/${value}`)
+      .then((result) => setPreview(result.url))
+      .catch(() => setPreview(''));
+  }, [value]);
+  return (
+    <label className="grid gap-2 text-sm font-bold">
+      تصویر دوره
+      {preview ? (
+        <img src={preview} alt="" className="h-32 w-full rounded-xl object-cover" />
+      ) : (
+        <div className="grid h-32 place-items-center rounded-xl bg-canvas text-muted">
+          <ImagePlus />
+        </div>
+      )}
+      <span className="secondary-button w-fit cursor-pointer">
+        <Upload size={16} />
+        {busy ? 'در حال آپلود...' : 'آپلود تصویر'}
+        <input
+          className="hidden"
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          disabled={busy}
+          onChange={async (event) => {
+            const file = event.target.files?.[0];
+            if (!file) return;
+            const input = event.currentTarget;
+            setBusy(true);
+            try {
+              const fileId = await uploadPanelFile(file, 'course-cover', true);
+              onChange(fileId);
+            } finally {
+              setBusy(false);
+              input.value = '';
+            }
+          }}
+        />
+      </span>
+    </label>
+  );
+}
+
 function WorkspaceSkeleton({ compact = false }: { compact?: boolean }) {
   return (
     <div className="grid gap-4" aria-label="در حال دریافت">

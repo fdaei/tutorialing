@@ -120,7 +120,12 @@ export class FilesService {
   async publicImage(id: string) {
     const file = requireValue(
       await this.db.storedFile.findFirst({
-        where: { id, status: 'SAFE', purpose: 'website-media', mimeType: { in: ['image/jpeg', 'image/png', 'image/webp'] } },
+        where: {
+          id,
+          status: 'SAFE',
+          purpose: { in: ['website-media', 'course-cover'] },
+          mimeType: { in: ['image/jpeg', 'image/png', 'image/webp'] },
+        },
         select: { key: true, mimeType: true, originalName: true },
       }),
       () => notFound('FILE_NOT_FOUND'),

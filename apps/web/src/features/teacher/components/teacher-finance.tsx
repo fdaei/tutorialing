@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowDownToLine, CircleDollarSign, Clock3, ReceiptText, ShieldCheck, WalletCards } from 'lucide-react';
 import { api, apiField, apiMessage } from '@/shared/services/api';
 import { useTranslations } from '@/components/shared/locale-provider';
+import { DataTable, type Column } from '@/shared/components/ui';
 
 type Earning = {
   id: string;
@@ -75,6 +76,61 @@ export function TeacherFinance() {
   const validIban = /^IR\d{24}$/.test(iban.replace(/\s/g, '').toUpperCase()),
     numericAmount = Number(amount),
     canSubmit = numericAmount >= 100_000 && numericAmount <= data.availableToWithdraw && validIban;
+  const withdrawalColumns: Column<Withdrawal>[] = [
+    {
+      key: 'date',
+      header: translate(locale, 'schedulingteacherPlannerCalendarDate'),
+      primary: true,
+      cell: (item) => date(item.createdAt),
+    },
+    {
+      key: 'amount',
+      header: translate(locale, 'teacherteacherFinanceAmount'),
+      cell: (item) => <span className="font-black">{money(item.amount)}</span>,
+    },
+    {
+      key: 'iban',
+      header: translate(locale, 'teacherteacherFinanceIban'),
+      hideOnMobile: true,
+      cell: (item) => <span className="latin">{maskIban(item.iban)}</span>,
+    },
+    {
+      key: 'status',
+      header: translate(locale, 'commercepricingManagerStatus'),
+      cell: (item) => <WithdrawalStatus status={item.status} fa={fa} />,
+    },
+    {
+      key: 'reference',
+      header: translate(locale, 'teacherteacherFinanceReference'),
+      hideOnMobile: true,
+      cell: (item) => <span className="latin">{item.reference || '—'}</span>,
+    },
+  ];
+  const earningColumns: Column<Earning>[] = [
+    {
+      key: 'date',
+      header: translate(locale, 'schedulingteacherPlannerCalendarDate'),
+      primary: true,
+      cell: (item) => date(item.createdAt),
+    },
+    { key: 'gross', header: translate(locale, 'teacherteacherFinanceGross'), cell: (item) => money(item.grossAmount) },
+    {
+      key: 'fee',
+      header: translate(locale, 'teacherteacherFinanceFee'),
+      hideOnMobile: true,
+      cell: (item) => <span className="text-red-500">− {money(item.commissionAmount)}</span>,
+    },
+    {
+      key: 'net',
+      header: translate(locale, 'teacherteacherFinanceYourNet'),
+      cell: (item) => <span className="font-black text-emerald-700">{money(item.netAmount)}</span>,
+    },
+    {
+      key: 'status',
+      header: translate(locale, 'commercepricingManagerStatus'),
+      cell: (item) => <EarningStatus status={item.status} fa={fa} />,
+    },
+  ];
   return (
     <div>
       <header>
@@ -211,36 +267,12 @@ export function TeacherFinance() {
             {translate(locale, 'teacherteacherFinanceRequestStatusAndBankReference')}
           </p>
         </div>
-        {data.withdrawals.length ? (
-          <div className="overflow-x-auto">
-            <table className="teacher-table">
-              <thead>
-                <tr>
-                  <th>{translate(locale, 'schedulingteacherPlannerCalendarDate')}</th>
-                  <th>{translate(locale, 'teacherteacherFinanceAmount')}</th>
-                  <th>{translate(locale, 'teacherteacherFinanceIban')}</th>
-                  <th>{translate(locale, 'commercepricingManagerStatus')}</th>
-                  <th>{translate(locale, 'teacherteacherFinanceReference')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.withdrawals.map((item) => (
-                  <tr key={item.id}>
-                    <td>{date(item.createdAt)}</td>
-                    <td className="font-black">{money(item.amount)}</td>
-                    <td className="latin">{maskIban(item.iban)}</td>
-                    <td>
-                      <WithdrawalStatus status={item.status} fa={fa} />
-                    </td>
-                    <td className="latin">{item.reference || '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <Empty fa={fa} text={translate(locale, 'teacherteacherFinanceYouHaveNotRequestedAWithdrawalYet')} />
-        )}
+        <DataTable
+          columns={withdrawalColumns}
+          rows={data.withdrawals}
+          rowKey={(item) => item.id}
+          empty={<Empty fa={fa} text={translate(locale, 'teacherteacherFinanceYouHaveNotRequestedAWithdrawalYet')} />}
+        />
       </section>
       <section className="mt-5 panel-card overflow-hidden">
         <div className="border-b hairline p-5 md:p-6">
@@ -249,36 +281,14 @@ export function TeacherFinance() {
             {translate(locale, 'teacherteacherFinanceGrossAmountMinusPlatformFee')}
           </p>
         </div>
-        {data.earnings.length ? (
-          <div className="overflow-x-auto">
-            <table className="teacher-table">
-              <thead>
-                <tr>
-                  <th>{translate(locale, 'schedulingteacherPlannerCalendarDate')}</th>
-                  <th>{translate(locale, 'teacherteacherFinanceGross')}</th>
-                  <th>{translate(locale, 'teacherteacherFinanceFee')}</th>
-                  <th>{translate(locale, 'teacherteacherFinanceYourNet')}</th>
-                  <th>{translate(locale, 'commercepricingManagerStatus')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.earnings.map((item) => (
-                  <tr key={item.id}>
-                    <td>{date(item.createdAt)}</td>
-                    <td>{money(item.grossAmount)}</td>
-                    <td className="text-red-500">− {money(item.commissionAmount)}</td>
-                    <td className="font-black text-emerald-700">{money(item.netAmount)}</td>
-                    <td>
-                      <EarningStatus status={item.status} fa={fa} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <Empty fa={fa} text={translate(locale, 'teacherteacherFinanceEarningsAppearAfterYourFirstCompletedClass')} />
-        )}
+        <DataTable
+          columns={earningColumns}
+          rows={data.earnings}
+          rowKey={(item) => item.id}
+          empty={
+            <Empty fa={fa} text={translate(locale, 'teacherteacherFinanceEarningsAppearAfterYourFirstCompletedClass')} />
+          }
+        />
       </section>
     </div>
   );

@@ -25,7 +25,7 @@ export const teacherSectionConfig = {
   plans: ['برنامه‌های یادگیری', 'Learning plans', '/learning/plans'],
   earnings: ['درآمد و تسویه', 'Earnings and payouts', '/teacher/finance'],
   tickets: ['تیکت‌ها', 'Tickets', '/support/tickets'],
-  reviews: ['نظرات و امتیازها', 'Reviews and ratings', '/teacher/application'],
+  reviews: ['نظرات و امتیازها', 'Reviews and ratings', '/reviews/mine'],
   notifications: ['اعلان‌ها', 'Notifications', '/notifications'],
   settings: ['تنظیمات', 'Settings', '/users/me'],
   magazine: ['مقالات', 'Articles', '/blog/instructor/posts'],

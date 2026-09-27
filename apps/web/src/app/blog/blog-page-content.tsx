@@ -73,7 +73,7 @@ export function BlogPageContent({ headerConfig }: { headerConfig: Pick<LandingCo
                 <Search size={20} aria-hidden="true" />
                 <input
                   aria-label={t('blogSearch')}
-                  placeholder={copy(locale, 'جست‌وجو در مقاله‌ها', 'Search the journal')}
+                  placeholder={copy(locale, 'جست‌وجو در مقاله‌ها', 'Search the blog')}
                   value={q}
                   onChange={(event) => setQ(event.target.value)}
                 />

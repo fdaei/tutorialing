@@ -506,6 +506,7 @@ export const teacherNav: NavItem[] = [
   { href: '/teacher-panel/courses', label: 'دوره‌های من', labelEn: 'My courses', icon: BookOpen },
   { href: '/teacher-panel/profile', label: 'پروفایل و تأیید', labelEn: 'Profile & verification', icon: UserCog },
   { href: '/teacher-panel/magazine', label: 'مقالات', labelEn: 'Articles', icon: FileEdit },
+  { href: '/teacher-panel/pricing', label: 'قیمت‌گذاری', labelEn: 'Pricing', icon: CreditCard },
   { href: '/teacher-panel/earnings', label: 'مالی', labelEn: 'Finance', icon: Wallet, tab: true },
   { href: '/teacher-panel/more', label: 'بیشتر', labelEn: 'More', icon: MoreHorizontal },
 ];

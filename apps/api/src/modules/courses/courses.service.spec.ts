@@ -8,7 +8,7 @@ describe('CoursesService reviews', () => {
       courseReview: { findUnique: jest.fn().mockResolvedValue(review) },
       $transaction: jest.fn().mockImplementation((queries: Array<Promise<unknown>>) => Promise.all(queries)),
     };
-    const service = new CoursesService(db as never);
+    const service = new CoursesService(db as never, {} as never);
 
     await expect(service.eligibility('student-1', 'course-1')).resolves.toEqual({ eligible: true, review });
     expect(db.courseEnrollment.findUnique).toHaveBeenCalledWith({
@@ -23,7 +23,7 @@ describe('CoursesService reviews', () => {
       courseReview: { findUnique: jest.fn().mockResolvedValue(null) },
       $transaction: jest.fn().mockImplementation((queries: Array<Promise<unknown>>) => Promise.all(queries)),
     };
-    await expect(new CoursesService(db as never).eligibility('student-2', 'course-1')).resolves.toEqual({
+    await expect(new CoursesService(db as never, {} as never).eligibility('student-2', 'course-1')).resolves.toEqual({
       eligible: false,
       review: null,
     });
@@ -32,7 +32,7 @@ describe('CoursesService reviews', () => {
   it.each([0, 6])('rejects rating %s before writing', async (rating) => {
     const db = { courseEnrollment: { findUnique: jest.fn() } };
     await expect(
-      new CoursesService(db as never).create('student-1', 'course-1', rating, 'نظر معتبر درباره دوره'),
+      new CoursesService(db as never, {} as never).create('student-1', 'course-1', rating, 'نظر معتبر درباره دوره'),
     ).rejects.toMatchObject({
       response: expect.objectContaining({ code: 'REVIEW_RATING_INVALID' }),
     });
@@ -41,7 +41,7 @@ describe('CoursesService reviews', () => {
 
   it('rejects a whitespace-only comment after normalization', async () => {
     await expect(
-      new CoursesService({} as never).create('student-1', 'course-1', 5, '             '),
+      new CoursesService({} as never, {} as never).create('student-1', 'course-1', 5, '             '),
     ).rejects.toMatchObject({
       response: expect.objectContaining({ code: 'REVIEW_COMMENT_INVALID' }),
     });
@@ -67,7 +67,7 @@ describe('CoursesService reviews', () => {
       courseReview: { findUnique: jest.fn().mockResolvedValue(null) },
       $transaction: jest.fn().mockImplementation((callback: (client: typeof tx) => unknown) => callback(tx)),
     };
-    const service = new CoursesService(db as never);
+    const service = new CoursesService(db as never, {} as never);
 
     await expect(service.create('student-1', 'course-1', 5, '  دوره بسیار کاربردی بود  ')).resolves.toEqual(created);
     expect(tx.courseReview.create).toHaveBeenCalledWith({
@@ -98,7 +98,7 @@ describe('CoursesService reviews', () => {
       courseReview: { findUnique: jest.fn().mockResolvedValue(current) },
       $transaction: jest.fn().mockImplementation((callback: (client: typeof tx) => unknown) => callback(tx)),
     };
-    const service = new CoursesService(db as never);
+    const service = new CoursesService(db as never, {} as never);
 
     await expect(service.update('student-1', 'review-1', 4, '  نظر به‌روزشده دوره  ')).resolves.toMatchObject({
       rating: 4,
@@ -109,7 +109,7 @@ describe('CoursesService reviews', () => {
 
   it('does not allow another student to update or delete a review', async () => {
     const db = { courseReview: { findUnique: jest.fn().mockResolvedValue({ id: 'review-1', userId: 'owner-1' }) } };
-    const service = new CoursesService(db as never);
+    const service = new CoursesService(db as never, {} as never);
     await expect(service.update('student-2', 'review-1', 4, 'نظر معتبر درباره دوره')).rejects.toMatchObject({
       response: expect.objectContaining({ code: 'COURSE_REVIEW_NOT_FOUND' }),
     });
@@ -122,7 +122,7 @@ describe('CoursesService reviews', () => {
 describe('CoursesService learning progress', () => {
   it('refuses player access without an enrollment', async () => {
     const db = { courseEnrollment: { findFirst: jest.fn().mockResolvedValue(null) } };
-    await expect(new CoursesService(db as never).player('student-1', 'course-1')).rejects.toMatchObject({
+    await expect(new CoursesService(db as never, {} as never).player('student-1', 'course-1')).rejects.toMatchObject({
       response: expect.objectContaining({ code: 'COURSE_ENROLLMENT_REQUIRED' }),
     });
   });
@@ -141,7 +141,7 @@ describe('CoursesService learning progress', () => {
       courseLesson: { findFirst: jest.fn().mockResolvedValue({ id: 'lesson-2', durationSeconds: 300 }) },
       $transaction: jest.fn().mockImplementation((callback: (client: typeof tx) => unknown) => callback(tx)),
     };
-    const result = await new CoursesService(db as never).progress('student-1', 'course-1', 'lesson-2', {
+    const result = await new CoursesService(db as never, {} as never).progress('student-1', 'course-1', 'lesson-2', {
       completed: true,
       positionSeconds: 999,
     });
@@ -163,7 +163,7 @@ describe('CoursesService learning progress', () => {
       courseLesson: { findFirst: jest.fn().mockResolvedValue(null) },
     };
     await expect(
-      new CoursesService(db as never).progress('student-1', 'course-1', 'foreign-lesson', { completed: true }),
+      new CoursesService(db as never, {} as never).progress('student-1', 'course-1', 'foreign-lesson', { completed: true }),
     ).rejects.toMatchObject({ response: expect.objectContaining({ code: 'COURSE_LESSON_NOT_FOUND' }) });
   });
 
@@ -182,7 +182,7 @@ describe('CoursesService learning progress', () => {
       $transaction: jest.fn().mockImplementation((callback: (client: typeof tx) => unknown) => callback(tx)),
     };
 
-    await new CoursesService(db as never).progress('student-1', 'course-1', 'lesson-1', {});
+    await new CoursesService(db as never, {} as never).progress('student-1', 'course-1', 'lesson-1', {});
 
     expect(tx.courseLessonProgress.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -203,7 +203,7 @@ describe('CoursesService curriculum ownership', () => {
       },
       courseChapter: { create: jest.fn().mockResolvedValue({ id: 'chapter-1' }) },
     };
-    const service = new CoursesService(db as never);
+    const service = new CoursesService(db as never, {} as never);
     await expect(
       service.createChapter(
         { id: 'teacher-user', roles: ['INSTRUCTOR'], permissions: [], sessionId: 'session-1' },
@@ -226,12 +226,84 @@ describe('CoursesService curriculum ownership', () => {
       courseChapter: { create: jest.fn() },
     };
     await expect(
-      new CoursesService(db as never).createChapter(
+      new CoursesService(db as never, {} as never).createChapter(
         { id: 'other-user', roles: ['INSTRUCTOR'], permissions: [], sessionId: 'session-1' },
         'course-1',
         { titleFa: 'فصل نخست', titleEn: 'First chapter', order: 1 },
       ),
     ).rejects.toMatchObject({ response: expect.objectContaining({ code: 'COURSE_OWNERSHIP_REQUIRED' }) });
     expect(db.courseChapter.create).not.toHaveBeenCalled();
+  });
+});
+
+describe('CoursesService.createInstructorCourse', () => {
+  const user = { id: 'teacher-user', roles: ['INSTRUCTOR'], permissions: [], sessionId: 'session-1' } as never;
+  const input = {
+    slug: 'live-course-20',
+    titleFa: 'دوره زنده',
+    titleEn: 'Live course',
+    descriptionFa: 'توضیح کامل و بلند برای دوره زنده جهت تست اعتبارسنجی',
+    descriptionEn: 'A sufficiently long description of the live course, used for validation in tests',
+    language: 'English',
+    level: 'B1',
+    credits: 20,
+    lessonMinutes: 60,
+    discountPercent: 0,
+  };
+
+  it('creates the session package and links it to a new draft course', async () => {
+    const pkg = { id: 'package-1', teacherId: 'teacher-1', credits: 20, price: 2_000_000 };
+    const db = {
+      course: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockResolvedValue({ id: 'course-1' }),
+      },
+      teacher: { findUniqueOrThrow: jest.fn().mockResolvedValue({ nameFa: 'استاد نمونه' }) },
+    };
+    const packages = { createPackage: jest.fn().mockResolvedValue(pkg) };
+    const service = new CoursesService(db as never, packages as never);
+
+    await expect(service.createInstructorCourse(user, input)).resolves.toEqual({ id: 'course-1' });
+    expect(packages.createPackage).toHaveBeenCalledWith('teacher-user', {
+      titleFa: input.titleFa,
+      titleEn: input.titleEn,
+      descriptionFa: input.descriptionFa,
+      descriptionEn: input.descriptionEn,
+      credits: 20,
+      lessonMinutes: 60,
+      discountPercent: 0,
+    });
+    expect(db.course.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        slug: 'live-course-20',
+        teacherId: 'teacher-1',
+        teacherName: 'استاد نمونه',
+        price: 2_000_000,
+        published: false,
+        lessonsCount: 20,
+        format: 'LIVE_ONLINE',
+        packageId: 'package-1',
+      }),
+    });
+  });
+
+  it('rejects a duplicate slug without creating a package', async () => {
+    const db = { course: { findFirst: jest.fn().mockResolvedValue({ id: 'existing-course' }) } };
+    const packages = { createPackage: jest.fn() };
+
+    await expect(
+      new CoursesService(db as never, packages as never).createInstructorCourse(user, input),
+    ).rejects.toMatchObject({ response: expect.objectContaining({ code: 'COURSE_SLUG_ALREADY_EXISTS' }) });
+    expect(packages.createPackage).not.toHaveBeenCalled();
+  });
+
+  it('bubbles up the price-not-approved error from PackagesService', async () => {
+    const db = { course: { findFirst: jest.fn().mockResolvedValue(null) } };
+    const priceNotApproved = new Error('TEACHER_PRICE_NOT_APPROVED');
+    const packages = { createPackage: jest.fn().mockRejectedValue(priceNotApproved) };
+
+    await expect(
+      new CoursesService(db as never, packages as never).createInstructorCourse(user, input),
+    ).rejects.toThrow(priceNotApproved);
   });
 });

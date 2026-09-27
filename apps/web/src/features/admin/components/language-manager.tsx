@@ -10,6 +10,7 @@ import { useTranslations } from '@/components/shared/locale-provider';
 import { adminDeleteConfirmation } from '../admin-confirmation';
 import { uploadPanelFile } from '@/features/panel/services/upload-panel-file';
 import { uploadErrorMessage } from '@/shared/services/upload';
+import { DataTable, type Column } from '@/shared/components/ui';
 
 const emptyLanguageForm = {
   code: '',
@@ -103,6 +104,71 @@ export function LanguageManager() {
     setImagePreview('');
     setImageError('');
   };
+  const columns: Column<EducationalLanguage>[] = [
+    {
+      key: 'name',
+      header: translate(locale, 'adminlanguageManagerLanguage'),
+      primary: true,
+      cell: (item) => (
+        <>
+          <strong>
+            {item.flag} {localized({ fa: item.nameFa, en: item.nameEn }, locale)}
+          </strong>
+          <small className="mt-1 block text-muted">{item.nativeName}</small>
+        </>
+      ),
+    },
+    { key: 'code', header: 'Code', cell: (item) => <span className="latin">{item.code}</span> },
+    {
+      key: 'direction',
+      header: translate(locale, 'adminlanguageManagerDirection'),
+      hideOnMobile: true,
+      cell: (item) => item.direction,
+    },
+    {
+      key: 'proficiency',
+      header: translate(locale, 'adminlanguageManagerProficiency'),
+      hideOnMobile: true,
+      cell: (item) => item.proficiencySystem,
+    },
+    {
+      key: 'status',
+      header: translate(locale, 'commercepricingManagerStatus'),
+      cell: (item) =>
+        item.active
+          ? translate(locale, 'admincountryManagerActive')
+          : translate(locale, 'admincountryManagerInactive'),
+    },
+    {
+      key: 'actions',
+      header: '',
+      align: 'end',
+      cell: (item) => (
+        <div className="flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => edit(item)}
+            className="rounded-lg border hairline px-3 py-2 font-bold text-blue"
+          >
+            {translate(locale, 'admincountryManagerEdit')}
+          </button>
+          <button
+            type="button"
+            aria-label={localized({ fa: `حذف ${item.nameFa}`, en: `Delete ${item.nameEn}` }, locale)}
+            disabled={remove.isPending}
+            onClick={() =>
+              window.confirm(
+                adminDeleteConfirmation(localized({ fa: item.nameFa, en: item.nameEn }, locale), locale),
+              ) && remove.mutate(item.id)
+            }
+            className="grid size-9 place-items-center rounded-lg text-red-600 hover:bg-red-50"
+          >
+            <Trash2 size={17} />
+          </button>
+        </div>
+      ),
+    },
+  ];
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_430px]">
       <section className="rounded-3xl border hairline bg-white p-6">
@@ -123,75 +189,19 @@ export function LanguageManager() {
             placeholder={translate(locale, 'adminlanguageManagerSearchLanguages')}
           />
         </div>
-        {query.isLoading ? (
-          <div className="mt-6 skeleton h-80 rounded-2xl" />
-        ) : query.isError ? (
+        {query.isError ? (
           <Error
             message={apiMessage(query.error, translate(locale, 'adminlanguageManagerCouldNotLoadLanguages'))}
             retry={() => query.refetch()}
           />
         ) : (
-          <div className="mt-6 overflow-x-auto">
-            <table className="w-full min-w-[700px] text-sm">
-              <thead>
-                <tr className="border-b hairline text-start text-muted">
-                  <th className="p-3 text-start">{translate(locale, 'adminlanguageManagerLanguage')}</th>
-                  <th className="p-3 text-start">Code</th>
-                  <th className="p-3 text-start">{translate(locale, 'adminlanguageManagerDirection')}</th>
-                  <th className="p-3 text-start">{translate(locale, 'adminlanguageManagerProficiency')}</th>
-                  <th className="p-3 text-start">{translate(locale, 'commercepricingManagerStatus')}</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {query.data?.data.map((item) => (
-                  <tr key={item.id} className="border-b hairline">
-                    <td className="p-3">
-                      <strong>
-                        {item.flag} {localized({ fa: item.nameFa, en: item.nameEn }, locale)}
-                      </strong>
-                      <small className="mt-1 block text-muted">{item.nativeName}</small>
-                    </td>
-                    <td className="p-3 latin">{item.code}</td>
-                    <td className="p-3">{item.direction}</td>
-                    <td className="p-3">{item.proficiencySystem}</td>
-                    <td className="p-3">
-                      {item.active
-                        ? translate(locale, 'admincountryManagerActive')
-                        : translate(locale, 'admincountryManagerInactive')}
-                    </td>
-                    <td className="p-3">
-                      <div className="flex justify-end gap-2">
-                        <button
-                          type="button"
-                          onClick={() => edit(item)}
-                          className="rounded-lg border hairline px-3 py-2 font-bold text-blue"
-                        >
-                          {translate(locale, 'admincountryManagerEdit')}
-                        </button>
-                        <button
-                          type="button"
-                          aria-label={localized(
-                            { fa: `حذف ${item.nameFa}`, en: `Delete ${item.nameEn}` },
-                            locale,
-                          )}
-                          disabled={remove.isPending}
-                          onClick={() =>
-                            window.confirm(
-                              adminDeleteConfirmation(localized({ fa: item.nameFa, en: item.nameEn }, locale), locale),
-                            ) && remove.mutate(item.id)
-                          }
-                          className="grid size-9 place-items-center rounded-lg text-red-600 hover:bg-red-50"
-                        >
-                          <Trash2 size={17} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            className="mt-6"
+            columns={columns}
+            rows={query.data?.data}
+            rowKey={(item) => item.id}
+            loading={query.isLoading}
+          />
         )}
         {remove.isError && (
           <p role="alert" className="mt-4 rounded-xl bg-red-50 p-3 text-red-800">

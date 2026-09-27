@@ -16,6 +16,7 @@ import {
   MapPin,
   MessageCircle,
   Phone,
+  Quote,
   Sparkles,
   ShieldCheck,
   Target,
@@ -85,6 +86,7 @@ export function LandingHome(props: LandingHomeProps) {
 
 function LandingSection(props: LandingRenderProps) {
   if (props.section.type === 'hero') return <HeroSection {...props} />;
+  if (props.section.type === 'about') return <AboutSection {...props} />;
   if (props.section.type === 'languages') return <LanguagesSection {...props} />;
   if (props.section.type === 'benefits') return <BenefitsSection {...props} />;
   if (props.section.type === 'placement') return <PlacementSection {...props} />;
@@ -130,31 +132,59 @@ function HeroSection({ config, locale, section }: LandingRenderProps) {
           </div>
         </div>
         <div className="landing-hero-visual">
+          <span className="landing-hero-glow" aria-hidden="true" />
+          <span className="landing-hero-backdrop" aria-hidden="true" />
           <div className="landing-hero-image">
             <img src={config.hero.image} alt={t(config.hero.imageAlt)} />
             {config.hero.overlay > 0 && (
               <span className="landing-image-overlay" style={{ opacity: config.hero.overlay }} />
             )}
           </div>
-          <div className="landing-hero-note landing-hero-note-top">
-            <span className="landing-note-icon">
-              <MessageCircle size={16} />
+          <div className="landing-hero-quote">
+            <Quote size={18} aria-hidden="true" />
+            <p>{t(config.hero.quote)}</p>
+          </div>
+          <div className="landing-founder-card">
+            <span className="landing-founder-photo">
+              <img src={config.hero.image} alt="" />
             </span>
-            <span>
-              <small>{english ? 'Online lessons' : 'کلاس آنلاین'}</small>
-              <strong>{english ? 'One-to-one with a teacher' : 'خصوصی و یک‌به‌یک'}</strong>
+            <span className="landing-founder-info">
+              <strong>
+                {t(config.hero.founderName)}
+                <BadgeCheck size={15} aria-hidden="true" />
+              </strong>
+              <small>{t(config.hero.founderTitle)}</small>
             </span>
           </div>
-          <div className="landing-hero-note landing-hero-note-bottom">
-            <span className="landing-note-avatar">A1</span>
-            <span>
-              <small>{english ? 'Placement test' : 'تعیین سطح'}</small>
-              <strong>{english ? 'Free, under 20 minutes' : 'رایگان، زیر ۲۰ دقیقه'}</strong>
-            </span>
-          </div>
-          <div className="landing-hero-index">
-            01 <span>/</span> 08
-          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function AboutSection({ config, locale, section }: LandingRenderProps) {
+  const t = (value: { fa: string; en: string }) => localizedText(value, locale);
+  return (
+    <section className="landing-section landing-about-section" style={sectionStyle(section, config.theme)}>
+      <div className="landing-container landing-about-grid">
+        <div className="landing-about-photo">
+          <img src={config.about.photo || config.hero.image} alt={t(config.about.photoAlt)} />
+        </div>
+        <div className="landing-about-copy">
+          <span className="landing-kicker">{t(config.about.eyebrow)}</span>
+          <h2>{t(config.about.title)}</h2>
+          <p>{t(config.about.bio)}</p>
+          <ul className="landing-about-philosophy">
+            {config.about.philosophy.map((item, index) => (
+              <li key={`${item.title.en}-${index}`}>
+                <span>{String(index + 1).padStart(2, '0')}</span>
+                <div>
+                  <strong>{t(item.title)}</strong>
+                  <small>{t(item.description)}</small>
+                </div>
+              </li>
+            ))}
+          </ul>
         </div>
       </div>
     </section>
@@ -427,14 +457,15 @@ function CoursesSection({ config, locale, courses, section }: LandingRenderProps
             {english ? 'View all courses' : 'مشاهده همه دوره‌ها'} <ForwardArrow locale={locale} size={16} />
           </Link>
         </div>
-        <TrustConversion locale={locale} />
+        <TrustConversion config={config} locale={locale} />
       </div>
     </section>
   );
 }
 
-function TrustConversion({ locale }: { locale: Locale }) {
+function TrustConversion({ config, locale }: { config: LandingConfig; locale: Locale }) {
   const english = locale === 'en';
+  const t = (value: { fa: string; en: string }) => localizedText(value, locale);
   const path = (href: string) => localePath(href, locale);
   const teacherDiscovery = isLinkEnabled('/teachers');
   return (
@@ -483,14 +514,16 @@ function TrustConversion({ locale }: { locale: Locale }) {
         className="landing-teacher-stack"
         aria-label={english ? 'Expert teacher profiles' : 'پروفایل مدرس‌های متخصص'}
       >
-        <article>
-          <div className="landing-teacher-avatar">AA</div>
+        <article className="landing-teacher-founder">
+          <div className="landing-teacher-avatar landing-teacher-photo">
+            <img src={config.hero.image} alt="" />
+          </div>
           <div>
             <span>
               <BadgeCheck size={16} />
-              {english ? 'Verified teacher' : 'مدرس تأییدشده'}
+              {english ? 'Founder of LingoSpeak' : 'بنیان‌گذار لینگواسپیک'}
             </span>
-            <strong>{english ? 'Arezoo Ahmadi' : 'آرزو احمدی'}</strong>
+            <strong>{t(config.hero.founderName)}</strong>
             <small>{english ? 'General English · IELTS' : 'انگلیسی عمومی · آیلتس'}</small>
           </div>
         </article>

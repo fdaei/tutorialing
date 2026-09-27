@@ -1,50 +1,39 @@
 'use client';
 import { X } from 'lucide-react';
-import { useEffect, useId, useRef } from 'react';
+import { useId } from 'react';
 import { cn } from './cn';
 import { Portal } from './portal';
+import { useOverlay } from './use-overlay';
 
 /**
  * Bottom sheet on phones, centred dialog from `sm` up. Closes on Escape and
- * backdrop click, locks page scroll and moves focus into the panel.
+ * backdrop click, locks page scroll and moves focus into the panel. Use this
+ * for short forms and confirmations; use `Drawer` for wide, full-height panels.
  */
 export function Sheet({
   open,
-  onClose,
+  onOpenChange,
   title,
   footer,
   children,
   className,
 }: {
   open: boolean;
-  onClose: () => void;
+  onOpenChange: (open: boolean) => void;
   title: React.ReactNode;
   footer?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
 }) {
   const titleId = useId();
-  const panel = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const previous = document.activeElement as HTMLElement | null;
-    const overflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    panel.current?.focus();
-    const onKey = (event: KeyboardEvent) => event.key === 'Escape' && onClose();
-    window.addEventListener('keydown', onKey);
-    return () => {
-      document.body.style.overflow = overflow;
-      window.removeEventListener('keydown', onKey);
-      previous?.focus?.();
-    };
-  }, [open, onClose]);
+  const panel = useOverlay<HTMLDivElement>(open, onOpenChange);
   if (!open) return null;
+  const close = () => onOpenChange(false);
   return (
     <Portal>
       <div
         className="fixed inset-0 z-[90] flex items-end justify-center bg-ink/40 backdrop-blur-[2px] sm:items-center sm:p-6"
-        onClick={onClose}
+        onClick={close}
       >
         <div
           ref={panel}
@@ -65,7 +54,7 @@ export function Sheet({
             </h2>
             <button
               type="button"
-              onClick={onClose}
+              onClick={close}
               aria-label="Close"
               className="grid size-9 place-items-center rounded-xl text-muted hover:bg-canvas"
             >

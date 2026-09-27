@@ -1,7 +1,9 @@
 import { z } from 'zod';
 
 export const localeSchema = z.enum(['fa', 'en']);
-export const phoneSchema = z.string().regex(/^09\d{9}$/, 'شماره موبایل باید با 09 شروع شود و 11 رقم باشد.');
+export const phoneSchema = z
+  .string()
+  .regex(/^\+[1-9]\d{7,14}$/, 'شماره موبایل باید به فرمت بین‌المللی (مثلاً +989123456789) باشد.');
 export const requestOtpSchema = z.object({ phone: phoneSchema });
 export const verifyOtpSchema = requestOtpSchema.extend({
   code: z.string().regex(/^\d{6}$/, 'کد تأیید باید دقیقاً 6 رقم باشد.'),

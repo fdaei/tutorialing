@@ -176,7 +176,7 @@ export const messages = {
     genericError: 'The request could not be completed. Please try again.',
     required: 'This field is required.',
     invalid: 'The provided information is invalid.',
-    blogEyebrow: 'LingoSpeak magazine',
+    blogEyebrow: 'LingoSpeak blog',
     blogTitle: 'Ideas for learning better',
     blogSearch: 'Search',
     blogLoading: 'Loading…',

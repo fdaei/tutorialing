@@ -28,4 +28,5 @@ export type BlogPostDetail = BlogPostSummary & {
   seoDescriptionFa?: string | null;
   seoDescriptionEn?: string | null;
   _count?: { views?: number; comments?: number };
+  likeCount?: number;
 };

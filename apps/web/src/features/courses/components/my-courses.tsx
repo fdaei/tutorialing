@@ -1,5 +1,4 @@
 'use client';
-import Image from 'next/image';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { BookOpen, CheckCircle2, PlayCircle } from 'lucide-react';
@@ -7,6 +6,7 @@ import { api, apiMessage } from '@/shared/services/api';
 import { useTranslations } from '@/components/shared/locale-provider';
 import { localePath, localized } from '@/lib/i18n';
 import type { LearningEnrollment } from '../course-types';
+import { CourseCoverImage } from './course-cover-image';
 
 export function MyCourses() {
   const { locale } = useTranslations(),
@@ -54,13 +54,7 @@ export function MyCourses() {
           <article key={item.id} className="panel-card overflow-hidden">
             <div className="relative aspect-[16/7] bg-lavender">
               {item.course.image && (
-                <Image
-                  src={item.course.image}
-                  alt=""
-                  fill
-                  sizes="(min-width:768px) 45vw, 100vw"
-                  className="object-cover"
-                />
+                <CourseCoverImage image={item.course.image} alt="" className="absolute inset-0 h-full w-full object-cover" />
               )}
               <span className="absolute inset-0 bg-gradient-to-t from-navy/65 to-transparent" />
               <span className="absolute bottom-4 right-4 rounded-full bg-white/90 px-3 py-1 text-xs font-black text-purple">

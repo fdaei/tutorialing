@@ -5,4 +5,5 @@ export { TeacherDashboard } from './components/teacher-dashboard';
 export { TeacherFinance } from './components/teacher-finance';
 export { TeacherMore } from './components/teacher-more';
 export { TeacherProfileHub } from './components/teacher-profile-hub';
+export { TeacherReviewsManager } from './components/teacher-reviews-manager';
 export type { PublicTeacher, TeacherLanguage } from './types/public-teacher';

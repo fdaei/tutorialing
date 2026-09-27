@@ -157,7 +157,7 @@ export function ResponsiveFilters({
       </div>
       <Sheet
         open={open}
-        onClose={() => setOpen(false)}
+        onOpenChange={setOpen}
         title={english ? 'Filters' : 'فیلترها'}
         footer={
           <div className="flex gap-2">

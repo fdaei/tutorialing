@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { LocaleProvider } from '@/components/shared/locale-provider';
 import { api } from '@/shared/services/api';
 import { AdminUsersManager } from './admin-users-manager';
@@ -53,12 +53,14 @@ describe('AdminUsersManager', () => {
     renderManager();
     expect(screen.getByRole('textbox', { name: 'جستجو با نام، موبایل یا ایمیل' })).toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: 'وضعیت' })).toBeInTheDocument();
-    expect(await screen.findByText('سارا')).toBeInTheDocument();
+    const table = await screen.findByRole('table');
+    expect(within(table).getByText('سارا')).toBeInTheDocument();
   });
 
   it('opens user details as a modal dialog and closes it with Escape', async () => {
     renderManager();
-    fireEvent.click(await screen.findByRole('button', { name: /جزئیات/ }));
+    const table = await screen.findByRole('table');
+    fireEvent.click(within(table).getByRole('button', { name: /جزئیات/ }));
 
     expect(await screen.findByRole('dialog', { name: 'سارا' })).toHaveAttribute('aria-modal', 'true');
     fireEvent.keyDown(document, { key: 'Escape' });

@@ -1,5 +1,6 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { plainToInstance } from 'class-transformer';
 import {
   CurrentUser,
   Public,
@@ -12,7 +13,15 @@ import {
 import { PermissionKeys, RequirePermissions } from '../auth/authorization';
 import { BlogService } from './blog.service';
 import { CreateBlogPostDto, ListBlogPostsDto, UpdateBlogPostDto } from './dto/request/blog-post.dto';
-import { BlogCommentDto, BlogRatingDto, BlogReactionDto, BlogViewDto, ModerateBlogCommentDto } from './dto/request/blog-interaction.dto';
+import {
+  AdminListBlogCommentsDto,
+  BlogCommentDto,
+  BlogRatingDto,
+  BlogReactionDto,
+  BlogViewDto,
+  ModerateBlogCommentDto,
+} from './dto/request/blog-interaction.dto';
+import { BlogCommentResponseDto } from './dto/response/blog-comment-response.dto';
 import { RejectBlogPostDto } from './dto/request/blog-review.dto';
 
 /**
@@ -61,10 +70,18 @@ export class BlogController {
 
   @Roles('ADMIN')
   @RequirePermissions(PermissionKeys.Content.Manage)
+  @Get('posts/:id/comments/queue')
+  async adminComments(@Param('id') id: string, @Query() query: AdminListBlogCommentsDto) {
+    const result = await this.blog.adminComments(id, query);
+    return { ...result, data: plainToInstance(BlogCommentResponseDto, result.data, { excludeExtraneousValues: true }) };
+  }
+
+  @Roles('ADMIN')
+  @RequirePermissions(PermissionKeys.Content.Manage)
   @RateLimit(RATE_LIMIT_TIERS.adminWrite)
   @Patch('comments/:id/moderate')
-  moderateComment(@Param('id') id: string, @Body() dto: ModerateBlogCommentDto) {
-    return this.blog.moderateComment(id, dto.status);
+  moderateComment(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: ModerateBlogCommentDto) {
+    return this.blog.moderateComment(user.id, id, dto.status);
   }
 
   @Roles('ADMIN')

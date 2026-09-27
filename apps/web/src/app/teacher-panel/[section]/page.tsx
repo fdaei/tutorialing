@@ -7,7 +7,13 @@ import {
   teacherNav,
   teacherSectionConfig,
 } from '@/features/panel';
-import { TeacherAvailabilityManager, TeacherFinance, TeacherMore, TeacherProfileHub } from '@/features/teacher';
+import {
+  TeacherAvailabilityManager,
+  TeacherFinance,
+  TeacherMore,
+  TeacherProfileHub,
+  TeacherReviewsManager,
+} from '@/features/teacher';
 import { PricingManager } from '@/features/commerce';
 import { MyTicketManager } from '@/features/support';
 import { requestLocale } from '@/lib/server-locale';
@@ -42,6 +48,8 @@ export default async function Section({ params }: { params: Promise<{ section: s
       <InstructorArticleWorkspace />
     ) : section === 'courses' ? (
       <InstructorCourseWorkspace />
+    ) : section === 'reviews' ? (
+      <TeacherReviewsManager />
     ) : section === 'more' ? (
       <TeacherMore locale={locale} />
     ) : section === 'tickets' ? (

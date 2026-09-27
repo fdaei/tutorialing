@@ -19,6 +19,7 @@ type Application = {
   nameEn: string;
   user?: { phone?: string };
   verificationItems: VerificationItem[];
+  introVideoFile?: { id: string; originalName: string; mimeType: string; size: number } | null;
 };
 
 export function TeacherDocumentsManager() {
@@ -30,6 +31,9 @@ export function TeacherDocumentsManager() {
   const items = (query.data ?? []).flatMap((teacher) =>
     teacher.verificationItems.map((item) => ({ teacher, item })),
   );
+  const videos = (query.data ?? [])
+    .filter((teacher) => teacher.introVideoFile)
+    .map((teacher) => ({ teacher, file: teacher.introVideoFile! }));
   const t = (fa: string, en: string) => localized({ fa, en }, locale);
 
   return (
@@ -45,8 +49,11 @@ export function TeacherDocumentsManager() {
           {apiMessage(query.error, t('مدارک مدرس‌ها دریافت نشد.', 'Teacher documents could not be loaded.'))}{' '}
           <button type="button" onClick={() => query.refetch()} className="font-black underline">{t('تلاش دوباره', 'Try again')}</button>
         </div>
-      ) : items.length ? (
+      ) : items.length || videos.length ? (
         <div className="mt-6 grid gap-5">
+          {videos.map(({ teacher, file }) => (
+            <VideoCard key={file.id} teacher={teacher} file={file} />
+          ))}
           {items.map(({ teacher, item }) => (
             <DocumentCard key={item.id} teacher={teacher} item={item} />
           ))}
@@ -57,6 +64,53 @@ export function TeacherDocumentsManager() {
         </div>
       )}
     </section>
+  );
+}
+
+function VideoCard({
+  teacher,
+  file,
+}: {
+  teacher: Application;
+  file: { id: string; originalName: string; mimeType: string; size: number };
+}) {
+  const { locale } = useTranslations();
+  const t = (fa: string, en: string) => localized({ fa, en }, locale);
+  const download = useQuery({
+    queryKey: ['admin-teacher-document-download', file.id],
+    queryFn: () => api<{ url: string }>(`/files/${file.id}/download`),
+    enabled: false,
+    retry: false,
+  });
+
+  return (
+    <article className="panel-card p-5 sm:p-6">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h2 className="text-lg font-black">{localized({ fa: teacher.nameFa, en: teacher.nameEn }, locale)}</h2>
+          <p className="mt-1 text-sm text-muted latin">{teacher.user?.phone || '—'}</p>
+        </div>
+        <span className="rounded-full bg-lavender px-3 py-1 text-xs font-black text-purple">
+          {t('ویدیوی معرفی', 'Intro video')}
+        </span>
+      </div>
+      <dl className="mt-5 grid gap-3 text-sm sm:grid-cols-3">
+        <div><dt className="text-muted">{t('نام فایل', 'File name')}</dt><dd className="mt-1 break-all font-bold">{file.originalName}</dd></div>
+        <div><dt className="text-muted">{t('نوع فایل', 'File type')}</dt><dd className="mt-1 font-bold latin">{file.mimeType}</dd></div>
+      </dl>
+      <div className="mt-5">
+        {download.data ? (
+          <a href={download.data.url} target="_blank" rel="noreferrer" className="secondary-button inline-flex">
+            <ExternalLink size={17} /> {t('باز کردن ویدیو', 'Open video')}
+          </a>
+        ) : (
+          <button type="button" onClick={() => download.refetch()} disabled={download.isFetching} className="secondary-button">
+            {download.isFetching ? t('آماده‌سازی…', 'Preparing…') : t('آماده‌سازی مشاهده ویدیو', 'Prepare video preview')}
+          </button>
+        )}
+        {download.isError && <p role="alert" className="mt-2 text-sm text-red-700">{t('فایل قابل دریافت نیست.', 'The file is unavailable.')}</p>}
+      </div>
+    </article>
   );
 }
 

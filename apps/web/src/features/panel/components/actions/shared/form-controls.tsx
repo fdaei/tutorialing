@@ -105,10 +105,15 @@ export function Select({ label, name, children }: { label: string; name: string;
   );
 }
 
-export function Submit({ busy, fa, children }: { busy: boolean; children: React.ReactNode } & Localized) {
+export function Submit({
+  busy,
+  disabled,
+  fa,
+  children,
+}: { busy: boolean; disabled?: boolean; children: React.ReactNode } & Localized) {
   return (
     <button
-      disabled={busy}
+      disabled={busy || disabled}
       className="mt-4 rounded-full bg-gradient-to-r from-blue to-purple px-6 py-3 font-black text-white shadow-lg shadow-purple/15 transition hover:-translate-y-0.5 disabled:opacity-50"
     >
       {busy ? translate(fa, 'legacyWorking') : children}

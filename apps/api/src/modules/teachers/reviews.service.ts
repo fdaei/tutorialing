@@ -245,6 +245,31 @@ export class ReviewsService {
     });
   }
 
+  async mine(teacherUserId: string, page: number, limit: number) {
+    const teacher = await this.db.teacher.findUnique({ where: { userId: teacherUserId }, select: { id: true } });
+    if (!teacher) throw notFound('TEACHER_NOT_FOUND');
+    const where = { teacherId: teacher.id, moderationStatus: 'APPROVED' as const, published: true };
+    const [data, total] = await this.db.$transaction([
+      this.db.review.findMany({
+        where,
+        skip: (page - 1) * limit,
+        take: limit,
+        select: {
+          id: true,
+          rating: true,
+          comment: true,
+          teacherResponse: true,
+          respondedAt: true,
+          createdAt: true,
+          student: { select: { name: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.db.review.count({ where }),
+    ]);
+    return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
+  }
+
   async reply(teacherUserId: string, reviewId: string, response: string) {
     const review = await this.db.review.findUnique({ where: { id: reviewId }, include: { teacher: true } });
     if (!review) throw notFound('REVIEW_NOT_FOUND');

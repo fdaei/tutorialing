@@ -21,6 +21,7 @@ import { useTranslations } from '@/components/shared/locale-provider';
 import { localePath, isDefaultLocale } from '@/lib/i18n';
 import { formatMoney } from '@/lib/money';
 import { api, apiMessage } from '@/shared/services/api';
+import { DataTable, type Column } from '@/shared/components/ui';
 
 type CourseFormat = 'SELF_PACED' | 'LIVE_ONLINE';
 type CoursePackage = {
@@ -229,6 +230,89 @@ export function AdminCourseManager() {
     save.mutate(form);
   }
 
+  const columns: Column<AdminCourse>[] = [
+    {
+      key: 'course',
+      header: fa ? 'دوره' : 'Course',
+      primary: true,
+      cell: (course) => (
+        <div className="flex items-start gap-3">
+          <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-lavender text-purple">
+            <BookOpen size={18} />
+          </span>
+          <div className="min-w-0">
+            <strong className="block truncate">{displayName(course, fa)}</strong>
+            <span className="latin mt-1 block truncate text-xs text-muted">/{course.slug}</span>
+            <span className="mt-2 inline-flex items-center gap-2 text-xs text-muted">
+              <span>{course.language}</span>
+              <span aria-hidden="true">·</span>
+              <span>{course.level}</span>
+            </span>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'instructor',
+      header: fa ? 'مدرس' : 'Instructor',
+      cell: (course) => (
+        <>
+          <span className="block">
+            {fa ? (course.teacher?.nameFa ?? course.teacherName) : (course.teacher?.nameEn ?? course.teacherName)}
+          </span>
+          <span className="mt-1 block text-xs text-muted">{formatMoney(course.price, locale)}</span>
+        </>
+      ),
+    },
+    {
+      key: 'structure',
+      header: fa ? 'ساختار' : 'Structure',
+      hideOnMobile: true,
+      cell: (course) => (
+        <>
+          <span className="block">
+            {course.lessonsCount} {fa ? 'درس' : 'lessons'}
+          </span>
+          <span className="mt-1 flex items-center gap-1 text-xs text-muted">
+            <Users size={13} />
+            {course._count.enrollments.toLocaleString(fa ? 'fa-IR' : 'en-US')} {fa ? 'ثبت‌نام' : 'enrolled'}
+          </span>
+        </>
+      ),
+    },
+    {
+      key: 'status',
+      header: fa ? 'وضعیت' : 'Status',
+      cell: (course) => <Status published={course.published} fa={fa} />,
+    },
+    {
+      key: 'actions',
+      header: fa ? 'عملیات' : 'Actions',
+      align: 'end',
+      cell: (course) => (
+        <div className="flex shrink-0 justify-end gap-2">
+          <Link
+            href={localePath(`/courses/${course.slug}`, locale)}
+            target="_blank"
+            className="grid size-9 place-items-center rounded-lg text-muted hover:bg-[#f1f3fb] hover:text-blue"
+            title={fa ? 'مشاهده دوره' : 'View course'}
+            aria-label={fa ? `مشاهده ${course.titleFa}` : `View ${course.titleEn}`}
+          >
+            <ExternalLink size={16} />
+          </Link>
+          <button
+            type="button"
+            onClick={() => startEdit(course)}
+            className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border hairline px-3 py-2 font-bold text-blue"
+          >
+            <Pencil size={15} className="shrink-0" />
+            {fa ? 'ویرایش' : 'Edit'}
+          </button>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <section className="grid gap-6">
       <header className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
@@ -308,115 +392,39 @@ export function AdminCourseManager() {
             </button>
           </div>
 
-          {courses.isLoading ? (
-            <div className="grid gap-3 p-5">
-              <div className="skeleton h-20 rounded-xl" />
-              <div className="skeleton h-20 rounded-xl" />
-              <div className="skeleton h-20 rounded-xl" />
-            </div>
-          ) : courses.isError ? (
+          {courses.isError ? (
             <div role="alert" className="m-5 rounded-xl bg-red-50 p-4 text-sm text-red-700">
               <p>{apiMessage(courses.error, fa ? 'فهرست دوره‌ها دریافت نشد.' : 'Courses could not be loaded.')}</p>
               <button type="button" onClick={() => void courses.refetch()} className="mt-2 font-black underline">
                 {fa ? 'تلاش دوباره' : 'Try again'}
               </button>
             </div>
-          ) : filteredCourses.length ? (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[820px] text-sm">
-                <thead className="bg-[#f8f9fd] text-muted">
-                  <tr>
-                    <th className="p-4 text-start">{fa ? 'دوره' : 'Course'}</th>
-                    <th className="p-4 text-start">{fa ? 'مدرس' : 'Instructor'}</th>
-                    <th className="p-4 text-start">{fa ? 'ساختار' : 'Structure'}</th>
-                    <th className="p-4 text-start">{fa ? 'وضعیت' : 'Status'}</th>
-                    <th className="p-4 text-end">{fa ? 'عملیات' : 'Actions'}</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y hairline">
-                  {filteredCourses.map((course) => (
-                    <tr key={course.id} className="transition hover:bg-[#fafbff]">
-                      <td className="p-4">
-                        <div className="flex items-start gap-3">
-                          <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-lavender text-purple">
-                            <BookOpen size={18} />
-                          </span>
-                          <div className="min-w-0">
-                            <strong className="block truncate">{displayName(course, fa)}</strong>
-                            <span className="latin mt-1 block truncate text-xs text-muted">/{course.slug}</span>
-                            <span className="mt-2 inline-flex items-center gap-2 text-xs text-muted">
-                              <span>{course.language}</span>
-                              <span aria-hidden="true">·</span>
-                              <span>{course.level}</span>
-                            </span>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        <span className="block">
-                          {fa
-                            ? (course.teacher?.nameFa ?? course.teacherName)
-                            : (course.teacher?.nameEn ?? course.teacherName)}
-                        </span>
-                        <span className="mt-1 block text-xs text-muted">{formatMoney(course.price, locale)}</span>
-                      </td>
-                      <td className="p-4">
-                        <span className="block">
-                          {course.lessonsCount} {fa ? 'درس' : 'lessons'}
-                        </span>
-                        <span className="mt-1 flex items-center gap-1 text-xs text-muted">
-                          <Users size={13} />
-                          {course._count.enrollments.toLocaleString(fa ? 'fa-IR' : 'en-US')}{' '}
-                          {fa ? 'ثبت‌نام' : 'enrolled'}
-                        </span>
-                      </td>
-                      <td className="p-4">
-                        <Status published={course.published} fa={fa} />
-                      </td>
-                      <td className="p-4">
-                        <div className="flex justify-end gap-2">
-                          <Link
-                            href={localePath(`/courses/${course.slug}`, locale)}
-                            target="_blank"
-                            className="grid size-9 place-items-center rounded-lg text-muted hover:bg-[#f1f3fb] hover:text-blue"
-                            title={fa ? 'مشاهده دوره' : 'View course'}
-                            aria-label={fa ? `مشاهده ${course.titleFa}` : `View ${course.titleEn}`}
-                          >
-                            <ExternalLink size={16} />
-                          </Link>
-                          <button
-                            type="button"
-                            onClick={() => startEdit(course)}
-                            className="inline-flex items-center gap-1.5 rounded-lg border hairline px-3 py-2 font-bold text-blue"
-                          >
-                            <Pencil size={15} />
-                            {fa ? 'ویرایش' : 'Edit'}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
           ) : (
-            <div className="grid min-h-64 place-items-center p-8 text-center">
-              <div>
-                <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-[#f1f3fb] text-muted">
-                  <BookOpen size={21} />
-                </span>
-                <strong className="mt-4 block">{fa ? 'دوره‌ای پیدا نشد' : 'No courses found'}</strong>
-                <p className="mt-2 text-sm text-muted">
-                  {search || status !== 'all'
-                    ? fa
-                      ? 'فیلترها را تغییر دهید یا یک دوره جدید بسازید.'
-                      : 'Adjust the filters or create a new course.'
-                    : fa
-                      ? 'اولین دوره را از فرم کنار صفحه بسازید.'
-                      : 'Create the first course with the form beside this list.'}
-                </p>
-              </div>
-            </div>
+            <DataTable
+              columns={columns}
+              rows={filteredCourses}
+              rowKey={(course) => course.id}
+              loading={courses.isLoading}
+              empty={
+                <div className="grid min-h-64 place-items-center p-8 text-center">
+                  <div>
+                    <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-[#f1f3fb] text-muted">
+                      <BookOpen size={21} />
+                    </span>
+                    <strong className="mt-4 block">{fa ? 'دوره‌ای پیدا نشد' : 'No courses found'}</strong>
+                    <p className="mt-2 text-sm text-muted">
+                      {search || status !== 'all'
+                        ? fa
+                          ? 'فیلترها را تغییر دهید یا یک دوره جدید بسازید.'
+                          : 'Adjust the filters or create a new course.'
+                        : fa
+                          ? 'اولین دوره را از فرم کنار صفحه بسازید.'
+                          : 'Create the first course with the form beside this list.'}
+                    </p>
+                  </div>
+                </div>
+              }
+            />
           )}
           <div className="border-t hairline px-4 py-3 text-xs text-muted">
             {fa

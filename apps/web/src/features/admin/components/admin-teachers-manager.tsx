@@ -1,14 +1,14 @@
 'use client';
 
-import { Portal } from '@/shared/components/ui/portal';
 import { localized, isDefaultLocale } from '@/lib/i18n';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight, ImagePlus, LoaderCircle, Pencil, Plus, Search, Upload, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ImagePlus, LoaderCircle, Pencil, Plus, Search, Upload } from 'lucide-react';
 import { api, apiField, ApiError, Paginated } from '@/shared/services/api';
 import { useTranslations } from '@/components/shared/locale-provider';
 import { uploadPanelFile } from '@/features/panel/services/upload-panel-file';
 import { uploadErrorMessage } from '@/shared/services/upload';
+import { DataTable, Drawer, type Column } from '@/shared/components/ui';
 
 type Language = { id: string; nameFa: string; nameEn: string; flag?: string | null };
 type TeacherRow = {
@@ -183,6 +183,80 @@ export function AdminTeachersManager() {
   });
   const data = query.data;
   const t = (faText: string, enText: string) => localized({ fa: faText, en: enText }, locale);
+  const columns: Column<TeacherRow>[] = [
+    {
+      key: 'teacher',
+      header: t('مدرس', 'Teacher'),
+      primary: true,
+      cell: (row) => (
+        <span className="flex items-center gap-3">
+          <Avatar url={row.avatarUrl} name={localized({ fa: row.nameFa, en: row.nameEn }, locale)} size="size-11" />
+          <span>
+            <strong className="block">{localized({ fa: row.nameFa, en: row.nameEn }, locale)}</strong>
+            <small className="text-muted">
+              {t(`${row.experienceYears} سال سابقه`, `${row.experienceYears} yrs experience`)}
+            </small>
+          </span>
+        </span>
+      ),
+    },
+    {
+      key: 'contact',
+      header: t('تماس', 'Contact'),
+      cell: (row) => (
+        <>
+          <span dir="ltr" className="block">
+            {row.user.phone ?? '—'}
+          </span>
+          {row.user.email && <small className="text-muted">{row.user.email}</small>}
+        </>
+      ),
+    },
+    {
+      key: 'languages',
+      header: t('زبان‌ها', 'Languages'),
+      cell: (row) => (
+        <div className="flex flex-wrap gap-1.5">
+          {row.languageLinks.map(({ language }) => (
+            <span key={language.id} className="rounded-full bg-lavender px-2.5 py-1 text-xs font-bold text-purple">
+              {language.flag ? `${language.flag} ` : ''}
+              {localized({ fa: language.nameFa, en: language.nameEn }, locale)}
+            </span>
+          ))}
+        </div>
+      ),
+    },
+    {
+      key: 'rating',
+      header: t('امتیاز', 'Rating'),
+      hideOnMobile: true,
+      cell: (row) => (
+        <span className="text-muted">
+          {row.rating.toFixed(1)} ({row.reviewsCount})
+        </span>
+      ),
+    },
+    {
+      key: 'status',
+      header: t('وضعیت', 'Status'),
+      cell: (row) => <StatusBadge value={row.status} fa={fa} />,
+    },
+    {
+      key: 'actions',
+      header: t('عملیات', 'Actions'),
+      align: 'end',
+      cell: (row) => (
+        <button
+          type="button"
+          onClick={() => setEditing(row.id)}
+          className="inline-flex items-center gap-2 rounded-xl border hairline px-3 py-2 font-bold text-blue"
+        >
+          <Pencil size={15} />
+          {t('ویرایش', 'Edit')}
+        </button>
+      ),
+    },
+  ];
 
   return (
     <section>
@@ -243,94 +317,26 @@ export function AdminTeachersManager() {
           </select>
           <button className="rounded-xl bg-navy px-6 py-3 font-black text-white">{t('جستجو', 'Search')}</button>
         </form>
-        {query.isLoading ? (
-          <div className="grid gap-3 p-5">
-            <div className="skeleton h-20 rounded-2xl" />
-            <div className="skeleton h-20 rounded-2xl" />
-          </div>
-        ) : query.isError ? (
+        {query.isError ? (
           <div role="alert" className="m-5 rounded-2xl bg-red-50 p-4 text-red-700">
             {errorMessage(query.error, fa)}{' '}
             <button type="button" onClick={() => query.refetch()} className="font-black underline">
               {t('تلاش دوباره', 'Try again')}
             </button>
           </div>
-        ) : data?.data.length ? (
-          <>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[900px] text-sm">
-                <thead className="bg-[#f8f9fd] text-muted">
-                  <tr>
-                    <th className="p-4 text-start">{t('مدرس', 'Teacher')}</th>
-                    <th className="p-4 text-start">{t('تماس', 'Contact')}</th>
-                    <th className="p-4 text-start">{t('زبان‌ها', 'Languages')}</th>
-                    <th className="p-4 text-start">{t('امتیاز', 'Rating')}</th>
-                    <th className="p-4 text-start">{t('وضعیت', 'Status')}</th>
-                    <th className="p-4 text-start">{t('عملیات', 'Actions')}</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y hairline">
-                  {data.data.map((row) => (
-                    <tr key={row.id} className="hover:bg-[#fafbff]">
-                      <td className="p-4">
-                        <span className="flex items-center gap-3">
-                          <Avatar
-                            url={row.avatarUrl}
-                            name={localized({ fa: row.nameFa, en: row.nameEn }, locale)}
-                            size="size-11"
-                          />
-                          <span>
-                            <strong className="block">{localized({ fa: row.nameFa, en: row.nameEn }, locale)}</strong>
-                            <small className="text-muted">
-                              {t(`${row.experienceYears} سال سابقه`, `${row.experienceYears} yrs experience`)}
-                            </small>
-                          </span>
-                        </span>
-                      </td>
-                      <td className="p-4">
-                        <span dir="ltr" className="block">
-                          {row.user.phone ?? '—'}
-                        </span>
-                        {row.user.email && <small className="text-muted">{row.user.email}</small>}
-                      </td>
-                      <td className="p-4">
-                        <div className="flex flex-wrap gap-1.5">
-                          {row.languageLinks.map(({ language }) => (
-                            <span
-                              key={language.id}
-                              className="rounded-full bg-lavender px-2.5 py-1 text-xs font-bold text-purple"
-                            >
-                              {language.flag ? `${language.flag} ` : ''}
-                              {localized({ fa: language.nameFa, en: language.nameEn }, locale)}
-                            </span>
-                          ))}
-                        </div>
-                      </td>
-                      <td className="p-4 text-muted">
-                        {row.rating.toFixed(1)} ({row.reviewsCount})
-                      </td>
-                      <td className="p-4">
-                        <StatusBadge value={row.status} fa={fa} />
-                      </td>
-                      <td className="p-4">
-                        <button
-                          type="button"
-                          onClick={() => setEditing(row.id)}
-                          className="inline-flex items-center gap-2 rounded-xl border hairline px-3 py-2 font-bold text-blue"
-                        >
-                          <Pencil size={15} />
-                          {t('ویرایش', 'Edit')}
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <Pagination page={data.page} pages={data.totalPages} total={data.total} setPage={setPage} fa={fa} />
-          </>
         ) : (
-          <div className="p-12 text-center text-muted">{t('مدرسی پیدا نشد.', 'No teachers found.')}</div>
+          <>
+            <DataTable
+              columns={columns}
+              rows={data?.data}
+              rowKey={(row) => row.id}
+              loading={query.isLoading}
+              empty={<div className="p-12 text-center text-muted">{t('مدرسی پیدا نشد.', 'No teachers found.')}</div>}
+            />
+            {data && data.data.length > 0 && (
+              <Pagination page={data.page} pages={data.totalPages} total={data.total} setPage={setPage} fa={fa} />
+            )}
+          </>
         )}
       </div>
       {editing && (
@@ -342,7 +348,6 @@ export function AdminTeachersManager() {
 
 function TeacherEditor({ id, close, fa }: { id?: string; close: () => void; fa: boolean }) {
   const qc = useQueryClient();
-  const dialogRef = useRef<HTMLElement>(null);
   const t = (faText: string, enText: string) => localized({ fa: faText, en: enText }, fa);
   const detail = useQuery({
     queryKey: ['admin-teacher-detail', id],
@@ -356,14 +361,6 @@ function TeacherEditor({ id, close, fa }: { id?: string; close: () => void; fa: 
   const [uploadError, setUploadError] = useState('');
   const [saved, setSaved] = useState(false);
 
-  useEffect(() => {
-    dialogRef.current?.focus();
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') close();
-    };
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
-  }, [close]);
   useEffect(() => {
     if (detail.data) {
       setForm(toForm(detail.data));
@@ -430,285 +427,249 @@ function TeacherEditor({ id, close, fa }: { id?: string; close: () => void; fa: 
   const busy = save.isPending || uploading;
 
   return (
-    <Portal>
-      <div className="fixed inset-0 z-[80] bg-navy/35 p-3 backdrop-blur-sm" onClick={close}>
-        <aside
-          ref={dialogRef}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="admin-teacher-editor-title"
-          tabIndex={-1}
-          className={`h-full w-full max-w-3xl overflow-y-auto bg-[#f8f9fd] p-5 shadow-2xl md:p-7 ${fa ? 'mr-auto rounded-l-[28px]' : 'ml-auto rounded-r-[28px]'}`}
-          onClick={(e) => e.stopPropagation()}
+    <Drawer open onOpenChange={(open) => !open && close()} title={title}>
+      {id && detail.isLoading ? (
+        <div className="skeleton mt-6 h-64 rounded-3xl" />
+      ) : id && detail.isError ? (
+        <div role="alert" className="mt-6 rounded-2xl bg-red-50 p-4 text-red-700">
+          {errorMessage(detail.error, fa)}
+        </div>
+      ) : (
+        <form
+          className="mt-6 grid gap-5"
+          onSubmit={(e) => {
+            e.preventDefault();
+            save.mutate();
+          }}
         >
-          <div className="flex items-center justify-between gap-3">
-            <h2 id="admin-teacher-editor-title" className="text-2xl font-black">
-              {title}
-            </h2>
+          <section className="panel-card flex flex-wrap items-center gap-5 p-5">
+            <Avatar url={preview} name={form.nameFa || form.nameEn} size="size-24" />
+            <div className="grid gap-2">
+              <div className="flex flex-wrap gap-2">
+                <label className="secondary-button cursor-pointer">
+                  {uploading ? <LoaderCircle size={16} className="animate-spin" /> : <Upload size={16} />}
+                  {uploading ? t('در حال آپلود...', 'Uploading...') : t('انتخاب عکس', 'Choose photo')}
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    aria-label={t('انتخاب عکس مدرس', 'Choose teacher photo')}
+                    className="hidden"
+                    disabled={uploading}
+                    onChange={onAvatar}
+                  />
+                </label>
+                {preview && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      set('avatarFileId', null);
+                      setPreview(null);
+                    }}
+                    className="rounded-xl border hairline bg-white px-4 py-2 text-sm font-bold text-red-600"
+                  >
+                    {t('حذف عکس', 'Remove photo')}
+                  </button>
+                )}
+              </div>
+              <small className="text-muted">{t('JPG، PNG یا WEBP تا ۵ مگابایت', 'JPG, PNG or WEBP up to 5 MB')}</small>
+              {uploadError && (
+                <p role="alert" className="text-sm text-red-700">
+                  {uploadError}
+                </p>
+              )}
+            </div>
+          </section>
+
+          <section className="panel-card grid gap-4 p-5 md:grid-cols-2">
+            <h3 className="font-black md:col-span-2">{t('اطلاعات اصلی', 'Basic information')}</h3>
+            <Input
+              label={t('نام (فارسی)', 'Name (Persian)')}
+              value={form.nameFa}
+              onChange={(v) => set('nameFa', v)}
+              required
+              minLength={2}
+              maxLength={80}
+              error={apiField(save.error, 'nameFa')}
+            />
+            <Input
+              label={t('نام (انگلیسی)', 'Name (English)')}
+              value={form.nameEn}
+              onChange={(v) => set('nameEn', v)}
+              required
+              minLength={2}
+              maxLength={80}
+              dir="ltr"
+              error={apiField(save.error, 'nameEn')}
+            />
+            <Input
+              label={t('موبایل', 'Phone')}
+              value={form.phone}
+              onChange={(v) => set('phone', v)}
+              required
+              dir="ltr"
+              placeholder="09xxxxxxxxx"
+              error={apiField(save.error, 'phone')}
+            />
+            <Input
+              label={t('ایمیل', 'Email')}
+              value={form.email}
+              onChange={(v) => set('email', v)}
+              type="email"
+              dir="ltr"
+              error={apiField(save.error, 'email')}
+            />
+            <Input
+              label={t('سال‌های سابقه', 'Years of experience')}
+              value={form.experienceYears}
+              onChange={(v) => set('experienceYears', v)}
+              type="number"
+              min={0}
+              max={60}
+            />
+            <Input label={t('جنسیت', 'Gender')} value={form.gender} onChange={(v) => set('gender', v)} maxLength={40} />
+            <label className="grid gap-1.5 text-sm font-bold md:col-span-2">
+              {t('وضعیت', 'Status')}
+              <select value={form.status} onChange={(e) => set('status', e.target.value)} className="input">
+                {STATUSES.map((s) => (
+                  <option key={s} value={s}>
+                    {statusLabel(s, fa)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </section>
+
+          <section className="panel-card grid gap-4 p-5">
+            <h3 className="font-black">{t('بیوگرافی و تخصص', 'Bio and specialties')}</h3>
+            <TextArea
+              label={t('بیوگرافی (فارسی)', 'Bio (Persian)')}
+              value={form.bioFa}
+              onChange={(v) => set('bioFa', v)}
+            />
+            <TextArea
+              label={t('بیوگرافی (انگلیسی)', 'Bio (English)')}
+              value={form.bioEn}
+              onChange={(v) => set('bioEn', v)}
+              dir="ltr"
+            />
+            <Input
+              label={t('تخصص‌ها (با کاما جدا کنید)', 'Specialties (comma separated)')}
+              value={form.specialties}
+              onChange={(v) => set('specialties', v)}
+            />
+            <fieldset>
+              <legend className="text-sm font-bold">{t('زبان‌های تدریس', 'Teaching languages')}</legend>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {languages.isLoading && (
+                  <span className="text-sm text-muted">{t('در حال بارگذاری...', 'Loading...')}</span>
+                )}
+                {languages.data?.map((language) => (
+                  <Chip
+                    key={language.id}
+                    checked={form.languageIds.includes(language.id)}
+                    onChange={() => toggle('languageIds', language.id)}
+                  >
+                    {language.flag ? `${language.flag} ` : ''}
+                    {localized({ fa: language.nameFa, en: language.nameEn }, fa)}
+                  </Chip>
+                ))}
+              </div>
+            </fieldset>
+            <fieldset>
+              <legend className="text-sm font-bold">{t('سطوح تدریس', 'Teaching levels')}</legend>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {LEVELS.map((level) => (
+                  <Chip key={level} checked={form.levels.includes(level)} onChange={() => toggle('levels', level)}>
+                    {level}
+                  </Chip>
+                ))}
+              </div>
+            </fieldset>
+          </section>
+
+          <section className="panel-card grid gap-4 p-5 md:grid-cols-2">
+            <h3 className="font-black md:col-span-2">{t('زمان‌بندی و قیمت', 'Schedule and pricing')}</h3>
+            <Input
+              label={t('مدت جلسه (دقیقه)', 'Lesson length (min)')}
+              value={form.lessonDuration}
+              onChange={(v) => set('lessonDuration', v)}
+              type="number"
+              min={20}
+              max={180}
+            />
+            <Input
+              label={t('مدت جلسه آزمایشی (دقیقه)', 'Trial length (min)')}
+              value={form.trialDuration}
+              onChange={(v) => set('trialDuration', v)}
+              type="number"
+              min={15}
+              max={90}
+            />
+            <Input
+              label={t('استراحت بین جلسات (دقیقه)', 'Break between lessons (min)')}
+              value={form.breakMinutes}
+              onChange={(v) => set('breakMinutes', v)}
+              type="number"
+              min={0}
+              max={120}
+            />
+            <span className="hidden md:block" />
+            <Input
+              label={t('قیمت پیشنهادی جلسه آزمایشی', 'Proposed trial price')}
+              value={form.trialPrice}
+              onChange={(v) => set('trialPrice', v)}
+              type="number"
+              min={0}
+            />
+            <Input
+              label={t('قیمت پیشنهادی جلسه عادی', 'Proposed regular price')}
+              value={form.regularPrice}
+              onChange={(v) => set('regularPrice', v)}
+              type="number"
+              min={0}
+            />
+            <Input
+              label={t('قیمت تأییدشده جلسه آزمایشی', 'Approved trial price')}
+              value={form.approvedTrialPrice}
+              onChange={(v) => set('approvedTrialPrice', v)}
+              type="number"
+              min={0}
+            />
+            <Input
+              label={t('قیمت تأییدشده جلسه عادی', 'Approved regular price')}
+              value={form.approvedRegularPrice}
+              onChange={(v) => set('approvedRegularPrice', v)}
+              type="number"
+              min={0}
+            />
+          </section>
+
+          {save.error && (
+            <p role="alert" className="rounded-2xl bg-red-50 p-4 text-sm text-red-700">
+              {errorMessage(save.error, fa)}
+            </p>
+          )}
+          {saved && (
+            <p role="status" className="rounded-2xl bg-emerald-50 p-4 text-sm text-emerald-700">
+              {t('تغییرات ذخیره شد.', 'Changes saved.')}
+            </p>
+          )}
+          <div className="flex flex-wrap gap-3">
             <button
-              type="button"
-              onClick={close}
-              className="grid size-10 place-items-center rounded-full border hairline bg-white"
-              aria-label={t('بستن', 'Close')}
+              type="submit"
+              disabled={busy || !form.languageIds.length}
+              className="brand-gradient inline-flex items-center gap-2 rounded-xl px-6 py-3 font-black text-white disabled:opacity-40"
             >
-              <X />
+              {save.isPending && <LoaderCircle size={16} className="animate-spin" />}
+              {id ? t('ذخیره تغییرات', 'Save changes') : t('ایجاد مدرس', 'Create teacher')}
+            </button>
+            <button type="button" onClick={close} className="rounded-xl border hairline bg-white px-6 py-3 font-black">
+              {t('انصراف', 'Cancel')}
             </button>
           </div>
-          {id && detail.isLoading ? (
-            <div className="skeleton mt-6 h-64 rounded-3xl" />
-          ) : id && detail.isError ? (
-            <div role="alert" className="mt-6 rounded-2xl bg-red-50 p-4 text-red-700">
-              {errorMessage(detail.error, fa)}
-            </div>
-          ) : (
-            <form
-              className="mt-6 grid gap-5"
-              onSubmit={(e) => {
-                e.preventDefault();
-                save.mutate();
-              }}
-            >
-              <section className="panel-card flex flex-wrap items-center gap-5 p-5">
-                <Avatar url={preview} name={form.nameFa || form.nameEn} size="size-24" />
-                <div className="grid gap-2">
-                  <div className="flex flex-wrap gap-2">
-                    <label className="secondary-button cursor-pointer">
-                      {uploading ? <LoaderCircle size={16} className="animate-spin" /> : <Upload size={16} />}
-                      {uploading ? t('در حال آپلود...', 'Uploading...') : t('انتخاب عکس', 'Choose photo')}
-                      <input
-                        type="file"
-                        accept="image/jpeg,image/png,image/webp"
-                        aria-label={t('انتخاب عکس مدرس', 'Choose teacher photo')}
-                        className="hidden"
-                        disabled={uploading}
-                        onChange={onAvatar}
-                      />
-                    </label>
-                    {preview && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          set('avatarFileId', null);
-                          setPreview(null);
-                        }}
-                        className="rounded-xl border hairline bg-white px-4 py-2 text-sm font-bold text-red-600"
-                      >
-                        {t('حذف عکس', 'Remove photo')}
-                      </button>
-                    )}
-                  </div>
-                  <small className="text-muted">
-                    {t('JPG، PNG یا WEBP تا ۵ مگابایت', 'JPG, PNG or WEBP up to 5 MB')}
-                  </small>
-                  {uploadError && (
-                    <p role="alert" className="text-sm text-red-700">
-                      {uploadError}
-                    </p>
-                  )}
-                </div>
-              </section>
-
-              <section className="panel-card grid gap-4 p-5 md:grid-cols-2">
-                <h3 className="font-black md:col-span-2">{t('اطلاعات اصلی', 'Basic information')}</h3>
-                <Input
-                  label={t('نام (فارسی)', 'Name (Persian)')}
-                  value={form.nameFa}
-                  onChange={(v) => set('nameFa', v)}
-                  required
-                  minLength={2}
-                  maxLength={80}
-                  error={apiField(save.error, 'nameFa')}
-                />
-                <Input
-                  label={t('نام (انگلیسی)', 'Name (English)')}
-                  value={form.nameEn}
-                  onChange={(v) => set('nameEn', v)}
-                  required
-                  minLength={2}
-                  maxLength={80}
-                  dir="ltr"
-                  error={apiField(save.error, 'nameEn')}
-                />
-                <Input
-                  label={t('موبایل', 'Phone')}
-                  value={form.phone}
-                  onChange={(v) => set('phone', v)}
-                  required
-                  dir="ltr"
-                  placeholder="09xxxxxxxxx"
-                  error={apiField(save.error, 'phone')}
-                />
-                <Input
-                  label={t('ایمیل', 'Email')}
-                  value={form.email}
-                  onChange={(v) => set('email', v)}
-                  type="email"
-                  dir="ltr"
-                  error={apiField(save.error, 'email')}
-                />
-                <Input
-                  label={t('سال‌های سابقه', 'Years of experience')}
-                  value={form.experienceYears}
-                  onChange={(v) => set('experienceYears', v)}
-                  type="number"
-                  min={0}
-                  max={60}
-                />
-                <Input
-                  label={t('جنسیت', 'Gender')}
-                  value={form.gender}
-                  onChange={(v) => set('gender', v)}
-                  maxLength={40}
-                />
-                <label className="grid gap-1.5 text-sm font-bold md:col-span-2">
-                  {t('وضعیت', 'Status')}
-                  <select value={form.status} onChange={(e) => set('status', e.target.value)} className="input">
-                    {STATUSES.map((s) => (
-                      <option key={s} value={s}>
-                        {statusLabel(s, fa)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </section>
-
-              <section className="panel-card grid gap-4 p-5">
-                <h3 className="font-black">{t('بیوگرافی و تخصص', 'Bio and specialties')}</h3>
-                <TextArea
-                  label={t('بیوگرافی (فارسی)', 'Bio (Persian)')}
-                  value={form.bioFa}
-                  onChange={(v) => set('bioFa', v)}
-                />
-                <TextArea
-                  label={t('بیوگرافی (انگلیسی)', 'Bio (English)')}
-                  value={form.bioEn}
-                  onChange={(v) => set('bioEn', v)}
-                  dir="ltr"
-                />
-                <Input
-                  label={t('تخصص‌ها (با کاما جدا کنید)', 'Specialties (comma separated)')}
-                  value={form.specialties}
-                  onChange={(v) => set('specialties', v)}
-                />
-                <fieldset>
-                  <legend className="text-sm font-bold">{t('زبان‌های تدریس', 'Teaching languages')}</legend>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {languages.isLoading && (
-                      <span className="text-sm text-muted">{t('در حال بارگذاری...', 'Loading...')}</span>
-                    )}
-                    {languages.data?.map((language) => (
-                      <Chip
-                        key={language.id}
-                        checked={form.languageIds.includes(language.id)}
-                        onChange={() => toggle('languageIds', language.id)}
-                      >
-                        {language.flag ? `${language.flag} ` : ''}
-                        {localized({ fa: language.nameFa, en: language.nameEn }, fa)}
-                      </Chip>
-                    ))}
-                  </div>
-                </fieldset>
-                <fieldset>
-                  <legend className="text-sm font-bold">{t('سطوح تدریس', 'Teaching levels')}</legend>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {LEVELS.map((level) => (
-                      <Chip key={level} checked={form.levels.includes(level)} onChange={() => toggle('levels', level)}>
-                        {level}
-                      </Chip>
-                    ))}
-                  </div>
-                </fieldset>
-              </section>
-
-              <section className="panel-card grid gap-4 p-5 md:grid-cols-2">
-                <h3 className="font-black md:col-span-2">{t('زمان‌بندی و قیمت', 'Schedule and pricing')}</h3>
-                <Input
-                  label={t('مدت جلسه (دقیقه)', 'Lesson length (min)')}
-                  value={form.lessonDuration}
-                  onChange={(v) => set('lessonDuration', v)}
-                  type="number"
-                  min={20}
-                  max={180}
-                />
-                <Input
-                  label={t('مدت جلسه آزمایشی (دقیقه)', 'Trial length (min)')}
-                  value={form.trialDuration}
-                  onChange={(v) => set('trialDuration', v)}
-                  type="number"
-                  min={15}
-                  max={90}
-                />
-                <Input
-                  label={t('استراحت بین جلسات (دقیقه)', 'Break between lessons (min)')}
-                  value={form.breakMinutes}
-                  onChange={(v) => set('breakMinutes', v)}
-                  type="number"
-                  min={0}
-                  max={120}
-                />
-                <span className="hidden md:block" />
-                <Input
-                  label={t('قیمت پیشنهادی جلسه آزمایشی', 'Proposed trial price')}
-                  value={form.trialPrice}
-                  onChange={(v) => set('trialPrice', v)}
-                  type="number"
-                  min={0}
-                />
-                <Input
-                  label={t('قیمت پیشنهادی جلسه عادی', 'Proposed regular price')}
-                  value={form.regularPrice}
-                  onChange={(v) => set('regularPrice', v)}
-                  type="number"
-                  min={0}
-                />
-                <Input
-                  label={t('قیمت تأییدشده جلسه آزمایشی', 'Approved trial price')}
-                  value={form.approvedTrialPrice}
-                  onChange={(v) => set('approvedTrialPrice', v)}
-                  type="number"
-                  min={0}
-                />
-                <Input
-                  label={t('قیمت تأییدشده جلسه عادی', 'Approved regular price')}
-                  value={form.approvedRegularPrice}
-                  onChange={(v) => set('approvedRegularPrice', v)}
-                  type="number"
-                  min={0}
-                />
-              </section>
-
-              {save.error && (
-                <p role="alert" className="rounded-2xl bg-red-50 p-4 text-sm text-red-700">
-                  {errorMessage(save.error, fa)}
-                </p>
-              )}
-              {saved && (
-                <p role="status" className="rounded-2xl bg-emerald-50 p-4 text-sm text-emerald-700">
-                  {t('تغییرات ذخیره شد.', 'Changes saved.')}
-                </p>
-              )}
-              <div className="flex flex-wrap gap-3">
-                <button
-                  type="submit"
-                  disabled={busy || !form.languageIds.length}
-                  className="brand-gradient inline-flex items-center gap-2 rounded-xl px-6 py-3 font-black text-white disabled:opacity-40"
-                >
-                  {save.isPending && <LoaderCircle size={16} className="animate-spin" />}
-                  {id ? t('ذخیره تغییرات', 'Save changes') : t('ایجاد مدرس', 'Create teacher')}
-                </button>
-                <button
-                  type="button"
-                  onClick={close}
-                  className="rounded-xl border hairline bg-white px-6 py-3 font-black"
-                >
-                  {t('انصراف', 'Cancel')}
-                </button>
-              </div>
-            </form>
-          )}
-        </aside>
-      </div>
-    </Portal>
+        </form>
+      )}
+    </Drawer>
   );
 }
 

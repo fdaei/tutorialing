@@ -7,6 +7,7 @@ import { CourseReviewDto } from './dto/course-review.dto';
 import { CourseProgressDto } from './dto/course-progress.dto';
 import { CourseChapterDto, CourseLessonDto } from './dto/course-curriculum.dto';
 import { AdminCourseDto } from './dto/admin-course.dto';
+import { InstructorCourseDto } from './dto/instructor-course.dto';
 
 @Controller('courses')
 export class CoursesController {
@@ -60,6 +61,10 @@ export class InstructorCoursesController {
 
   @Get() mine(@CurrentUser() user: AuthUser) {
     return this.service.instructorCourses(user);
+  }
+
+  @Post() create(@CurrentUser() user: AuthUser, @Body() body: InstructorCourseDto) {
+    return this.service.createInstructorCourse(user, body);
   }
 
   @Get(':courseId/curriculum') curriculum(@CurrentUser() user: AuthUser, @Param('courseId') courseId: string) {

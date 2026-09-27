@@ -88,6 +88,147 @@ describe('Teacher review eligibility', () => {
   });
 });
 
+describe('Teacher review replies', () => {
+  it('lets the reviewed teacher reply to their own published review', async () => {
+    const db = {
+      review: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'review-1',
+          teacherId: 'teacher-1',
+          moderationStatus: 'APPROVED',
+          teacher: { userId: 'teacher-user' },
+        }),
+        update: jest.fn().mockResolvedValue({ id: 'review-1', teacherResponse: 'Thank you!' }),
+      },
+    } as any;
+    const service = new ReviewsService(db, {} as any);
+
+    await service.reply('teacher-user', 'review-1', '  Thank you!  ');
+
+    expect(db.review.update).toHaveBeenCalledWith({
+      where: { id: 'review-1' },
+      data: { teacherResponse: 'Thank you!', respondedAt: expect.any(Date) },
+    });
+  });
+
+  it('rejects a reply from a teacher who was not reviewed', async () => {
+    const db = {
+      review: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'review-1',
+          teacherId: 'teacher-1',
+          moderationStatus: 'APPROVED',
+          teacher: { userId: 'other-teacher-user' },
+        }),
+      },
+    } as any;
+    const service = new ReviewsService(db, {} as any);
+
+    await expect(service.reply('teacher-user', 'review-1', 'Nice try')).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'REVIEW_REPLY_FORBIDDEN' }),
+    });
+  });
+
+  it('rejects a reply to a review that is not published yet', async () => {
+    const db = {
+      review: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'review-1',
+          teacherId: 'teacher-1',
+          moderationStatus: 'PENDING',
+          teacher: { userId: 'teacher-user' },
+        }),
+      },
+    } as any;
+    const service = new ReviewsService(db, {} as any);
+
+    await expect(service.reply('teacher-user', 'review-1', 'Too early')).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'REVIEW_NOT_PUBLISHED' }),
+    });
+  });
+});
+
+describe('Teacher own review listing', () => {
+  it('lists only the calling teacher’s published, approved reviews', async () => {
+    const rows = [{ id: 'review-1', rating: 5, comment: 'Great', teacherResponse: null }];
+    const db = {
+      teacher: { findUnique: jest.fn().mockResolvedValue({ id: 'teacher-1' }) },
+      $transaction: jest.fn().mockResolvedValue([rows, 1]),
+      review: { findMany: jest.fn(), count: jest.fn() },
+    } as any;
+    const service = new ReviewsService(db, {} as any);
+
+    const result = await service.mine('teacher-user', 1, 20);
+
+    expect(db.teacher.findUnique).toHaveBeenCalledWith({ where: { userId: 'teacher-user' }, select: { id: true } });
+    expect(result).toEqual({ data: rows, total: 1, page: 1, limit: 20, totalPages: 1 });
+  });
+
+  it('rejects when the caller has no teacher profile', async () => {
+    const db = { teacher: { findUnique: jest.fn().mockResolvedValue(null) } } as any;
+    const service = new ReviewsService(db, {} as any);
+
+    await expect(service.mine('not-a-teacher', 1, 20)).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'TEACHER_NOT_FOUND' }),
+    });
+  });
+});
+
+describe('Teacher price proposal', () => {
+  it('submits a valid proposal, clears any stale counter/note, and records history', async () => {
+    const tx = {
+      teacher: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'teacher-1',
+          userId: 'teacher-user',
+          priceStatus: 'DRAFT',
+          counterTrialPrice: null,
+          counterRegularPrice: null,
+        }),
+        update: jest.fn().mockResolvedValue({ id: 'teacher-1', priceStatus: 'SUBMITTED' }),
+      },
+      teacherPriceHistory: { create: jest.fn() },
+      auditLog: { create: jest.fn() },
+    };
+    const service = new PricingService({ $transaction: jest.fn((callback) => callback(tx)) } as never);
+
+    await service.propose('teacher-user', 250000, 500000);
+
+    expect(tx.teacher.update).toHaveBeenCalledWith({
+      where: { id: 'teacher-1' },
+      data: expect.objectContaining({
+        proposedTrialPrice: 250000,
+        proposedRegularPrice: 500000,
+        counterTrialPrice: null,
+        counterRegularPrice: null,
+        priceStatus: 'SUBMITTED',
+      }),
+    });
+    expect(tx.teacherPriceHistory.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ action: 'teacher.price.proposed' }) }),
+    );
+  });
+
+  it('rejects a trial price that is not exactly half the regular price', async () => {
+    const service = new PricingService({} as never);
+    await expect(service.propose('teacher-user', 300000, 500000)).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'TRIAL_PRICE_NOT_HALF_REGULAR' }),
+    });
+  });
+
+  it('rejects a new proposal while a management counter-offer is pending', async () => {
+    const tx = {
+      teacher: {
+        findUnique: jest.fn().mockResolvedValue({ id: 'teacher-1', userId: 'teacher-user', priceStatus: 'COUNTER_OFFER' }),
+      },
+    };
+    const service = new PricingService({ $transaction: jest.fn((callback) => callback(tx)) } as never);
+    await expect(service.propose('teacher-user', 250000, 500000)).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'PRICE_COUNTER_OFFER_PENDING' }),
+    });
+  });
+});
+
 describe('Teacher counter-offer acceptance', () => {
   it('activates the agreed admin offer, clears the counter, and records an audit event', async () => {
     const tx = {

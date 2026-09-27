@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { LocaleProvider } from '@/components/shared/locale-provider';
 import { api } from '@/shared/services/api';
 import { CountryManager } from './country-manager';
@@ -10,10 +10,10 @@ jest.mock('@/shared/services/api', () => ({
   ...jest.requireActual('@/shared/services/api'),
   api: jest.fn(),
   apiMessage: (_error: unknown, fallback: string) => fallback,
-}));dffdfd
+}));
 
 const apiMock = jest.mocked(api);
-dsdsdsdsdsds
+
 function renderManager(manager: React.ReactNode) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   return render(
@@ -44,7 +44,8 @@ describe('admin catalog deletion safeguards', () => {
     jest.spyOn(window, 'confirm').mockReturnValue(false);
     renderManager(<LanguageManager />);
 
-    fireEvent.click(await screen.findByRole('button', { name: 'حذف آلمانی' }));
+    const table = await screen.findByRole('table');
+    fireEvent.click(within(table).getByRole('button', { name: 'حذف آلمانی' }));
     expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('برای همیشه حذف'));
     expect(apiMock).toHaveBeenCalledTimes(1);
   });
@@ -63,7 +64,8 @@ describe('admin catalog deletion safeguards', () => {
     });
     renderManager(<LanguageManager />);
 
-    fireEvent.click(await screen.findByRole('button', { name: 'ویرایش' }));
+    const table = await screen.findByRole('table');
+    fireEvent.click(within(table).getByRole('button', { name: 'ویرایش' }));
     expect(screen.getByLabelText('Code')).toHaveValue('de');
     fireEvent.click(screen.getByRole('button', { name: 'انصراف' }));
     expect(screen.getByLabelText('Code')).toHaveValue('');
@@ -91,9 +93,10 @@ describe('admin catalog deletion safeguards', () => {
     expect(screen.getByLabelText('ISO')).toHaveAttribute('pattern', '[A-Z]{2}');
     expect(screen.getByLabelText('پیش‌شماره')).toBeRequired();
 
-    fireEvent.click(await screen.findByRole('button', { name: 'حذف کشور' }));
+    const table = await screen.findByRole('table');
+    fireEvent.click(within(table).getByRole('button', { name: 'حذف کشور' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('حذف کشور انجام نشد.');
-    expect(screen.getByRole('cell', { name: /آلمان/ })).toBeInTheDocument();
+    expect(within(table).getByRole('cell', { name: /آلمان/ })).toBeInTheDocument();
     await waitFor(() =>
       expect(apiMock).toHaveBeenCalledWith('/admin/countries/country-1', { method: 'DELETE' }),
     );

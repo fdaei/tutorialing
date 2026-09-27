@@ -31,9 +31,15 @@ function harness(post?: Record<string, unknown>) {
       findFirst: jest.fn().mockResolvedValue(post?.status === 'PUBLISHED' ? { id: 'post-1' } : null),
     },
     blogRating: { upsert: jest.fn().mockResolvedValue({}), aggregate: jest.fn() },
-    blogReaction: { upsert: jest.fn().mockResolvedValue({}) },
+    blogReaction: { upsert: jest.fn().mockResolvedValue({}), count: jest.fn().mockResolvedValue(0) },
     blogView: { upsert: jest.fn().mockResolvedValue({}) },
-    blogComment: { findMany: jest.fn().mockResolvedValue([]) },
+    blogComment: {
+      findMany: jest.fn().mockResolvedValue([]),
+      findUnique: jest.fn().mockResolvedValue(null),
+      update: jest.fn(({ data }: { data: Record<string, unknown> }) => Promise.resolve({ id: 'comment-1', ...data })),
+      count: jest.fn().mockResolvedValue(0),
+    },
+    $transaction: jest.fn((ops: Promise<unknown>[]) => Promise.all(ops)),
   };
   const audit = { write: jest.fn().mockResolvedValue({}) };
   const svc = new BlogService(db as never, audit as never);
@@ -219,6 +225,56 @@ describe('BlogService reader writes (SEC-213)', () => {
     expect(detail).not.toHaveProperty('ratings');
     const include = (db.blogPost.findFirst.mock.calls[0]![0] as { include: Record<string, unknown> }).include;
     expect(include).not.toHaveProperty('ratings');
+  });
+});
+
+describe('BlogService comment moderation', () => {
+  it('filters the admin comment queue by status and paginates', async () => {
+    const { svc, db } = harness();
+    db.blogComment.count.mockResolvedValue(42);
+    const result = await svc.adminComments('post-1', { page: 2, limit: 10, status: 'PENDING' });
+
+    const { where, skip, take } = db.blogComment.findMany.mock.calls[0]![0] as {
+      where: Record<string, unknown>;
+      skip: number;
+      take: number;
+    };
+    expect(where).toEqual({ postId: 'post-1', parentId: null, status: 'PENDING' });
+    expect(skip).toBe(10);
+    expect(take).toBe(10);
+    expect(result).toEqual({ data: [], total: 42, page: 2, limit: 10, totalPages: 5 });
+  });
+
+  it('omits the status filter when none is requested', async () => {
+    const { svc, db } = harness();
+    await svc.adminComments('post-1', {});
+    const { where } = db.blogComment.findMany.mock.calls[0]![0] as { where: Record<string, unknown> };
+    expect(where).toEqual({ postId: 'post-1', parentId: null });
+  });
+
+  it('caps the page size at 100 regardless of what is requested', async () => {
+    const { svc, db } = harness();
+    await svc.adminComments('post-1', { limit: 500 });
+    const { take } = db.blogComment.findMany.mock.calls[0]![0] as { take: number };
+    expect(take).toBe(100);
+  });
+
+  it('404s when moderating a comment that does not exist', async () => {
+    const { svc } = harness();
+    await expect(svc.moderateComment('admin-1', 'missing', 'APPROVED')).rejects.toMatchObject({
+      response: expect.objectContaining({ code: 'BLOG_COMMENT_NOT_FOUND' }),
+    });
+  });
+
+  it('updates the status and records an audit row against the acting admin', async () => {
+    const { svc, db, audit } = harness();
+    db.blogComment.findUnique.mockResolvedValue({ id: 'comment-1', status: 'PENDING' });
+    await svc.moderateComment('admin-1', 'comment-1', 'REJECTED');
+
+    expect(db.blogComment.update).toHaveBeenCalledWith({ where: { id: 'comment-1' }, data: { status: 'REJECTED' } });
+    expect(audit.write).toHaveBeenCalledWith(
+      'admin-1', 'blog.comment.moderated', 'BlogComment', 'comment-1', { status: 'PENDING' }, { status: 'REJECTED' },
+    );
   });
 });
 

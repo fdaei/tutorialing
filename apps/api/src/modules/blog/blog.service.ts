@@ -4,6 +4,7 @@ import { conflict, notFound } from '../../common';
 import { PrismaService } from '../../infrastructure/database/prisma.service';
 import { AuditService } from '../../system/audit/audit.service';
 import { CreateBlogPostDto, ListBlogPostsDto, UpdateBlogPostDto } from './dto/request/blog-post.dto';
+import { AdminListBlogCommentsDto } from './dto/request/blog-interaction.dto';
 
 /**
  * The lifecycle a post is allowed to walk, named rather than implied.
@@ -96,15 +97,19 @@ export class BlogService {
       },
     });
     if (!post) throw notFound('BLOG_POST_NOT_FOUND');
-    const ratings = await this.db.blogRating.aggregate({
-      where: { postId: post.id },
-      _avg: { value: true },
-      _count: { value: true },
-    });
+    const [ratings, likeCount] = await Promise.all([
+      this.db.blogRating.aggregate({
+        where: { postId: post.id },
+        _avg: { value: true },
+        _count: { value: true },
+      }),
+      this.db.blogReaction.count({ where: { postId: post.id, type: 'LIKE' } }),
+    ]);
     return {
       ...post,
       readingTimeMinutes: readingTimeMinutes(post.contentFa || post.contentEn),
       rating: { average: ratings._avg.value, count: ratings._count.value },
+      likeCount,
     };
   }
 
@@ -126,8 +131,38 @@ export class BlogService {
     return this.db.blogComment.create({ data: { postId, userId, parentId, body: body.trim(), status: 'PENDING' }, include: { user: { select: { id: true, name: true, avatarKey: true } } } });
   }
 
-  moderateComment(id: string, status: 'APPROVED' | 'REJECTED') {
-    return this.db.blogComment.update({ where: { id }, data: { status } });
+  /**
+   * The admin counterpart to `comments()`: that one is public and only ever
+   * shows APPROVED top-level comments, so it can't surface what a moderator
+   * actually needs to act on. Replies come back regardless of status here —
+   * an admin needs to see a pending reply even if its parent is approved.
+   */
+  async adminComments(postId: string, query: AdminListBlogCommentsDto) {
+    const page = query.page ?? 1;
+    const limit = Math.min(query.limit ?? 20, 100);
+    const where: Prisma.BlogCommentWhereInput = { postId, parentId: null, ...(query.status ? { status: query.status } : {}) };
+    const [data, total] = await this.db.$transaction([
+      this.db.blogComment.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+        include: {
+          user: { select: { id: true, name: true, avatarKey: true } },
+          replies: { orderBy: { createdAt: 'asc' }, include: { user: { select: { id: true, name: true, avatarKey: true } } } },
+        },
+      }),
+      this.db.blogComment.count({ where }),
+    ]);
+    return { data, total, page, limit, totalPages: Math.max(1, Math.ceil(total / limit)) };
+  }
+
+  async moderateComment(actorId: string, id: string, status: 'APPROVED' | 'REJECTED') {
+    const before = await this.db.blogComment.findUnique({ where: { id } });
+    if (!before) throw notFound('BLOG_COMMENT_NOT_FOUND');
+    const comment = await this.db.blogComment.update({ where: { id }, data: { status } });
+    await this.audit.write(actorId, 'blog.comment.moderated', 'BlogComment', id, { status: before.status }, { status });
+    return comment;
   }
 
   mine(authorId: string) {
