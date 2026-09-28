@@ -81,6 +81,7 @@ describe('module boundaries', () => {
     expect(exported.sort()).toEqual([
       'AutoDiscountsService',
       'EarningsService',
+      'PackagesService',
       'WalletService',
       'releaseDiscount',
     ]);
