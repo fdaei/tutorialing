@@ -80,7 +80,6 @@ export function AdminFinanceCenter() {
   });
 
   const reports = useQuery({ queryKey: ['/admin/reports'], queryFn: () => api<Reports>('/admin/reports') });
-  const me = useQuery({ queryKey: ['me'], queryFn: () => api<{ id: string }>('/users/me') });
   const payments = useQuery({ queryKey: ['/admin/payments'], queryFn: () => api<Payment[]>('/admin/payments') });
   const withdrawals = useQuery({
     queryKey: ['/payouts/withdrawals'],
@@ -309,7 +308,7 @@ export function AdminFinanceCenter() {
         />
       </section>
 
-      <ReceiptReviewQueue payments={payments.data ?? []} fa={fa} currentUserId={me.data?.id} />
+      <ReceiptReviewQueue payments={payments.data ?? []} fa={fa} />
 
       <section className="panel-card mt-5 overflow-hidden">
         <div className="border-b hairline p-5 text-end">

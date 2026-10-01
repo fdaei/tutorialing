@@ -507,23 +507,6 @@ async function createDemo(tx: Tx, adminHash: string, adminIdentity: string, admi
         attendanceTeacher: completed ? true : null,
       },
     });
-    await tx.payment.create({
-      data: {
-        id: `${PREFIX}payment-${i}`,
-        bookingId,
-        userId: `${PREFIX}student-${student[0]}`,
-        purpose: 'BOOKING',
-        referenceId: bookingId,
-        subtotal: teacher.price,
-        gatewayAmount: teacher.price,
-        amount: teacher.price,
-        status: 'PAID',
-        authority: `${PREFIX}authority-${i}`,
-        gatewayReference: `${PREFIX}gateway-${i}`,
-        idempotencyKey: `${PREFIX}payment-${i}`,
-        verifiedAt: at(completed ? -30 + i * 2 : -2),
-      },
-    });
     if (completed)
       await tx.review.create({
         data: {

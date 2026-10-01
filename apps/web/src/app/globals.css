@@ -416,7 +416,7 @@ a {
 .public-page-hero h1 {
   max-width: 800px;
   margin-top: 1.25rem;
-  font-size: clamp(1.80rem, 3vw, 3rem);
+  font-size: clamp(1.8rem, 3vw, 3rem);
   font-weight: 850;
   letter-spacing: -0.045em;
   line-height: 1.28;
@@ -968,7 +968,11 @@ a {
   border-radius: 34px;
   background-image:
     radial-gradient(circle, rgba(255, 255, 255, 0.35) 1.4px, transparent 1.4px),
-    linear-gradient(155deg, var(--landing-primary, #6d4aff), color-mix(in srgb, var(--landing-primary, #6d4aff) 45%, #1c1440));
+    linear-gradient(
+      155deg,
+      var(--landing-primary, #6d4aff),
+      color-mix(in srgb, var(--landing-primary, #6d4aff) 45%, #1c1440)
+    );
   background-size:
     15px 15px,
     100% 100%;
@@ -1759,6 +1763,277 @@ a {
     line-height: 1.8;
   }
 }
+
+/* Kal Arzoo homepage signature: a quiet editorial canvas around the founder. */
+.landing-hero {
+  isolation: isolate;
+  background:
+    radial-gradient(circle at 9% 18%, rgba(217, 68, 145, 0.08), transparent 23rem),
+    radial-gradient(circle at 92% 8%, rgba(112, 70, 216, 0.12), transparent 28rem), #fff;
+}
+.landing-hero-grid {
+  grid-template-columns: minmax(0, 0.92fr) minmax(460px, 1.08fr);
+  gap: clamp(3rem, 7vw, 8rem);
+}
+.landing-hero-copy h1 {
+  max-width: 670px;
+  color: #17133f;
+  font-size: clamp(2.65rem, 5vw, 4.45rem);
+  line-height: 1.28;
+}
+.landing-hero-copy h1 em {
+  color: #d94491;
+  text-shadow: 0 8px 28px rgba(217, 68, 145, 0.13);
+}
+.landing-hero-copy p {
+  max-width: 570px;
+  color: #5d6278;
+  font-size: clamp(1rem, 1.25vw, 1.13rem);
+}
+.landing-hero-image {
+  inset: 0 0.9rem 1.35rem 0;
+  border: 10px solid rgba(255, 255, 255, 0.92);
+  border-radius: 132px 34px 34px 34px;
+  box-shadow: 0 34px 90px rgba(48, 31, 112, 0.2);
+}
+.landing-hero-backdrop {
+  inset: 2.1rem -1.25rem -1.1rem 2.2rem;
+  border-radius: 40px;
+  background:
+    radial-gradient(circle at 20% 18%, rgba(255, 255, 255, 0.22) 0 2px, transparent 3px),
+    linear-gradient(145deg, #8d65ef, #2b205f);
+  background-size:
+    19px 19px,
+    100% 100%;
+}
+.landing-hero-quote {
+  top: 1.4rem;
+  right: -1.5rem;
+  max-width: 245px;
+  border-radius: 20px;
+  box-shadow: 0 20px 48px rgba(36, 28, 83, 0.16);
+}
+.landing-founder-card {
+  right: 1.15rem;
+  bottom: -0.5rem;
+  border-radius: 20px;
+}
+.landing-hero-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+  margin-top: 2.5rem;
+}
+.landing-hero-stats div {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 112px;
+  border-inline-start: 1px solid #e4e1ee;
+  padding-inline: 1.1rem;
+}
+.landing-hero-stats div:first-child {
+  border-inline-start: 0;
+  padding-inline-start: 0;
+}
+.landing-hero-stats strong {
+  color: #7046d8;
+  font-size: 1.28rem;
+  font-weight: 900;
+}
+.landing-hero-stats span {
+  color: #777b8d;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+@media (max-width: 1023px) {
+  .landing-hero-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Kal Arzoo personal-brand landing direction */
+.landing-page {
+  --landing-ink: #17152f;
+  --landing-muted: #6f6a82;
+  --landing-line: #ebe8f3;
+  color: var(--landing-ink);
+}
+.landing-hero {
+  background:
+    radial-gradient(circle at 17% 10%, rgba(220, 66, 143, 0.09), transparent 19rem),
+    radial-gradient(circle at 86% 16%, rgba(112, 70, 216, 0.13), transparent 25rem), #fff;
+}
+.landing-hero::before {
+  opacity: 0.45;
+  background-size: 56px 56px;
+}
+.landing-hero-grid {
+  min-height: 720px;
+  grid-template-columns: minmax(440px, 0.96fr) minmax(0, 1.04fr);
+  gap: clamp(2.5rem, 6vw, 7rem);
+  padding-block: clamp(4rem, 8vw, 7rem) 5rem;
+}
+.landing-hero-reversed .landing-hero-copy {
+  text-align: right;
+}
+.landing-hero-copy h1 {
+  max-width: 620px;
+  font-size: clamp(2.35rem, 4.6vw, 4.4rem);
+  line-height: 1.2;
+  letter-spacing: -0.06em;
+}
+.landing-hero-copy h1 em {
+  color: #d94491;
+  font-style: normal;
+  position: relative;
+  white-space: nowrap;
+}
+.landing-hero-copy h1 em::after {
+  content: '';
+  position: absolute;
+  height: 0.18em;
+  left: 0.05em;
+  right: 0.05em;
+  bottom: -0.05em;
+  z-index: -1;
+  border-radius: 999px;
+  background: rgba(219, 68, 145, 0.16);
+}
+.landing-hero-copy p {
+  max-width: 540px;
+  font-size: 1.08rem;
+  line-height: 2.15;
+}
+.landing-hero-visual {
+  min-height: 590px;
+}
+.landing-hero-image {
+  inset: 0 0.75rem 1.5rem 0;
+  border: 10px solid rgba(255, 255, 255, 0.92);
+  border-radius: 34px 150px 34px 34px;
+  box-shadow: 0 38px 100px rgba(35, 23, 81, 0.19);
+}
+.landing-hero-image img {
+  object-position: center center;
+}
+.landing-hero-backdrop {
+  inset: 2.2rem -1.1rem -1.2rem 2.2rem;
+  border-radius: 42px;
+  background-image:
+    radial-gradient(circle, rgba(255, 255, 255, 0.3) 1.5px, transparent 1.5px),
+    linear-gradient(145deg, #7046d8, #211b4f);
+  background-size:
+    18px 18px,
+    100% 100%;
+}
+.landing-hero-glow {
+  background: radial-gradient(circle, rgba(217, 68, 145, 0.23), transparent 68%);
+}
+.landing-hero-quote {
+  top: 1.5rem;
+  right: -1.6rem;
+  max-width: 245px;
+}
+.landing-founder-card {
+  right: 1.25rem;
+  bottom: -0.35rem;
+}
+.landing-hero-stats {
+  display: grid;
+  max-width: 560px;
+  grid-template-columns: repeat(3, 1fr);
+  margin-top: 2.7rem;
+  border-top: 1px solid var(--landing-line);
+  padding-top: 1.35rem;
+}
+.landing-hero-stats div {
+  display: grid;
+  gap: 0.35rem;
+  border-inline-start: 1px solid var(--landing-line);
+  padding-inline: 1.1rem;
+}
+.landing-hero-stats div:first-child {
+  border-inline-start: 0;
+  padding-inline-start: 0;
+}
+.landing-hero-stats strong {
+  color: #7046d8;
+  font-size: 1.28rem;
+  font-weight: 900;
+}
+.landing-hero-stats span {
+  color: var(--landing-muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+.landing-header-signup {
+  background: #7046d8;
+}
+.landing-section-intro h2 {
+  letter-spacing: -0.045em;
+}
+.landing-section-tint {
+  background: linear-gradient(180deg, #f7f4fc, #fbfaff);
+}
+
+@media (max-width: 900px) {
+  .landing-hero-grid {
+    grid-template-columns: 1fr;
+    min-height: 0;
+  }
+  .landing-hero-reversed .landing-hero-copy {
+    order: 1;
+  }
+  .landing-hero-reversed .landing-hero-visual {
+    order: 2;
+  }
+  .landing-hero-copy {
+    max-width: 680px;
+    margin-inline: auto;
+    text-align: center !important;
+  }
+  .landing-hero-copy p,
+  .landing-actions,
+  .landing-hero-stats {
+    margin-inline: auto;
+  }
+  .landing-actions {
+    justify-content: center;
+  }
+  .landing-hero-visual {
+    width: min(100%, 620px);
+    margin-inline: auto;
+    min-height: 560px;
+  }
+}
+@media (max-width: 560px) {
+  .landing-hero-copy h1 {
+    font-size: clamp(2.15rem, 10vw, 3.2rem);
+  }
+  .landing-hero-visual {
+    min-height: 430px;
+  }
+  .landing-hero-image {
+    border-radius: 28px 90px 28px 28px;
+  }
+  .landing-hero-quote {
+    right: -0.4rem;
+    max-width: 190px;
+    padding: 0.7rem;
+  }
+  .landing-hero-quote p {
+    font-size: 0.7rem;
+  }
+  .landing-founder-card {
+    right: 0.4rem;
+  }
+  .landing-hero-stats strong {
+    font-size: 1rem;
+  }
+  .landing-hero-stats span {
+    font-size: 0.68rem;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   .landing-page *,
   .landing-page *::before,
@@ -1766,6 +2041,210 @@ a {
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
+  }
+}
+
+/* Mobile discovery shelves: preserve the editorial card treatment without
+ * making users walk through four full-height cards before reaching the next
+ * decision. The partial next card is an intentional affordance. */
+@media (max-width: 640px) {
+  .landing-container {
+    width: min(calc(100% - 2rem), var(--landing-container, 1240px));
+  }
+
+  .landing-header-inner {
+    min-height: 64px;
+  }
+
+  .landing-brand-logo {
+    height: 38px;
+    max-width: 142px;
+  }
+
+  .landing-brand-wordmark {
+    gap: 0.45rem;
+    font-size: 0.98rem;
+  }
+
+  .landing-header-signup {
+    min-height: 40px;
+    padding: 0.55rem 0.7rem;
+    font-size: 0.78rem;
+  }
+
+  .landing-menu-toggle {
+    width: 44px;
+    height: 44px;
+  }
+
+  .landing-hero-grid {
+    gap: 2.25rem;
+    padding-block: 2.75rem 3.25rem;
+  }
+
+  .landing-hero-copy {
+    text-align: start !important;
+  }
+
+  .landing-hero-copy h1 {
+    margin-top: 1rem;
+    font-size: clamp(2rem, 9vw, 2.8rem);
+    line-height: 1.28;
+  }
+
+  .landing-hero-copy p {
+    margin-top: 1rem;
+    font-size: 0.96rem;
+    line-height: 1.95;
+  }
+
+  .landing-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    margin-top: 1.4rem;
+  }
+
+  .landing-actions .landing-button {
+    width: 100%;
+  }
+
+  .landing-hero-stats {
+    margin-top: 1.9rem;
+  }
+
+  .landing-hero-stats div {
+    min-width: 0;
+    padding-inline: 0.65rem;
+  }
+
+  .landing-hero-stats strong {
+    font-size: 0.98rem;
+  }
+
+  .landing-hero-stats span {
+    font-size: 0.63rem;
+  }
+
+  .landing-hero-visual {
+    min-height: 350px;
+  }
+
+  .landing-hero-image {
+    inset: 0 0.5rem 1rem 0;
+    border-width: 6px;
+    border-radius: 26px 76px 26px 26px;
+  }
+
+  .landing-hero-quote {
+    top: 0.75rem;
+    right: -0.15rem;
+    max-width: 170px;
+  }
+
+  .landing-founder-card {
+    right: 0.25rem;
+    bottom: -0.15rem;
+  }
+
+  .landing-section {
+    padding-block: 3.25rem;
+  }
+
+  .landing-section-intro h2 {
+    margin-top: 0.75rem;
+    font-size: 1.5rem;
+    line-height: 1.45;
+  }
+
+  .landing-section-intro p {
+    margin-top: 0.75rem;
+    font-size: 0.88rem;
+    line-height: 1.9;
+  }
+
+  .landing-language-grid,
+  .landing-course-grid,
+  .landing-blog-grid {
+    display: flex;
+    gap: 0.8rem;
+    margin-top: 1.75rem;
+    padding-inline: 0.05rem 1.5rem;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scroll-snap-type: inline mandatory;
+    scrollbar-width: none;
+  }
+
+  .landing-language-grid::-webkit-scrollbar,
+  .landing-course-grid::-webkit-scrollbar,
+  .landing-blog-grid::-webkit-scrollbar {
+    display: none;
+  }
+
+  .landing-language-card,
+  .landing-course-card,
+  .landing-blog-card {
+    flex: 0 0 min(82vw, 305px);
+    scroll-snap-align: start;
+  }
+
+  .landing-language-card {
+    min-height: 0;
+  }
+
+  .landing-language-image {
+    height: 160px;
+  }
+
+  .landing-course-image,
+  .landing-blog-image {
+    height: 155px;
+  }
+
+  .landing-language-body,
+  .landing-course-content,
+  .landing-blog-content {
+    padding: 1rem;
+  }
+
+  .landing-language-body h3,
+  .landing-course-content h3,
+  .landing-blog-content h3 {
+    font-size: 1.08rem;
+  }
+
+  .landing-section-link-wrap {
+    margin-top: 1.15rem;
+  }
+
+  .landing-benefit-grid {
+    margin-top: 1.75rem;
+  }
+
+  .landing-benefit-item {
+    padding-block: 1.1rem;
+  }
+
+  .landing-benefit-item p {
+    max-width: 34rem;
+  }
+
+  .landing-placement-copy {
+    padding: 1.75rem 1.2rem 1.25rem;
+  }
+
+  .landing-placement-copy .landing-button,
+  .landing-final-cta .landing-button {
+    width: 100%;
+  }
+
+  .landing-faq-list summary {
+    min-height: 48px;
+    font-size: 0.86rem;
+  }
+
+  .landing-final-cta {
+    padding: 1.75rem 1.2rem;
   }
 }
 

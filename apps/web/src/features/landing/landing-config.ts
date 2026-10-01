@@ -151,7 +151,7 @@ export const HEADING_WEIGHTS = ['600', '700', '750', '800', '900'] as const;
 const text = (fa: string, en: string): LocaleText => ({ fa, en });
 
 export const defaultLandingConfig: LandingConfig = {
-  brand: { name: 'LingoSpeak', mark: 'LS', logo: '' },
+  brand: { name: 'کال آرزو', mark: 'کا', logo: '' },
   header: {
     sticky: true,
     background: '#ffffff',
@@ -166,20 +166,20 @@ export const defaultLandingConfig: LandingConfig = {
     signUp: text('ثبت‌نام', 'Sign up free'),
   },
   hero: {
-    eyebrow: text('کلاس خصوصی آنلاین با مدرس‌های تأییدشده', 'Private online lessons with verified teachers'),
-    title: text('زبان را برای حرف‌زدن یاد بگیر، نه فقط برای امتحان.', 'Learn a language to speak it, not just to pass a test.'),
+    eyebrow: text('کال آرزو؛ مدرسه‌ی مکالمه با آرزو', 'Kal Arzoo — real conversation with Arezoo'),
+    title: text('زبان را برای حرف زدن واقعی یاد بگیرید', 'Learn a language for real conversations'),
     description: text(
-      'سطحت را رایگان بسنج، مدرسی متناسب با هدفت انتخاب کن و با برنامه‌ای که با زمان تو جور است، جلو برو.',
-      'Check your level for free, pick a teacher who fits your goal, and follow a plan that works with your schedule.',
+      'با آموزش‌های کاربردی و همراهی آرزو، از حفظ کردن فاصله بگیر و با اعتمادبه‌نفس حرف بزن؛ در موقعیت‌هایی که واقعاً برایت مهم‌اند.',
+      'Move beyond memorisation with practical lessons and Arezoo’s guidance, so you can speak with confidence in situations that matter.',
     ),
-    primaryButton: { label: text('انتخاب زبان', 'Choose a language'), href: '/languages' },
+    primaryButton: { label: text('مشاهده دوره‌ها', 'Explore courses'), href: '/courses' },
     secondaryButton: { label: text('تعیین سطح رایگان', 'Free placement test'), href: '/placement' },
-    image: '/images/lingospeak-student.png',
-    imageAlt: text('زبان‌آموز در حال یادگیری با لپ‌تاپ', 'A language learner studying with a laptop'),
-    imageSide: 'right',
+    image: '/images/arzoo-hero.png',
+    imageAlt: text('آرزو، بنیان‌گذار و مدرس کال آرزو در فضای آموزش', 'Arezoo, founder and instructor of Kal Arzoo'),
+    imageSide: 'left',
     overlay: 0,
     founderName: text('آرزو احمدی', 'Arezoo Ahmadi'),
-    founderTitle: text('بنیان‌گذار و مدرس ارشد لینگواسپیک', 'Founder & lead teacher at LingoSpeak'),
+    founderTitle: text('بنیان‌گذار و مدرس کال آرزو', 'Founder & lead teacher at Kal Arzoo'),
     quote: text(
       '«زبان را یاد می‌گیریم که حرف بزنیم، نه فقط که امتحان بدهیم.»',
       '“We learn a language to speak it, not just to pass a test.”',
@@ -326,8 +326,8 @@ export const defaultLandingConfig: LandingConfig = {
   },
   footer: {
     description: text(
-      'LingoSpeak؛ کلاس خصوصی آنلاین زبان با مدرس‌های تأییدشده و برنامه متناسب با هدف تو.',
-      'LingoSpeak: private online language lessons with verified teachers and a plan built around your goal.',
+      'کال آرزو؛ یادگیری زبان برای حرف زدن واقعی، با همراهی آرزو.',
+      'Kal Arzoo: practical language learning for real conversations, guided by Arezoo.',
     ),
     columns: [
       {
@@ -343,7 +343,6 @@ export const defaultLandingConfig: LandingConfig = {
         links: [
           { label: text('مدرس‌ها', 'Teachers'), href: '/teachers' },
           { label: text('مقالات', 'Articles'), href: '/blog' },
-          { label: text('درباره ما', 'About us'), href: '/about' },
         ],
       },
     ],
@@ -354,20 +353,20 @@ export const defaultLandingConfig: LandingConfig = {
   },
   sections: [
     { id: 'hero', type: 'hero', label: text('هیرو', 'Hero'), visible: true, style: {} },
-    { id: 'about', type: 'about', label: text('درباره آرزو', 'About Arezoo'), visible: true, style: {} },
+    { id: 'about', type: 'about', label: text('درباره آرزو', 'About Arezoo'), visible: false, style: {} },
     { id: 'languages', type: 'languages', label: text('زبان‌ها', 'Languages'), visible: true, style: {} },
     { id: 'benefits', type: 'benefits', label: text('مزیت‌ها', 'Benefits'), visible: true, style: {} },
     { id: 'placement', type: 'placement', label: text('تعیین سطح', 'Placement'), visible: true, style: {} },
     { id: 'courses', type: 'courses', label: text('دوره‌ها', 'Courses'), visible: true, style: {} },
-    { id: 'blog', type: 'blog', label: text('مقالات', 'Articles'), visible: true, style: {} },
+    { id: 'blog', type: 'blog', label: text('مقالات', 'Articles'), visible: false, style: {} },
     { id: 'faq', type: 'faq', label: text('سؤالات متداول', 'FAQ'), visible: true, style: {} },
     { id: 'finalCta', type: 'finalCta', label: text('دعوت نهایی', 'Final CTA'), visible: true, style: {} },
   ],
   theme: {
-    primary: '#6d4aff',
-    secondary: '#c4b5fd',
-    button: '#6d4aff',
-    background: '#fbfbfe',
+    primary: '#7046d8',
+    secondary: '#c7b4ff',
+    button: '#7046d8',
+    background: '#fcfbff',
     radius: '24px',
     shadow: '0 18px 55px rgba(48, 31, 112, 0.09)',
     containerWidth: '1240px',

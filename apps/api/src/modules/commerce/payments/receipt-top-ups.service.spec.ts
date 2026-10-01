@@ -95,10 +95,12 @@ describe('ReceiptTopUpsService', () => {
     expect(h.payments.settleVerified).not.toHaveBeenCalled();
   });
 
-  it('an admin cannot approve their own receipt', async () => {
-    const h = harness({ payment: { ...pending, userId: 'admin-1' } });
-    await expect(h.svc.approve('admin-1', 'p-1')).rejects.toMatchObject({
-      response: { code: 'RECEIPT_SELF_REVIEW_FORBIDDEN' },
+  it('an admin can approve their own course receipt', async () => {
+    const h = harness({ payment: { ...pending, userId: 'admin-1', purpose: 'course' } });
+    await h.svc.approve('admin-1', 'p-1');
+    expect(h.payments.settleVerified).toHaveBeenCalledWith('p-1', undefined, {
+      method: 'receipt',
+      approvedBy: 'admin-1',
     });
   });
 

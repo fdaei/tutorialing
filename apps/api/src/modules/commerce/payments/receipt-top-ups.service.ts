@@ -207,7 +207,11 @@ export class ReceiptTopUpsService {
   private async claim(actorId: string, paymentId: string, rejectReason: string | null) {
     const payment = await this.db.payment.findUnique({ where: { id: paymentId } });
     if (!payment || !payment.receiptFileId) throw notFound('PAYMENT_NOT_FOUND');
-    if (payment.userId === actorId) throw badRequest('RECEIPT_SELF_REVIEW_FORBIDDEN');
+    // Course purchases are reviewed by the course administrator, who may also
+    // be the purchaser. Keep the self-review guard for ordinary wallet top-ups.
+    if (payment.userId === actorId && payment.purpose !== 'course') {
+      throw badRequest('RECEIPT_SELF_REVIEW_FORBIDDEN');
+    }
     const claimed = await this.db.payment.updateMany({
       where: { id: paymentId, status: 'PENDING', reviewedAt: null },
       data: {

@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService, type DbClient } from '../../infrastructure/database/prisma.service';
 import { badRequest, conflict, forbidden, notFound } from '../../common';
 import type { AuthUser } from '../../common';
-import { PackagesService } from '../commerce/packages/packages.service';
+import { PackagesService } from '../commerce';
 import type { CourseChapterDto, CourseLessonDto } from './dto/course-curriculum.dto';
 import type { AdminCourseDto } from './dto/admin-course.dto';
 import type { InstructorCourseDto } from './dto/instructor-course.dto';

@@ -14,7 +14,7 @@ export const webDefaults = {
 /** Static brand artwork served from apps/web/public. */
 export const brandAssets = {
   /** Full logo (mark + wordmark), used in the header and footer. */
-  logo: '/images/brand/lingospeak-logo.png',
+  logo: '/images/brand/lingospeak-logo.svg',
   /** The "L" mark alone, used as the favicon and app icon. */
-  mark: '/images/brand/lingospeak-mark.png',
+  mark: '/images/brand/lingospeak-mark.svg',
 } as const;

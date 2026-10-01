@@ -47,7 +47,8 @@ import { clearAuthSession } from '@/shared/services/api';
 import { featureFlags } from '@/config';
 import { cn } from '@/shared/components/ui/cn';
 import { formatNumber } from '@/lib/money';
-import { useNotifications } from '../hooks/use-notifications';
+import { useMarkAllNotificationsRead, useMarkNotificationRead, useNotifications } from '../hooks/use-notifications';
+import { OnlineClassToast } from './online-class-toast';
 
 export type NavItem = {
   href: string;
@@ -152,6 +153,9 @@ export function PanelShell({ items, children }: { title?: string; items: NavItem
   const permissions = Array.isArray(me.data?.permissions) ? me.data.permissions : [];
   const isAdmin = roles.includes('ADMIN');
   const notifications = useNotifications(Boolean(me.data) && !adminMode);
+  const markNotificationRead = useMarkNotificationRead();
+  const markAllNotificationsRead = useMarkAllNotificationsRead();
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const adminSummary = useQuery({
     queryKey: ['admin-dashboard'],
     queryFn: () => api<AdminDashboard>('/admin/dashboard'),
@@ -399,8 +403,10 @@ export function PanelShell({ items, children }: { title?: string; items: NavItem
               </Link>
             )}
             {notificationsHref && (
-              <Link
-                href={p(notificationsHref)}
+              <div className="relative">
+              <button
+                type="button"
+                onClick={() => setNotificationsOpen((value) => !value)}
                 className="relative grid size-10 place-items-center rounded-xl text-muted hover:bg-canvas hover:text-ink"
                 aria-label={
                   notifications.unread
@@ -416,7 +422,25 @@ export function PanelShell({ items, children }: { title?: string; items: NavItem
                     {notifications.unread > 9 ? '9+' : formatNumber(notifications.unread, locale)}
                   </span>
                 )}
-              </Link>
+              </button>
+              {notificationsOpen && (
+                <div className="absolute end-0 top-12 z-40 w-[min(360px,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-line bg-white shadow-pop">
+                  <div className="flex items-center justify-between border-b border-line px-4 py-3">
+                    <strong className="text-sm text-ink">{english ? 'Notifications' : 'اعلان‌ها'}</strong>
+                    <Link href={p(notificationsHref)} onClick={() => { markAllNotificationsRead.mutate(); setNotificationsOpen(false); }} className="text-xs font-bold text-primary">{english ? 'View all' : 'مشاهده همه'}</Link>
+                  </div>
+                  <div className="max-h-80 overflow-y-auto p-2">
+                    {(notifications.data ?? []).slice(0, 6).map((item) => (
+                      <Link key={item.id} href={p(item.link ?? notificationsHref)} onClick={() => { if (!item.readAt) markNotificationRead.mutate(item.id); setNotificationsOpen(false); }} className="flex gap-3 rounded-xl px-3 py-3 text-start hover:bg-canvas">
+                        <span className={cn('mt-1.5 size-2 shrink-0 rounded-full', item.readAt ? 'bg-transparent' : 'bg-primary')} />
+                        <span className="min-w-0"><strong className={cn('block truncate text-sm', item.readAt ? 'font-medium text-muted' : 'text-ink')}>{localized({ fa: item.titleFa, en: item.titleEn }, locale)}</strong><span className="mt-0.5 block truncate text-xs text-muted">{localized({ fa: item.bodyFa, en: item.bodyEn }, locale)}</span></span>
+                      </Link>
+                    ))}
+                    {!notifications.data?.length && <p className="p-4 text-center text-sm text-muted">{english ? 'You are all caught up.' : 'اعلان تازه‌ای ندارید.'}</p>}
+                  </div>
+                </div>
+              )}
+              </div>
             )}
           </div>
         </header>
@@ -424,6 +448,7 @@ export function PanelShell({ items, children }: { title?: string; items: NavItem
           <div className="reveal">{children}</div>
         </div>
       </main>
+      {!adminMode && <OnlineClassToast />}
       {tabItems.length > 0 && (
         <nav
           aria-label={english ? 'Quick navigation' : 'دسترسی سریع'}

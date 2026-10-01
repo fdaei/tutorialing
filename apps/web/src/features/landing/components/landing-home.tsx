@@ -8,7 +8,6 @@ import {
   Bot,
   BookOpen,
   CalendarCheck2,
-  Check,
   ChevronDown,
   Clock3,
   Headphones,
@@ -74,7 +73,9 @@ export function LandingHome(props: LandingHomeProps) {
       <Header config={{ brand: config.brand, header: config.header }} />
       <main>
         {config.sections
-          .filter((section) => section.visible)
+          // The founder is introduced in the hero; never render the legacy
+          // biography block even if an older CMS configuration enables it.
+          .filter((section) => section.visible && section.type !== 'about')
           .map((section) => (
             <LandingSection key={section.id} {...props} section={section} />
           ))}
@@ -108,7 +109,17 @@ function HeroSection({ config, locale, section }: LandingRenderProps) {
       <div className="landing-container landing-hero-grid">
         <div className="landing-hero-copy">
           <span className="landing-kicker">{t(config.hero.eyebrow)}</span>
-          <h1>{t(config.hero.title)}</h1>
+          <h1>
+            {english ? (
+              <>
+                Learn a language for <em>real conversations</em>
+              </>
+            ) : (
+              <>
+                زبان را برای <em>حرف زدن واقعی</em> یاد بگیرید
+              </>
+            )}
+          </h1>
           <p>{t(config.hero.description)}</p>
           <div className="landing-actions">
             <Link href={path(config.hero.primaryButton.href)} className="landing-button landing-button-primary">
@@ -119,16 +130,22 @@ function HeroSection({ config, locale, section }: LandingRenderProps) {
               {t(config.hero.secondaryButton.label)}
             </Link>
           </div>
-          <div className="landing-trust-row">
-            <span>
-              <ShieldCheck size={16} /> {english ? 'Identity-verified teachers' : 'احراز هویت مدرس‌ها'}
-            </span>
-            <span>
-              <CalendarCheck2 size={16} /> {english ? 'Flexible online scheduling' : 'زمان‌بندی منعطف آنلاین'}
-            </span>
-            <span>
-              <Check size={16} /> {english ? 'Clear learning plan' : 'مسیر یادگیری شفاف'}
-            </span>
+          <div
+            className="landing-hero-stats"
+            aria-label={english ? 'Kal Arzoo by the numbers' : 'کال آرزو به روایت عددها'}
+          >
+            <div>
+              <strong>+۱۲٬۰۰۰</strong>
+              <span>{english ? 'learners' : 'زبان‌آموز'}</span>
+            </div>
+            <div>
+              <strong>۲۴</strong>
+              <span>{english ? 'courses' : 'دوره آموزشی'}</span>
+            </div>
+            <div>
+              <strong>۹۸٪</strong>
+              <span>{english ? 'satisfaction' : 'رضایت کاربران'}</span>
+            </div>
           </div>
         </div>
         <div className="landing-hero-visual">
@@ -228,7 +245,12 @@ function LanguagesSection({ config, locale, languages, section }: LandingRenderP
                 style={{ '--language-accent': card?.accent ?? '#ede9fe' } as React.CSSProperties}
               >
                 <div className="landing-language-image">
-                  <img src={language.imageUrl || card?.image || config.hero.image} alt="" />
+                  <img
+                    src={language.imageUrl || card?.image || config.hero.image}
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                  />
                   <span>{language.flag || '🌐'}</span>
                 </div>
                 <div className="landing-language-body">
@@ -414,7 +436,7 @@ function CoursesSection({ config, locale, courses, section }: LandingRenderProps
                 <Link href={path(`/courses/${course.slug}`)} key={course.slug} className="landing-course-card">
                   <div className="landing-course-image">
                     {course.image ? (
-                      <img src={course.image} alt="" />
+                      <img src={course.image} alt="" loading="lazy" decoding="async" />
                     ) : (
                       <span className="landing-course-placeholder">
                         <BookGlyph />
@@ -571,7 +593,7 @@ function BlogSection({ config, locale, posts, section }: LandingRenderProps) {
             <Link href={path(`/blog/${post.slug}`)} className="landing-blog-card" key={post.slug}>
               <div className="landing-blog-image">
                 {post.coverImage ? (
-                  <img src={post.coverImage} alt="" />
+                  <img src={post.coverImage} alt="" loading="lazy" decoding="async" />
                 ) : (
                   <span>
                     <Sparkles size={22} />
@@ -665,7 +687,11 @@ function LandingFooter({
     <footer className="landing-footer">
       <div
         className="landing-container landing-footer-grid"
-        style={{ '--landing-footer-columns': config.footer.columns.length + (infoPages.length ? 1 : 0) } as React.CSSProperties}
+        style={
+          {
+            '--landing-footer-columns': config.footer.columns.length + (infoPages.length ? 1 : 0),
+          } as React.CSSProperties
+        }
       >
         <div className="landing-footer-brand">
           <Link href={path('/')} className="landing-brand">

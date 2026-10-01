@@ -19,7 +19,10 @@ export function AuthShell({
 }) {
   const { locale } = useTranslations();
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#f4f6fb] px-3 py-3 text-[#111a38] sm:px-6 sm:py-6 lg:grid lg:place-items-center">
+    <main
+      dir={locale === 'en' ? 'ltr' : 'rtl'}
+      className="relative min-h-screen overflow-hidden bg-[#f4f6fb] px-3 py-3 text-[#111a38] sm:px-6 sm:py-6 lg:grid lg:place-items-center"
+    >
       <div aria-hidden className="absolute -right-32 -top-32 size-[30rem] rounded-full bg-[#7857ee]/10 blur-3xl" />
       <div aria-hidden className="absolute -bottom-44 -left-28 size-[34rem] rounded-full bg-[#315efb]/10 blur-3xl" />
       <section

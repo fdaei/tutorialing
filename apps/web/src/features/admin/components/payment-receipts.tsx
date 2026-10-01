@@ -74,11 +74,9 @@ export function ReceiptLink({ fileId, fa }: { fileId: string; fa: boolean }) {
 export function ReceiptReviewQueue({
   payments,
   fa,
-  currentUserId,
 }: {
   payments: ReceiptPayment[];
   fa: boolean;
-  currentUserId?: string;
 }) {
   const queryClient = useQueryClient();
   const [rejecting, setRejecting] = useState<string | null>(null);
@@ -148,15 +146,7 @@ export function ReceiptReviewQueue({
                   {item.reviewNote && <small className="text-muted">{item.reviewNote}</small>}
                 </span>
               </div>
-              {currentUserId && item.user?.id === currentUserId ? (
-                <p className="text-end text-xs text-amber-700">
-                  {t(
-                    fa,
-                    'این رسید مال خودتان است و باید ادمین دیگری آن را بررسی کند.',
-                    'This is your own receipt; another admin must review it.',
-                  )}
-                </p>
-              ) : rejecting === item.id ? (
+              {rejecting === item.id ? (
                 <form
                   className="flex flex-wrap gap-2"
                   onSubmit={(e) => {

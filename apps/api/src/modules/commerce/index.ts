@@ -13,3 +13,4 @@ export { EarningsService } from './payouts/earnings.service';
 export { WalletService } from './payments/wallet.service';
 export { AutoDiscountsService } from './discounts/auto-discounts.service';
 export { releaseDiscount } from './discounts/discount-reservation';
+export { PackagesService } from './packages/packages.service';

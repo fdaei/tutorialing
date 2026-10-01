@@ -11,7 +11,10 @@ export class BookingJobsService {
   }
 
   async scheduleBooking(bookingId: string, startsAt: Date) {
-    for (const [minutes, type] of [[1440, '24h'], [60, '1h']] as const) {
+    // Keep the short, user-facing reminder in the same durable queue as the
+    // longer reminders. This is also the reminder that powers the in-app class
+    // toast and carries the meeting URL in the notification payload.
+    for (const [minutes, type] of [[1440, '24h'], [60, '1h'], [15, '15m']] as const) {
       const scheduledAt = new Date(startsAt.getTime() - minutes * 60e3);
       if (scheduledAt <= new Date()) continue;
       const reminder = await this.db.reminder.upsert({

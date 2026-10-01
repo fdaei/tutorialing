@@ -9,6 +9,9 @@ export type UserNotification = {
   titleEn: string;
   bodyFa: string;
   bodyEn: string;
+  title?: string;
+  message?: string;
+  link?: string | null;
   data?: Record<string, unknown> | null;
   readAt?: string | null;
   createdAt: string;
@@ -41,6 +44,24 @@ export function useMarkNotificationRead() {
       return { previous };
     },
     onError: (_error, _id, context) => {
+      if (context?.previous) queryClient.setQueryData(notificationsQueryKey, context.previous);
+    },
+  });
+}
+
+export function useMarkAllNotificationsRead() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => api('/notifications/read-all', { method: 'PUT' }),
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: notificationsQueryKey });
+      const previous = queryClient.getQueryData<UserNotification[]>(notificationsQueryKey);
+      queryClient.setQueryData<UserNotification[]>(notificationsQueryKey, (items) =>
+        items?.map((item) => ({ ...item, readAt: item.readAt ?? new Date().toISOString() })),
+      );
+      return { previous };
+    },
+    onError: (_error, _variables, context) => {
       if (context?.previous) queryClient.setQueryData(notificationsQueryKey, context.previous);
     },
   });

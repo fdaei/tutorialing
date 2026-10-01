@@ -73,7 +73,9 @@ test('student panel routes and data widgets render', async ({ page }) => {
 test('teacher panel routes and data widgets render', async ({ page }) => {
   test.setTimeout(90_000);
   const errors = failures(page);
-  await session(page, 'user-teacher-approved', ['TEACHER']);
+  // The persisted domain role is INSTRUCTOR (not the display label “Teacher”).
+  // Keeping the fixture aligned with the API enum exercises the real teacher guard.
+  await session(page, 'user-teacher-shahriar', ['INSTRUCTOR']);
   await visit(page, [
     '/teacher-panel',
     '/teacher-panel/profile',
