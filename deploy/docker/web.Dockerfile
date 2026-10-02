@@ -79,6 +79,9 @@ RUN apt-get -o APT::Update::Error-Mode=any update \
 	&& rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 
+ARG NPM_REGISTRY=
+RUN if [ -n "$NPM_REGISTRY" ]; then npm config set registry "$NPM_REGISTRY" --location=global; fi
+
 FROM base AS deps
 COPY package.json package-lock.json ./
 COPY apps/api/package.json ./apps/api/
@@ -96,6 +99,7 @@ FROM deps AS builder
 COPY tsconfig.base.json ./
 COPY packages/contracts ./packages/contracts
 COPY apps/web ./apps/web
+COPY deploy/prisma-engines/ ./node_modules/@prisma/engines/
 RUN npm rebuild
 # ‏web هم در زمان type-check (نگاشت مسیر در apps/web/tsconfig.json) و هم در
 # زمان اجرا (dist/esm از طریق node_modules) به contracts نیاز دارد.

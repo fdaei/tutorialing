@@ -113,3 +113,6 @@ deploy/env/app.env
 demo-admin-credentials*
 *.credentials.txt
 DEPLOY/
+
+deploy/prisma-engines/*
+!deploy/prisma-engines/.gitkeep

@@ -33,6 +33,7 @@ apps/*/.env.*
 
 # اسکریپت‌های دیپلوی خودشان بخشی از اپ نیستند.
 deploy
+!deploy/prisma-engines
 docker
 docs
 AUDIT

@@ -79,6 +79,9 @@ RUN apt-get -o APT::Update::Error-Mode=any update \
 	&& rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 
+ARG NPM_REGISTRY=
+RUN if [ -n "$NPM_REGISTRY" ]; then npm config set registry "$NPM_REGISTRY" --location=global; fi
+
 # فقط مانیفست‌ها کپی می‌شوند تا این لایه با تغییر سورس بی‌اعتبار نشود.
 FROM base AS deps
 COPY package.json package-lock.json ./
@@ -100,6 +103,7 @@ FROM deps AS builder
 COPY tsconfig.base.json ./
 COPY packages/contracts ./packages/contracts
 COPY apps/api ./apps/api
+COPY deploy/prisma-engines/ ./node_modules/@prisma/engines/
 RUN npm rebuild
 RUN npm run build:contracts
 # apps/api/prisma.config.ts می‌خواند `env('DATABASE_URL')` از پکیج
