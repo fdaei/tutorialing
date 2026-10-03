@@ -159,7 +159,7 @@ export default function Admin() {
           {cards.map(({ label, value, hint, tone, icon: Icon }) => (
             <article key={label} className="panel-card admin-kpi p-5">
               <div className="flex items-start justify-between gap-4">
-                <span className={`grid size-10 place-items-center rounded-xl bg-[#f5f7ff] ${tone}`}>
+                <span className={`grid size-10 place-items-center rounded-xl bg-canvas ${tone}`}>
                   <Icon size={19} />
                 </span>
                 <div className="text-end">
@@ -193,7 +193,7 @@ export default function Admin() {
                     <strong className="block truncate text-sm">{title}</strong>
                     <small className="mt-1 block truncate text-muted">{detail}</small>
                   </div>
-                  <span className="grid size-10 flex-none place-items-center rounded-xl bg-[#f0f2ff] text-blue">
+                  <span className="grid size-10 flex-none place-items-center rounded-xl bg-primary-soft text-blue">
                     <Icon size={18} />
                   </span>
                 </div>
@@ -246,7 +246,7 @@ function HealthBar({ label, value, color, locale }: { label: string; value: numb
         <strong>{value == null ? '—' : `${value.toLocaleString(translate(locale, 'commercepricingManagerEnUS2'))}٪`}</strong>
         <span className="text-muted">{label}</span>
       </div>
-      <div className="h-2 overflow-hidden rounded-full bg-[#ebedf7]">
+      <div className="h-2 overflow-hidden rounded-full bg-line">
         <div className={`h-full rounded-full ${color}`} style={{ width: `${value ?? 0}%` }} />
       </div>
     </div>
