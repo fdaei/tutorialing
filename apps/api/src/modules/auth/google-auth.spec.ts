@@ -21,6 +21,13 @@ jest.mock('google-auth-library', () => ({
   },
 }));
 
+jest.mock('../../config/auth.config', () => ({
+  authConfig: () => ({
+    googleClientId: 'lingospeak-test.apps.googleusercontent.com',
+    providerTimeoutMs: 2500,
+  }),
+}));
+
 const { AuthService } = require('./auth.service') as typeof import('./auth.service');
 
 /**
